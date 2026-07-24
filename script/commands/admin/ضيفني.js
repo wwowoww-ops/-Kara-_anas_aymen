@@ -20,7 +20,7 @@ module.exports.run = async function({ api, event, args }) {
 
   if (senderID !== devID) {
     return api.sendMessage(
-      `⌬ ━━ ABU HURAIRA ADMIN ━━ ⌬\n\n⛔ هذا الأمر للمطور الأساسي فقط!`,
+      `⌬ ━━ HINA ━━ ⌬\n\n⛔ هذا الأمر للمطور الأساسي فقط!`,
       threadID,
       messageID
     );
@@ -35,7 +35,7 @@ module.exports.run = async function({ api, event, args }) {
     
     if (groups.length === 0) {
       return api.sendMessage(
-        `⌬ ━━ ABU HURAIRA ADMIN ━━ ⌬\n\n❌ لا توجد مجموعات متاحة.`,
+        `⌬ ━━ HINA ━━ ⌬\n\n❌ لا توجد مجموعات متاحة.`,
         threadID,
         messageID
       );
@@ -64,19 +64,18 @@ module.exports.run = async function({ api, event, args }) {
       }
     }
 
-    // إرسال تقرير بعدد المجموعات التي تم فحصها
     console.log(`✅ تم فحص ${processed} مجموعة، البوت في ${processed - groupsWithoutBot.length} مجموعة`);
 
     if (groupsWithoutBot.length === 0) {
       return api.sendMessage(
-        `⌬ ━━ ABU HURAIRA ADMIN ━━ ⌬\n\n✅ البوت موجود في جميع المجموعات!\n📊 تم فحص ${processed} مجموعة.\n\n⚠️ إذا كنت قد خرجت من مجموعة مؤخراً، قد تكون القائمة غير محدثة. حاول مرة أخرى خلال دقائق.`,
+        `⌬ ━━ HINA ━━ ⌬\n\n✅ البوت موجود في جميع المجموعات!\n📊 تم فحص ${processed} مجموعة.\n\n⚠️ إذا كنت قد خرجت من مجموعة مؤخراً، قد تكون القائمة غير محدثة. حاول مرة أخرى خلال دقائق.`,
         threadID,
         messageID
       );
     }
 
     // بناء الرسالة
-    let msg = `⌬ ━━ ABU HURAIRA ADMIN ━━ ⌬\n\n📋 قائمة المجموعات التي لست فيها:\n`;
+    let msg = `⌬ ━━ HINA ━━ ⌬\n\n📋 قائمة المجموعات التي لست فيها:\n`;
     msg += `📊 تم فحص ${processed} مجموعة\n\n`;
     
     groupsWithoutBot.forEach((g, index) => {
@@ -95,7 +94,7 @@ module.exports.run = async function({ api, event, args }) {
   } catch (error) {
     console.error("ضيفني - خطأ:", error);
     return api.sendMessage(
-      `⌬ ━━ ABU HURAIRA ADMIN ━━ ⌬\n\n❌ حدث خطأ أثناء جلب القائمة:\n${error.message}`,
+      `⌬ ━━ HINA ━━ ⌬\n\n❌ حدث خطأ أثناء جلب القائمة:\n${error.message}`,
       threadID,
       messageID
     );
@@ -135,14 +134,14 @@ module.exports.handleReply = async function({ api, event, handleReply }) {
     await api.addUserToGroup(senderID, groupID);
     
     return api.sendMessage(
-      `⌬ ━━ ABU HURAIRA ADMIN ━━ ⌬\n\n✅ تم إضافتك إلى المجموعة:\n📌 ${selectedGroup.name}\n🆔 ${groupID}`,
+      `⌬ ━━ HINA ━━ ⌬\n\n✅ تم إضافتك إلى المجموعة:\n📌 ${selectedGroup.name}\n🆔 ${groupID}`,
       threadID,
       messageID
     );
   } catch (error) {
     console.error("ضيفني - خطأ إضافة:", error);
     return api.sendMessage(
-      `⌬ ━━ ABU HURAIRA ADMIN ━━ ⌬\n\n❌ فشل إضافتك إلى المجموعة:\n📌 ${selectedGroup.name}\n❌ ${error.message}`,
+      `⌬ ━━ HINA ━━ ⌬\n\n❌ فشل إضافتك إلى المجموعة:\n📌 ${selectedGroup.name}\n❌ ${error.message}`,
       threadID,
       messageID
     );
