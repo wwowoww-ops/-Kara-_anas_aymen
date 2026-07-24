@@ -1,15 +1,18 @@
 /**
  * ═══════════════════════════════════════════════════════════
- * 🔧 handleEvent.js - نسخة محسّنة ومصححة
+ * 🔧 handleEvent.js - نسخة محسّنة ومصححة مع دعم التتبع
  * ═══════════════════════════════════════════════════════════
  * الغرض: معالجة جميع أحداث Events بشكل صحيح
- * التحسينات: error handling + logging + دعم الطريقتين
+ * التحسينات: error handling + logging + دعم الطريقتين + تتبع الأعضاء
  * ═══════════════════════════════════════════════════════════
  */
 
 module.exports = function ({ api, models, Users, Threads, Currencies }) {
     const logger = require("../../utils/log.js");
     const moment = require("moment-timezone");
+    const fs = require("fs");
+    const path = "./data/tracking.json";
+    const permissionsPath = "./data/permissions.json";
 
     return async function ({ event }) {
         const timeStart = Date.now();
@@ -69,13 +72,82 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
         }
 
         // ════════════════════════════════════════════════════════════
+        // 🔄 معالج خروج الأعضاء (لتتبع وإعادة العضو)
+        // ════════════════════════════════════════════════════════════
+        
+        if (event.logMessageType === "log:unsubscribe") {
+            const userID = event.logMessageData?.leftParticipantFbId;
+            if (!userID) return;
+
+            // قراءة ملف التتبع
+            if (fs.existsSync(path)) {
+                let trackingData = JSON.parse(fs.readFileSync(path));
+                
+                // التأكد من تفعيل التتبع في هذه المجموعة
+                if (trackingData[threadID] && trackingData[threadID].active) {
+                    
+                    // التحقق من وجود إذن خروج
+                    let hasPermission = false;
+                    if (fs.existsSync(permissionsPath)) {
+                        const permissionsData = JSON.parse(fs.readFileSync(permissionsPath));
+                        if (permissionsData[threadID] && permissionsData[threadID][userID]) {
+                            const perm = permissionsData[threadID][userID];
+                            if (perm.expiry > Date.now()) {
+                                hasPermission = true;
+                                console.log(`✅ العضو ${userID} لديه إذن خروج، لن يتم إعادته.`);
+                            } else {
+                                // انتهى الإذن، حذفه
+                                delete permissionsData[threadID][userID];
+                                fs.writeFileSync(permissionsPath, JSON.stringify(permissionsData, null, 2));
+                            }
+                        }
+                    }
+
+                    // إذا كان لديه إذن، لا نعيده
+                    if (hasPermission) return;
+
+                    // التحقق من أن البوت أدمن
+                    try {
+                        const threadInfo = await api.getThreadInfo(threadID);
+                        const isBotAdmin = threadInfo.adminIDs.some(admin => admin.id === api.getCurrentUserID());
+                        
+                        if (!isBotAdmin) {
+                            console.log(`❌ البوت ليس أدمن في ${threadID}، لا يمكن إعادة الأعضاء.`);
+                            return;
+                        }
+
+                        // ✅ إعادة العضو إلى المجموعة
+                        await api.addUserToGroup(userID, threadID);
+                        console.log(`✅ تم إعادة العضو ${userID} إلى المجموعة ${threadID}`);
+
+                        // جلب اسم العضو وإرسال رسالة
+                        try {
+                            const userInfo = await api.getUserInfo(userID);
+                            const userName = userInfo[userID]?.name || "حبيبي/حبيبتي";
+                            
+                            await api.sendMessage(
+                                `🥺 تعال يا ${userName} 💕\n\n` +
+                                `مامي قالت مين عطاك إذن تخرج؟! 😤💢\n` +
+                                `ما تطلعش غير بإذن مامي تاني مرة 🌸✨\n\n` +
+                                `🔄 تم إعادتك يا قمر 🌙💖`,
+                                threadID
+                            );
+                        } catch (e) {}
+
+                    } catch (error) {
+                        console.error(`❌ فشل إعادة العضو ${userID}:`, error);
+                    }
+                }
+            }
+        }
+
+        // ════════════════════════════════════════════════════════════
         // ⚙️ معالجة الأحداث - النسخة المحسّنة
         // ════════════════════════════════════════════════════════════
         
         const currentEventType = event.type || event.logMessageType;
         let processedEvents = 0;
         
-        // Logging للتتبع (في وضع التطوير فقط)
         if (DeveloperMode) {
             console.log(`\n📊 ═══ handleEvent Debug ═══`);
             console.log(`   Event Type: ${currentEventType}`);
@@ -86,7 +158,6 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
         
         for (const [eventName, eventModule] of events.entries()) {
             
-            // التحقق من وجود eventType
             if (!eventModule.config || !eventModule.config.eventType) {
                 if (DeveloperMode) {
                     console.log(`   ⚠️ ${eventName}: مفقود eventType`);
@@ -96,13 +167,11 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
             
             const eventTypes = eventModule.config.eventType;
             
-            // التحقق من تطابق نوع الحدث
             if (!eventTypes.includes(currentEventType)) {
                 continue;
             }
             
             try {
-                // إنشاء كائن الحدث
                 const eventObject = {
                     api,
                     event,
@@ -112,7 +181,6 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
                     Currencies
                 };
                 
-                // تنفيذ الحدث (دعم الطريقتين)
                 if (typeof eventModule.run === 'function') {
                     await eventModule.run(eventObject);
                     processedEvents++;
@@ -126,7 +194,6 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
                     continue;
                 }
 
-                // تسجيل النجاح في وضع التطوير
                 if (DeveloperMode) {
                     const executionTime = Date.now() - timeStart;
                     logger(
@@ -153,7 +220,6 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
             }
         }
         
-        // Logging النتيجة النهائية
         if (DeveloperMode && processedEvents > 0) {
             const totalTime = Date.now() - timeStart;
             console.log(`   ✅ معالجة: ${processedEvents} events في ${totalTime}ms`);
@@ -166,20 +232,3 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
         return;
     };
 };
-
-/**
- * ═══════════════════════════════════════════════════════════
- * 📝 التحسينات في هذه النسخة:
- * ═══════════════════════════════════════════════════════════
- * 
- * ✅ دعم كامل لـ run و handleEvent
- * ✅ error handling شامل لكل event
- * ✅ logging مفصّل في وضع التطوير
- * ✅ قياس وقت التنفيذ
- * ✅ التحقق من صحة الهيكل قبل التنفيذ
- * ✅ رسائل خطأ واضحة ومفصلة
- * ✅ عدّاد للـ events المعالجة
- * ✅ نظام حذف رسائل محسّن مع إعادة محاولة
- * 
- * ═══════════════════════════════════════════════════════════
- */
