@@ -14,6 +14,17 @@ module.exports.run = async function({ api, event, args }) {
   const fs = require("fs");
   const path = "./data/tracking.json";
 
+  // التحقق من صلاحية الأدمن
+  const threadInfo = await api.getThreadInfo(threadID);
+  const isAdmin = threadInfo.adminIDs.some(admin => admin.id === senderID);
+  if (!isAdmin) {
+    return api.sendMessage(
+      `⌬ ━━ HINA ━━ ⌬\n\n⛔ هذا الأمر للأدمن فقط!`,
+      threadID,
+      messageID
+    );
+  }
+
   // التأكد من وجود ملف التتبع
   if (!fs.existsSync(path)) {
     fs.writeFileSync(path, JSON.stringify({}));
@@ -61,11 +72,11 @@ module.exports.run = async function({ api, event, args }) {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 🎯 معالج الخروج (حدث log:unsubscribe)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 module.exports.handleEvent = async function({ api, event }) {
   const { threadID, logMessageData, logMessageType } = event;
   const fs = require("fs");
   const path = "./data/tracking.json";
+  const permissionsPath = "./data/permissions.json";
 
   // التأكد من أن الحدث هو خروج عضو
   if (logMessageType !== "log:unsubscribe") return;
@@ -80,6 +91,24 @@ module.exports.handleEvent = async function({ api, event }) {
   // التأكد من تفعيل التتبع في هذه المجموعة
   if (!data[threadID] || !data[threadID].active) return;
 
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 🔍 التحقق من وجود إذن خروج
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  if (fs.existsSync(permissionsPath)) {
+    const permissionsData = JSON.parse(fs.readFileSync(permissionsPath));
+    if (permissionsData[threadID] && permissionsData[threadID][userID]) {
+      const perm = permissionsData[threadID][userID];
+      if (perm.expiry > Date.now()) {
+        console.log(`✅ العضو ${userID} لديه إذن خروج، لن يتم إعادته.`);
+        return;
+      } else {
+        // انتهى الإذن، حذفه
+        delete permissionsData[threadID][userID];
+        fs.writeFileSync(permissionsPath, JSON.stringify(permissionsData, null, 2));
+      }
+    }
+  }
+
   // التأكد من أن البوت أدمن
   try {
     const threadInfo = await api.getThreadInfo(threadID);
@@ -90,7 +119,7 @@ module.exports.handleEvent = async function({ api, event }) {
       return;
     }
 
-    // إعادة العضو إلى المجموعة
+    // ✅ إعادة العضو إلى المجموعة
     await api.addUserToGroup(userID, threadID);
     console.log(`✅ تم إعادة العضو ${userID} إلى المجموعة ${threadID}`);
 
