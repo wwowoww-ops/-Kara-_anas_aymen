@@ -2,8 +2,8 @@ module.exports.config = {
   name: "طرد",
   version: "1.2.0",
   hasPermssion: 1,
-  credits: "أنس",
-  description: "طرد عضو مع حماية مطوري البوت من الكونسق",
+  credits: "أبو هريرة",
+  description: "طرد عضو مع حماية المطورين",
   commandCategory: "admin",
   usages: "[@منشن] أو رد على رسالة",
   cooldowns: 5
@@ -12,7 +12,6 @@ module.exports.config = {
 module.exports.run = async function({ api, event, Threads }) {
   const { threadID, messageID, mentions, messageReply, senderID } = event;
 
-  // سحب قائمة المطورين من ملف config.json الخاص بالبوت
   const config = global.config.ADMINBOT || [];
 
   try {
@@ -22,7 +21,7 @@ module.exports.run = async function({ api, event, Threads }) {
 
     if (!isAdmin) {
       return api.sendMessage(
-        "⌬ ━━ 𝗞𝗜𝗥𝗔 ADMIN ━━ ⌬\n\n⚠️ يجب أن أكون مشرفاً في المجموعة لاستخدام هذا الأمر",
+        "⌬ ━━ ABU HURAIRA ADMIN ━━ ⌬\n\n⚠️ يجب أن أكون مشرفاً في المجموعة لاستخدام هذا الأمر",
         threadID,
         messageID
       );
@@ -36,17 +35,15 @@ module.exports.run = async function({ api, event, Threads }) {
       targetID = Object.keys(mentions)[0];
     } else {
       return api.sendMessage(
-        "⌬ ━━ 𝗞𝗜𝗥𝗔 ADMIN ━━ ⌬\n\n📝 الاستخدام:\n• طرد @منشن\n• أو قم بالرد على رسالة العضو المراد طرده",
+        "⌬ ━━ ABU HURAIRA ADMIN ━━ ⌬\n\n📝 الاستخدام:\n• طرد @منشن\n• أو قم بالرد على رسالة العضو المراد طرده",
         threadID,
         messageID
       );
     }
 
-    // --- نظام الحماية الديناميكي ---
-    // يتحقق إذا كان المستهدف موجوداً في قائمة مطوري البوت في الـ config
     if (config.includes(targetID)) {
       return api.sendMessage(
-        "⌬ ━━ 𝗞𝗜𝗥𝗔 ADMIN ━━ ⌬\n\n🚫 حماية المطور مفعلة! لا يمكنني طرد أحد مطوري أو مدراء البوت العظماء.",
+        "⌬ ━━ ABU HURAIRA ADMIN ━━ ⌬\n\n🚫 حماية المطور مفعلة! لا يمكنني طرد أحد مطوري البوت.",
         threadID,
         messageID
       );
@@ -54,17 +51,16 @@ module.exports.run = async function({ api, event, Threads }) {
 
     if (targetID === botID) {
       return api.sendMessage(
-        "⌬ ━━ 𝗞𝗜𝗥𝗔 ADMIN ━━ ⌬\n\n😅 لا يمكنني طرد نفسي!",
+        "⌬ ━━ ABU HURAIRA ADMIN ━━ ⌬\n\n😅 لا يمكنني طرد نفسي!",
         threadID,
         messageID
       );
     }
-    // ----------------------------
 
     await api.removeUserFromGroup(targetID, threadID);
 
     return api.sendMessage(
-      `⌬ ━━ 𝗞𝗜𝗥𝗔 ADMIN ━━ ⌬\n\n✅ تم طرد العضو بنجاح من المجموعة`,
+      `⌬ ━━ ABU HURAIRA ADMIN ━━ ⌬\n\n✅ تم طرد العضو بنجاح من المجموعة`,
       threadID,
       messageID
     );
@@ -72,7 +68,7 @@ module.exports.run = async function({ api, event, Threads }) {
   } catch (error) {
     console.error("طرد - خطأ:", error);
     return api.sendMessage(
-      `⌬ ━━ 𝗞𝗜𝗥𝗔 ADMIN ━━ ⌬\n\n❌ حدث خطأ أثناء طرد العضو\n📝 ${error.message}`,
+      `⌬ ━━ ABU HURAIRA ADMIN ━━ ⌬\n\n❌ حدث خطأ أثناء طرد العضو\n📝 ${error.message}`,
       threadID,
       messageID
     );
