@@ -1,7 +1,7 @@
 module.exports.config = {
   name: "ضيفني",
-  version: "1.0.0",
-  hasPermssion: 2,
+  version: "2.0.0",
+  hasPermssion: 1,
   credits: "أبو هريرة",
   description: "يعرض قائمة المجموعات التي لست فيها ويضيفك عند الاختيار",
   commandCategory: "admin",
@@ -14,56 +14,72 @@ module.exports.run = async function({ api, event, args }) {
   const fs = require("fs");
   const path = "./config.json";
 
-  // التحقق من أن المستخدم هو المطور الأساسي
+  // التحقق من المطور
   const config = JSON.parse(fs.readFileSync(path));
   const devID = config.KIRA_CONF?.dev || config.ADMINBOT?.[0];
 
   if (senderID !== devID) {
     return api.sendMessage(
-      `⌬ ━━ ABU HURAIRA ADMIN ━━ ⌬\n\n⛔ هذا الأمر للمطور الأساسي فقط!\nأنت لست مخولاً لاستخدامه.`,
+      `⌬ ━━ ABU HURAIRA ADMIN ━━ ⌬\n\n⛔ هذا الأمر للمطور الأساسي فقط!`,
       threadID,
       messageID
     );
   }
 
-  // جلب قائمة المجموعات التي فيها البوت
   try {
-    const threadList = await api.getThreadList(100, null, ["INBOX"]);
+    // جلب قائمة المجموعات (زيادة العدد إلى 500)
+    const threadList = await api.getThreadList(500, null, ["INBOX"]);
     
-    // تصفية المجموعات (ليست محادثة فردية)
+    // تصفية المجموعات فقط
     const groups = threadList.filter(t => t.isGroup === true);
     
-    // جلب معلومات المجموعات التي فيها البوت
+    if (groups.length === 0) {
+      return api.sendMessage(
+        `⌬ ━━ ABU HURAIRA ADMIN ━━ ⌬\n\n❌ لا توجد مجموعات متاحة.`,
+        threadID,
+        messageID
+      );
+    }
+
+    // جلب معرف البوت
     const botID = api.getCurrentUserID();
-    const groupsWithBot = [];
-    
+    const groupsWithoutBot = [];
+    let processed = 0;
+
+    // التحقق من كل مجموعة
     for (const group of groups) {
       try {
         const info = await api.getThreadInfo(group.threadID);
-        const isBotInGroup = info.participantIDs.includes(botID);
-        if (!isBotInGroup) {
-          groupsWithBot.push({
+        // التحقق من وجود البوت في المجموعة
+        if (!info.participantIDs.includes(botID)) {
+          groupsWithoutBot.push({
             id: group.threadID,
             name: group.name || "بدون اسم",
             members: info.participantIDs.length || 0
           });
         }
+        processed++;
       } catch (e) {
-        // تجاهل المجموعات التي لا يمكن الوصول لها
+        console.log(`❌ لا يمكن الوصول للمجموعة: ${group.threadID}`);
       }
     }
 
-    if (groupsWithBot.length === 0) {
+    // إرسال تقرير بعدد المجموعات التي تم فحصها
+    console.log(`✅ تم فحص ${processed} مجموعة، البوت في ${processed - groupsWithoutBot.length} مجموعة`);
+
+    if (groupsWithoutBot.length === 0) {
       return api.sendMessage(
-        `⌬ ━━ ABU HURAIRA ADMIN ━━ ⌬\n\n✅ البوت موجود في جميع المجموعات!\nلا توجد مجموعات لست فيها.`,
+        `⌬ ━━ ABU HURAIRA ADMIN ━━ ⌬\n\n✅ البوت موجود في جميع المجموعات!\n📊 تم فحص ${processed} مجموعة.\n\n⚠️ إذا كنت قد خرجت من مجموعة مؤخراً، قد تكون القائمة غير محدثة. حاول مرة أخرى خلال دقائق.`,
         threadID,
         messageID
       );
     }
 
     // بناء الرسالة
-    let msg = `⌬ ━━ ABU HURAIRA ADMIN ━━ ⌬\n\n📋 قائمة المجموعات التي لست فيها:\n\n`;
-    groupsWithBot.forEach((g, index) => {
+    let msg = `⌬ ━━ ABU HURAIRA ADMIN ━━ ⌬\n\n📋 قائمة المجموعات التي لست فيها:\n`;
+    msg += `📊 تم فحص ${processed} مجموعة\n\n`;
+    
+    groupsWithoutBot.forEach((g, index) => {
       msg += `${index + 1}. ${g.name}\n`;
       msg += `   🆔 ${g.id}\n`;
       msg += `   👥 ${g.members} عضو\n\n`;
@@ -71,8 +87,8 @@ module.exports.run = async function({ api, event, args }) {
     msg += `📝 أرسل: ضيفني [رقم] لإضافتك إلى المجموعة\n`;
     msg += `مثال: ضيفني 1`;
 
-    // تخزين القائمة مؤقتاً للاستخدام لاحقاً
-    global.tempGroupList = groupsWithBot;
+    // تخزين القائمة مؤقتاً
+    global.tempGroupList = groupsWithoutBot;
 
     return api.sendMessage(msg, threadID, messageID);
 
@@ -86,13 +102,12 @@ module.exports.run = async function({ api, event, args }) {
   }
 };
 
-// معالج الردود (عند اختيار رقم)
+// معالج الردود
 module.exports.handleReply = async function({ api, event, handleReply }) {
   const { threadID, messageID, senderID, body } = event;
   const fs = require("fs");
   const path = "./config.json";
 
-  // التحقق من المطور
   const config = JSON.parse(fs.readFileSync(path));
   const devID = config.KIRA_CONF?.dev || config.ADMINBOT?.[0];
 
@@ -100,12 +115,10 @@ module.exports.handleReply = async function({ api, event, handleReply }) {
     return api.sendMessage("⛔ هذا الأمر للمطور فقط!", threadID, messageID);
   }
 
-  // التحقق من وجود القائمة
   if (!global.tempGroupList || global.tempGroupList.length === 0) {
     return api.sendMessage("⚠️ القائمة فارغة. استخدم الأمر مرة أخرى.", threadID, messageID);
   }
 
-  // استخراج الرقم
   const choice = parseInt(body);
   if (isNaN(choice) || choice < 1 || choice > global.tempGroupList.length) {
     return api.sendMessage(
@@ -119,7 +132,6 @@ module.exports.handleReply = async function({ api, event, handleReply }) {
   const groupID = selectedGroup.id;
 
   try {
-    // محاولة إضافة المستخدم إلى المجموعة
     await api.addUserToGroup(senderID, groupID);
     
     return api.sendMessage(
