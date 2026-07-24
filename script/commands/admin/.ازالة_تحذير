@@ -1,0 +1,59 @@
+module.exports.config = {
+  name: "ازالة_تحذير",
+  version: "1.0.0",
+  hasPermssion: 1,
+  credits: "أبو هريرة",
+  description: "حذف تحذير من عضو",
+  commandCategory: "admin",
+  usages: "ازالة_تحذير [@منشن] أو [رقم]",
+  cooldowns: 5
+};
+
+module.exports.run = async function({ api, event, args }) {
+  const { threadID, messageID, mentions, messageReply } = event;
+  const fs = require("fs");
+  const path = "./warnings.json";
+
+  if (!fs.existsSync(path)) {
+    return api.sendMessage("⚠️ لا يوجد تحذيرات مسجلة", threadID, messageID);
+  }
+
+  let data = JSON.parse(fs.readFileSync(path));
+
+  if (!data[threadID] || Object.keys(data[threadID]).length === 0) {
+    return api.sendMessage("⚠️ لا يوجد تحذيرات في هذه المجموعة", threadID, messageID);
+  }
+
+  let targetID;
+
+  if (messageReply) {
+    targetID = messageReply.senderID;
+  } else if (Object.keys(mentions).length > 0) {
+    targetID = Object.keys(mentions)[0];
+  } else {
+    return api.sendMessage(
+      "⚠️ الاستخدام:\n• ازالة_تحذير @منشن\n• ازالة_تحذير [رقم التحذير]\n• رد على رسالة العضو\n\nلعرض التحذيرات: .قائمة_تحذيرات",
+      threadID,
+      messageID
+    );
+  }
+
+  if (!data[threadID][targetID]) {
+    return api.sendMessage("✅ هذا العضو ليس لديه تحذيرات", threadID, messageID);
+  }
+
+  // حذف آخر تحذير
+  data[threadID][targetID].pop();
+
+  if (data[threadID][targetID].length === 0) {
+    delete data[threadID][targetID];
+  }
+
+  fs.writeFileSync(path, JSON.stringify(data, null, 2));
+
+  return api.sendMessage(
+    `⌬ ━━ 𝗞𝗜𝗥𝗔 ADMIN ━━ ⌬\n\n✅ تم حذف آخر تحذير من العضو`,
+    threadID,
+    messageID
+  );
+};
