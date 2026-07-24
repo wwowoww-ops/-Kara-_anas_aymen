@@ -37,15 +37,17 @@ module.exports.run = async function({ api, event, args }) {
       );
     }
 
-    const botID = api.getCurrentUserID();
-    const groupsWithoutBot = [];
+    // ✅ نتحقق من وجود المطور (أنت) وليس البوت
+    const myID = devID; // أو senderID
+    const groupsWithoutMe = [];
     let processed = 0;
 
     for (const group of groups) {
       try {
         const info = await api.getThreadInfo(group.threadID);
-        if (!info.participantIDs.includes(botID)) {
-          groupsWithoutBot.push({
+        // ✅ التحقق: هل أنت موجود في المجموعة؟
+        if (!info.participantIDs.includes(myID)) {
+          groupsWithoutMe.push({
             id: group.threadID,
             name: group.name || "بدون اسم",
             members: info.participantIDs.length || 0
@@ -57,11 +59,11 @@ module.exports.run = async function({ api, event, args }) {
       }
     }
 
-    console.log(`✅ تم فحص ${processed} مجموعة، البوت في ${processed - groupsWithoutBot.length} مجموعة`);
+    console.log(`✅ تم فحص ${processed} مجموعة، أنت في ${processed - groupsWithoutMe.length} مجموعة`);
 
-    if (groupsWithoutBot.length === 0) {
+    if (groupsWithoutMe.length === 0) {
       return api.sendMessage(
-        `⌬ ━━ HINA ━━ ⌬\n\n✅ البوت موجود في جميع المجموعات!\n📊 تم فحص ${processed} مجموعة.`,
+        `⌬ ━━ HINA ━━ ⌬\n\n✅ أنت موجود في جميع المجموعات!\n📊 تم فحص ${processed} مجموعة.`,
         threadID,
         messageID
       );
@@ -70,7 +72,7 @@ module.exports.run = async function({ api, event, args }) {
     let msg = `⌬ ━━ HINA ━━ ⌬\n\n📋 قائمة المجموعات التي لست فيها:\n`;
     msg += `📊 تم فحص ${processed} مجموعة\n\n`;
     
-    groupsWithoutBot.forEach((g, index) => {
+    groupsWithoutMe.forEach((g, index) => {
       msg += `${index + 1}. ${g.name}\n`;
       msg += `   🆔 ${g.id}\n`;
       msg += `   👥 ${g.members} عضو\n\n`;
@@ -78,7 +80,7 @@ module.exports.run = async function({ api, event, args }) {
     msg += `📝 أرسل: ضيفني [رقم] لإضافتك إلى المجموعة\n`;
     msg += `مثال: ضيفني 1`;
 
-    global.tempGroupList = groupsWithoutBot;
+    global.tempGroupList = groupsWithoutMe;
 
     return api.sendMessage(msg, threadID, messageID);
 
@@ -121,7 +123,7 @@ module.exports.handleReply = async function({ api, event, handleReply }) {
   const groupID = selectedGroup.id;
 
   try {
-    // ✅ هذا الكود يضيفك أنت فقط (المطور)
+    // ✅ يضيفك أنت إلى المجموعة
     await api.addUserToGroup(senderID, groupID);
     
     return api.sendMessage(
