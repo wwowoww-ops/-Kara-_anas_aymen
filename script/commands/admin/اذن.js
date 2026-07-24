@@ -5,12 +5,12 @@ module.exports.config = {
   credits: "أبو هريرة",
   description: "إعطاء أو إلغاء إذن الخروج لعضو (يلغي تتبع البوت)",
   commandCategory: "admin",
-  usages: "اذن [@منشن] [مدة] أو اذن [@منشن] الغاء",
+  usages: "اذن [@منشن] [مدة] أو اذن [@منشن] الغاء أو رد على رسالة العضو",
   cooldowns: 5
 };
 
 module.exports.run = async function({ api, event, args }) {
-  const { threadID, messageID, mentions, senderID } = event;
+  const { threadID, messageID, mentions, senderID, messageReply } = event;
   const fs = require("fs");
   const path = "./data/tracking.json";
   const permissionsPath = "./data/permissions.json";
@@ -42,29 +42,41 @@ module.exports.run = async function({ api, event, args }) {
     permissionsData[threadID] = {};
   }
 
-  // تحديد المستهدف
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 🎯 تحديد المستهدف (منشن أو رد على رسالة)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   let targetID;
-  if (Object.keys(mentions).length > 0) {
+  let userName = "العضو";
+
+  // ✅ الحالة 1: رد على رسالة العضو
+  if (messageReply) {
+    targetID = messageReply.senderID;
+    try {
+      const userInfo = await api.getUserInfo(targetID);
+      userName = userInfo[targetID]?.name || "العضو";
+    } catch (e) {}
+  } 
+  // ✅ الحالة 2: منشن
+  else if (Object.keys(mentions).length > 0) {
     targetID = Object.keys(mentions)[0];
-  } else {
+    try {
+      const userInfo = await api.getUserInfo(targetID);
+      userName = userInfo[targetID]?.name || "العضو";
+    } catch (e) {}
+  } 
+  // ❌ لا يوجد مستهدف
+  else {
     return api.sendMessage(
-      `⌬ ━━ HINA ━━ ⌬\n\n📝 الاستخدام:\n• اذن @منشن [عدد الدقائق]\n• اذن @منشن الغاء\n\nمثال: اذن @أحمد 10`,
+      `⌬ ━━ HINA ━━ ⌬\n\n📝 الاستخدام:\n• اذن @منشن [عدد الدقائق]\n• اذن @منشن الغاء\n• رد على رسالة العضو ثم اذن [مدة]\n\nمثال: اذن @أحمد 10`,
       threadID,
       messageID
     );
   }
 
-  // جلب اسم العضو
-  let userName = "العضو";
-  try {
-    const userInfo = await api.getUserInfo(targetID);
-    userName = userInfo[targetID]?.name || "العضو";
-  } catch (e) {}
-
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // إلغاء الإذن
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  if (args[1] === "الغاء" || args[1] === "cancel") {
+  if (args[0] === "الغاء" || args[0] === "cancel") {
     if (permissionsData[threadID][targetID]) {
       delete permissionsData[threadID][targetID];
       fs.writeFileSync(permissionsPath, JSON.stringify(permissionsData, null, 2));
@@ -85,10 +97,10 @@ module.exports.run = async function({ api, event, args }) {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // منح الإذن (مع مدة)
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const duration = parseInt(args[1]);
+  const duration = parseInt(args[0]);
   if (!duration || duration <= 0) {
     return api.sendMessage(
-      `⌬ ━━ HINA ━━ ⌬\n\n⚠️ الرجاء إدخال مدة صحيحة (بالدقائق).\nمثال: اذن @أحمد 10`,
+      `⌬ ━━ HINA ━━ ⌬\n\n⚠️ الرجاء إدخال مدة صحيحة (بالدقائق).\nمثال: اذن @أحمد 10\nأو رد على رسالة العضو ثم اذن 10`,
       threadID,
       messageID
     );
