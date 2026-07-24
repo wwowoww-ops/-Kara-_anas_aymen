@@ -56,7 +56,7 @@ module.exports.run = async function({ api, event, args }) {
   let count = data[threadID][targetID].length;
 
   return api.sendMessage(
-    `⌬ ━━ 𝗞𝗜𝗥𝗔 ADMIN ━━ ⌬\n\n⚠️ تم إعطاء تحذير للعضو\n\n📌 السبب: ${reason}\n🔢 عدد التحذيرات: ${count}/3`,
+    `⌬ ━━ ABU HURAIRA ADMIN ━━ ⌬\n\n⚠️ تم إعطاء تحذير للعضو\n\n📌 السبب: ${reason}\n🔢 عدد التحذيرات: ${count}/3`,
     threadID,
     messageID
   );
