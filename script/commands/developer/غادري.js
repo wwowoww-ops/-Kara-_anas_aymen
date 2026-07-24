@@ -50,19 +50,19 @@ module.exports.run = async ({ api, event, args }) => {
 
     fs.writeFileSync(pathGif, Buffer.from(response.data));
 
-    await new Promise((resolve, reject) => {
-      api.sendMessage(
-        {
-          body: "⌬ ━━ HINA ━━ ⌬\n\nأنا في خدمتك دائماً يا سيدي 💖\n\nنغادر الآن بكل احترام.. إلى اللقاء 👋",
-          attachment: fs.createReadStream(pathGif)
-        },
-        targetID,
-        (err) => {
-          if (err) reject(err);
-          else resolve();
-        }
-      );
-    });
+    // ✅ إرسال الرسالة أولاً
+    await api.sendMessage(
+      `⌬ ━━ HINA ━━ ⌬\n\nأنا في خدمتك دائماً يا سيدي 💖\n\nنغادر الآن بكل احترام.. إلى اللقاء 👋`,
+      targetID
+    );
+
+    // ✅ ثم إرسال الـ GIF
+    await api.sendMessage(
+      {
+        attachment: fs.createReadStream(pathGif)
+      },
+      targetID
+    );
 
     setTimeout(() => {
       leaveGroup(targetID);
