@@ -7,156 +7,64 @@ module.exports.config = {
   version: "1.0.0",
   hasPermssion: 1,
   credits: "أبو هريرة",
-  description: "طرد عضو مع صورة بانكاي",
+  description: "بانكاي ثم طرد العضو",
   commandCategory: "admin",
-  usages: "بانكاي [@منشن] أو رد على رسالة",
+  usages: "@منشن أو الرد",
   cooldowns: 5
 };
 
-module.exports.run = async function({ api, event, args }) {
-  const { threadID, messageID, senderID, mentions, messageReply } = event;
+module.exports.run = async function ({ api, event }) {
+  const { threadID, messageID, mentions, messageReply } = event;
+  const adminBot = global.config.ADMINBOT || [];
+  const botID = api.getCurrentUserID();
 
   try {
     const threadInfo = await api.getThreadInfo(threadID);
-    const isAdmin = threadInfo.adminIDs.some(admin => admin.id === senderID);
-    const isBotAdmin = threadInfo.adminIDs.some(admin => admin.id === api.getCurrentUserID());
 
-    if (!isAdmin) {
-      return api.sendMessage(
-        `⌬ ━━ HINA ━━ ⌬\n\n⛔ هذا الأمر للأدمن فقط!`,
-        threadID,
-        messageID
-      );
-    }
-
-    if (!isBotAdmin) {
-      return api.sendMessage(
-        `⌬ ━━ HINA ━━ ⌬\n\n⚠️ يجب أن أكون أدمن في المجموعة لاستخدام هذا الأمر`,
-        threadID,
-        messageID
-      );
-    }
+    if (!threadInfo.adminIDs.some(i => i.id == botID))
+      return api.sendMessage("❌ يجب أن أكون مشرفًا في المجموعة.", threadID, messageID);
 
     let targetID;
 
-    if (messageReply) {
+    if (messageReply)
       targetID = messageReply.senderID;
-    } else if (Object.keys(mentions).length > 0) {
+    else if (Object.keys(mentions).length)
       targetID = Object.keys(mentions)[0];
-    } else {
-      return api.sendMessage(
-        `⌬ ━━ HINA ━━ ⌬\n\n📝 الاستخدام:\n• بانكاي @منشن\n• أو قم بالرد على رسالة العضو`,
-        threadID,
-        messageID
-      );
-    }
+    else
+      return api.sendMessage("⚠️ قم بالرد على رسالة العضو أو عمل منشن له.", threadID, messageID);
 
-    // ═══════════════════════════════════════════════
-    // 🛡️ حماية المطور (لا يمكن طرد المطور)
-    // ═══════════════════════════════════════════════
-    
-    // قراءة config.json للحصول على قائمة المطورين
-    let config;
-    try {
-      config = JSON.parse(fs.readFileSync("./config.json"));
-    } catch (e) {
-      try {
-        config = JSON.parse(fs.readFileSync(process.cwd() + "/config.json"));
-      } catch (e2) {
-        try {
-          config = JSON.parse(fs.readFileSync(__dirname + "/../../../config.json"));
-        } catch (e3) {
-          return api.sendMessage(
-            `⌬ ━━ HINA ━━ ⌬\n\n❌ لم يتم العثور على ملف config.json`,
-            threadID,
-            messageID
-          );
-        }
-      }
-    }
+    if (adminBot.includes(String(targetID)))
+      return api.sendMessage("🛡️ لا يمكن استخدام بانكاي على أحد مطوري البوت.", threadID, messageID);
 
-    // جمع كل المطورين من config.json
-    const devIDs = config.ADMINBOT || [];
-    if (config.KIRA_CONF?.dev) {
-      devIDs.push(config.KIRA_CONF.dev);
-    }
-    const uniqueDevIDs = [...new Set(devIDs)];
+    if (String(targetID) === String(botID))
+      return api.sendMessage("😅 لا أستطيع استخدام بانكاي على نفسي.", threadID, messageID);
 
-    // ✅ التحقق: هل المستهدف مطور؟
-    if (uniqueDevIDs.includes(targetID)) {
-      // جلب اسم المطور
-      let devName = "المطور";
-      try {
-        const userInfo = await api.getUserInfo(targetID);
-        devName = userInfo[targetID]?.name || "المطور";
-      } catch (e) {}
-      
-      return api.sendMessage(
-        `⌬ ━━ HINA ━━ ⌬\n\n🛡️ لا يمكن طرد المطور!\n\n👤 ${devName}\n🆔 ${targetID}\n\nهذا العضو محمي بواسطة نظام حماية المطورين.`,
-        threadID,
-        messageID
-      );
-    }
+    const cache = path.join(__dirname, "cache");
+    fs.ensureDirSync(cache);
+    const gifPath = path.join(cache, "bankai.gif");
 
-    // ✅ حماية البوت نفسه
-    if (targetID === api.getCurrentUserID()) {
-      return api.sendMessage(
-        `⌬ ━━ HINA ━━ ⌬\n\n😅 لا يمكنني طرد نفسي!`,
-        threadID,
-        messageID
-      );
-    }
+    const res = await axios.get(
+      "https://media.giphy.com/media/3ohzdIuqJoo8QdKlnW/giphy.gif",
+      { responseType: "arraybuffer" }
+    );
 
-    // جلب اسم العضو
-    let userName = "العضو";
-    try {
-      const userInfo = await api.getUserInfo(targetID);
-      userName = userInfo[targetID]?.name || "العضو";
-    } catch (e) {}
+    fs.writeFileSync(gifPath, Buffer.from(res.data));
 
-    // تحميل صورة بانكاي
-    const cacheDir = path.join(__dirname, "cache");
-    fs.ensureDirSync(cacheDir);
-    const pathImg = path.join(cacheDir, "bankai.jpg");
-
-    try {
-      const response = await axios.get(
-        "https://kommodo.ai/i/VYpiY1t3d7FcfWRahJql",
-        { responseType: "arraybuffer", timeout: 15000 }
-      );
-      fs.writeFileSync(pathImg, Buffer.from(response.data));
-    } catch (e) {
-      console.log("❌ فشل تحميل الصورة:", e);
-    }
-
-    let imageAttachment = null;
-    if (fs.existsSync(pathImg)) {
-      imageAttachment = fs.createReadStream(pathImg);
-    }
-
-    // إرسال رسالة الطرد مع الصورة
-    await api.sendMessage(
+    api.sendMessage(
       {
-        body: `⌬ ━━ HINA ━━ ⌬\n\n🔥 BANKAI! ZANKA NO TACHI 🔥\n\n(BLADE OF EMBER)\n\n✅ تم طرد العضو:\n📌 ${userName}\n🆔 ${targetID}`,
-        attachment: imageAttachment
+        body: "⚔️ BANKAI ⚔️\n\nوداعًا...",
+        attachment: fs.createReadStream(gifPath)
       },
-      threadID
-    );
-
-    // طرد العضو
-    await api.removeUserFromGroup(targetID, threadID);
-
-    // حذف الصورة المؤقتة
-    try {
-      if (fs.existsSync(pathImg)) fs.unlinkSync(pathImg);
-    } catch (_) {}
-
-  } catch (error) {
-    console.error("بانكاي - خطأ:", error);
-    return api.sendMessage(
-      `⌬ ━━ HINA ━━ ⌬\n\n❌ حدث خطأ: ${error.message}`,
       threadID,
-      messageID
+      async () => {
+        await api.removeUserFromGroup(targetID, threadID);
+
+        if (fs.existsSync(gifPath))
+          fs.unlinkSync(gifPath);
+      }
     );
+
+  } catch (e) {
+    return api.sendMessage(`❌ حدث خطأ:\n${e.message}`, threadID, messageID);
   }
 };
