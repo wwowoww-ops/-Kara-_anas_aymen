@@ -52,25 +52,47 @@ module.exports.run = async function({ api, event, args }) {
     }
 
     // ═══════════════════════════════════════════════
-    // 🛡️ حماية المطورين (قائمة كاملة)
+    // 🛡️ حماية المطور (لا يمكن طرد المطور)
     // ═══════════════════════════════════════════════
-    const config = JSON.parse(fs.readFileSync("./config.json"));
     
-    // قائمة المطورين من ADMINBOT
+    // قراءة config.json للحصول على قائمة المطورين
+    let config;
+    try {
+      config = JSON.parse(fs.readFileSync("./config.json"));
+    } catch (e) {
+      try {
+        config = JSON.parse(fs.readFileSync(process.cwd() + "/config.json"));
+      } catch (e2) {
+        try {
+          config = JSON.parse(fs.readFileSync(__dirname + "/../../../config.json"));
+        } catch (e3) {
+          return api.sendMessage(
+            `⌬ ━━ HINA ━━ ⌬\n\n❌ لم يتم العثور على ملف config.json`,
+            threadID,
+            messageID
+          );
+        }
+      }
+    }
+
+    // جمع كل المطورين من config.json
     const devIDs = config.ADMINBOT || [];
-    
-    // إضافة المطور من KIRA_CONF.dev
     if (config.KIRA_CONF?.dev) {
       devIDs.push(config.KIRA_CONF.dev);
     }
-    
-    // إزالة التكرارات
     const uniqueDevIDs = [...new Set(devIDs)];
-    
+
     // ✅ التحقق: هل المستهدف مطور؟
     if (uniqueDevIDs.includes(targetID)) {
+      // جلب اسم المطور
+      let devName = "المطور";
+      try {
+        const userInfo = await api.getUserInfo(targetID);
+        devName = userInfo[targetID]?.name || "المطور";
+      } catch (e) {}
+      
       return api.sendMessage(
-        `⌬ ━━ HINA ━━ ⌬\n\n🛡️ هذا العضو محمي (مطور)!\nلا يمكن طرده.`,
+        `⌬ ━━ HINA ━━ ⌬\n\n🛡️ لا يمكن طرد المطور!\n\n👤 ${devName}\n🆔 ${targetID}\n\nهذا العضو محمي بواسطة نظام حماية المطورين.`,
         threadID,
         messageID
       );
@@ -112,7 +134,7 @@ module.exports.run = async function({ api, event, args }) {
       imageAttachment = fs.createReadStream(pathImg);
     }
 
-    // إرسال رسالة الطرد
+    // إرسال رسالة الطرد مع الصورة
     await api.sendMessage(
       {
         body: `⌬ ━━ HINA ━━ ⌬\n\n🔥 BANKAI! ZANKA NO TACHI 🔥\n\n(BLADE OF EMBER)\n\n✅ تم طرد العضو:\n📌 ${userName}\n🆔 ${targetID}`,
