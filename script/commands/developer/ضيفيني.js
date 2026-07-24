@@ -37,15 +37,13 @@ module.exports.run = async function({ api, event, args }) {
       );
     }
 
-    // ✅ نتحقق من وجود المطور (أنت) وليس البوت
-    const myID = devID; // أو senderID
+    const myID = devID;
     const groupsWithoutMe = [];
     let processed = 0;
 
     for (const group of groups) {
       try {
         const info = await api.getThreadInfo(group.threadID);
-        // ✅ التحقق: هل أنت موجود في المجموعة؟
         if (!info.participantIDs.includes(myID)) {
           groupsWithoutMe.push({
             id: group.threadID,
@@ -58,8 +56,6 @@ module.exports.run = async function({ api, event, args }) {
         console.log(`❌ لا يمكن الوصول للمجموعة: ${group.threadID}`);
       }
     }
-
-    console.log(`✅ تم فحص ${processed} مجموعة، أنت في ${processed - groupsWithoutMe.length} مجموعة`);
 
     if (groupsWithoutMe.length === 0) {
       return api.sendMessage(
@@ -82,7 +78,13 @@ module.exports.run = async function({ api, event, args }) {
 
     global.tempGroupList = groupsWithoutMe;
 
-    return api.sendMessage(msg, threadID, messageID);
+    const sent = await api.sendMessage(msg, threadID, messageID);
+
+    // 🔥 إصلاح الخطأ: إضافة handleReply
+    global.client.handleReply.push({
+      name: module.exports.config.name,
+      messageID: sent.messageID
+    });
 
   } catch (error) {
     console.error("ضيفني - خطأ:", error);
@@ -94,7 +96,7 @@ module.exports.run = async function({ api, event, args }) {
   }
 };
 
-module.exports.handleReply = async function({ api, event, handleReply }) {
+module.exports.handleReply = async function({ api, event }) {
   const { threadID, messageID, senderID, body } = event;
   const fs = require("fs");
   const path = "./config.json";
@@ -123,7 +125,6 @@ module.exports.handleReply = async function({ api, event, handleReply }) {
   const groupID = selectedGroup.id;
 
   try {
-    // ✅ يضيفك أنت إلى المجموعة
     await api.addUserToGroup(senderID, groupID);
     
     return api.sendMessage(
