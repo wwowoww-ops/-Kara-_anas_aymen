@@ -6,12 +6,12 @@ module.exports.config = {
   name: "غادري",
   version: "1.2.7",
   hasPermssion: 2,
-  credits: "Ayman",
+  credits: "أبو هريرة",
   description: "مغادرة البوت للمجموعة",
   commandCategory: "developer",
   usages: "غادري [ID]",
   cooldowns: 5,
-  devID: "61580139921634"
+  devID: "61578581225040"
 };
 
 module.exports.run = async ({ api, event, args }) => {
@@ -53,7 +53,7 @@ module.exports.run = async ({ api, event, args }) => {
     await new Promise((resolve, reject) => {
       api.sendMessage(
         {
-          body: "⌬ ━━ 𝗞𝗜𝗥𝗔 ━━ ⌬\n\nنغادر الآن بكل هيبة.. وداعاً. 👑",
+          body: "⌬ ━━ HINA ━━ ⌬\n\nنغادر الآن بكل هيبة.. وداعاً. 👑",
           attachment: fs.createReadStream(pathGif)
         },
         targetID,
