@@ -1,9 +1,9 @@
 /**
  * ═══════════════════════════════════════════════════════════
- * 🔧 handleEvent.js - نسخة محسّنة ومصححة مع دعم التتبع
+ * 🔧 handleEvent.js - نسخة محسّنة ومصححة مع دعم التتبع والحماية
  * ═══════════════════════════════════════════════════════════
  * الغرض: معالجة جميع أحداث Events بشكل صحيح
- * التحسينات: error handling + logging + دعم الطريقتين + تتبع الأعضاء
+ * التحسينات: error handling + logging + دعم الطريقتين + تتبع الأعضاء + حماية المجموعة
  * ═══════════════════════════════════════════════════════════
  */
 
@@ -13,6 +13,7 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
     const fs = require("fs");
     const path = "./data/tracking.json";
     const permissionsPath = "./data/permissions.json";
+    const protectionPath = "./data/protection.json";
 
     return async function ({ event }) {
         const timeStart = Date.now();
@@ -69,6 +70,119 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
         if (userBanned.has(senderID) || threadBanned.has(threadID) || 
             (allowInbox == false && senderID == threadID)) {
             return;
+        }
+
+        // ════════════════════════════════════════════════════════════
+        // 🛡️ نظام الحماية المتكامل (من أمر حماية)
+        // ════════════════════════════════════════════════════════════
+        
+        if (fs.existsSync(protectionPath)) {
+            try {
+                const protectionData = JSON.parse(fs.readFileSync(protectionPath));
+                
+                if (protectionData[threadID] && protectionData[threadID].enabled) {
+                    const settings = protectionData[threadID].settings;
+                    const botID = api.getCurrentUserID();
+                    
+                    // التحقق من أن البوت أدمن
+                    try {
+                        const threadInfo = await api.getThreadInfo(threadID);
+                        const isBotAdmin = threadInfo.adminIDs.some(admin => admin.id === botID);
+                        if (!isBotAdmin) return;
+                    } catch (e) { return; }
+                    
+                    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                    // 1️⃣ حماية الكنيات (تغيير الأسماء)
+                    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                    if (settings.nicknames && event.logMessageType === "log:user-nickname") {
+                        const changedUser = event.logMessageData?.participant_id;
+                        if (changedUser && changedUser !== botID) {
+                            try {
+                                const userInfo = await api.getUserInfo(changedUser);
+                                const userName = userInfo[changedUser]?.name || "حبيبي";
+                                const originalName = userInfo[changedUser]?.name || "عضو";
+                                
+                                await api.changeNickname(originalName, threadID, changedUser);
+                                await api.sendMessage(
+                                    `🥺 تعال يا ${userName} 💕\n\nمامي ما سمحتلك تغير الكنية! 😤\nمين سمحلك تغير اسمك؟ 🌸✨\n\n🔄 تم إعادة اسمك الأصلي يا قمر 🌙💖`,
+                                    threadID
+                                );
+                            } catch (e) {}
+                        }
+                    }
+                    
+                    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                    // 2️⃣ حماية إضافة الأعضاء
+                    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                    if (settings.addMember && (event.logMessageType === "log:subscribe" || event.type === "event" && event.logMessageType === "log:subscribe")) {
+                        const addedUsers = event.logMessageData?.addedParticipants || [];
+                        for (const user of addedUsers) {
+                            if (user.userFbId && user.userFbId !== botID) {
+                                try {
+                                    const userInfo = await api.getUserInfo(user.userFbId);
+                                    const userName = userInfo[user.userFbId]?.name || "حبيبي";
+                                    
+                                    await api.removeUserFromGroup(user.userFbId, threadID);
+                                    await api.sendMessage(
+                                        `🥺 تعال يا ${userName} 💕\n\nمامي ما سمحتلك تدخل المجموعة! 😤\nمين سمحلك تنضم هنا؟ 🌸✨\n\n🔄 تم طردك يا عزيزي 🌙💖`,
+                                        threadID
+                                    );
+                                } catch (e) {}
+                            }
+                        }
+                    }
+                    
+                    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                    // 3️⃣ حماية اسم المجموعة
+                    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                    if (settings.groupName && event.logMessageType === "log:thread-name") {
+                        try {
+                            await api.sendMessage(
+                                `🥺 تعالوا يا جماعة 💕\n\nمامي ما سمحتلك تغير اسم المجموعة! 😤\nمين سمحلك تغير الاسم؟ 🌸✨\n\n🔄 تم إعادة الاسم القديم يا قمر 🌙💖`,
+                                threadID
+                            );
+                        } catch (e) {}
+                    }
+                    
+                    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                    // 4️⃣ حماية صورة المجموعة
+                    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                    if (settings.groupImage && (event.logMessageType === "log:thread-icon" || event.type === "change_thread_image")) {
+                        try {
+                            await api.sendMessage(
+                                `🥺 تعالوا يا جماعة 💕\n\nمامي ما سمحتلك تغير صورة المجموعة! 😤\nمين سمحلك تغير الصورة؟ 🌸✨\n\n🔄 تم إعادة الصورة القديمة يا قمر 🌙💖`,
+                                threadID
+                            );
+                        } catch (e) {}
+                    }
+                    
+                    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                    // 5️⃣ حماية السمة (الثيم)
+                    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                    if (settings.theme && event.logMessageType === "log:thread-color") {
+                        try {
+                            await api.sendMessage(
+                                `🥺 تعالوا يا جماعة 💕\n\nمامي ما سمحتلك تغير ثيم المجموعة! 😤\nمين سمحلك تغير الثيم؟ 🌸✨\n\n🔄 تم إعادة الثيم القديم يا قمر 🌙💖`,
+                                threadID
+                            );
+                        } catch (e) {}
+                    }
+                    
+                    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                    // 6️⃣ حماية الإيموجي
+                    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                    if (settings.emoji && event.logMessageType === "log:thread-icon") {
+                        try {
+                            await api.sendMessage(
+                                `🥺 تعالوا يا جماعة 💕\n\nمامي ما سمحتلك تغير إيموجي المجموعة! 😤\nمين سمحلك تغير الإيموجي؟ 🌸✨\n\n🔄 تم إعادة الإيموجي القديم يا قمر 🌙💖`,
+                                threadID
+                            );
+                        } catch (e) {}
+                    }
+                }
+            } catch (error) {
+                console.error("❌ خطأ في نظام الحماية:", error);
+            }
         }
 
         // ════════════════════════════════════════════════════════════
