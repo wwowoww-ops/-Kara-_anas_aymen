@@ -2,17 +2,65 @@ const axios = require('axios');
 const fs = require('fs-extra');
 const path = require('path');
 
-module.exports.run = async function({ api, event, args, Users, Threads, Currencies, models }) {
-    const { threadID, messageID, senderID, mentions } = event;
+module.exports.config = {
+    name: "عناق",
+    version: "2.0.0",
+    hasPermssion: 0,
+    credits: "أبو هريرة",
+    description: "عانق شخص ما",
+    commandCategory: "fun",
+    usages: "عناق [@منشن] أو رد على رسالة",
+    cooldowns: 5
+};
+
+module.exports.run = async function({ api, event, args, Users }) {
+    const { threadID, messageID, senderID, mentions, messageReply } = event;
     
-    if (Object.keys(mentions).length === 0) {
-        return api.sendMessage("⌬ ━━ 𝗞𝗜𝗥𝗔 FUN ━━ ⌬\n\nعليك عمل منشن لشخص لعناقه", threadID, messageID);
+    let targetID;
+    let targetName = "شخص ما";
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // تحديد المستهدف (رد أو منشن)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    if (messageReply) {
+        targetID = messageReply.senderID;
+        try {
+            const userInfo = await api.getUserInfo(targetID);
+            targetName = userInfo[targetID]?.name || "الشخص";
+        } catch (e) {
+            targetName = "الشخص";
+        }
+    } else if (Object.keys(mentions).length > 0) {
+        targetID = Object.keys(mentions)[0];
+        targetName = mentions[targetID].replace("@", "");
+    } else {
+        return api.sendMessage(
+            `⌬ ━━ HINA FUN ━━ ⌬\n\n📝 الاستخدام:\n• عناق @منشن\n• أو رد على رسالة العضو`,
+            threadID,
+            messageID
+        );
     }
-    
-    const targetID = Object.keys(mentions)[0];
-    const senderName = await Users.getNameUser(senderID);
-    const targetName = mentions[targetID].replace("@", "");
-    
+
+    // جلب اسم المرسل
+    let senderName = "أنا";
+    try {
+        const userInfo = await api.getUserInfo(senderID);
+        senderName = userInfo[senderID]?.name || "أنا";
+    } catch (e) {}
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ❌ تم إلغاء حماية المطور ✅
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    // منع عناق البوت فقط
+    if (targetID === api.getCurrentUserID()) {
+        return api.sendMessage(
+            `⌬ ━━ HINA FUN ━━ ⌬\n\n😅 لا يمكنك عناقي! أنا هنا لمساعدتك.`,
+            threadID,
+            messageID
+        );
+    }
+
     try {
         const response = await axios.get('https://nekos.best/api/v2/hug');
         const gifUrl = response.data.results[0].url;
@@ -25,24 +73,18 @@ module.exports.run = async function({ api, event, args, Users, Threads, Currenci
         fs.writeFileSync(gifPath, Buffer.from(gifResponse.data));
         
         await api.sendMessage({
-            body: `⌬ ━━ 𝗞𝗜𝗥𝗔 FUN ━━ ⌬\n\n${senderName} يعانق ${targetName}`,
+            body: `⌬ ━━ HINA FUN ━━ ⌬\n\n🤗 ${senderName} يعانق ${targetName}! 💕`,
             attachment: fs.createReadStream(gifPath)
         }, threadID, () => {
             if (fs.existsSync(gifPath)) fs.unlinkSync(gifPath);
         }, messageID);
         
     } catch (error) {
-        return api.sendMessage("⌬ ━━ 𝗞𝗜𝗥𝗔 FUN ━━ ⌬\n\nفشل جلب صورة العناق", threadID, messageID);
+        console.error("❌ خطأ في عناق:", error);
+        return api.sendMessage(
+            `⌬ ━━ HINA FUN ━━ ⌬\n\n❌ فشل جلب صورة العناق. حاول مرة أخرى.`,
+            threadID,
+            messageID
+        );
     }
-};
-
-module.exports.config = {
-    name: "عناق",
-    version: "2.0.0",
-    hasPermssion: 0,
-    credits: "ايمن",
-    description: "عانق شخص ما",
-    commandCategory: "fun",
-    usages: "عناق [@منشن]",
-    cooldowns: 5
 };
