@@ -2,7 +2,7 @@ module.exports.config = {
   name: "بادئة",
   version: "1.0.0",
   hasPermssion: 0,
-  credits: "ايمن",
+  credits: "أبو هريرة",
   description: "عرض بادئة البوت",
   commandCategory: "utility",
   usages: "بادئة",
@@ -12,11 +12,11 @@ module.exports.config = {
 module.exports.run = async function({ api, event }) {
   const { threadID, messageID } = event;
 
-  const prefix = global.config.PREFIX || "/";
-  const botName = global.config.BOTNAME || "كيرا";
+  const prefix = global.config.PREFIX || ".";
+  const botName = global.config.BOTNAME || "هينا";
 
   return api.sendMessage(
-    `⌬ ━━ 𝗞𝗜𝗥𝗔 UTILITY ━━ ⌬\n\n🤖 اسم البوت: ${botName}\n🔑 البادئة: ${prefix}\n\n💡 استخدم: ${prefix}مساعدة للحصول على قائمة الأوامر`,
+    `⌬ ━━ HINA ━━ ⌬\n\n🤖 اسم البوت: ${botName}\n🔑 البادئة: ${prefix}\n\n💡 استخدم: ${prefix}مساعدة للحصول على قائمة الأوامر`,
     threadID,
     messageID
   );
