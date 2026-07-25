@@ -1,4 +1,5 @@
 const axios = require("axios");
+const fs = require("fs");
 
 // ===== أنظمة الذاكرة =====
 if (!global.usersNames) global.usersNames = new Map();
@@ -15,7 +16,14 @@ module.exports.config = {
   cooldowns: 3,
 };
 
-const GROQ_API_KEY = "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";
+// ===== قراءة المفتاح من config.json =====
+const config = JSON.parse(fs.readFileSync("./config.json"));
+const GROQ_API_KEY = config.MODEL_API_KEY;
+
+if (!GROQ_API_KEY || GROQ_API_KEY === "YOUR_API_KEY_HERE") {
+  console.error("❌ لم يتم العثور على مفتاح Groq API في config.json");
+}
+
 const ADMIN_ID = "61578581225040"; // أبو هريرة
 
 // ===== كشف اللهجة =====
