@@ -1,11 +1,11 @@
-const fs = require("fs-extra");
+const axios = require("axios");
 
 module.exports.config = {
   name: "زوجيني",
-  version: "3.1.0",
+  version: "3.2.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
-  description: "زواج عشوائي أو بالرد على شخص",
+  description: "اختيار شريك عشوائي أو الزواج بالرد",
   commandCategory: "fun",
   usages: "زوجيني",
   cooldowns: 5
@@ -20,31 +20,29 @@ module.exports.run = async function({ api, event }) {
     let user1 = senderID;
     let user2;
 
-    // بالرد على شخص
+    // إذا كان ردًا على شخص
     if (type === "message_reply") {
+
       user2 = messageReply.senderID;
-    }
 
-    // اختيار عشوائي
-    else {
+    } else {
 
+      // اختيار شريك عشوائي
       const threadInfo = await api.getThreadInfo(threadID);
 
       let members = threadInfo.participantIDs.filter(
-        id => id !== api.getCurrentUserID()
+        id => id !== senderID && id !== api.getCurrentUserID()
       );
 
-      if (members.length < 2) {
+
+      if (members.length === 0) {
         return api.sendMessage(
-          "❌ لا يوجد أعضاء كافيين للزواج.",
+          "❌ لا يوجد أعضاء آخرون للزواج.",
           threadID,
           messageID
         );
       }
 
-      user1 = members[Math.floor(Math.random() * members.length)];
-
-      members = members.filter(id => id !== user1);
 
       user2 = members[Math.floor(Math.random() * members.length)];
     }
@@ -59,39 +57,54 @@ module.exports.run = async function({ api, event }) {
     }
 
 
-    // جلب الأسماء من فيسبوك
-    let names = await api.getUserInfo([user1, user2]);
+    // جلب الأسماء
+    let name1 = "مستخدم";
+    let name2 = "مستخدم";
 
-    let name1 = names[user1]?.name || "عضو";
-    let name2 = names[user2]?.name || "عضو";
+    try {
+
+      const info = await api.getUserInfo([
+        user1,
+        user2
+      ]);
+
+      name1 = info[user1]?.name || "مستخدم";
+      name2 = info[user2]?.name || "مستخدم";
+
+    } catch (e) {
+      console.log("خطأ الأسماء:", e);
+    }
 
 
-    // نسبة التوافق
+
+    // حساب التوافق
     let love = Math.floor(Math.random() * 101);
 
-    let text;
+
+    let message;
 
     if (love >= 90) {
-      text = "💖 توافق أسطوري! حب لا ينتهي.";
+      message = "💖 توافق أسطوري! أنتما مناسبين لبعضكما.";
     } 
     else if (love >= 70) {
-      text = "❤️ توافق رائع!";
+      message = "❤️ توافق رائع! بداية جميلة.";
     } 
     else if (love >= 50) {
-      text = "💕 بداية جيدة.";
+      message = "💕 توافق جيد، تحتاجان لبعض الوقت.";
     } 
     else if (love >= 30) {
-      text = "💔 يحتاجان للمزيد من التفاهم.";
+      message = "💔 توافق متوسط، حاولوا التفاهم.";
     } 
     else {
-      text = "😂 يبدو أن الزواج كان قرارًا خاطئًا.";
+      message = "😂 يبدو أن الحظ لم يكن معكما.";
     }
+
 
 
     return api.sendMessage(
 `⌬ ━━ HINA FUN ━━ ⌬
 
-💍 تم اختيار زوجين جديدين!
+💍 تم العثور على شريكك!
 
 👤 ${name1}
 ❤️ 💍 ❤️
@@ -99,9 +112,9 @@ module.exports.run = async function({ api, event }) {
 
 📊 نسبة التوافق: ${love}%
 
-${text}
+${message}
 
-🎉 مبروك للعروسين!`,
+🎉 مبروك!`,
       threadID,
       messageID
     );
@@ -109,7 +122,7 @@ ${text}
 
   } catch (err) {
 
-    console.log("زوجيني:", err);
+    console.log("زوجيني ERROR:", err);
 
     return api.sendMessage(
 `⌬ ━━ HINA FUN ━━ ⌬
@@ -119,5 +132,6 @@ ${err.message}`,
       threadID,
       messageID
     );
+
   }
 };
