@@ -1,6 +1,6 @@
 module.exports.config = {
   name: "قبول",
-  version: "2.0.0",
+  version: "3.0.0",
   hasPermssion: 1,
   credits: "أبو هريرة",
   description: "عرض وقبول طلبات الانضمام",
@@ -10,30 +10,50 @@ module.exports.config = {
 };
 
 module.exports.run = async function({ api, event, args }) {
+
   const { threadID, messageID } = event;
 
   try {
 
-    let requests = [];
+    let info;
 
-    // محاولة جلب الطلبات من أكثر من مكان
     try {
-      const info = await api.getThreadInfo(threadID);
+      info = await api.getThreadInfo(threadID);
 
-      requests =
-        info.approvalRequests ||
-        info.pendingRequests ||
-        info.approvalQueue ||
-        info.pendingParticipants ||
-        [];
+      // تسجيل البيانات في اللوغز
+      console.log(
+        "===== JOIN REQUEST LOG ====="
+      );
+      console.log(
+        JSON.stringify(info, null, 2)
+      );
+      console.log(
+        "============================"
+      );
 
-    } catch (e) {}
+    } catch (e) {
+      return api.sendMessage(
+        "❌ فشل جلب معلومات المجموعة.",
+        threadID,
+        messageID
+      );
+    }
 
-    // إذا لم يجدها
+
+    // البحث عن الطلبات
+    let requests =
+      info.approvalRequests ||
+      info.pendingRequests ||
+      info.approvalQueue ||
+      info.pendingParticipants ||
+      info.joinRequests ||
+      [];
+
+
     if (!Array.isArray(requests) || requests.length === 0) {
 
       return api.sendMessage(
-        "ℹ️ لم أجد طلبات انضمام معلقة.\n\nتأكد أن هناك طلبات معلقة فعلًا وأن البوت لديه صلاحيات.",
+        "ℹ️ لا توجد طلبات انضمام معلقة.",
         threadID,
         messageID
       );
@@ -43,17 +63,38 @@ module.exports.run = async function({ api, event, args }) {
     // عرض القائمة
     if (!args[0]) {
 
-      let msg = "📋 طلبات الانضمام:\n\n";
+      let msg =
+`📋 طلبات الانضمام:
 
-      requests.forEach((user, i) => {
-        msg += `${i + 1}- ${user.name || user.id || user.userFbId}\n`;
+`;
+
+      requests.forEach((user, index) => {
+
+        const id =
+          user.id ||
+          user.userFbId ||
+          user.userID ||
+          user.uid;
+
+        const name =
+          user.name ||
+          user.fullName ||
+          id ||
+          "عضو";
+
+        msg += `${index + 1}- ${name}\n`;
+
       });
 
-      msg += "\n━━━━━━━━━━━━━━\n";
-      msg += "✅ قبول طلب:\n";
-      msg += ".قبول رقم\n\n";
-      msg += "✅ قبول الجميع:\n";
-      msg += ".قبول الكل";
+
+      msg +=
+`
+━━━━━━━━━━━━━━
+✅ قبول طلب:
+.قبول رقم
+
+✅ قبول الجميع:
+.قبول الكل`;
 
       return api.sendMessage(
         msg,
@@ -63,6 +104,7 @@ module.exports.run = async function({ api, event, args }) {
     }
 
 
+
     // قبول الكل
     if (args[0] === "الكل") {
 
@@ -70,76 +112,148 @@ module.exports.run = async function({ api, event, args }) {
 
       for (const user of requests) {
 
-        const id = user.id || user.userFbId;
+        const id =
+          user.id ||
+          user.userFbId ||
+          user.userID ||
+          user.uid;
 
         if (!id) continue;
 
         try {
 
-          if (api.addUserToGroup) {
-            await api.addUserToGroup(id, threadID);
+          if (api.approvePendingJoinRequest) {
+            await api.approvePendingJoinRequest(
+              id,
+              threadID
+            );
+          }
+
+          else if (api.approveJoinRequest) {
+            await api.approveJoinRequest(
+              id,
+              threadID
+            );
+          }
+
+          else if (api.addUserToGroup) {
+            await api.addUserToGroup(
+              id,
+              threadID
+            );
           }
 
           count++;
 
-        } catch (e) {}
+        } catch (e) {
+
+          console.log(
+            "فشل قبول:",
+            id,
+            e.message
+          );
+
+        }
       }
 
 
       return api.sendMessage(
-        `✅ تم قبول ${count} من الطلبات.`,
+        `✅ تم قبول ${count} طلب.`,
         threadID,
         messageID
       );
     }
 
 
-    // قبول رقم معين
-    let num = parseInt(args[0]);
 
-    if (isNaN(num) || !requests[num - 1]) {
+
+    // قبول رقم محدد
+
+    const number = parseInt(args[0]);
+
+    if (
+      isNaN(number) ||
+      !requests[number - 1]
+    ) {
 
       return api.sendMessage(
-        "❌ رقم الطلب غير موجود.",
+        "❌ رقم الطلب غير صحيح.",
         threadID,
         messageID
       );
+
     }
 
 
-    const user = requests[num - 1];
-    const id = user.id || user.userFbId;
+    const user = requests[number - 1];
+
+
+    const id =
+      user.id ||
+      user.userFbId ||
+      user.userID ||
+      user.uid;
 
 
     try {
 
-      if (api.addUserToGroup) {
-        await api.addUserToGroup(id, threadID);
+      if (api.approvePendingJoinRequest) {
+
+        await api.approvePendingJoinRequest(
+          id,
+          threadID
+        );
+
       }
 
+      else if (api.approveJoinRequest) {
+
+        await api.approveJoinRequest(
+          id,
+          threadID
+        );
+
+      }
+
+      else if (api.addUserToGroup) {
+
+        await api.addUserToGroup(
+          id,
+          threadID
+        );
+
+      }
+
+
       return api.sendMessage(
-        `✅ تم قبول الطلب رقم ${num}.`,
+        `✅ تم قبول الطلب رقم ${number}.`,
         threadID,
         messageID
       );
+
 
     } catch (e) {
 
       return api.sendMessage(
-        `❌ فشل قبول الطلب:\n${e.message}`,
+        `❌ فشل القبول:\n${e.message}`,
         threadID,
         messageID
       );
+
     }
+
 
 
   } catch (error) {
 
+    console.log(error);
+
     return api.sendMessage(
-      `❌ حدث خطأ:\n${error.message}`,
+      `❌ خطأ:\n${error.message}`,
       threadID,
       messageID
     );
 
   }
+
 };
