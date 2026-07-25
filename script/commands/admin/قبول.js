@@ -1,11 +1,11 @@
 module.exports.config = {
   name: "قبول",
-  version: "5.0.0",
+  version: "6.0.0",
   hasPermssion: 1,
   credits: "أبو هريرة",
-  description: "إدارة طلبات الانضمام عن طريق رابط المجموعة",
+  description: "إدارة طلبات انضمام الأعضاء للمجموعة",
   commandCategory: "admin",
-  usages: "قبول [قائمة/رابط]",
+  usages: "قبول [قائمة/رقم/الكل/رفض]",
   cooldowns: 5
 };
 
@@ -33,20 +33,14 @@ module.exports.run = async function({ api, event, args }) {
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 📋 عرض القائمة مع روابط
+    // 🔍 جلب الطلبات من approvalQueue
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    let pendingRequests = threadInfo.approvalQueue || [];
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 📋 عرض القائمة
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     if (!args[0] || args[0] === "قائمة" || args[0] === "list") {
-      // جلب طلبات الانضمام
-      let pendingRequests = [];
-      try {
-        const response = await api.getThreadInfo(threadID);
-        if (response.pendingRequests && response.pendingRequests.length > 0) {
-          pendingRequests = response.pendingRequests;
-        }
-      } catch (e) {
-        console.log("⚠️ فشل جلب الطلبات:", e.message);
-      }
-
       if (pendingRequests.length === 0) {
         return api.sendMessage(
           `⌬ ━━ HINA ADMIN ━━ ⌬\n\n📭 لا توجد طلبات انضمام معلقة.`,
@@ -55,48 +49,70 @@ module.exports.run = async function({ api, event, args }) {
         );
       }
 
-      // إنشاء رابط المجموعة
-      let inviteLink = "https://www.facebook.com/groups/" + threadID;
-      try {
-        const link = await api.createGroupLink(threadID);
-        if (link) inviteLink = link;
-      } catch (e) {
-        console.log("⚠️ فشل إنشاء الرابط:", e.message);
-      }
-
       let msg = `⌬ ━━ HINA ADMIN ━━ ⌬\n\n📋 قائمة طلبات الانضمام (${pendingRequests.length}):\n\n`;
       
       for (let i = 0; i < Math.min(pendingRequests.length, 20); i++) {
         const req = pendingRequests[i];
-        const name = req.name || `مستخدم ${i+1}`;
+        const name = req.requesterName || `مستخدم ${i+1}`;
+        const id = req.requesterID || "غير معروف";
         msg += `${i+1}. ${name}\n`;
-        msg += `   🔗 https://www.facebook.com/${req.id || req.userID || 'profile'}\n\n`;
+        msg += `   🆔 ${id}\n\n`;
       }
 
       if (pendingRequests.length > 20) {
         msg += `... و ${pendingRequests.length - 20} طلب آخر\n`;
       }
 
-      msg += `\n🔗 رابط المجموعة:\n${inviteLink}\n\n`;
-      msg += `📝 الأوامر:\n• قبول رابط (لإنشاء رابط جديد)\n• قبول رفض (لرفض جميع الطلبات)`;
+      msg += `\n📝 الأوامر:\n• قبول [رقم] (لقبول طلب معين)\n• قبول الكل (لقبول جميع الطلبات)\n• قبول رفض (لرفض جميع الطلبات)`;
 
       return api.sendMessage(msg, threadID, messageID);
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 🔗 إنشاء رابط المجموعة
+    // ✅ قبول طلب معين
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    if (args[0] === "رابط" || args[0] === "link") {
-      try {
-        const inviteLink = await api.createGroupLink(threadID);
+    if (!isNaN(args[0])) {
+      const index = parseInt(args[0]) - 1;
+
+      if (pendingRequests.length === 0) {
         return api.sendMessage(
-          `⌬ ━━ HINA ADMIN ━━ ⌬\n\n🔗 رابط دعوة المجموعة:\n${inviteLink}\n\n📤 أرسل الرابط للأشخاص الذين تريد قبولهم.`,
+          `⌬ ━━ HINA ADMIN ━━ ⌬\n\n📭 لا توجد طلبات.`,
+          threadID,
+          messageID
+        );
+      }
+
+      if (index < 0 || index >= pendingRequests.length) {
+        return api.sendMessage(
+          `⌬ ━━ HINA ADMIN ━━ ⌬\n\n⚠️ رقم غير صحيح!`,
+          threadID,
+          messageID
+        );
+      }
+
+      const target = pendingRequests[index];
+      const userID = target.requesterID;
+
+      if (!userID) {
+        return api.sendMessage(
+          `⌬ ━━ HINA ADMIN ━━ ⌬\n\n❌ لا يمكن تحديد المستخدم.`,
+          threadID,
+          messageID
+        );
+      }
+
+      try {
+        await api.addUserToGroup(userID, threadID);
+        // إزالة الطلب من القائمة
+        pendingRequests.splice(index, 1);
+        return api.sendMessage(
+          `⌬ ━━ HINA ADMIN ━━ ⌬\n\n✅ تم قبول ${target.requesterName || "المستخدم"} بنجاح!`,
           threadID,
           messageID
         );
       } catch (error) {
         return api.sendMessage(
-          `⌬ ━━ HINA ADMIN ━━ ⌬\n\n❌ فشل إنشاء الرابط:\n${error.message}`,
+          `⌬ ━━ HINA ADMIN ━━ ⌬\n\n❌ فشل القبول: ${error.message}`,
           threadID,
           messageID
         );
@@ -104,20 +120,52 @@ module.exports.run = async function({ api, event, args }) {
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ✅ قبول الكل
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    if (args[0] === "الكل" || args[0] === "all") {
+      if (pendingRequests.length === 0) {
+        return api.sendMessage(
+          `⌬ ━━ HINA ADMIN ━━ ⌬\n\n📭 لا توجد طلبات.`,
+          threadID,
+          messageID
+        );
+      }
+
+      let accepted = 0;
+      let failed = 0;
+
+      for (const req of pendingRequests) {
+        const userID = req.requesterID;
+        if (!userID) {
+          failed++;
+          continue;
+        }
+
+        try {
+          await api.addUserToGroup(userID, threadID);
+          accepted++;
+          await new Promise(resolve => setTimeout(resolve, 300));
+        } catch (e) {
+          failed++;
+        }
+      }
+
+      // مسح القائمة
+      pendingRequests.length = 0;
+
+      return api.sendMessage(
+        `⌬ ━━ HINA ADMIN ━━ ⌬\n\n✅ تم قبول ${accepted} طلب.\n❌ فشل: ${failed}`,
+        threadID,
+        messageID
+      );
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // ❌ رفض الكل
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     if (args[0] === "رفض" || args[0] === "reject") {
-      let pendingRequests = [];
-      try {
-        const response = await api.getThreadInfo(threadID);
-        if (response.pendingRequests && response.pendingRequests.length > 0) {
-          pendingRequests = response.pendingRequests;
-        }
-      } catch (e) {}
-
       const count = pendingRequests.length;
       pendingRequests.length = 0;
-      
       return api.sendMessage(
         `⌬ ━━ HINA ADMIN ━━ ⌬\n\n❌ تم رفض ${count} طلب.`,
         threadID,
@@ -125,11 +173,8 @@ module.exports.run = async function({ api, event, args }) {
       );
     }
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // ❌ أمر غير معروف
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     return api.sendMessage(
-      `⌬ ━━ HINA ADMIN ━━ ⌬\n\n📝 الاستخدام:\n• قبول (لعرض القائمة مع الروابط)\n• قبول رابط (لإنشاء رابط المجموعة)\n• قبول رفض (لرفض جميع الطلبات)`,
+      `⌬ ━━ HINA ADMIN ━━ ⌬\n\n📝 الاستخدام:\n• قبول (لعرض القائمة)\n• قبول [رقم] (لقبول طلب معين)\n• قبول الكل (لقبول جميع الطلبات)\n• قبول رفض (لرفض جميع الطلبات)`,
       threadID,
       messageID
     );
