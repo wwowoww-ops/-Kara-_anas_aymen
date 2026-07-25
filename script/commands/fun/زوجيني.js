@@ -4,7 +4,7 @@ const path = require("path");
 
 module.exports.config = {
   name: "زوجيني",
-  version: "2.3.1",
+  version: "2.3.2",
   hasPermssion: 0,
   credits: "أبو هريرة",
   description: "زواج عشوائي أو من الشخص الذي ترد على رسالته مع نسبة توافق",
@@ -72,6 +72,9 @@ module.exports.run = async function({ api, event, Users }) {
     m => m.user1 === senderID || m.user2 === senderID
   );
 
+  // حساب عدد الزيجات (بأمان)
+  const totalMarriages = marriages[threadID] ? marriages[threadID].length : 0;
+
   if (!existingMarriage) {
     const marriageDate = new Date().toLocaleString("ar", {
       year: 'numeric',
@@ -110,7 +113,7 @@ module.exports.run = async function({ api, event, Users }) {
     const name2 = userData2.name;
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 💖 حساب نسبة التوافق بطريقة أكثر دقة
+    // 💖 حساب نسبة التوافق
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     const getCompatibility = (name1, name2) => {
       let base = Math.floor(Math.random() * 41) + 30;
@@ -144,13 +147,6 @@ module.exports.run = async function({ api, event, Users }) {
     } else {
       loveMessage = "💔 توافق ضعيف... الله يعينكم على بعض! 😂";
     }
-
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 📊 إحصائيات الزواج (مع التحقق من الصحة)
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    const totalMarriages = (marriages[threadID] && Array.isArray(marriages[threadID])) 
-      ? marriages[threadID].length 
-      : 0;
 
     // جلب الصور
     const getAvt = async (uid, savePath) => {
