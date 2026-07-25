@@ -1,6 +1,6 @@
 module.exports.config = {
   name: "قبول",
-  version: "6.0.0",
+  version: "8.0.0",
   hasPermssion: 1,
   credits: "أبو هريرة",
   description: "إدارة طلبات انضمام الأعضاء للمجموعة",
@@ -38,7 +38,7 @@ module.exports.run = async function({ api, event, args }) {
     let pendingRequests = threadInfo.approvalQueue || [];
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 📋 عرض القائمة
+    // 📋 عرض القائمة مع الأسماء
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     if (!args[0] || args[0] === "قائمة" || args[0] === "list") {
       if (pendingRequests.length === 0) {
@@ -53,8 +53,44 @@ module.exports.run = async function({ api, event, args }) {
       
       for (let i = 0; i < Math.min(pendingRequests.length, 20); i++) {
         const req = pendingRequests[i];
-        const name = req.requesterName || `مستخدم ${i+1}`;
-        const id = req.requesterID || "غير معروف";
+        
+        // محاولة جلب الاسم من مصادر مختلفة
+        let name = "مستخدم";
+        let id = "غير معروف";
+        
+        // المصدر 1: requesterName
+        if (req.requesterName) {
+          name = req.requesterName;
+        }
+        // المصدر 2: name
+        else if (req.name) {
+          name = req.name;
+        }
+        // المصدر 3: userInfo
+        else if (req.userInfo && req.userInfo.name) {
+          name = req.userInfo.name;
+        }
+        // المصدر 4: جلب من API
+        else if (req.requesterID) {
+          try {
+            const userInfo = await api.getUserInfo(req.requesterID);
+            if (userInfo && userInfo[req.requesterID]) {
+              name = userInfo[req.requesterID].name || "مستخدم";
+            }
+          } catch (e) {
+            console.log("⚠️ فشل جلب اسم المستخدم:", e.message);
+          }
+        }
+        
+        // جلب المعرف
+        if (req.requesterID) {
+          id = req.requesterID;
+        } else if (req.id) {
+          id = req.id;
+        } else if (req.userID) {
+          id = req.userID;
+        }
+        
         msg += `${i+1}. ${name}\n`;
         msg += `   🆔 ${id}\n\n`;
       }
@@ -91,7 +127,7 @@ module.exports.run = async function({ api, event, args }) {
       }
 
       const target = pendingRequests[index];
-      const userID = target.requesterID;
+      const userID = target.requesterID || target.id || target.userID;
 
       if (!userID) {
         return api.sendMessage(
@@ -101,18 +137,44 @@ module.exports.run = async function({ api, event, args }) {
         );
       }
 
+      // جلب اسم المستخدم
+      let userName = "المستخدم";
       try {
-        await api.addUserToGroup(userID, threadID);
-        // إزالة الطلب من القائمة
+        const userInfo = await api.getUserInfo(userID);
+        if (userInfo && userInfo[userID]) {
+          userName = userInfo[userID].name || "المستخدم";
+        }
+      } catch (e) {
+        userName = target.requesterName || target.name || "المستخدم";
+      }
+
+      try {
+        await new Promise((resolve, reject) => {
+          api.addUserToGroup(userID, threadID, (err) => {
+            if (err) reject(err);
+            else resolve();
+          });
+        });
+        
         pendingRequests.splice(index, 1);
+        
         return api.sendMessage(
-          `⌬ ━━ HINA ADMIN ━━ ⌬\n\n✅ تم قبول ${target.requesterName || "المستخدم"} بنجاح!`,
+          `⌬ ━━ HINA ADMIN ━━ ⌬\n\n✅ تم قبول ${userName} بنجاح!`,
           threadID,
           messageID
         );
       } catch (error) {
+        console.error("❌ خطأ في القبول:", error);
+        
+        let errorMsg = error.message || "خطأ غير معروف";
+        if (errorMsg.includes("permission")) {
+          errorMsg = "البوت ليس لديه صلاحية. تأكد من أن البوت أدمن.";
+        } else if (errorMsg.includes("blocked")) {
+          errorMsg = "المستخدم محظور أو قام بحظر البوت.";
+        }
+        
         return api.sendMessage(
-          `⌬ ━━ HINA ADMIN ━━ ⌬\n\n❌ فشل القبول: ${error.message}`,
+          `⌬ ━━ HINA ADMIN ━━ ⌬\n\n❌ فشل قبول ${userName}:\n${errorMsg}`,
           threadID,
           messageID
         );
@@ -135,22 +197,27 @@ module.exports.run = async function({ api, event, args }) {
       let failed = 0;
 
       for (const req of pendingRequests) {
-        const userID = req.requesterID;
+        const userID = req.requesterID || req.id || req.userID;
         if (!userID) {
           failed++;
           continue;
         }
 
         try {
-          await api.addUserToGroup(userID, threadID);
+          await new Promise((resolve, reject) => {
+            api.addUserToGroup(userID, threadID, (err) => {
+              if (err) reject(err);
+              else resolve();
+            });
+          });
           accepted++;
           await new Promise(resolve => setTimeout(resolve, 300));
         } catch (e) {
           failed++;
+          console.log(`❌ فشل قبول ${userID}:`, e.message);
         }
       }
 
-      // مسح القائمة
       pendingRequests.length = 0;
 
       return api.sendMessage(
