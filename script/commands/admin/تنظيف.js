@@ -1,6 +1,6 @@
 module.exports.config = {
   name: "تنظيف",
-  version: "1.0.0",
+  version: "2.0.0",
   hasPermssion: 1,
   credits: "أبو هريرة",
   description: "إزالة الأعضاء الذين حساباتهم محذوفة من المجموعة",
@@ -42,14 +42,17 @@ module.exports.run = async function({ api, event }) {
     );
 
     // جلب قائمة الأعضاء
-    const participants = threadInfo.participantIDs;
+    const participants = threadInfo.participantIDs || [];
     const botID = api.getCurrentUserID();
     let deleted = 0;
     let errors = 0;
+    let skipped = 0;
     const deletedUsers = [];
 
     // فحص كل عضو
-    for (const userID of participants) {
+    for (let i = 0; i < participants.length; i++) {
+      const userID = participants[i];
+      
       // تخطي البوت نفسه
       if (userID === botID) continue;
 
@@ -58,35 +61,63 @@ module.exports.run = async function({ api, event }) {
         const userInfo = await api.getUserInfo(userID);
         
         // إذا كان العضو موجوداً، نمرره
-        if (userInfo[userID]) continue;
+        if (userInfo && userInfo[userID]) {
+          continue;
+        }
         
       } catch (error) {
-        // إذا فشل جلب المعلومات، يعني أن الحساب محذوف
-        try {
-          // محاولة طرد العضو
-          await api.removeUserFromGroup(userID, threadID);
-          deleted++;
-          deletedUsers.push(userID);
+        // إذا فشل جلب المعلومات، قد يكون الحساب محذوفاً
+        // نتحقق من نوع الخطأ
+        const errorMsg = error.message || error.toString();
+        
+        // إذا كان الخطأ يشير إلى أن الحساب غير موجود
+        if (errorMsg.includes("Not Found") || 
+            errorMsg.includes("not found") || 
+            errorMsg.includes("This user") ||
+            errorMsg.includes("User") && errorMsg.includes("not") ||
+            errorMsg.includes("does not exist") ||
+            errorMsg.includes("unavailable") ||
+            errorMsg.includes("deactivated")) {
           
-          // تأخير بسيط لتجنب الحظر
-          await new Promise(resolve => setTimeout(resolve, 500));
-          
-        } catch (e) {
-          errors++;
-          console.log(`❌ فشل طرد ${userID}:`, e.message);
+          try {
+            // محاولة طرد العضو
+            await api.removeUserFromGroup(userID, threadID);
+            deleted++;
+            deletedUsers.push(userID);
+            
+            // تأخير بسيط لتجنب الحظر
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+          } catch (e) {
+            errors++;
+            console.log(`❌ فشل طرد ${userID}:`, e.message);
+          }
+        } else {
+          // أخطاء أخرى (مشكلة في الاتصال)
+          skipped++;
+          console.log(`⚠️ تخطي ${userID}:`, error.message);
         }
+      }
+
+      // تحديث التقدم كل 10 أعضاء
+      if (i % 10 === 0 && i > 0) {
+        await api.sendMessage(
+          `⌬ ━━ HINA ADMIN ━━ ⌬\n\n🔄 جاري التنظيف... ${Math.round((i/participants.length)*100)}%`,
+          threadID,
+          messageID
+        );
       }
     }
 
     // بناء رسالة النتيجة
-    let resultMsg = `⌬ ━━ HINA ADMIN ━━ ⌬\n\n✅ تم الانتهاء من التنظيف!\n\n`;
-    resultMsg += `📊 التقرير:\n`;
+    let resultMsg = `⌬ ━━ HINA ADMIN ━━ ⌬\n\n✅ تم الانتهاء من التنظيف!\n\n📊 التقرير:\n`;
     resultMsg += `🗑️ تم طرد: ${deleted} عضو (حسابات محذوفة)\n`;
     resultMsg += `❌ فشل: ${errors} عضو\n`;
+    resultMsg += `⚠️ تم تخطي: ${skipped} عضو (أخطاء أخرى)\n`;
     resultMsg += `👥 بقي: ${participants.length - deleted - 1} عضو`;
 
     if (deletedUsers.length > 0) {
-      resultMsg += `\n\n🆔 المعرفات المطرودة:\n`;
+      resultMsg += `\n\n🆔 المعرفات المطرودة (${deletedUsers.length}):\n`;
       deletedUsers.slice(0, 20).forEach(id => {
         resultMsg += `• ${id}\n`;
       });
