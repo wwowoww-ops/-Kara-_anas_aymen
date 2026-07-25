@@ -23,7 +23,6 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
     const threadSetting = threadData.get(threadID) || {};
     const prefix = threadSetting.hasOwnProperty("PREFIX") ? threadSetting.PREFIX : PREFIX;
     
-    // ✅ الإصلاح الصحيح: استخدام Bot ID للمنشن
     const botID = api.getCurrentUserID();
     const prefixRegex = new RegExp(`^(<@!?${botID}>|${escapeRegex(prefix)})\\s*`);
 
@@ -48,9 +47,9 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
 
         const closestMatch = checker.bestMatch.target;
         const funnyReplies = [
-          `⌬ ━━ SOMI 𝗨𝗧𝗜𝗟𝗜𝗧𝗬 ━━ ⌬\n\n❌ خطأ: "${commandName}" غير مسجل\n💡 هل تقصد: '${closestMatch}'؟`,
-          `⌬ ━━ SOMI 𝗨𝗧𝗜𝗟𝗜𝗧𝗬 ━━ ⌬\n\n⚠️ الأمر غير موجود\n🔍 جرب: '${closestMatch}'`,
-          `⌬ ━━ SOMI 𝗨𝗧𝗜𝗟𝗜𝗧𝗬 ━━ ⌬\n\n🚫 أمر خاطئ\n✨ ربما تقصد: '${closestMatch}'`,
+          `⌬ ━━ HINA UTILITY ━━ ⌬\n\n❌ خطأ: "${commandName}" غير مسجل\n💡 هل تقصد: '${closestMatch}'؟`,
+          `⌬ ━━ HINA UTILITY ━━ ⌬\n\n⚠️ الأمر غير موجود\n🔍 جرب: '${closestMatch}'`,
+          `⌬ ━━ HINA UTILITY ━━ ⌬\n\n🚫 أمر خاطئ\n✨ ربما تقصد: '${closestMatch}'`,
         ];
 
         return api.sendMessage(
@@ -66,15 +65,15 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
         const banThreads = commandBanned.get(threadID) || [];
         const banUsers = commandBanned.get(senderID) || [];
         if (banThreads.includes(command.config.name)) {
-          return api.sendMessage(`⌬ ━━ SOMI 𝗔𝗗𝗠𝗜𝗡 ━━ ⌬\n\n🚫 الأمر محظور في هذه المجموعة\nالأمر: ${command.config.name}`, threadID, messageID);
+          return api.sendMessage(`⌬ ━━ HINA ADMIN ━━ ⌬\n\n🚫 الأمر محظور في هذه المجموعة\nالأمر: ${command.config.name}`, threadID, messageID);
         } else if (banUsers.includes(command.config.name)) {
-          return api.sendMessage(`⌬ ━━ SOMI 𝗔𝗗𝗠𝗜𝗡 ━━ ⌬\n\n⛔ أنت محظور من استخدام هذا الأمر`, threadID, messageID);
+          return api.sendMessage(`⌬ ━━ HINA ADMIN ━━ ⌬\n\n⛔ أنت محظور من استخدام هذا الأمر`, threadID, messageID);
         }
       }
     }
 
     if (command.config.commandCategory.toLowerCase() == "nsfw" && !global.data.threadAllowNSFW.includes(threadID) && !ADMINBOT.includes(senderID)) {
-      return api.sendMessage(`⌬ ━━ SOMI 𝗨𝗧𝗜𝗟𝗜𝗧𝗬 ━━ ⌬\n\n🔞 محتوى محظور في هذه المجموعة`, threadID, messageID);
+      return api.sendMessage(`⌬ ━━ HINA UTILITY ━━ ⌬\n\n🔞 محتوى محظور في هذه المجموعة`, threadID, messageID);
     }
 
     var permssion = 0;
@@ -84,7 +83,7 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
     else if (find) permssion = 1;
 
     if (command.config.hasPermssion > permssion) {
-      return api.sendMessage(`⌬ ━━ SOMI 𝗔𝗗𝗠𝗜𝗡 ━━ ⌬\n\n⚠️ ليس لديك صلاحية لتنفيذ هذا الأمر`, event.threadID, event.messageID);
+      return api.sendMessage(`⌬ ━━ ABU HURAIRA ADMIN ━━ ⌬\n\n⚠️ ليس لديك صلاحية لتنفيذ هذا الأمر`, event.threadID, event.messageID);
     }
 
     if (!client.cooldowns.has(command.config.name)) {
@@ -103,7 +102,7 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
       return;
     } catch (e) {
       console.error(e);
-      return api.sendMessage(`⌬ ━━ SOMI 𝗗𝗘𝗩𝗘𝗟𝗢𝗣𝗘𝗥 ━━ ⌬\n\n❌ حدث خطأ أثناء تنفيذ الأمر\n\n${e.message}`, threadID);
+      return api.sendMessage(`⌬ ━━ ABU HURAIRA DEVELOPER ━━ ⌬\n\n❌ حدث خطأ أثناء تنفيذ الأمر\n\n${e.message}`, threadID);
     }
   };
 };
