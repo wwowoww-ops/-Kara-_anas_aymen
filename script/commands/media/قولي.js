@@ -6,7 +6,7 @@ module.exports.config = {
     name: "قولي",
     version: "2.0.0",
     hasPermssion: 0,
-    credits: "Ayman",
+    credits: "أبو هريرة",
     description: "تحويل النص إلى صوت بلهجة سعودية واضحة",
     commandCategory: "media",
     usages: "[النص]",
@@ -17,25 +17,33 @@ module.exports.run = async function({ api, event, args }) {
     const { threadID, messageID } = event;
     const content = args.join(" ");
 
-    if (!content) return api.sendMessage("⌬ ━━ 𝗞𝗜𝗥𝗔 𝗩𝗢𝗜𝗖𝗘 ━━ ⌬\n⚠️ اكتب النص اللي تبيني أقوله يا بطل!", threadID, messageID);
+    if (!content) return api.sendMessage(
+        `⌬ ━━ HINA VOICE ━━ ⌬\n\n⚠️ اكتب النص اللي تبيني أقوله يا بطل!`,
+        threadID,
+        messageID
+    );
+
+    // التأكد من وجود مجلد cache
+    const cacheDir = path.join(__dirname, 'cache');
+    if (!fs.existsSync(cacheDir)) {
+        fs.mkdirSync(cacheDir, { recursive: true });
+    }
 
     try {
-        // تحديد اللغة (العربية السعودية)
+        // تحديد اللغة
         const lang = /[\u0600-\u06FF]/.test(content) ? 'ar' : 'en';
         
-        // رابط API جوجل المباشر (أكثر استقراراً ويدعم اللهجات)
-        // إضافة المنطقة sa للعربية
-        const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(content)}&tl=${lang}&client=tw-ob`;
+        // ✅ الرابط الجديد (يعمل)
+        const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(content)}&tl=${lang}&client=gtx`;
 
-        const cachePath = path.join(__dirname, 'cache', `say_${Date.now()}.mp3`);
+        const cachePath = path.join(cacheDir, `say_${Date.now()}.mp3`);
 
-        // تحميل الصوت باستخدام axios
         const res = await axios({
             method: 'get',
             url: url,
             responseType: 'stream',
             headers: {
-                'User-Agent': 'Mozilla/5.0' // ضروري لتجنب الحظر
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             }
         });
 
@@ -44,7 +52,7 @@ module.exports.run = async function({ api, event, args }) {
 
         writer.on('finish', () => {
             api.sendMessage({
-                body: "⌬ ━━ 𝗞𝗜𝗥𝗔 𝗩𝗢𝗜𝗖𝗘 ━━ ⌬\n✅ تفضل الاستماع:",
+                body: `⌬ ━━ HINA VOICE ━━ ⌬\n\n✅ تفضل الاستماع:`,
                 attachment: fs.createReadStream(cachePath)
             }, threadID, () => {
                 if (fs.existsSync(cachePath)) fs.unlinkSync(cachePath);
@@ -52,11 +60,19 @@ module.exports.run = async function({ api, event, args }) {
         });
 
         writer.on('error', () => {
-            api.sendMessage("⌬ ⚠️ فشل في حفظ ملف الصوت.", threadID, messageID);
+            api.sendMessage(
+                `⌬ ━━ HINA VOICE ━━ ⌬\n\n⚠️ فشل في حفظ ملف الصوت.`,
+                threadID,
+                messageID
+            );
         });
 
     } catch (error) {
-        console.error(error);
-        api.sendMessage("⌬ ⚠️ عذراً، خوادم الصوت لا تستجيب حالياً.", threadID, messageID);
+        console.error("❌ خطأ في قولي:", error);
+        api.sendMessage(
+            `⌬ ━━ HINA VOICE ━━ ⌬\n\n⚠️ عذراً، خوادم الصوت لا تستجيب حالياً.\n📝 ${error.message}`,
+            threadID,
+            messageID
+        );
     }
 };
