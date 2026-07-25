@@ -2,20 +2,21 @@ const axios = require("axios");
 
 module.exports.config = {
   name: "بنترست",
-  version: "1.0.0",
+  version: "2.0.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
-  description: "جلب صور من بنترست مع إمكانية طلب المزيد",
-  commandCategory: "صور",
+  description: "جلب صور حسب الطلب مع المزيد",
+  commandCategory: "fun",
   usages: "بنترست [البحث]",
   cooldowns: 5
 };
 
 
-// جلب الصور
+// جلب الصور من Bing
 async function getImages(query, start = 0) {
+
   const res = await axios.get(
-    `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(query)}`,
+    `https://www.bing.com/images/search?q=${encodeURIComponent(query)}`,
     {
       headers: {
         "User-Agent": "Mozilla/5.0"
@@ -23,13 +24,40 @@ async function getImages(query, start = 0) {
     }
   );
 
-  let images = [
-    ...res.data.matchAll(/https:\/\/i\.pinimg\.com\/[^"]+/g)
-  ]
-    .map(x => x[0].replace(/\\u002F/g, "/"));
 
-  return images.slice(start, start + 5);
+  let images = [
+    ...res.data.matchAll(/murl&quot;:&quot;(.*?)&quot;/g)
+  ]
+  .map(x => x[1]);
+
+
+  return [...new Set(images)].slice(start, start + 5);
 }
+
+
+// تحويل الروابط إلى مرفقات
+async function makeAttachments(images) {
+
+  let attachments = [];
+
+  for (const img of images) {
+
+    try {
+
+      const stream = await axios.get(img, {
+        responseType: "stream",
+        timeout: 10000
+      });
+
+      attachments.push(stream.data);
+
+    } catch {}
+
+  }
+
+  return attachments;
+}
+
 
 
 // الأمر الأساسي
@@ -37,49 +65,59 @@ module.exports.run = async function({ api, event, args }) {
 
   const { threadID, messageID, senderID } = event;
 
+
   if (!args.length) {
+
     return api.sendMessage(
-      "📌 الاستخدام:\nبنترست [الكلمة]\n\nمثال:\nبنترست ناروتو",
+      "📌 اكتب ما تريد البحث عنه\nمثال:\nبنترست انمي",
       threadID,
       messageID
     );
+
   }
+
 
   const query = args.join(" ");
 
+
   try {
 
-    const images = await getImages(query, 0);
+    const images = await getImages(query);
+
 
     if (!images.length) {
+
       return api.sendMessage(
-        "❌ لم أجد صورًا لهذا البحث.",
+        "❌ لم أجد صورًا.",
         threadID,
         messageID
       );
+
     }
 
 
-    let attachments = [];
+    const attachments = await makeAttachments(images);
 
-    for (const img of images) {
 
-      const stream = await axios.get(img, {
-        responseType: "stream"
-      });
+    if (!attachments.length) {
 
-      attachments.push(stream.data);
+      return api.sendMessage(
+        "❌ لم أستطع تحميل الصور.",
+        threadID,
+        messageID
+      );
+
     }
 
 
-    const sent = await api.sendMessage(
+    const msg = await api.sendMessage(
       {
         body:
 `⌬ ━━ HINA FUN ━━ ⌬
 
 📌 البحث: ${query}
 
-🖼️ تم إرسال 5 صور
+🖼️ تم إرسال ${attachments.length} صور
 💬 رد بكلمة "مزيد" للحصول على المزيد`,
         attachment: attachments
       },
@@ -91,7 +129,7 @@ module.exports.run = async function({ api, event, args }) {
 
       name: "بنترست",
 
-      messageID: sent.messageID,
+      messageID: msg.messageID,
 
       author: senderID,
 
@@ -103,6 +141,8 @@ module.exports.run = async function({ api, event, args }) {
 
 
   } catch (e) {
+
+    console.log(e);
 
     api.sendMessage(
       "❌ حدث خطأ أثناء جلب الصور.",
@@ -116,15 +156,12 @@ module.exports.run = async function({ api, event, args }) {
 
 
 
-// عند الرد بكلمة مزيد
+// نظام المزيد
 module.exports.handleReply = async function({
   api,
   event,
   handleReply
 }) {
-
-  const { threadID, messageID, senderID } = event;
-
 
   if (!event.body) return;
 
@@ -132,14 +169,9 @@ module.exports.handleReply = async function({
   if (event.body.trim() !== "مزيد") return;
 
 
-  // فقط صاحب البحث يستطيع طلب المزيد
-  if (senderID !== handleReply.author) {
+  if (event.senderID !== handleReply.author) {
 
-    return api.sendMessage(
-      "⚠️ هذا البحث ليس لك.",
-      threadID,
-      messageID
-    );
+    return;
 
   }
 
@@ -156,46 +188,34 @@ module.exports.handleReply = async function({
 
       return api.sendMessage(
         "❌ لا توجد صور إضافية.",
-        threadID,
-        messageID
+        event.threadID,
+        event.messageID
       );
 
     }
 
 
-    let attachments = [];
+    const attachments = await makeAttachments(images);
 
 
-    for (const img of images) {
-
-      const stream = await axios.get(img, {
-        responseType: "stream"
-      });
-
-      attachments.push(stream.data);
-
-    }
-
-
-    const sent = await api.sendMessage(
+    const msg = await api.sendMessage(
       {
         body:
-`📌 صور إضافية لـ: ${handleReply.query}
+`📌 المزيد عن: ${handleReply.query}
 
-🖼️ تم إرسال 5 صور أخرى
-💬 أرسل "مزيد" للمزيد`,
+🖼️ تم إرسال ${attachments.length} صور
+💬 اكتب "مزيد" للمزيد`,
         attachment: attachments
       },
-      threadID
+      event.threadID
     );
 
 
-    // تحديث الصفحة
     global.client.handleReply.push({
 
       name: "بنترست",
 
-      messageID: sent.messageID,
+      messageID: msg.messageID,
 
       author: handleReply.author,
 
@@ -208,10 +228,12 @@ module.exports.handleReply = async function({
 
   } catch (e) {
 
+    console.log(e);
+
     api.sendMessage(
       "❌ حدث خطأ أثناء جلب المزيد.",
-      threadID,
-      messageID
+      event.threadID,
+      event.messageID
     );
 
   }
