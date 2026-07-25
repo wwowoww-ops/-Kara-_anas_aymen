@@ -11,12 +11,20 @@ module.exports.run = async function({ api, event, args, Users, Threads, Currenci
             maxAttempts: 10
         };
         
-        return api.sendMessage(`⌬ ━━ 𝗞𝗜𝗥𝗔 FUN ━━ ⌬\n\nبدأت لعبة التخمين!\nخمن رقم من 1 إلى 100\nلديك 10 محاولات\n\nاكتب: خمن [الرقم]`, threadID, messageID);
+        return api.sendMessage(
+            `⌬ ━━ HINA GAMES ━━ ⌬\n\n🎮 بدأت لعبة التخمين!\n🔢 خمن رقم من 1 إلى 100\n📊 لديك 10 محاولات\n\n📝 اكتب: خمن [الرقم]`,
+            threadID,
+            messageID
+        );
     }
     
     const guess = parseInt(args[0]);
     if (isNaN(guess) || guess < 1 || guess > 100) {
-        return api.sendMessage("⌬ ━━ 𝗞𝗜𝗥𝗔 FUN ━━ ⌬\n\nاكتب رقم صحيح من 1 إلى 100", threadID, messageID);
+        return api.sendMessage(
+            `⌬ ━━ HINA GAMES ━━ ⌬\n\n⚠️ اكتب رقم صحيح من 1 إلى 100`,
+            threadID,
+            messageID
+        );
     }
     
     const game = global.guessGames[threadID];
@@ -24,25 +32,37 @@ module.exports.run = async function({ api, event, args, Users, Threads, Currenci
     
     if (guess === game.number) {
         delete global.guessGames[threadID];
-        return api.sendMessage(`⌬ ━━ 𝗞𝗜𝗥𝗔 FUN ━━ ⌬\n\nمبروك! 🎉\nالرقم الصحيح: ${game.number}\nعدد المحاولات: ${game.attempts}`, threadID, messageID);
+        return api.sendMessage(
+            `⌬ ━━ HINA GAMES ━━ ⌬\n\n🎉 مبروك! لقد خمنت الرقم الصحيح! 🎉\n\n🔢 الرقم الصحيح: ${game.number}\n📊 عدد المحاولات: ${game.attempts}\n\n🏆 أنت بطل! 🌟`,
+            threadID,
+            messageID
+        );
     }
     
     if (game.attempts >= game.maxAttempts) {
         delete global.guessGames[threadID];
-        return api.sendMessage(`⌬ ━━ 𝗞𝗜𝗥𝗔 FUN ━━ ⌬\n\nانتهت المحاولات!\nالرقم الصحيح كان: ${game.number}`, threadID, messageID);
+        return api.sendMessage(
+            `⌬ ━━ HINA GAMES ━━ ⌬\n\n😅 انتهت المحاولات!\n🔢 الرقم الصحيح كان: ${game.number}\n\n💪 حاول مرة أخرى!`,
+            threadID,
+            messageID
+        );
     }
     
-    const hint = guess > game.number ? "الرقم أصغر" : "الرقم أكبر";
+    const hint = guess > game.number ? "🔻 الرقم أصغر" : "🔺 الرقم أكبر";
     const remaining = game.maxAttempts - game.attempts;
     
-    return api.sendMessage(`⌬ ━━ 𝗞𝗜𝗥𝗔 FUN ━━ ⌬\n\n${hint}\nالمحاولات المتبقية: ${remaining}`, threadID, messageID);
+    return api.sendMessage(
+        `⌬ ━━ HINA GAMES ━━ ⌬\n\n${hint}\n📊 المحاولات المتبقية: ${remaining}\n📝 خمن مرة أخرى!`,
+        threadID,
+        messageID
+    );
 };
 
 module.exports.config = {
     name: "خمن",
     version: "2.0.0",
     hasPermssion: 0,
-    credits: "ايمن",
+    credits: "أبو هريرة",
     description: "لعبة تخمين الرقم",
     commandCategory: "games",
     usages: "خمن [الرقم]",
