@@ -1,9 +1,9 @@
 module.exports.config = {
   name: "ممنوع_الكلام",
-  version: "2.0.0",
+  version: "3.0.0",
   hasPermssion: 1,
   credits: "أبو هريرة",
-  description: "منع أو السماح بالكلام في المجموعة (تقييد الأعضاء)",
+  description: "منع الكلام مع تحذير تلقائي للمخالفين",
   commandCategory: "admin",
   usages: "ممنوع_الكلام [تشغيل/إيقاف]",
   cooldowns: 5
@@ -25,7 +25,6 @@ module.exports.run = async function({ api, event, args }) {
     );
   }
 
-  // التأكد من وجود ملف التقييد
   if (!fs.existsSync(path)) {
     fs.writeFileSync(path, JSON.stringify({}));
   }
@@ -34,7 +33,8 @@ module.exports.run = async function({ api, event, args }) {
 
   if (!data[threadID]) {
     data[threadID] = {
-      active: false
+      active: false,
+      warnings: {}
     };
   }
 
@@ -42,7 +42,6 @@ module.exports.run = async function({ api, event, args }) {
   // تشغيل منع الكلام
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   if (args[0] === "تشغيل" || args[0] === "on") {
-    // التأكد من أن البوت أدمن
     const isBotAdmin = threadInfo.adminIDs.some(admin => admin.id === api.getCurrentUserID());
     if (!isBotAdmin) {
       return api.sendMessage(
@@ -53,20 +52,22 @@ module.exports.run = async function({ api, event, args }) {
     }
 
     data[threadID].active = true;
+    data[threadID].warnings = {};
     fs.writeFileSync(path, JSON.stringify(data, null, 2));
     
     return api.sendMessage(
-      `⌬ ━━ HINA ADMIN ━━ ⌬\n\n🔇 تم تفعيل منع الكلام!\n\n🚫 لا يمكن لأي عضو التحدث الآن.\n📌 الأدمن فقط من يستطيع الكلام.\n\n🔓 للسماح بالكلام: ممنوع_الكلام إيقاف`,
+      `⌬ ━━ HINA ADMIN ━━ ⌬\n\n🔇 تم تفعيل منع الكلام!\n\n🚫 لا يمكن لأي عضو التحدث الآن.\n📌 الأدمن فقط من يستطيع الكلام.\n⚠️ المخالف سيحصل على تحذير تلقائي.\n\n🔓 للسماح بالكلام: ممنوع_الكلام إيقاف`,
       threadID,
       messageID
     );
   } 
   
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // إيقاف منع الكلام (السماح بالكلام)
+  // إيقاف منع الكلام
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   else if (args[0] === "إيقاف" || args[0] === "off") {
     data[threadID].active = false;
+    data[threadID].warnings = {};
     fs.writeFileSync(path, JSON.stringify(data, null, 2));
     
     return api.sendMessage(
@@ -80,7 +81,7 @@ module.exports.run = async function({ api, event, args }) {
   // عرض الحالة
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   else {
-    const status = data[threadID].active ? "مفعل 🔇 (ممنوع الكلام)" : "معطل 🔊 (مسموح الكلام)";
+    const status = data[threadID].active ? "مفعل 🔇" : "معطل 🔊";
     return api.sendMessage(
       `⌬ ━━ HINA ADMIN ━━ ⌬\n\n📊 حالة منع الكلام: ${status}\n\n📝 الاستخدام:\n• ممنوع_الكلام تشغيل (لمنع الكلام)\n• ممنوع_الكلام إيقاف (للسماح بالكلام)`,
       threadID,
@@ -90,47 +91,102 @@ module.exports.run = async function({ api, event, args }) {
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 🎯 معالج الرسائل (لمنع أو السماح بالكلام)
+// 🎯 معالج الرسائل (مع تحذير تلقائي)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 module.exports.handleEvent = async function({ api, event }) {
-  const { threadID, senderID, type } = event;
+  const { threadID, senderID, type, messageID } = event;
   const fs = require("fs");
   const path = "./data/mute.json";
+  const warningsPath = "./warnings.json";
 
-  // التأكد من أن الحدث هو رسالة
   if (type !== "message" && type !== "message_reply") return;
 
-  // قراءة ملف التقييد
   if (!fs.existsSync(path)) return;
   let data = JSON.parse(fs.readFileSync(path));
 
-  // التأكد من تفعيل منع الكلام في هذه المجموعة
   if (!data[threadID] || !data[threadID].active) return;
 
-  // التأكد من أن البوت أدمن
   try {
     const threadInfo = await api.getThreadInfo(threadID);
     const isBotAdmin = threadInfo.adminIDs.some(admin => admin.id === api.getCurrentUserID());
-    if (!isBotAdmin) {
-      console.log(`❌ البوت ليس أدمن في ${threadID}، لا يمكن تطبيق منع الكلام.`);
-      return;
-    }
-  } catch (e) { return; }
+    if (!isBotAdmin) return;
 
-  // التحقق من أن المرسل ليس أدمن
-  try {
-    const threadInfo = await api.getThreadInfo(threadID);
     const isSenderAdmin = threadInfo.adminIDs.some(admin => admin.id === senderID);
-    
-    // ✅ إذا كان المرسل أدمن، يسمح له بالكلام
     if (isSenderAdmin) return;
-    
-    // ❌ إذا كان المرسل ليس أدمن، يتم حذف رسالته
+
+    // حذف الرسالة
     if (event.messageID) {
       await api.unsendMessage(event.messageID);
-      console.log(`🔇 تم حذف رسالة من ${senderID} في ${threadID}`);
     }
-  } catch (e) { 
-    console.log(`❌ خطأ في معالج منع الكلام:`, e);
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 📝 نظام التحذير التلقائي
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    // تهيئة ملف التحذيرات
+    if (!fs.existsSync(warningsPath)) {
+      fs.writeFileSync(warningsPath, JSON.stringify({}));
+    }
+
+    let warningsData = JSON.parse(fs.readFileSync(warningsPath));
+
+    if (!warningsData[threadID]) {
+      warningsData[threadID] = {};
+    }
+
+    if (!warningsData[threadID][senderID]) {
+      warningsData[threadID][senderID] = [];
+    }
+
+    // جلب اسم العضو
+    let userName = "العضو";
+    try {
+      const userInfo = await api.getUserInfo(senderID);
+      userName = userInfo[senderID]?.name || "العضو";
+    } catch (e) {}
+
+    // إضافة تحذير جديد
+    warningsData[threadID][senderID].push({
+      reason: "🔇 مخالفة منع الكلام (تحدث أثناء التقييد)",
+      time: new Date().toLocaleString("ar")
+    });
+
+    const warningCount = warningsData[threadID][senderID].length;
+
+    fs.writeFileSync(warningsPath, JSON.stringify(warningsData, null, 2));
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 🚨 إرسال تحذير للعضو
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    await api.sendMessage(
+      `⌬ ━━ HINA ADMIN ━━ ⌬\n\n🔇 تم حذف رسالتك لأن الكلام ممنوع!\n\n👤 ${userName}\n📌 السبب: التحدث أثناء التقييد\n🔢 عدد التحذيرات: ${warningCount}/3\n\n⚠️ عند وصولك إلى 3 تحذيرات، سيتم طردك تلقائياً.`,
+      threadID
+    );
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 🚫 الطرد التلقائي بعد 3 تحذيرات
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    if (warningCount >= 3) {
+      // حذف تحذيرات العضو بعد الطرد
+      delete warningsData[threadID][senderID];
+      fs.writeFileSync(warningsPath, JSON.stringify(warningsData, null, 2));
+
+      // طرد العضو
+      try {
+        await api.removeUserFromGroup(senderID, threadID);
+        await api.sendMessage(
+          `⌬ ━━ HINA ADMIN ━━ ⌬\n\n🚫 تم طرد ${userName} من المجموعة!\n\n📌 سبب الطرد: تجاوز 3 تحذيرات بسبب مخالفة منع الكلام.`,
+          threadID
+        );
+        console.log(`🚫 تم طرد ${userName} (${senderID}) بسبب 3 تحذيرات`);
+      } catch (error) {
+        console.error(`❌ فشل طرد العضو ${senderID}:`, error);
+      }
+    }
+
+  } catch (error) {
+    console.error("❌ خطأ في معالج منع الكلام:", error);
   }
 };
