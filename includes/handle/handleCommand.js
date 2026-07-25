@@ -1,11 +1,11 @@
-module.exports = function ({ api, models, Users, Threads, Currencies }) {
-  const fs = require("fs");
-  const path = require("path");
-  const stringSimilarity = require("string-similarity"),
-    escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-    logger = require("../../utils/log.js");
-  const moment = require("moment-timezone");
+const fs = require("fs");
+const path = require("path");
+const stringSimilarity = require("string-similarity");
+const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const logger = require("../../utils/log.js");
+const moment = require("moment-timezone");
 
+module.exports = function ({ api, models, Users, Threads, Currencies }) {
   return async function ({ event }) {
     const dateNow = Date.now();
     const time = moment.tz("Africa/Casablanca").format("HH:mm:ss DD/MM/YYYY");
@@ -20,6 +20,31 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
 
     senderID = String(senderID);
     threadID = String(threadID);
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 🔴 نظام الإيقاف (كف) - للأدمن فقط
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    const stopPath = "./data/stop.json";
+    if (fs.existsSync(stopPath)) {
+      const stopData = JSON.parse(fs.readFileSync(stopPath));
+      if (stopData[threadID] && stopData[threadID].active) {
+        // إذا كانت المجموعة موقوفة، لا يستجيب البوت
+        return;
+      }
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 🔒 نظام التقييد (إيقاف البوت في مجموعة)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    const restrictPath = "./data/restrict.json";
+    if (fs.existsSync(restrictPath)) {
+      const restrictData = JSON.parse(fs.readFileSync(restrictPath));
+      if (restrictData[threadID] && restrictData[threadID].active) {
+        // إذا كانت المجموعة مقيدة، لا يستجيب البوت
+        return;
+      }
+    }
+
     const threadSetting = threadData.get(threadID) || {};
     const prefix = threadSetting.hasOwnProperty("PREFIX") ? threadSetting.PREFIX : PREFIX;
     
@@ -59,6 +84,8 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
         );
       }
     }
+
+    if (!command) return;
 
     if (commandBanned.get(threadID) || commandBanned.get(senderID)) {
       if (!ADMINBOT.includes(senderID)) {
