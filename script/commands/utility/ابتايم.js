@@ -2,7 +2,7 @@ module.exports.config = {
   name: "ابتايم",
   version: "1.2.0",
   hasPermssion: 0,
-  credits: "أنس",
+  credits: "أبو هريرة",
   description: "عرض حالة النظام وإحصائيات التشغيل",
   commandCategory: "utility",
   cooldowns: 5
@@ -31,7 +31,7 @@ module.exports.run = async ({ api, event }) => {
                    `• المجموعات النشطة: ${groupCount}\n` +
                    `• سرعة الاستجابة: مستقرة\n\n` +
                    `🤖 الحالة: متصل\n` +
-                   `👑 المطور: أنس`;
+                   `👑 المطور: أبو هريرة`;
 
   return api.sendMessage(statusMsg, threadID, (err, info) => {
       // حذف الرسالة تلقائياً بعد 15 ثانية
