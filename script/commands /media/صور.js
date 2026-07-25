@@ -3,23 +3,23 @@ const fs = require("fs-extra");
 const path = require("path");
 
 module.exports.config = {
-  name: "بنترست",
+  name: "صور",
   version: "3.0.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
-  description: "البحث عن صور من Pinterest",
+  description: "البحث عن صور من Unsplash",
   commandCategory: "media",
-  usages: "بنترست [كلمة البحث]",
+  usages: "صور [كلمة البحث]",
   cooldowns: 5
 };
 
 module.exports.run = async function({ api, event, args }) {
-  const { threadID, messageID, senderID } = event;
+  const { threadID, messageID } = event;
   const search = args.join(" ");
 
   if (!search) {
     return api.sendMessage(
-      `⌬ ━━ HINA MEDIA ━━ ⌬\n\n📝 استخدم: بنترست [كلمة البحث]\nمثال: بنترست مناظر طبيعية`,
+      `⌬ ━━ HINA MEDIA ━━ ⌬\n\n📝 استخدم: صور [كلمة البحث]\nمثال: صور غروب شمس`,
       threadID,
       messageID
     );
@@ -27,19 +27,18 @@ module.exports.run = async function({ api, event, args }) {
 
   try {
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 🔍 البحث عن الصور باستخدام API بديل
+    // 🔍 استخدام Unsplash API مع المفتاح الخاص بك
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    const UNSPLASH_KEY = "BmiP3mpC4AMj8PhAD6LKrMx58IHSnQUpuKfqleiRucU";
+    
     const response = await axios.get(
-      `https://api.pinterest.com/v1/search/pins/?q=${encodeURIComponent(search)}&limit=20`,
-      {
-        headers: {
-          'User-Agent': 'Mozilla/5.0'
-        }
-      }
+      `https://api.unsplash.com/search/photos?query=${encodeURIComponent(search)}&per_page=10&client_id=${UNSPLASH_KEY}`,
+      { timeout: 15000 }
     );
 
-    const pins = response.data?.data || [];
-    if (pins.length === 0) {
+    const photos = response.data?.results || [];
+
+    if (photos.length === 0) {
       return api.sendMessage(
         `⌬ ━━ HINA MEDIA ━━ ⌬\n\n❌ لا توجد نتائج للبحث: "${search}"`,
         threadID,
@@ -48,34 +47,25 @@ module.exports.run = async function({ api, event, args }) {
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 💾 حفظ الصور في مجلد cache
+    // 💾 حفظ الصور
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     const cacheDir = path.join(__dirname, 'cache');
     if (!fs.existsSync(cacheDir)) {
       fs.mkdirSync(cacheDir, { recursive: true });
     }
 
-    const imageUrls = pins.slice(0, 5).map(pin => pin.image?.original?.url || pin.image?.large?.url);
-    const validImages = imageUrls.filter(url => url);
-
-    if (validImages.length === 0) {
-      return api.sendMessage(
-        `⌬ ━━ HINA MEDIA ━━ ⌬\n\n❌ لا توجد صور متاحة للتحميل.`,
-        threadID,
-        messageID
-      );
-    }
-
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 📥 تحميل الصور
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     const attachments = [];
-    for (let i = 0; i < validImages.length; i++) {
+    const maxImages = Math.min(photos.length, 5);
+
+    for (let i = 0; i < maxImages; i++) {
       try {
-        const imgPath = path.join(cacheDir, `pinterest_${Date.now()}_${i}.jpg`);
+        const imgUrl = photos[i].urls?.regular || photos[i].urls?.small;
+        if (!imgUrl) continue;
+
+        const imgPath = path.join(cacheDir, `image_${Date.now()}_${i}.jpg`);
         const imgResponse = await axios({
           method: 'get',
-          url: validImages[i],
+          url: imgUrl,
           responseType: 'stream',
           headers: {
             'User-Agent': 'Mozilla/5.0'
@@ -107,13 +97,12 @@ module.exports.run = async function({ api, event, args }) {
     const msg = `⌬ ━━ HINA MEDIA ━━ ⌬\n\n📌 نتائج البحث: "${search}"\n📸 عدد الصور: ${attachments.length}\n\n💡 اكتب "المزيد" للحصول على صور إضافية`;
 
     global.client.handleReply.push({
-      name: "بنترست",
+      name: "صور",
       messageID: messageID,
       threadID: threadID,
       search: search,
       page: 1,
-      pins: pins,
-      validImages: validImages
+      photos: photos
     });
 
     return api.sendMessage({
@@ -122,59 +111,7 @@ module.exports.run = async function({ api, event, args }) {
     }, threadID, messageID);
 
   } catch (error) {
-    console.error("❌ خطأ في بنترست:", error);
-    
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 🔄 محاولة البحث باستخدام موقع بديل
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    try {
-      const fallbackResponse = await axios.get(
-        `https://api.unsplash.com/search/photos?query=${encodeURIComponent(search)}&per_page=5&client_id=demo`,
-        { timeout: 10000 }
-      );
-      
-      const images = fallbackResponse.data?.results || [];
-      if (images.length === 0) throw new Error("No images");
-
-      const cacheDir = path.join(__dirname, 'cache');
-      if (!fs.existsSync(cacheDir)) {
-        fs.mkdirSync(cacheDir, { recursive: true });
-      }
-
-      const attachments = [];
-      for (let i = 0; i < Math.min(images.length, 5); i++) {
-        try {
-          const imgUrl = images[i].urls?.regular || images[i].urls?.small;
-          if (!imgUrl) continue;
-
-          const imgPath = path.join(cacheDir, `unsplash_${Date.now()}_${i}.jpg`);
-          const imgResponse = await axios({
-            method: 'get',
-            url: imgUrl,
-            responseType: 'stream'
-          });
-          const writer = fs.createWriteStream(imgPath);
-          imgResponse.data.pipe(writer);
-          await new Promise((resolve, reject) => {
-            writer.on('finish', resolve);
-            writer.on('error', reject);
-          });
-          attachments.push(fs.createReadStream(imgPath));
-        } catch (e) {
-          console.error(`❌ فشل تحميل الصورة ${i}:`, e);
-        }
-      }
-
-      if (attachments.length > 0) {
-        return api.sendMessage({
-          body: `⌬ ━━ HINA MEDIA ━━ ⌬\n\n📌 نتائج البحث (Unsplash): "${search}"\n📸 عدد الصور: ${attachments.length}`,
-          attachment: attachments
-        }, threadID, messageID);
-      }
-    } catch (fallbackError) {
-      console.error("❌ فشل البحث البديل:", fallbackError);
-    }
-
+    console.error("❌ خطأ في صور:", error);
     return api.sendMessage(
       `⌬ ━━ HINA MEDIA ━━ ⌬\n\n❌ حدث خطأ أثناء البحث:\n${error.message}`,
       threadID,
@@ -194,15 +131,15 @@ module.exports.handleReply = async function({ api, event, handleReply }) {
 
   if (body.toLowerCase() !== "المزيد" && body.toLowerCase() !== "more") return;
 
-  const { search, page, pins, validImages } = handleReply;
+  const { search, page, photos } = handleReply;
   const cacheDir = path.join(__dirname, 'cache');
 
   const nextPage = page + 1;
   const startIndex = nextPage * 5;
   const endIndex = startIndex + 5;
-  const nextImages = validImages.slice(startIndex, endIndex);
+  const nextPhotos = photos.slice(startIndex, endIndex);
 
-  if (nextImages.length === 0) {
+  if (nextPhotos.length === 0) {
     return api.sendMessage(
       `⌬ ━━ HINA MEDIA ━━ ⌬\n\n❌ لا توجد صور إضافية للبحث: "${search}"`,
       threadID,
@@ -211,12 +148,15 @@ module.exports.handleReply = async function({ api, event, handleReply }) {
   }
 
   const attachments = [];
-  for (let i = 0; i < nextImages.length; i++) {
+  for (let i = 0; i < nextPhotos.length; i++) {
     try {
-      const imgPath = path.join(cacheDir, `pinterest_${Date.now()}_${i}.jpg`);
+      const imgUrl = nextPhotos[i].urls?.regular || nextPhotos[i].urls?.small;
+      if (!imgUrl) continue;
+
+      const imgPath = path.join(cacheDir, `image_${Date.now()}_${i}.jpg`);
       const imgResponse = await axios({
         method: 'get',
-        url: nextImages[i],
+        url: imgUrl,
         responseType: 'stream'
       });
       const writer = fs.createWriteStream(imgPath);
@@ -240,13 +180,12 @@ module.exports.handleReply = async function({ api, event, handleReply }) {
   }
 
   global.client.handleReply.push({
-    name: "بنترست",
+    name: "صور",
     messageID: messageID,
     threadID: threadID,
     search: search,
     page: nextPage,
-    pins: pins,
-    validImages: validImages
+    photos: photos
   });
 
   return api.sendMessage({
