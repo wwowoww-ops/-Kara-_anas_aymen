@@ -3,7 +3,7 @@ const path = "./data/noTalk.json";
 
 module.exports.config = {
   name: "الكلام",
-  version: "1.0.0",
+  version: "2.0.0",
   hasPermssion: 1,
   credits: "أبو هريرة",
   description: "منع أو السماح بالكلام في المجموعة مع تحذير المخالفين",
@@ -86,29 +86,45 @@ module.exports.run = async function({ api, event, args }) {
 // 🎯 معالج الأحداث (لمنع الكلام وتحذير المخالفين)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 module.exports.handleEvent = async function({ api, event }) {
-  const { threadID, senderID, type, messageID } = event;
+  const { threadID, senderID, type, messageID, body } = event;
+
+  // التأكد من أن الحدث هو رسالة
+  if (type !== "message" && type !== "message_reply") return;
+
+  // قراءة ملف منع الكلام
   const fs = require("fs");
   const path = "./data/noTalk.json";
   const warningsPath = "./warnings.json";
 
-  if (type !== "message" && type !== "message_reply") return;
-
   if (!fs.existsSync(path)) return;
   let data = JSON.parse(fs.readFileSync(path));
 
+  // التأكد من تفعيل منع الكلام في هذه المجموعة
   if (!data[threadID] || !data[threadID].enabled) return;
 
   try {
+    // التحقق من أن البوت أدمن
     const threadInfo = await api.getThreadInfo(threadID);
     const isBotAdmin = threadInfo.adminIDs.some(admin => admin.id === api.getCurrentUserID());
-    if (!isBotAdmin) return;
+    if (!isBotAdmin) {
+      console.log(`❌ البوت ليس أدمن في ${threadID}`);
+      return;
+    }
 
+    // التحقق من أن المرسل ليس أدمن
     const isSenderAdmin = threadInfo.adminIDs.some(admin => admin.id === senderID);
     if (isSenderAdmin) return;
 
-    // حذف الرسالة
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 🗑️ حذف الرسالة
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     if (messageID) {
-      await api.unsendMessage(messageID);
+      try {
+        await api.unsendMessage(messageID);
+        console.log(`🔇 تم حذف رسالة من ${senderID} في ${threadID}`);
+      } catch (e) {
+        console.log(`❌ فشل حذف الرسالة: ${e.message}`);
+      }
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -148,10 +164,14 @@ module.exports.handleEvent = async function({ api, event }) {
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 🚨 إرسال تحذير للعضو
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    await api.sendMessage(
-      `⌬ ━━ HINA ADMIN ━━ ⌬\n\n🔇 تم حذف رسالتك لأن الكلام ممنوع!\n\n👤 ${userName}\n📌 السبب: التحدث أثناء منع الكلام\n🔢 عدد التحذيرات: ${warningCount}/3\n\n⚠️ عند وصولك إلى 3 تحذيرات، سيتم طردك تلقائياً.`,
-      threadID
-    );
+    try {
+      await api.sendMessage(
+        `⌬ ━━ HINA ADMIN ━━ ⌬\n\n🔇 تم حذف رسالتك لأن الكلام ممنوع!\n\n👤 ${userName}\n📌 السبب: التحدث أثناء منع الكلام\n🔢 عدد التحذيرات: ${warningCount}/3\n\n⚠️ عند وصولك إلى 3 تحذيرات، سيتم طردك تلقائياً.`,
+        threadID
+      );
+    } catch (e) {
+      console.log(`❌ فشل إرسال تحذير: ${e.message}`);
+    }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 🚫 الطرد التلقائي بعد 3 تحذيرات
