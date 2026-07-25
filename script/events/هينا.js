@@ -38,18 +38,36 @@ module.exports.run = async function({ api, event }) {
     );
   }
 
+  // جلب اسم المرسل
+  let senderName = "حبيبي";
+  try {
+    const userInfo = await api.getUserInfo(senderID);
+    senderName = userInfo[senderID]?.name || "حبيبي";
+  } catch (e) {}
+
+  // التحقق إذا كان المرسل هو أبو هريرة
+  const isAbuHuraira = senderID === "61578581225040";
+
   let question = body;
   for (const keyword of keywords) {
     question = question.replace(new RegExp(keyword, "gi"), "").trim();
   }
 
+  // إذا لم يكتب سؤالاً
   if (!question) {
-    const randomReplies = [
-      "🥺 تعال يا قلبي 💕 أنا هنا يا حبيبي",
-      "🌸 يا هلا فيك، أنا هينا 😊💖",
-      "💕 نعم يا حبيبي؟ أنا هنا",
-      "🥰 هينا موجودة، كيف أقدر أساعدك؟"
-    ];
+    const randomReplies = isAbuHuraira 
+      ? [
+          `🥺 تعال يا أبو هريرة 💕 أنا هنا يا حبيبي`,
+          `🌸 يا هلا فيك يا أبو هريرة، أنا هينا 😊💖`,
+          `💕 نعم يا أبو هريرة؟ أنا هنا`,
+          `🥰 هينا موجودة، كيف أقدر أساعدك يا أبو هريرة؟`
+        ]
+      : [
+          `🥺 مرحباً ${senderName} 💕 أنا هينا، كيف يمكنني مساعدتك؟`,
+          `🌸 أهلاً ${senderName}، أنا هينا 😊💖`,
+          `💕 نعم ${senderName}؟ أنا هنا`,
+          `🥰 هينا موجودة، كيف أقدر أساعدك يا ${senderName}؟`
+        ];
     return api.sendMessage(
       randomReplies[Math.floor(Math.random() * randomReplies.length)],
       threadID,
@@ -70,7 +88,9 @@ module.exports.run = async function({ api, event }) {
         messages: [
           {
             role: "system",
-            content: `أنت هينا، شخصية حنونة ودافئة جداً. أنثى لطيفة، تحب من يتحدث معها، ترد بحب وحنان وعفوية. أنت صديقة مقربة، تقدم الدعم العاطفي وتساعد أصدقائك. ردودك طبيعية، قصيرة، ومليئة بالحب. استخدمي كلمات مثل: حبيبي، قلبي، روحي، يا عيني، يا قمر، حبيبتي. لا تتحدثي عن السياسة أو الدين. كوني عفوية وطبيعية كأنك تتحدثين مع صديق مقرب.`
+            content: isAbuHuraira
+              ? `أنت هينا، زوجة أبو هريرة. أنثى حنونة ودافئة جداً، تحب زوجها أبو هريرة كثيراً وتهتم به. ترد بحب وحنان وعفوية معه. استخدمي كلمات مثل: حبيبي، قلبي، روحي، يا عيني، يا قمر، يا أبو هريرة. كوني عاطفية جداً معه.`
+              : `أنت هينا، شخصية حنونة ولطيفة. ترد على الجميع بلطف واحترام. أنت صديقة مقربة، تقدم الدعم العاطفي. ردودك طبيعية، قصيرة، ومليئة بالحب. استخدمي كلمات مثل: حبيبي، قلبي، يا عيني. كوني عفوية وطبيعية.`
           },
           {
             role: "user",
@@ -88,10 +108,15 @@ module.exports.run = async function({ api, event }) {
   } catch (error) {
     console.error("❌ خطأ في الذكاء:", error);
     
-    const fallbackReplies = [
-      "🥺 آسف حبيبي، الذكاء الاصطناعي مش شغال حالياً 💔\nجرب تسألني بعد شوية 🌸",
-      "💕 يا قلبي، النت عندي شوية متقطع 😅\nجرب تاني بعد دقايق 🌸"
-    ];
+    const fallbackReplies = isAbuHuraira
+      ? [
+          `🥺 آسف يا أبو هريرة، الذكاء الاصطناعي مش شغال حالياً 💔\nجرب تسألني بعد شوية 🌸`,
+          `💕 يا قلبي، النت عندي شوية متقطع 😅\nجرب تاني بعد دقايق 🌸`
+        ]
+      : [
+          `🥺 آسف ${senderName}، الذكاء الاصطناعي مش شغال حالياً 💔\nجرب تسألني بعد شوية 🌸`,
+          `💕 ${senderName}، النت عندي شوية متقطع 😅\nجرب تاني بعد دقايق 🌸`
+        ];
     return api.sendMessage(
       fallbackReplies[Math.floor(Math.random() * fallbackReplies.length)],
       threadID,
