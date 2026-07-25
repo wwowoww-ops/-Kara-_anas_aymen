@@ -4,7 +4,7 @@ const path = require("path");
 
 module.exports.config = {
   name: "زوجيني",
-  version: "2.3.0",
+  version: "2.3.1",
   hasPermssion: 0,
   credits: "أبو هريرة",
   description: "زواج عشوائي أو من الشخص الذي ترد على رسالته مع نسبة توافق",
@@ -62,6 +62,7 @@ module.exports.run = async function({ api, event, Users }) {
   }
   let marriages = JSON.parse(fs.readFileSync(marriagePath));
 
+  // ✅ التأكد من وجود المفتاح
   if (!marriages[threadID]) {
     marriages[threadID] = [];
   }
@@ -112,22 +113,17 @@ module.exports.run = async function({ api, event, Users }) {
     // 💖 حساب نسبة التوافق بطريقة أكثر دقة
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     const getCompatibility = (name1, name2) => {
-      // أساس النسبة (عشوائي مع بعض المنطق)
-      let base = Math.floor(Math.random() * 41) + 30; // 30-70
+      let base = Math.floor(Math.random() * 41) + 30;
       
-      // عامل طول الاسم
       const len1 = name1.length;
       const len2 = name2.length;
       const lenFactor = Math.min(len1, len2) / Math.max(len1, len2);
       
-      // عامل الحروف المشتركة
       const commonLetters = [...new Set(name1.split(''))].filter(c => name2.includes(c)).length;
       const letterFactor = commonLetters / Math.max([...new Set(name1 + name2)].length, 1);
       
-      // النسبة النهائية
       let finalPercent = Math.round((base + (lenFactor * 15) + (letterFactor * 15)) / 1.3);
       
-      // التأكد من أنها بين 0 و 100
       return Math.min(Math.max(finalPercent, 0), 100);
     };
 
@@ -150,9 +146,11 @@ module.exports.run = async function({ api, event, Users }) {
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 📊 إحصائيات الزواج
+    // 📊 إحصائيات الزواج (مع التحقق من الصحة)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    const totalMarriages = marriages[threadID]?.length || 0;
+    const totalMarriages = (marriages[threadID] && Array.isArray(marriages[threadID])) 
+      ? marriages[threadID].length 
+      : 0;
 
     // جلب الصور
     const getAvt = async (uid, savePath) => {
