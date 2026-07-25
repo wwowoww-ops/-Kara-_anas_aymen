@@ -2,7 +2,7 @@ const fs = require("fs-extra");
 
 module.exports.config = {
   name: "زوجيني",
-  version: "3.0.0",
+  version: "3.1.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
   description: "زواج عشوائي أو بالرد على شخص",
@@ -11,7 +11,8 @@ module.exports.config = {
   cooldowns: 5
 };
 
-module.exports.run = async function({ api, event, Users }) {
+module.exports.run = async function({ api, event }) {
+
   const { threadID, messageID, senderID, type, messageReply } = event;
 
   try {
@@ -19,16 +20,17 @@ module.exports.run = async function({ api, event, Users }) {
     let user1 = senderID;
     let user2;
 
-    // الزواج بالرد
+    // بالرد على شخص
     if (type === "message_reply") {
       user2 = messageReply.senderID;
     }
 
-    // زواج عشوائي
+    // اختيار عشوائي
     else {
-      const info = await api.getThreadInfo(threadID);
 
-      let members = info.participantIDs.filter(
+      const threadInfo = await api.getThreadInfo(threadID);
+
+      let members = threadInfo.participantIDs.filter(
         id => id !== api.getCurrentUserID()
       );
 
@@ -57,34 +59,32 @@ module.exports.run = async function({ api, event, Users }) {
     }
 
 
-    // جلب الأسماء بأمان
-    const data1 = await Users.getData(user1) || {};
-    const data2 = await Users.getData(user2) || {};
+    // جلب الأسماء من فيسبوك
+    let names = await api.getUserInfo([user1, user2]);
 
-    const name1 = data1.name || "عضو";
-    const name2 = data2.name || "عضو";
-
-
-    // نسبة الحب
-    const love = Math.floor(Math.random() * 101);
+    let name1 = names[user1]?.name || "عضو";
+    let name2 = names[user2]?.name || "عضو";
 
 
-    let result;
+    // نسبة التوافق
+    let love = Math.floor(Math.random() * 101);
+
+    let text;
 
     if (love >= 90) {
-      result = "💖 توافق أسطوري! ثنائي لا يُهزم.";
+      text = "💖 توافق أسطوري! حب لا ينتهي.";
     } 
     else if (love >= 70) {
-      result = "❤️ توافق رائع!";
+      text = "❤️ توافق رائع!";
     } 
     else if (love >= 50) {
-      result = "💕 علاقة مقبولة.";
+      text = "💕 بداية جيدة.";
     } 
     else if (love >= 30) {
-      result = "💔 يحتاجان إلى التفاهم.";
+      text = "💔 يحتاجان للمزيد من التفاهم.";
     } 
     else {
-      result = "😂 يبدو أن الزواج كان خطأ!";
+      text = "😂 يبدو أن الزواج كان قرارًا خاطئًا.";
     }
 
 
@@ -99,7 +99,7 @@ module.exports.run = async function({ api, event, Users }) {
 
 📊 نسبة التوافق: ${love}%
 
-${result}
+${text}
 
 🎉 مبروك للعروسين!`,
       threadID,
@@ -109,7 +109,7 @@ ${result}
 
   } catch (err) {
 
-    console.log("زوجيني ERROR:", err);
+    console.log("زوجيني:", err);
 
     return api.sendMessage(
 `⌬ ━━ HINA FUN ━━ ⌬
