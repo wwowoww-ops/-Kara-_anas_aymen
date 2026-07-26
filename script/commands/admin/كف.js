@@ -1,9 +1,9 @@
 module.exports.config = {
   name: "كف",
-  version: "1.0.0",
+  version: "2.0.0",
   hasPermssion: 1,
   credits: "أبو هريرة",
-  description: "إيقاف البوت مؤقتاً في المجموعة (كف)",
+  description: "إيقاف البوت مؤقتاً في المجموعة (للأدمن)",
   commandCategory: "admin",
   usages: "كف",
   cooldowns: 5
@@ -39,7 +39,7 @@ module.exports.run = async function({ api, event, args }) {
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // عكس حالة الإيقاف (Toggle)
+  // 🔄 عكس حالة الإيقاف (Toggle)
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   const currentStatus = data[threadID].active;
   const newStatus = !currentStatus;
@@ -49,7 +49,7 @@ module.exports.run = async function({ api, event, args }) {
 
   if (newStatus) {
     return api.sendMessage(
-      `⌬ ━━ HINA ADMIN ━━ ⌬\n\n🛑 تم إيقاف البوت!\n\n🚫 البوت متوقف عن العمل في هذه المجموعة.\n\n🔓 للتشغيل: كف`,
+      `⌬ ━━ HINA ADMIN ━━ ⌬\n\n🛑 تم إيقاف البوت!\n\n🚫 البوت متوقف عن العمل في هذه المجموعة.\n📌 استخدم: كف مرة أخرى للتشغيل`,
       threadID,
       messageID
     );
