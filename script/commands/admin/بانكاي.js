@@ -4,7 +4,7 @@ const axios = require("axios");
 
 module.exports.config = {
   name: "بانكاي",
-  version: "2.2.0",
+  version: "2.3.0",
   hasPermssion: 1,
   credits: "أبو هريرة",
   description: "طرد عضو مع صورة بانكاي وصوت (بالرد فقط)",
@@ -14,7 +14,7 @@ module.exports.config = {
 };
 
 module.exports.run = async function({ api, event, args }) {
-  const { threadID, messageID, senderID, mentions, messageReply } = event;
+  const { threadID, messageID, senderID, messageReply } = event;
 
   try {
     const threadInfo = await api.getThreadInfo(threadID);
@@ -39,7 +39,6 @@ module.exports.run = async function({ api, event, args }) {
 
     let targetID;
 
-    // ✅ فقط الرد (بدون منشن)
     if (messageReply) {
       targetID = messageReply.senderID;
     } else {
@@ -59,14 +58,13 @@ module.exports.run = async function({ api, event, args }) {
     }
 
     // ═══════════════════════════════════════════════
-    // 🛡️ حماية المطور (معرف ثابت)
+    // 🛡️ حماية المطور
     // ═══════════════════════════════════════════════
-    const DEV_ID = "61578581225040"; // ✅ ضع معرفك هنا
+    const DEV_ID = "61578581225040";
     
-    // ✅ التحقق: هل المستهدف هو المطور؟
     if (targetID === DEV_ID) {
       return api.sendMessage(
-        `⌬ ━━ HINA ━━ ⌬\n\n🛡️ لا يمكن طرد المطور!\n\n👤 هذا الحساب محمي بواسطة نظام حماية المطورين.`,
+        `⌬ ━━ HINA ━━ ⌬\n\n🛡️ لا يمكن طرد المطور!`,
         threadID,
         messageID
       );
@@ -92,8 +90,8 @@ module.exports.run = async function({ api, event, args }) {
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     const cacheDir = path.join(__dirname, "cache");
     fs.ensureDirSync(cacheDir);
-    const pathImg = path.join(cacheDir, "bankai.gif");
-    const pathAudio = path.join(cacheDir, "bankai_audio.mp3");
+    const pathImg = path.join(cacheDir, `bankai_img_${Date.now()}.gif`);
+    const pathAudio = path.join(cacheDir, `bankai_audio_${Date.now()}.mp3`);
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 🖼️ تحميل الصورة
@@ -105,7 +103,7 @@ module.exports.run = async function({ api, event, args }) {
       );
       fs.writeFileSync(pathImg, Buffer.from(response.data));
     } catch (e) {
-      console.log("❌ فشل تحميل الصورة:", e);
+      console.log("❌ فشل تحميل الصورة:", e.message);
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -118,7 +116,7 @@ module.exports.run = async function({ api, event, args }) {
       );
       fs.writeFileSync(pathAudio, Buffer.from(audioResponse.data));
     } catch (e) {
-      console.log("❌ فشل تحميل الصوت:", e);
+      console.log("❌ فشل تحميل الصوت:", e.message);
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -126,6 +124,7 @@ module.exports.run = async function({ api, event, args }) {
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     const attachments = [];
     
+    // ✅ التحقق من وجود الملفات قبل إضافتها
     if (fs.existsSync(pathImg)) {
       attachments.push(fs.createReadStream(pathImg));
     }
@@ -134,7 +133,7 @@ module.exports.run = async function({ api, event, args }) {
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 📨 إرسال الرسالة مع الصورة والصوت
+    // 📨 إرسال الرسالة
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     await api.sendMessage(
       {
@@ -154,9 +153,16 @@ module.exports.run = async function({ api, event, args }) {
     } catch (_) {}
 
   } catch (error) {
-    console.error("بانكاي - خطأ:", error);
+    console.error("❌ خطأ في بانكاي:", error);
+    
+    // ✅ رسالة خطأ واضحة
+    let errorMsg = error.message || "خطأ غير معروف";
+    if (errorMsg.includes("Cannot convert undefined or null to object")) {
+      errorMsg = "حدث خطأ في تحميل الملفات المؤقتة. حاول مرة أخرى.";
+    }
+    
     return api.sendMessage(
-      `⌬ ━━ HINA ━━ ⌬\n\n❌ حدث خطأ: ${error.message}`,
+      `⌬ ━━ HINA ━━ ⌬\n\n❌ حدث خطأ: ${errorMsg}`,
       threadID,
       messageID
     );
