@@ -29,9 +29,9 @@ const { readdirSync, readFileSync, writeFileSync, existsSync, unlinkSync } = req
 const { join, resolve } = require("path");
 const logger = require("./utils/log.js");
 
-// ===== استيراد المكتبات الجديدة =====
-// ✅ nextgen-fca هي الأفضل حالياً (تدعم تجديد الجلسة التلقائي)
-const login = require("nextgen-fca");
+// ===== استيراد المكتبة الأكثر استقراراً =====
+// ✅ @dongdev/fca-unofficial هي الأفضل حالياً (مدعومة ومحدثة)
+const login = require("@dongdev/fca-unofficial");
 
 const axios = require("axios");
 
