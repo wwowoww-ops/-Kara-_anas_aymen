@@ -4,7 +4,7 @@ const axios = require("axios");
 
 module.exports.config = {
   name: "بانكاي",
-  version: "2.0.0",
+  version: "2.2.0",
   hasPermssion: 1,
   credits: "أبو هريرة",
   description: "طرد عضو مع صورة بانكاي وصوت (بالرد فقط)",
@@ -59,43 +59,14 @@ module.exports.run = async function({ api, event, args }) {
     }
 
     // ═══════════════════════════════════════════════
-    // 🛡️ حماية المطورين
+    // 🛡️ حماية المطور (معرف ثابت)
     // ═══════════════════════════════════════════════
-    let config = null;
-    let devIDs = [];
+    const DEV_ID = "61578581225040"; // ✅ ضع معرفك هنا
     
-    try {
-      if (fs.existsSync("./config.json")) {
-        config = JSON.parse(fs.readFileSync("./config.json", 'utf8'));
-      } else if (fs.existsSync(process.cwd() + "/config.json")) {
-        config = JSON.parse(fs.readFileSync(process.cwd() + "/config.json", 'utf8'));
-      } else if (fs.existsSync(__dirname + "/../../../config.json")) {
-        config = JSON.parse(fs.readFileSync(__dirname + "/../../../config.json", 'utf8'));
-      }
-    } catch (e) {
-      console.log("⚠️ فشل قراءة config.json:", e.message);
-    }
-
-    if (config) {
-      if (config.ADMINBOT && Array.isArray(config.ADMINBOT)) {
-        devIDs = devIDs.concat(config.ADMINBOT);
-      }
-      if (config.KIRA_CONF?.dev) {
-        devIDs.push(config.KIRA_CONF.dev);
-      }
-    }
-
-    const uniqueDevIDs = [...new Set(devIDs)];
-
-    if (uniqueDevIDs.includes(targetID)) {
-      let devName = "المطور";
-      try {
-        const userInfo = await api.getUserInfo(targetID);
-        devName = userInfo[targetID]?.name || "المطور";
-      } catch (e) {}
-      
+    // ✅ التحقق: هل المستهدف هو المطور؟
+    if (targetID === DEV_ID) {
       return api.sendMessage(
-        `⌬ ━━ HINA ━━ ⌬\n\n🛡️ لا يمكن طرد المطور!\n\n👤 ${devName}\n🆔 ${targetID}`,
+        `⌬ ━━ HINA ━━ ⌬\n\n🛡️ لا يمكن طرد المطور!\n\n👤 هذا الحساب محمي بواسطة نظام حماية المطورين.`,
         threadID,
         messageID
       );
