@@ -28,11 +28,7 @@ exec("rm -rf script/commands/data && mkdir -p script/commands/data && rm -rf scr
 const { readdirSync, readFileSync, writeFileSync, existsSync, unlinkSync } = require("fs-extra");
 const { join, resolve } = require("path");
 const logger = require("./utils/log.js");
-
-// ===== استيراد المكتبة الأكثر استقراراً =====
-// ✅ @dongdev/fca-unofficial هي الأفضل حالياً (مدعومة ومحدثة)
-const login = require("@dongdev/fca-unofficial");
-
+const login = require("hut-chat-api");
 const axios = require("axios");
 
 console.log(chalk.bold.hex("#03f0fc").bold("[ KIRA ] » ") + chalk.bold.hex("#fcba03").bold("Initializing variables..."));
