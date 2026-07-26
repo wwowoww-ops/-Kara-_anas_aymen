@@ -1,3 +1,6 @@
+const fs = require("fs");
+const path = "./data/protection.json";
+
 module.exports.config = {
   name: "حماية",
   version: "1.0.0",
@@ -11,8 +14,6 @@ module.exports.config = {
 
 module.exports.run = async function({ api, event, args }) {
   const { threadID, messageID, senderID } = event;
-  const fs = require("fs");
-  const path = "./data/protection.json";
 
   // التحقق من صلاحية الأدمن
   const threadInfo = await api.getThreadInfo(threadID);
@@ -101,6 +102,15 @@ module.exports.handleReply = async function({ api, event, handleReply }) {
     );
   }
 
+  // التحقق من أن الرد موجه لرسالة البوت
+  if (handleReply.author !== senderID) {
+    return api.sendMessage(
+      `🥺 هذا الأمر ليس لك يا قلبي 💕`,
+      threadID,
+      messageID
+    );
+  }
+
   let protectionData = JSON.parse(fs.readFileSync(path));
   if (!protectionData[threadID]) {
     protectionData[threadID] = {
@@ -121,7 +131,7 @@ module.exports.handleReply = async function({ api, event, handleReply }) {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // خروج
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  if (choice === "خروج") {
+  if (choice === "خروج" || choice === "cancel") {
     return api.sendMessage(
       `🥺 اوكي حبيبي، خلاص مامي سامحتلك 💕🌸\n\n✅ تم إلغاء عملية الإعداد.`,
       threadID,
@@ -130,8 +140,17 @@ module.exports.handleReply = async function({ api, event, handleReply }) {
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // معالجة الاختيار
+  // معالجة الاختيار (تأكد من أن الإدخال رقم)
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const choiceNum = parseInt(choice);
+  if (isNaN(choiceNum) || choiceNum < 1 || choiceNum > 7) {
+    return api.sendMessage(
+      `🥺 رقم غير صحيح يا قلبي 💕\nالرجاء اختيار رقم من 1 إلى 7.`,
+      threadID,
+      messageID
+    );
+  }
+
   const options = {
     "1": { key: "enabled", name: "تفعيل/إيقاف الحماية (الكل)" },
     "2": { key: "nicknames", name: "حماية الكنيات" },
@@ -143,13 +162,6 @@ module.exports.handleReply = async function({ api, event, handleReply }) {
   };
 
   const selected = options[choice];
-  if (!selected) {
-    return api.sendMessage(
-      `🥺 رقم غير صحيح يا قلبي 💕\nالرجاء اختيار رقم من 1 إلى 7.`,
-      threadID,
-      messageID
-    );
-  }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // تفعيل/إيقاف الحماية الكلية
