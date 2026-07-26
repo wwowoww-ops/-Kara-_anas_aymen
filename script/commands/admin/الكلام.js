@@ -1,9 +1,10 @@
 const fs = require("fs");
 const path = "./data/noTalk.json";
+const warningsPath = "./warnings.json";
 
 module.exports.config = {
   name: "الكلام",
-  version: "2.0.0",
+  version: "3.0.0",
   hasPermssion: 1,
   credits: "أبو هريرة",
   description: "منع أو السماح بالكلام في المجموعة مع تحذير المخالفين",
@@ -37,6 +38,9 @@ module.exports.run = async function({ api, event, args }) {
 
   let data = JSON.parse(fs.readFileSync(path));
 
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 🔇 منع الكلام
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   if (args[0] === "ممنوع" || args[0] === "منع") {
     // التأكد من أن البوت أدمن
     const isBotAdmin = threadInfo.adminIDs.some(admin => admin.id === api.getCurrentUserID());
@@ -62,16 +66,31 @@ module.exports.run = async function({ api, event, args }) {
       messageID
     );
 
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 🔊 السماح بالكلام
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   } else if (args[0] === "مسموح" || args[0] === "سماح") {
+    // حذف جميع تحذيرات المجموعة
+    if (fs.existsSync(warningsPath)) {
+      let warningsData = JSON.parse(fs.readFileSync(warningsPath));
+      if (warningsData[threadID]) {
+        delete warningsData[threadID];
+        fs.writeFileSync(warningsPath, JSON.stringify(warningsData, null, 2));
+      }
+    }
+
     delete data[threadID];
     fs.writeFileSync(path, JSON.stringify(data, null, 2));
 
     return api.sendMessage(
-      `⌬ ━━ HINA ADMIN ━━ ⌬\n\n🔊 تم السماح بالكلام في المجموعة!\n\n✅ يمكن للأعضاء التحدث الآن.`,
+      `⌬ ━━ HINA ADMIN ━━ ⌬\n\n🔊 تم السماح بالكلام في المجموعة!\n\n✅ يمكن للأعضاء التحدث الآن.\n📝 تم حذف جميع التحذيرات.`,
       threadID,
       messageID
     );
 
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 📊 عرض الحالة
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   } else {
     const status = data[threadID] && data[threadID].enabled ? "🔇 ممنوع" : "🔊 مسموح";
     return api.sendMessage(
@@ -86,7 +105,7 @@ module.exports.run = async function({ api, event, args }) {
 // 🎯 معالج الأحداث (لمنع الكلام وتحذير المخالفين)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 module.exports.handleEvent = async function({ api, event }) {
-  const { threadID, senderID, type, messageID, body } = event;
+  const { threadID, senderID, type, messageID, messageReply } = event;
 
   // التأكد من أن الحدث هو رسالة
   if (type !== "message" && type !== "message_reply") return;
@@ -116,7 +135,7 @@ module.exports.handleEvent = async function({ api, event }) {
     if (isSenderAdmin) return;
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 🗑️ حذف الرسالة
+    // 🗑️ حذف رسالة العضو
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     if (messageID) {
       try {
@@ -164,14 +183,10 @@ module.exports.handleEvent = async function({ api, event }) {
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 🚨 إرسال تحذير للعضو
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    try {
-      await api.sendMessage(
-        `⌬ ━━ HINA ADMIN ━━ ⌬\n\n🔇 تم حذف رسالتك لأن الكلام ممنوع!\n\n👤 ${userName}\n📌 السبب: التحدث أثناء منع الكلام\n🔢 عدد التحذيرات: ${warningCount}/3\n\n⚠️ عند وصولك إلى 3 تحذيرات، سيتم طردك تلقائياً.`,
-        threadID
-      );
-    } catch (e) {
-      console.log(`❌ فشل إرسال تحذير: ${e.message}`);
-    }
+    const warningMsg = await api.sendMessage(
+      `⌬ ━━ HINA ADMIN ━━ ⌬\n\n🔇 تم حذف رسالتك لأن الكلام ممنوع!\n\n👤 ${userName}\n📌 السبب: التحدث أثناء منع الكلام\n🔢 عدد التحذيرات: ${warningCount}/3\n\n⚠️ عند وصولك إلى 3 تحذيرات، سيتم طردك تلقائياً.`,
+      threadID
+    );
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // 🚫 الطرد التلقائي بعد 3 تحذيرات
@@ -192,7 +207,38 @@ module.exports.handleEvent = async function({ api, event }) {
       }
     }
 
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 🗑️ حذف رسالة التحذير إذا حذف العضو رسالته
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // نراقب إذا قام العضو بحذف رسالته الأصلية، نحذف رسالة التحذير
+    // هذا يتم في حدث message_unsend
+
   } catch (error) {
     console.error("❌ خطأ في معالج منع الكلام:", error);
+  }
+};
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 🎯 معالج حذف الرسائل (إذا حذف العضو رسالته نحذف التحذير)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+module.exports.handleEvent2 = async function({ api, event }) {
+  const { threadID, senderID, type } = event;
+
+  // التأكد من أن الحدث هو حذف رسالة
+  if (type !== "message_unsend") return;
+
+  // قراءة ملف التحذيرات
+  const fs = require("fs");
+  const warningsPath = "./warnings.json";
+
+  if (!fs.existsSync(warningsPath)) return;
+  let warningsData = JSON.parse(fs.readFileSync(warningsPath));
+
+  // البحث عن تحذيرات لهذا العضو في هذه المجموعة
+  if (warningsData[threadID] && warningsData[threadID][senderID]) {
+    // حذف التحذيرات
+    delete warningsData[threadID][senderID];
+    fs.writeFileSync(warningsPath, JSON.stringify(warningsData, null, 2));
+    console.log(`🗑️ تم حذف تحذيرات ${senderID} في ${threadID} بعد حذف رسالته`);
   }
 };
