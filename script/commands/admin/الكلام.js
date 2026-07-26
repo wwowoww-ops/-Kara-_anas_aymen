@@ -4,7 +4,7 @@ const warningsPath = "./warnings.json";
 
 module.exports.config = {
   name: "الكلام",
-  version: "3.0.0",
+  version: "4.0.0",
   hasPermssion: 1,
   credits: "أبو هريرة",
   description: "منع أو السماح بالكلام في المجموعة مع تحذير المخالفين",
@@ -61,7 +61,7 @@ module.exports.run = async function({ api, event, args }) {
     fs.writeFileSync(path, JSON.stringify(data, null, 2));
 
     return api.sendMessage(
-      `⌬ ━━ HINA ADMIN ━━ ⌬\n\n🔇 تم منع الكلام في المجموعة!\n\n🚫 أي عضو يرسل رسالة سيتم تحذيره.\n📌 الأدمن فقط يستطيع الكلام.\n\n🔓 للسماح: الكلام مسموح`,
+      `⌬ ━━ HINA ADMIN ━━ ⌬\n\n🔇 تم منع الكلام في المجموعة!\n\n🚫 أي عضو يرسل رسالة سيتم تحذيره.\n📌 الأدمن فقط يستطيع الكلام.\n⚠️ التحذير الثاني = طرد فوري.\n\n🔓 للسماح: الكلام مسموح`,
       threadID,
       messageID
     );
@@ -105,7 +105,7 @@ module.exports.run = async function({ api, event, args }) {
 // 🎯 معالج الأحداث (لمنع الكلام وتحذير المخالفين)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 module.exports.handleEvent = async function({ api, event }) {
-  const { threadID, senderID, type, messageID, messageReply } = event;
+  const { threadID, senderID, type, messageID } = event;
 
   // التأكد من أن الحدث هو رسالة
   if (type !== "message" && type !== "message_reply") return;
@@ -178,67 +178,39 @@ module.exports.handleEvent = async function({ api, event }) {
 
     const warningCount = warningsData[threadID][senderID].length;
 
-    fs.writeFileSync(warningsPath, JSON.stringify(warningsData, null, 2));
-
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 🚨 إرسال تحذير للعضو
+    // 🚨 إذا وصل لتحذيرين → طرد فوري
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    const warningMsg = await api.sendMessage(
-      `⌬ ━━ HINA ADMIN ━━ ⌬\n\n🔇 تم حذف رسالتك لأن الكلام ممنوع!\n\n👤 ${userName}\n📌 السبب: التحدث أثناء منع الكلام\n🔢 عدد التحذيرات: ${warningCount}/3\n\n⚠️ عند وصولك إلى 3 تحذيرات، سيتم طردك تلقائياً.`,
-      threadID
-    );
-
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 🚫 الطرد التلقائي بعد 3 تحذيرات
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    if (warningCount >= 3) {
+    if (warningCount >= 2) {
+      // حذف تحذيرات العضو بعد الطرد
       delete warningsData[threadID][senderID];
       fs.writeFileSync(warningsPath, JSON.stringify(warningsData, null, 2));
 
       try {
         await api.removeUserFromGroup(senderID, threadID);
         await api.sendMessage(
-          `⌬ ━━ HINA ADMIN ━━ ⌬\n\n🚫 تم طرد ${userName} من المجموعة!\n\n📌 سبب الطرد: تجاوز 3 تحذيرات بسبب مخالفة منع الكلام.`,
+          `⌬ ━━ HINA ADMIN ━━ ⌬\n\n🚫 تم طرد ${userName} من المجموعة!\n\n📌 سبب الطرد: مخالفة منع الكلام (التحذير الثاني).`,
           threadID
         );
-        console.log(`🚫 تم طرد ${userName} (${senderID}) بسبب 3 تحذيرات`);
+        console.log(`🚫 تم طرد ${userName} (${senderID}) بسبب مخالفة منع الكلام`);
+        return;
       } catch (error) {
         console.error(`❌ فشل طرد العضو ${senderID}:`, error);
+        return;
       }
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 🗑️ حذف رسالة التحذير إذا حذف العضو رسالته
+    // ⚠️ إرسال تحذير للعضو (أول مخالفة)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // نراقب إذا قام العضو بحذف رسالته الأصلية، نحذف رسالة التحذير
-    // هذا يتم في حدث message_unsend
+    fs.writeFileSync(warningsPath, JSON.stringify(warningsData, null, 2));
+
+    await api.sendMessage(
+      `⌬ ━━ HINA ADMIN ━━ ⌬\n\n🔇 تم حذف رسالتك لأن الكلام ممنوع!\n\n👤 ${userName}\n📌 السبب: التحدث أثناء منع الكلام\n🔢 هذا تحذيرك الأول والأخير!\n\n⚠️ المرة القادمة = طرد فوري.`,
+      threadID
+    );
 
   } catch (error) {
     console.error("❌ خطأ في معالج منع الكلام:", error);
-  }
-};
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 🎯 معالج حذف الرسائل (إذا حذف العضو رسالته نحذف التحذير)
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-module.exports.handleEvent2 = async function({ api, event }) {
-  const { threadID, senderID, type } = event;
-
-  // التأكد من أن الحدث هو حذف رسالة
-  if (type !== "message_unsend") return;
-
-  // قراءة ملف التحذيرات
-  const fs = require("fs");
-  const warningsPath = "./warnings.json";
-
-  if (!fs.existsSync(warningsPath)) return;
-  let warningsData = JSON.parse(fs.readFileSync(warningsPath));
-
-  // البحث عن تحذيرات لهذا العضو في هذه المجموعة
-  if (warningsData[threadID] && warningsData[threadID][senderID]) {
-    // حذف التحذيرات
-    delete warningsData[threadID][senderID];
-    fs.writeFileSync(warningsPath, JSON.stringify(warningsData, null, 2));
-    console.log(`🗑️ تم حذف تحذيرات ${senderID} في ${threadID} بعد حذف رسالته`);
   }
 };
