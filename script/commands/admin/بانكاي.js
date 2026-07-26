@@ -7,9 +7,9 @@ module.exports.config = {
   version: "2.0.0",
   hasPermssion: 1,
   credits: "أبو هريرة",
-  description: "طرد عضو مع صورة بانكاي وصوت",
+  description: "طرد عضو مع صورة بانكاي وصوت (بالرد فقط)",
   commandCategory: "admin",
-  usages: "بانكاي [@منشن] أو رد على رسالة",
+  usages: "بانكاي (رد على رسالة العضو)",
   cooldowns: 5
 };
 
@@ -39,13 +39,12 @@ module.exports.run = async function({ api, event, args }) {
 
     let targetID;
 
+    // ✅ فقط الرد (بدون منشن)
     if (messageReply) {
       targetID = messageReply.senderID;
-    } else if (Object.keys(mentions).length > 0) {
-      targetID = Object.keys(mentions)[0];
     } else {
       return api.sendMessage(
-        `⌬ ━━ HINA ━━ ⌬\n\n📝 الاستخدام:\n• بانكاي @منشن\n• أو قم بالرد على رسالة العضو`,
+        `⌬ ━━ HINA ━━ ⌬\n\n📝 الاستخدام:\n• قم بالرد على رسالة العضو ثم اكتب .بانكاي`,
         threadID,
         messageID
       );
@@ -60,13 +59,12 @@ module.exports.run = async function({ api, event, args }) {
     }
 
     // ═══════════════════════════════════════════════
-    // 🛡️ حماية المطورين (مع مسار آمن)
+    // 🛡️ حماية المطورين
     // ═══════════════════════════════════════════════
     let config = null;
     let devIDs = [];
     
     try {
-      // محاولة قراءة config.json
       if (fs.existsSync("./config.json")) {
         config = JSON.parse(fs.readFileSync("./config.json", 'utf8'));
       } else if (fs.existsSync(process.cwd() + "/config.json")) {
@@ -78,7 +76,6 @@ module.exports.run = async function({ api, event, args }) {
       console.log("⚠️ فشل قراءة config.json:", e.message);
     }
 
-    // استخراج معرفات المطورين
     if (config) {
       if (config.ADMINBOT && Array.isArray(config.ADMINBOT)) {
         devIDs = devIDs.concat(config.ADMINBOT);
@@ -88,10 +85,8 @@ module.exports.run = async function({ api, event, args }) {
       }
     }
 
-    // إزالة التكرارات
     const uniqueDevIDs = [...new Set(devIDs)];
 
-    // ✅ التحقق: هل المستهدف مطور؟
     if (uniqueDevIDs.includes(targetID)) {
       let devName = "المطور";
       try {
@@ -106,7 +101,6 @@ module.exports.run = async function({ api, event, args }) {
       );
     }
 
-    // ✅ حماية البوت نفسه
     if (targetID === api.getCurrentUserID()) {
       return api.sendMessage(
         `⌬ ━━ HINA ━━ ⌬\n\n😅 لا يمكنني طرد نفسي!`,
