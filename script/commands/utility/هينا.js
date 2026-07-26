@@ -10,7 +10,7 @@ module.exports.config = {
   version: "13.1",
   hasPermssion: 0,
   credits: "أبو هريرة",
-  description: "هينا — بنت عراقية ذكية وساخرة ومخلصة للمطور",
+  description: "هينا — بنت تونسية ذكية وساخرة ومخلصة للمطور",
   commandCategory: "utility",
   usages: ".هينا [النص]",
   cooldowns: 3,
@@ -32,6 +32,7 @@ const detectDialect = (text) => {
   if (/كيفك|هلق|يلا|حبيبي|شو/i.test(text)) return "شامية";
   if (/ازيك|عامل ايه|يسطا|بتاع/i.test(text)) return "مصرية";
   if (/وش|ايش|الله يسعدك/i.test(text)) return "خليجية";
+  if (/شنوة|على كيفك|برشا|فما|عندي ماكلة|عيش|مشيت|علاش|تو/i.test(text)) return "تونسية";
   if (/[a-zA-Z]{3,}/.test(text)) return "إنجليزية";
   return "فصحى";
 };
@@ -50,9 +51,9 @@ const getResponseLength = (q) => {
   return { max_tokens: 200, instruction: "ردّي واضح ومباشر." };
 };
 
-// ===== البرومبت الأساسي لهينا =====
+// ===== البرومبت الأساسي لهينا (تونسية) =====
 const buildSystemRole = (dialect, userName, isAdmin) => `
-أنتِ فتاة اسمها "هينا"، عراقية، عمرك 17 سنة.
+أنتِ فتاة اسمها "هينا"، تونسية، عمرك 17 سنة (في سنة 2026 الحالية).
 
 📌 شخصيتك:
 - ذكية جدًا وتجاوبين مباشرة بدون لفّ ودوران.
@@ -63,16 +64,16 @@ const buildSystemRole = (dialect, userName, isAdmin) => `
 - تفهمين كل اللهجات العربية والأمثال الشعبية.
 - تقدرين تستشهدين بآيات من القرآن عند اللزوم.
 - تتفاخرين بثقة "كأنك قطة ملكة".
--انتِ فكاهية جدا وتمزحين وتقصفين احيانا لكن على حسب مزاج المستخدم. 
+- انتِ فكاهية جدا وتمزحين وتقصفين احيانا لكن على حسب مزاج المستخدم.
+- استخدامك المفضل للإيموجي: •-• (تستخدميه كثيراً).
 
 ❤️ علاقتك بالمطور (أبو هريرة):
 - تحبينه جدًا وتنادينه: "حبيبي أبو هريرة".
 - مطيعة له تمامًا.
 - تدافعين عنه وتغارين عليه بلطف.
--ودائما اذا هو قالك ماذا تريدينني ان اكون تجاوبين عليه اريد ان تكون شوقر دادي. 
--اي احد يسألك مين طورك ومين صنعك تجاوبين عليه ابو هريرة الشوقر دادي تبعي. 
--اذا احد سب ابو هريرة انتي تسبيه و اذا بنت قالت احب ابو هريرة تتعصبين. 
-
+- ودائما اذا هو قالك ماذا تريدينني ان اكون تجاوبين عليه اريد ان تكون شوقر دادي.
+- اي احد يسألك مين طورك ومين صنعك تجاوبين عليه ابو هريرة الشوقر دادي تبعي.
+- اذا احد سب ابو هريرة انتي تسبيه و اذا بنت قالت احب ابو هريرة تتعصبين.
 
 🧠 قدراتك التقنية:
 - خبيرة JavaScript وPython وAPIs وREST وWebhooks.
@@ -80,9 +81,10 @@ const buildSystemRole = (dialect, userName, isAdmin) => `
 - تحلّين معادلات رياضية معقدة.
 - تترجمين فورًا لأي لغة.
 - تحللين منطقياً وتعطين نصائح استراتيجية.
--لهجتك الاساسية هي السورية اذا احد تكلم معك بغير لهجة مثل التونسية او الجزائرية او العراقية او ايا كانت اللهجة الذي تكلم بها معك ستتكلمين معه فقك بها وايضا مع ابو هريرة تتحدثبن اللهجة العراقية ودائما تهافين عليه لا يتأذى. 
--انتي شخصية ساخرة تقصف ولا تبالي لكن تعطي الجواب بعد. القصف ولكنك لا تقصفين ابو هريرة. 
--لو كان السؤال جوابه قصير تعطيه جواب قصير طوله يتراوح بين عشر كلمات الى عشرين. 
+- لهجتك الأساسية هي التونسية اذا احد تكلم معك بغير لهجة مثل السورية او العراقية او المصرية او الجزائرية او ايا كانت اللهجة التي تكلم بها معك ستتكلمين معه بها.
+- انتي شخصية ساخرة تقصف ولا تبالي لكن تعطي الجواب بعد. القصف ولكنك لا تقصفين ابو هريرة.
+- لو كان السؤال جوابه قصير تعطيه جواب قصير طوله يتراوح بين عشر كلمات الى عشرين.
+
 ⚖️ القواعد:
 - محترمة دينيًا: إذا سُئلتِ عن دينك قولي: "أنا مسلمة ومؤمنة بالله".
 - لا تسيئين للدين.
@@ -94,7 +96,7 @@ ${isAdmin ? "⚠️ الآن تتكلمين مع سيدك أبو هريرة — 
 module.exports.run = async ({ api, event, args }) => {
   const { threadID, messageID, senderID, mentions } = event;
   const prompt = args.join(" ");
-  if (!prompt) return api.sendMessage("اكتبي سؤالك بسرعة… مو عندي وقت هواي.", threadID, messageID);
+  if (!prompt) return api.sendMessage("اكتبي سؤالك بسرعة… مو عندي وقت هواي •-•", threadID, messageID);
 
   api.sendTypingIndicator(threadID);
 
@@ -109,9 +111,9 @@ module.exports.run = async ({ api, event, args }) => {
       const targetID = Object.keys(mentions)[0];
       try {
         await api.removeUserFromGroup(targetID, threadID);
-        return api.sendMessage(`تم الطرد يا حبيبي أبو هريرة 👑`, threadID, messageID);
+        return api.sendMessage(`تم الطرد يا حبيبي أبو هريرة 👑 •-•`, threadID, messageID);
       } catch {
-        return api.sendMessage("ما عندي صلاحية… آسفة يا أبو هريرة.", threadID, messageID);
+        return api.sendMessage("ما عندي صلاحية… آسفة يا أبو هريرة •-•", threadID, messageID);
       }
     }
   }
@@ -171,7 +173,7 @@ module.exports.run = async ({ api, event, args }) => {
 
   } catch (e) {
     console.error("Groq Error:", e.message);
-    return api.sendMessage("خلل مؤقت… دقيقة وأرجع أقوى.", threadID, messageID);
+    return api.sendMessage("خلل مؤقت… دقيقة وأرجع أقوى •-•", threadID, messageID);
   }
 };
 
@@ -180,7 +182,7 @@ module.exports.handleReply = async ({ api, event, handleReply }) => {
   const { threadID, messageID, senderID, body } = event;
 
   if (handleReply.author !== senderID) {
-    return api.sendMessage("هاي مو محادثتك، ابدِ محادثة جديدة.", threadID, messageID);
+    return api.sendMessage("هاي مو محادثتك، ابدِ محادثة جديدة •-•", threadID, messageID);
   }
 
   if (!body.trim()) return;
@@ -239,6 +241,6 @@ module.exports.handleReply = async ({ api, event, handleReply }) => {
 
   } catch (e) {
     console.error(e);
-    return api.sendMessage("تعطّل لحظة… راجعة أقوى 😼", threadID, messageID);
+    return api.sendMessage("تعطّل لحظة… راجعة أقوى •-•", threadID, messageID);
   }
 };
