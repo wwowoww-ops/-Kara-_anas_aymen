@@ -7,7 +7,7 @@ module.exports.config = {
   version: "1.0.0",
   hasPermssion: 1,
   credits: "أبو هريرة",
-  description: "طرد عضو مع صورة بانكاي",
+  description: "طرد عضو مع صورة بانكاي وصوت",
   commandCategory: "admin",
   usages: "بانكاي [@منشن] أو رد على رسالة",
   cooldowns: 5
@@ -51,11 +51,17 @@ module.exports.run = async function({ api, event, args }) {
       );
     }
 
-    // ═══════════════════════════════════════════════
-    // 🛡️ حماية المطور (لا يمكن طرد المطور)
-    // ═══════════════════════════════════════════════
-    
-    // قراءة config.json للحصول على قائمة المطورين
+    if (!targetID) {
+      return api.sendMessage(
+        `⌬ ━━ HINA ━━ ⌬\n\n❌ لم يتم تحديد العضو المستهدف.`,
+        threadID,
+        messageID
+      );
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 🛡️ حماية المطورين
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     let config;
     try {
       config = JSON.parse(fs.readFileSync("./config.json"));
@@ -75,16 +81,13 @@ module.exports.run = async function({ api, event, args }) {
       }
     }
 
-    // جمع كل المطورين من config.json
     const devIDs = config.ADMINBOT || [];
     if (config.KIRA_CONF?.dev) {
       devIDs.push(config.KIRA_CONF.dev);
     }
     const uniqueDevIDs = [...new Set(devIDs)];
 
-    // ✅ التحقق: هل المستهدف مطور؟
     if (uniqueDevIDs.includes(targetID)) {
-      // جلب اسم المطور
       let devName = "المطور";
       try {
         const userInfo = await api.getUserInfo(targetID);
@@ -92,13 +95,12 @@ module.exports.run = async function({ api, event, args }) {
       } catch (e) {}
       
       return api.sendMessage(
-        `⌬ ━━ HINA ━━ ⌬\n\n🛡️ لا يمكن طرد المطور!\n\n👤 ${devName}\n🆔 ${targetID}\n\nهذا العضو محمي بواسطة نظام حماية المطورين.`,
+        `⌬ ━━ HINA ━━ ⌬\n\n🛡️ لا يمكن طرد المطور!\n\n👤 ${devName}\n🆔 ${targetID}`,
         threadID,
         messageID
       );
     }
 
-    // ✅ حماية البوت نفسه
     if (targetID === api.getCurrentUserID()) {
       return api.sendMessage(
         `⌬ ━━ HINA ━━ ⌬\n\n😅 لا يمكنني طرد نفسي!`,
@@ -114,11 +116,17 @@ module.exports.run = async function({ api, event, args }) {
       userName = userInfo[targetID]?.name || "العضو";
     } catch (e) {}
 
-    // تحميل صورة بانكاي
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 📁 مجلد الكاش
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     const cacheDir = path.join(__dirname, "cache");
     fs.ensureDirSync(cacheDir);
     const pathImg = path.join(cacheDir, "bankai.jpg");
+    const pathAudio = path.join(cacheDir, "bankai_audio.mp3");
 
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 🖼️ تحميل الصورة
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     try {
       const response = await axios.get(
         "https://www.image2url.com/r2/default/gifs/1784918159700-c4c984fc-ae25-4b9e-9e95-c4339273808f.gif",
@@ -129,16 +137,38 @@ module.exports.run = async function({ api, event, args }) {
       console.log("❌ فشل تحميل الصورة:", e);
     }
 
-    let imageAttachment = null;
-    if (fs.existsSync(pathImg)) {
-      imageAttachment = fs.createReadStream(pathImg);
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 🔊 تحميل الصوت
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    try {
+      const audioResponse = await axios.get(
+        "https://anytourl.com/s/84881688188870918",
+        { responseType: "arraybuffer", timeout: 15000 }
+      );
+      fs.writeFileSync(pathAudio, Buffer.from(audioResponse.data));
+    } catch (e) {
+      console.log("❌ فشل تحميل الصوت:", e);
     }
 
-    // إرسال رسالة الطرد مع الصورة
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 📤 إعداد المرفقات
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    const attachments = [];
+    
+    if (fs.existsSync(pathImg)) {
+      attachments.push(fs.createReadStream(pathImg));
+    }
+    if (fs.existsSync(pathAudio)) {
+      attachments.push(fs.createReadStream(pathAudio));
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 📨 إرسال الرسالة مع الصورة والصوت
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     await api.sendMessage(
       {
         body: `⌬ ━━ HINA ━━ ⌬\n\n🔥 BANKAI! ZANKA NO TACHI 🔥\n\n(BLADE OF EMBER)\n\n✅ تم طرد العضو:\n📌 ${userName}\n🆔 ${targetID}`,
-        attachment: imageAttachment
+        attachment: attachments
       },
       threadID
     );
@@ -146,9 +176,10 @@ module.exports.run = async function({ api, event, args }) {
     // طرد العضو
     await api.removeUserFromGroup(targetID, threadID);
 
-    // حذف الصورة المؤقتة
+    // حذف الملفات المؤقتة
     try {
       if (fs.existsSync(pathImg)) fs.unlinkSync(pathImg);
+      if (fs.existsSync(pathAudio)) fs.unlinkSync(pathAudio);
     } catch (_) {}
 
   } catch (error) {
