@@ -1,146 +1,157 @@
-[
-    {
-        "key": "dbln",
-        "value": "%7B%2261580666247101%22%3A%222xAtPdwf%22%7D",
-        "domain": "facebook.com",
-        "path": "/login/device-based/",
-        "hostOnly": false,
-        "creation": "2026-07-26T19:10:09.959Z",
-        "lastAccessed": "2026-07-26T19:10:09.959Z"
-    },
-    {
-        "key": "datr",
-        "value": "qERVassKG84rER-Jc_h8cQ5j",
-        "domain": "facebook.com",
-        "path": "/",
-        "hostOnly": false,
-        "creation": "2026-07-26T19:10:09.959Z",
-        "lastAccessed": "2026-07-26T19:10:09.959Z"
-    },
-    {
-        "key": "sb",
-        "value": "qERVaiFRgA6eK_Wn5DqJx24q",
-        "domain": "facebook.com",
-        "path": "/",
-        "hostOnly": false,
-        "creation": "2026-07-26T19:10:09.959Z",
-        "lastAccessed": "2026-07-26T19:10:09.959Z"
-    },
-    {
-        "key": "ps_l",
-        "value": "1",
-        "domain": "facebook.com",
-        "path": "/",
-        "hostOnly": false,
-        "creation": "2026-07-26T19:10:09.959Z",
-        "lastAccessed": "2026-07-26T19:10:09.959Z"
-    },
-    {
-        "key": "ps_n",
-        "value": "1",
-        "domain": "facebook.com",
-        "path": "/",
-        "hostOnly": false,
-        "creation": "2026-07-26T19:10:09.959Z",
-        "lastAccessed": "2026-07-26T19:10:09.959Z"
-    },
-    {
-        "key": "vpd",
-        "value": "v1%3B641x351x1.7482542991638184",
-        "domain": "facebook.com",
-        "path": "/",
-        "hostOnly": false,
-        "creation": "2026-07-26T19:10:09.960Z",
-        "lastAccessed": "2026-07-26T19:10:09.960Z"
-    },
-    {
-        "key": "locale",
-        "value": "en_GB",
-        "domain": "facebook.com",
-        "path": "/",
-        "hostOnly": false,
-        "creation": "2026-07-26T19:10:09.960Z",
-        "lastAccessed": "2026-07-26T19:10:09.960Z"
-    },
-    {
-        "key": "dpr",
-        "value": "1.7482542991638184",
-        "domain": "facebook.com",
-        "path": "/",
-        "hostOnly": false,
-        "creation": "2026-07-26T19:10:09.960Z",
-        "lastAccessed": "2026-07-26T19:10:09.960Z"
-    },
-    {
-        "key": "pas",
-        "value": "61579445999995%3AtFcNiFCu9Z%2C61592103006012%3AJaYuE5r9vH%2C61580666247101%3AnExOD3IM3I",
-        "domain": "facebook.com",
-        "path": "/",
-        "hostOnly": false,
-        "creation": "2026-07-26T19:10:09.960Z",
-        "lastAccessed": "2026-07-26T19:10:09.960Z"
-    },
-    {
-        "key": "m_pixel_ratio",
-        "value": "1.7482542991638184",
-        "domain": "facebook.com",
-        "path": "/",
-        "hostOnly": false,
-        "creation": "2026-07-26T19:10:09.960Z",
-        "lastAccessed": "2026-07-26T19:10:09.960Z"
-    },
-    {
-        "key": "wd",
-        "value": "351x784",
-        "domain": "facebook.com",
-        "path": "/",
-        "hostOnly": false,
-        "creation": "2026-07-26T19:10:09.960Z",
-        "lastAccessed": "2026-07-26T19:10:09.960Z"
-    },
-    {
-        "key": "c_user",
-        "value": "61592103006012",
-        "domain": "facebook.com",
-        "path": "/",
-        "hostOnly": false,
-        "creation": "2026-07-26T19:10:09.960Z",
-        "lastAccessed": "2026-07-26T19:10:09.960Z"
-    },
-    {
-        "key": "xs",
-        "value": "11%3AvSu1AiBZ63646Q%3A2%3A1785092995%3A-1%3A-1",
-        "domain": "facebook.com",
-        "path": "/",
-        "hostOnly": false,
-        "creation": "2026-07-26T19:10:09.960Z",
-        "lastAccessed": "2026-07-26T19:10:09.960Z"
-    },
-    {
-        "key": "fr",
-        "value": "0a7N4Bj3Nidwsj8yW.AWcyZmHX_-pHwgYi8rsJdZSnVUzMRugfhtqyO21NRGMfEk2mIAE.BqVUSo..AAA.0.0.BqZluM.AWdWBkSMI0NS6MoiMdjOmSjbPkY",
-        "domain": "facebook.com",
-        "path": "/",
-        "hostOnly": false,
-        "creation": "2026-07-26T19:10:09.960Z",
-        "lastAccessed": "2026-07-26T19:10:09.960Z"
-    },
-    {
-        "key": "wl_cbv",
-        "value": "v2%3Bclient_version%3A3228%3Btimestamp%3A1785093005",
-        "domain": "facebook.com",
-        "path": "/",
-        "hostOnly": false,
-        "creation": "2026-07-26T19:10:09.960Z",
-        "lastAccessed": "2026-07-26T19:10:09.960Z"
-    },
-    {
-        "key": "fbl_st",
-        "value": "101435424%3BT%3A29751550",
-        "domain": "facebook.com",
-        "path": "/",
-        "hostOnly": false,
-        "creation": "2026-07-26T19:10:09.960Z",
-        "lastAccessed": "2026-07-26T19:10:09.960Z"
+const fs = require("fs-extra");
+const path = require("path");
+const axios = require("axios");
+
+module.exports.config = {
+  name: "بانكاي",
+  version: "2.5.0",
+  hasPermssion: 1,
+  credits: "أبو هريرة",
+  description: "طرد عضو مع صورة بانكاي (بدون صوت)",
+  commandCategory: "admin",
+  usages: "بانكاي (رد على رسالة العضو)",
+  cooldowns: 5
+};
+
+module.exports.run = async function({ api, event, args }) {
+  const { threadID, messageID, senderID, messageReply } = event;
+
+  try {
+    const threadInfo = await api.getThreadInfo(threadID);
+    const isAdmin = threadInfo.adminIDs.some(admin => admin.id === senderID);
+    const isBotAdmin = threadInfo.adminIDs.some(admin => admin.id === api.getCurrentUserID());
+
+    if (!isAdmin) {
+      return api.sendMessage(
+        `⌬ ━━ HINA ━━ ⌬\n\n⛔ هذا الأمر للأدمن فقط!`,
+        threadID,
+        messageID
+      );
     }
-]
+
+    if (!isBotAdmin) {
+      return api.sendMessage(
+        `⌬ ━━ HINA ━━ ⌬\n\n⚠️ يجب أن أكون أدمن في المجموعة لاستخدام هذا الأمر`,
+        threadID,
+        messageID
+      );
+    }
+
+    let targetID;
+
+    if (messageReply) {
+      targetID = messageReply.senderID;
+    } else {
+      return api.sendMessage(
+        `⌬ ━━ HINA ━━ ⌬\n\n📝 الاستخدام:\n• قم بالرد على رسالة العضو ثم اكتب .بانكاي`,
+        threadID,
+        messageID
+      );
+    }
+
+    if (!targetID) {
+      return api.sendMessage(
+        `⌬ ━━ HINA ━━ ⌬\n\n❌ لم يتم تحديد العضو المستهدف.`,
+        threadID,
+        messageID
+      );
+    }
+
+    // ═══════════════════════════════════════════════
+    // 🛡️ حماية المطور
+    // ═══════════════════════════════════════════════
+    const DEV_ID = "61578581225040";
+    
+    if (targetID === DEV_ID) {
+      return api.sendMessage(
+        `⌬ ━━ HINA ━━ ⌬\n\n🛡️ لا يمكن طرد المطور!`,
+        threadID,
+        messageID
+      );
+    }
+
+    if (targetID === api.getCurrentUserID()) {
+      return api.sendMessage(
+        `⌬ ━━ HINA ━━ ⌬\n\n😅 لا يمكنني طرد نفسي!`,
+        threadID,
+        messageID
+      );
+    }
+
+    // جلب اسم العضو
+    let userName = "العضو";
+    try {
+      const userInfo = await api.getUserInfo(targetID);
+      userName = userInfo[targetID]?.name || "العضو";
+    } catch (e) {}
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 📁 مجلد الكاش
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    const cacheDir = path.join(__dirname, "cache");
+    fs.ensureDirSync(cacheDir);
+    const pathImg = path.join(cacheDir, `bankai_${Date.now()}.gif`);
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 🖼️ تحميل الصورة (GIF)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    let imageAttachment = null;
+    
+    try {
+      const imageUrl = "https://www.image2url.com/r2/default/gifs/1784918159700-c4c984fc-ae25-4b9e-9e95-c4339273808f.gif";
+      
+      const response = await axios.get(imageUrl, { 
+        responseType: "arraybuffer", 
+        timeout: 10000 
+      });
+      fs.writeFileSync(pathImg, Buffer.from(response.data));
+      
+      if (fs.existsSync(pathImg)) {
+        imageAttachment = fs.createReadStream(pathImg);
+        console.log("✅ تم تحميل الصورة بنجاح");
+      }
+    } catch (e) {
+      console.log("❌ فشل تحميل الصورة:", e.message);
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 📨 إرسال الرسالة مع الصورة
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    const messageBody = `⌬ ━━ HINA ━━ ⌬\n\n🔥 BANKAI! ZANKA NO TACHI 🔥\n\n(BLADE OF EMBER)\n\n✅ تم طرد العضو:\n📌 ${userName}\n🆔 ${targetID}`;
+
+    if (imageAttachment) {
+      await api.sendMessage(
+        {
+          body: messageBody,
+          attachment: imageAttachment
+        },
+        threadID
+      );
+    } else {
+      // إذا فشل تحميل الصورة، أرسل النص فقط
+      await api.sendMessage(messageBody, threadID);
+    }
+
+    // طرد العضو
+    await api.removeUserFromGroup(targetID, threadID);
+
+    // حذف الملفات المؤقتة
+    try {
+      if (fs.existsSync(pathImg)) fs.unlinkSync(pathImg);
+    } catch (_) {}
+
+  } catch (error) {
+    console.error("❌ خطأ في بانكاي:", error);
+    
+    // رسالة احتياطية
+    try {
+      await api.sendMessage(
+        `⌬ ━━ HINA ━━ ⌬\n\n✅ تم طرد العضو بنجاح!`,
+        threadID,
+        messageID
+      );
+    } catch (e) {
+      console.error("❌ فشل حتى في الرسالة النصية:", e);
+    }
+  }
+};
