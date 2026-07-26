@@ -95,9 +95,7 @@
     "qrcode": "^1.5.3",
     "qrcode-reader": "^1.0.4",
     "imgur": "^2.4.2",
-    "nextgen-fca": "^1.0.0",
-    "fca-sifu": "^1.0.0",
-    "nexusfca-tphatremake": "^1.0.0"
+    "nextgen-fca": "^1.0.0"
   },
   "engines": {
     "node": ">=20.16.0"
