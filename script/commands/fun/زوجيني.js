@@ -1,137 +1,160 @@
 const axios = require("axios");
+const fs = require("fs-extra");
+const path = require("path");
 
 module.exports.config = {
   name: "زوجيني",
-  version: "3.2.0",
+  version: "2.2.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
-  description: "اختيار شريك عشوائي أو الزواج بالرد",
+  description: "زواج عشوائي من أحد أعضاء المجموعة مع نسبة توافق (المطور غير محمي)",
   commandCategory: "fun",
   usages: "زوجيني",
   cooldowns: 5
 };
 
-module.exports.run = async function({ api, event }) {
+module.exports.run = async function({ api, event, Users }) {
+  const { threadID, messageID, senderID } = event;
 
-  const { threadID, messageID, senderID, type, messageReply } = event;
-
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // جلب جميع أعضاء المجموعة
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   try {
-
-    let user1 = senderID;
-    let user2;
-
-    // إذا كان ردًا على شخص
-    if (type === "message_reply") {
-
-      user2 = messageReply.senderID;
-
-    } else {
-
-      // اختيار شريك عشوائي
-      const threadInfo = await api.getThreadInfo(threadID);
-
-      let members = threadInfo.participantIDs.filter(
-        id => id !== senderID && id !== api.getCurrentUserID()
-      );
-
-
-      if (members.length === 0) {
-        return api.sendMessage(
-          "❌ لا يوجد أعضاء آخرون للزواج.",
-          threadID,
-          messageID
-        );
-      }
-
-
-      user2 = members[Math.floor(Math.random() * members.length)];
-    }
-
-
-    if (user1 === user2) {
+    const threadInfo = await api.getThreadInfo(threadID);
+    const participants = threadInfo.participantIDs || [];
+    
+    // استبعاد البوت نفسه
+    const botID = api.getCurrentUserID();
+    const members = participants.filter(id => id !== botID && id !== senderID);
+    
+    if (members.length === 0) {
       return api.sendMessage(
-        "😂 لا يمكنك الزواج من نفسك.",
+        `⌬ ━━ HINA FUN ━━ ⌬\n\n❌ لا يوجد أعضاء كافيين في المجموعة للزواج!`,
         threadID,
         messageID
       );
     }
 
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // اختيار شخص عشوائي
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    const randomIndex = Math.floor(Math.random() * members.length);
+    const partnerID = members[randomIndex];
 
-    // جلب الأسماء
-    let name1 = "مستخدم";
-    let name2 = "مستخدم";
+    // جلب أسماء المستخدمين
+    const [senderData, partnerData] = await Promise.all([
+      Users.getData(senderID),
+      Users.getData(partnerID)
+    ]);
 
-    try {
+    const senderName = senderData.name;
+    const partnerName = partnerData.name;
 
-      const info = await api.getUserInfo([
-        user1,
-        user2
-      ]);
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // حساب نسبة التوافق
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    const getCompatibility = (name1, name2) => {
+      let base = Math.floor(Math.random() * 41) + 30;
+      
+      const len1 = name1.length;
+      const len2 = name2.length;
+      const lenFactor = Math.min(len1, len2) / Math.max(len1, len2);
+      
+      const commonLetters = [...new Set(name1.split(''))].filter(c => name2.includes(c)).length;
+      const letterFactor = commonLetters / Math.max([...new Set(name1 + name2)].length, 1);
+      
+      let finalPercent = Math.round((base + (lenFactor * 15) + (letterFactor * 15)) / 1.3);
+      
+      return Math.min(Math.max(finalPercent, 0), 100);
+    };
 
-      name1 = info[user1]?.name || "مستخدم";
-      name2 = info[user2]?.name || "مستخدم";
+    const lovePercent = getCompatibility(senderName, partnerName);
 
-    } catch (e) {
-      console.log("خطأ الأسماء:", e);
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // رسالة حسب نسبة التوافق
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    let loveMessage = "";
+    if (lovePercent >= 90) {
+      loveMessage = "💖 توافق خيالي! أنتما مثاليان لبعضكما!";
+    } else if (lovePercent >= 70) {
+      loveMessage = "❤️ توافق رائع! علاقة قوية بإذن الله!";
+    } else if (lovePercent >= 50) {
+      loveMessage = "💕 توافق جيد! مع الوقت ستزداد المحبة!";
+    } else if (lovePercent >= 30) {
+      loveMessage = "💔 توافق متوسط... تحتاجون إلى عمل على العلاقة!";
+    } else {
+      loveMessage = "💔 توافق ضعيف... الله يعينكم على بعض! 😂";
     }
 
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ردود مضحكة
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    const funnyReplies = [
+      `💍 ألف مبروك الزواج لـ ${senderName} و ${partnerName}! 🎉`,
+      `💕 تم الزواج! ${senderName} و ${partnerName} أصبحا زوجين! 🥂`,
+      `🌸 مبارك للعروسين ${senderName} و ${partnerName}! 💐`,
+      `💖 زواج سعيد لـ ${senderName} و ${partnerName}! 🎊`
+    ];
+    const randomReply = funnyReplies[Math.floor(Math.random() * funnyReplies.length)];
 
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // حفظ الزواج في ملف (اختياري)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    const marriagePath = "./data/marriages.json";
+    if (!fs.existsSync(marriagePath)) {
+      fs.writeFileSync(marriagePath, JSON.stringify({}));
+    }
+    let marriages = JSON.parse(fs.readFileSync(marriagePath));
 
-    // حساب التوافق
-    let love = Math.floor(Math.random() * 101);
-
-
-    let message;
-
-    if (love >= 90) {
-      message = "💖 توافق أسطوري! أنتما مناسبين لبعضكما.";
-    } 
-    else if (love >= 70) {
-      message = "❤️ توافق رائع! بداية جميلة.";
-    } 
-    else if (love >= 50) {
-      message = "💕 توافق جيد، تحتاجان لبعض الوقت.";
-    } 
-    else if (love >= 30) {
-      message = "💔 توافق متوسط، حاولوا التفاهم.";
-    } 
-    else {
-      message = "😂 يبدو أن الحظ لم يكن معكما.";
+    if (!marriages[threadID]) {
+      marriages[threadID] = [];
     }
 
+    // التحقق من وجود زواج سابق
+    const existingMarriage = marriages[threadID].find(
+      m => m.user1 === senderID || m.user2 === senderID
+    );
 
+    if (!existingMarriage) {
+      const marriageDate = new Date().toLocaleString("ar", {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      marriages[threadID].push({
+        user1: senderID,
+        user2: partnerID,
+        date: marriageDate,
+        timestamp: Date.now()
+      });
+      fs.writeFileSync(marriagePath, JSON.stringify(marriages, null, 2));
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // إرسال النتيجة
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    const totalMarriages = marriages[threadID] ? marriages[threadID].length : 0;
 
     return api.sendMessage(
-`⌬ ━━ HINA FUN ━━ ⌬
-
-💍 تم العثور على شريكك!
-
-👤 ${name1}
-❤️ 💍 ❤️
-👤 ${name2}
-
-📊 نسبة التوافق: ${love}%
-
-${message}
-
-🎉 مبروك!`,
+      `⌬ ━━ HINA FUN ━━ ⌬\n\n` +
+      `${randomReply}\n\n` +
+      `📊 نسبة التوافق: ${lovePercent}%\n${loveMessage}\n\n` +
+      `👤 ${senderName} ❤️ ${partnerName}\n` +
+      `📅 تاريخ الزواج: ${new Date().toLocaleString("ar")}\n` +
+      `📊 عدد الزيجات في المجموعة: ${totalMarriages}`,
       threadID,
       messageID
     );
 
-
-  } catch (err) {
-
-    console.log("زوجيني ERROR:", err);
-
+  } catch (error) {
+    console.error("❌ خطأ في زوجيني:", error);
     return api.sendMessage(
-`⌬ ━━ HINA FUN ━━ ⌬
-
-❌ حدث خطأ أثناء الزواج:
-${err.message}`,
+      `⌬ ━━ HINA FUN ━━ ⌬\n\n❌ حدث خطأ أثناء الزواج:\n${error.message}`,
       threadID,
       messageID
     );
-
   }
 };
