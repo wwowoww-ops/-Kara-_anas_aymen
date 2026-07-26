@@ -4,7 +4,7 @@ const axios = require("axios");
 
 module.exports.config = {
   name: "بانكاي",
-  version: "1.0.0",
+  version: "2.0.0",
   hasPermssion: 1,
   credits: "أبو هريرة",
   description: "طرد عضو مع صورة بانكاي وصوت",
@@ -63,26 +63,26 @@ module.exports.run = async function({ api, event, args }) {
     // 🛡️ حماية المطورين
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     let config;
-    try {
-      config = JSON.parse(fs.readFileSync("./config.json"));
-    } catch (e) {
+    let configFound = false;
+    
+    const configPaths = [
+      "./config.json",
+      process.cwd() + "/config.json",
+      __dirname + "/../../../config.json"
+    ];
+
+    for (const configPath of configPaths) {
       try {
-        config = JSON.parse(fs.readFileSync(process.cwd() + "/config.json"));
-      } catch (e2) {
-        try {
-          config = JSON.parse(fs.readFileSync(__dirname + "/../../../config.json"));
-        } catch (e3) {
-          return api.sendMessage(
-            `⌬ ━━ HINA ━━ ⌬\n\n❌ لم يتم العثور على ملف config.json`,
-            threadID,
-            messageID
-          );
+        if (fs.existsSync(configPath)) {
+          config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+          configFound = true;
+          break;
         }
-      }
+      } catch (e) {}
     }
 
-    const devIDs = config.ADMINBOT || [];
-    if (config.KIRA_CONF?.dev) {
+    const devIDs = configFound ? (config.ADMINBOT || []) : [];
+    if (configFound && config.KIRA_CONF?.dev) {
       devIDs.push(config.KIRA_CONF.dev);
     }
     const uniqueDevIDs = [...new Set(devIDs)];
@@ -121,7 +121,7 @@ module.exports.run = async function({ api, event, args }) {
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     const cacheDir = path.join(__dirname, "cache");
     fs.ensureDirSync(cacheDir);
-    const pathImg = path.join(cacheDir, "bankai.jpg");
+    const pathImg = path.join(cacheDir, "bankai.gif");
     const pathAudio = path.join(cacheDir, "bankai_audio.mp3");
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -138,11 +138,11 @@ module.exports.run = async function({ api, event, args }) {
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 🔊 تحميل الصوت
+    // 🔊 تحميل الصوت (الرابط الجديد)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     try {
       const audioResponse = await axios.get(
-        "https://anytourl.com/s/84881688188870918",
+        "https://files.catbox.moe/eq9fbl.mp3",
         { responseType: "arraybuffer", timeout: 15000 }
       );
       fs.writeFileSync(pathAudio, Buffer.from(audioResponse.data));
