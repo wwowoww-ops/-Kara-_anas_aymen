@@ -59,34 +59,39 @@ module.exports.run = async function({ api, event, args }) {
       );
     }
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 🛡️ حماية المطورين
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    let config;
-    let configFound = false;
+    // ═══════════════════════════════════════════════
+    // 🛡️ حماية المطورين (مع مسار آمن)
+    // ═══════════════════════════════════════════════
+    let config = null;
+    let devIDs = [];
     
-    const configPaths = [
-      "./config.json",
-      process.cwd() + "/config.json",
-      __dirname + "/../../../config.json"
-    ];
-
-    for (const configPath of configPaths) {
-      try {
-        if (fs.existsSync(configPath)) {
-          config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          configFound = true;
-          break;
-        }
-      } catch (e) {}
+    try {
+      // محاولة قراءة config.json
+      if (fs.existsSync("./config.json")) {
+        config = JSON.parse(fs.readFileSync("./config.json", 'utf8'));
+      } else if (fs.existsSync(process.cwd() + "/config.json")) {
+        config = JSON.parse(fs.readFileSync(process.cwd() + "/config.json", 'utf8'));
+      } else if (fs.existsSync(__dirname + "/../../../config.json")) {
+        config = JSON.parse(fs.readFileSync(__dirname + "/../../../config.json", 'utf8'));
+      }
+    } catch (e) {
+      console.log("⚠️ فشل قراءة config.json:", e.message);
     }
 
-    const devIDs = configFound ? (config.ADMINBOT || []) : [];
-    if (configFound && config.KIRA_CONF?.dev) {
-      devIDs.push(config.KIRA_CONF.dev);
+    // استخراج معرفات المطورين
+    if (config) {
+      if (config.ADMINBOT && Array.isArray(config.ADMINBOT)) {
+        devIDs = devIDs.concat(config.ADMINBOT);
+      }
+      if (config.KIRA_CONF?.dev) {
+        devIDs.push(config.KIRA_CONF.dev);
+      }
     }
+
+    // إزالة التكرارات
     const uniqueDevIDs = [...new Set(devIDs)];
 
+    // ✅ التحقق: هل المستهدف مطور؟
     if (uniqueDevIDs.includes(targetID)) {
       let devName = "المطور";
       try {
@@ -101,6 +106,7 @@ module.exports.run = async function({ api, event, args }) {
       );
     }
 
+    // ✅ حماية البوت نفسه
     if (targetID === api.getCurrentUserID()) {
       return api.sendMessage(
         `⌬ ━━ HINA ━━ ⌬\n\n😅 لا يمكنني طرد نفسي!`,
@@ -138,7 +144,7 @@ module.exports.run = async function({ api, event, args }) {
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 🔊 تحميل الصوت (الرابط الجديد)
+    // 🔊 تحميل الصوت
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     try {
       const audioResponse = await axios.get(
