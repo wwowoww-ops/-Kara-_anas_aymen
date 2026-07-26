@@ -28,7 +28,11 @@ exec("rm -rf script/commands/data && mkdir -p script/commands/data && rm -rf scr
 const { readdirSync, readFileSync, writeFileSync, existsSync, unlinkSync } = require("fs-extra");
 const { join, resolve } = require("path");
 const logger = require("./utils/log.js");
-const login = require("hut-chat-api");
+
+// ===== استيراد المكتبات الجديدة =====
+// ✅ nextgen-fca هي الأفضل حالياً (تدعم تجديد الجلسة التلقائي)
+const login = require("nextgen-fca");
+
 const axios = require("axios");
 
 console.log(chalk.bold.hex("#03f0fc").bold("[ KIRA ] » ") + chalk.bold.hex("#fcba03").bold("Initializing variables..."));
