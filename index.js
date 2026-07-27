@@ -29,9 +29,9 @@ const { readdirSync, readFileSync, writeFileSync, existsSync, unlinkSync } = req
 const { join, resolve } = require("path");
 const logger = require("./utils/log.js");
 
-// ===== استيراد المكتبة (طريقة آمنة) =====
-// ✅ biar-fca مع دعم .default
-const biar = require("biar-fca").default || require("biar-fca");
+// ===== استيراد المكتبة (الطريقة الصحيحة) =====
+// ✅ biar-fca
+const biar = require("biar-fca");
 
 const axios = require("axios");
 
@@ -147,16 +147,15 @@ let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 10;
 
 function onBot({ models: botModel }) {
-    const loginData = { appState };
-    
-    // ✅ استخدام biar-fca مع إعدادات محسّنة
-    biar({ appState: appState }, {
+    // ✅ الطريقة الصحيحة لاستخدام biar-fca
+    biar({
+        appState: appState,
+        listenEvents: true,
+        forceLogin: true,
+        autoReconnect: true,
         advancedProtection: true,
         autoRotateSession: true,
-        randomUserAgent: true,
-        autoReconnect: true,
-        listenEvents: true,
-        forceLogin: true
+        randomUserAgent: true
     }, async(loginError, loginApiData) => {
         if (loginError) {
             console.error(chalk.red(`❌ خطأ في تسجيل الدخول: ${loginError.message || loginError}`));
