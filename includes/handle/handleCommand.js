@@ -5,6 +5,9 @@ const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const logger = require("../../utils/log.js");
 const moment = require("moment-timezone");
 
+// ✅ منع تكرار تنفيذ الأوامر
+let commandExecuted = new Set();
+
 module.exports = function ({ api, models, Users, Threads, Currencies }) {
   return async function ({ event }) {
     const dateNow = Date.now();
@@ -27,12 +30,9 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
     const stopPath = "./data/stop.json";
     if (fs.existsSync(stopPath)) {
       const stopData = JSON.parse(fs.readFileSync(stopPath));
-      // ✅ استثناء: لا توقف البوت إذا كان الأمر هو "كف" نفسه
       if (stopData[threadID] && stopData[threadID].active) {
-        // نتحقق من الأمر قبل منعه
         const commandNameCheck = body.slice(global.config.PREFIX.length).trim().split(/ +/)[0].toLowerCase();
         if (commandNameCheck !== "كف") {
-          // إذا كانت المجموعة موقوفة، لا يستجيب البوت إلا لأمر كف
           return;
         }
       }
@@ -45,7 +45,6 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
     if (fs.existsSync(restrictPath)) {
       const restrictData = JSON.parse(fs.readFileSync(restrictPath));
       if (restrictData[threadID] && restrictData[threadID].active) {
-        // إذا كانت المجموعة مقيدة، لا يستجيب البوت
         return;
       }
     }
@@ -128,6 +127,17 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
     }
 
     try {
+      // ✅ منع تكرار تنفيذ الأمر
+      const commandKey = `${threadID}_${senderID}_${commandName}_${Date.now()}`;
+      if (commandExecuted.has(commandKey)) {
+        return;
+      }
+      commandExecuted.add(commandKey);
+
+      setTimeout(() => {
+        commandExecuted.delete(commandKey);
+      }, 1000);
+
       const Obj = { api, event, args, models, Users, Threads, Currencies, permssion, getText: () => {} };
       command.run(Obj);
       timestamps.set(senderID, dateNow);
