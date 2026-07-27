@@ -28,7 +28,6 @@
     "@napi-rs/canvas": "^0.1.56",
     "adm-zip": "^0.5.12",
     "axios": "^1.6.8",
-    "biar-fca": "latest",
     "bluebird": "^3.7.2",
     "body-parser": "",
     "caesar-salad": "",
@@ -100,4 +99,4 @@
   "engines": {
     "node": ">=20.16.0"
   }
-}
+  }
