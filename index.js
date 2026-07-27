@@ -29,9 +29,9 @@ const { readdirSync, readFileSync, writeFileSync, existsSync, unlinkSync } = req
 const { join, resolve } = require("path");
 const logger = require("./utils/log.js");
 
-// ===== استيراد المكتبة الجديدة =====
-// ✅ biar-fca (أفضل خيار للاستقرار)
-const login = require("biar-fca");
+// ===== استيراد المكتبة (طريقة آمنة) =====
+// ✅ biar-fca مع دعم .default
+const biar = require("biar-fca").default || require("biar-fca");
 
 const axios = require("axios");
 
@@ -150,7 +150,7 @@ function onBot({ models: botModel }) {
     const loginData = { appState };
     
     // ✅ استخدام biar-fca مع إعدادات محسّنة
-    login(loginData, {
+    biar({ appState: appState }, {
         advancedProtection: true,
         autoRotateSession: true,
         randomUserAgent: true,
