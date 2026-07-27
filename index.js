@@ -28,7 +28,11 @@ exec("rm -rf script/commands/data && mkdir -p script/commands/data && rm -rf scr
 const { readdirSync, readFileSync, writeFileSync, existsSync, unlinkSync } = require("fs-extra");
 const { join, resolve } = require("path");
 const logger = require("./utils/log.js");
-const login = require("hut-chat-api");
+
+// ===== استيراد المكتبة الجديدة =====
+// ✅ biar-fca (أفضل خيار للاستقرار)
+const login = require("biar-fca");
+
 const axios = require("axios");
 
 console.log(chalk.bold.hex("#03f0fc").bold("[ KIRA ] » ") + chalk.bold.hex("#fcba03").bold("Initializing variables..."));
@@ -145,7 +149,15 @@ const MAX_RECONNECT_ATTEMPTS = 10;
 function onBot({ models: botModel }) {
     const loginData = { appState };
     
-    login(loginData, async(loginError, loginApiData) => {
+    // ✅ استخدام biar-fca مع إعدادات محسّنة
+    login(loginData, {
+        advancedProtection: true,
+        autoRotateSession: true,
+        randomUserAgent: true,
+        autoReconnect: true,
+        listenEvents: true,
+        forceLogin: true
+    }, async(loginError, loginApiData) => {
         if (loginError) {
             console.error(chalk.red(`❌ خطأ في تسجيل الدخول: ${loginError.message || loginError}`));
             reconnectAttempts++;
