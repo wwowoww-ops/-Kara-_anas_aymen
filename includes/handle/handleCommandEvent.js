@@ -1,5 +1,11 @@
+const fs = require("fs");
+const path = require("path");
+
+// ✅ منع تكرار معالجة الأحداث
+let processedEvents = new Set();
+
 module.exports = function ({ api, models, Users, Threads, Currencies }) {
-    const logger = require("../../utils/log.js")
+    const logger = require("../../utils/log.js");
     return function ({ event }) {
         const { allowInbox } = global.config;
         const { userBanned, threadBanned } = global.data;
@@ -7,7 +13,20 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
         var { senderID, threadID } = event;
         var senderID = String(senderID);
         var threadID = String(threadID);
+
         if (userBanned.has(senderID) || threadBanned.has(threadID) || allowInbox == !![] && senderID == threadID) return;
+
+        // ✅ منع التكرار
+        const eventKey = `${threadID}_${senderID}_${Date.now()}`;
+        if (processedEvents.has(eventKey)) {
+            return;
+        }
+        processedEvents.add(eventKey);
+
+        setTimeout(() => {
+            processedEvents.delete(eventKey);
+        }, 500);
+
         for (const eventReg of eventRegistered) {
             const cmd = commands.get(eventReg);
             var getText2;
@@ -25,6 +44,7 @@ module.exports = function ({ api, models, Users, Threads, Currencies }) {
                 return lang;
             };
             else getText2 = () => {};
+            
             try {
                 const Obj = {};
                 Obj.event = event 
