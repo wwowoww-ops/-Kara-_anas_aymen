@@ -28,11 +28,7 @@ exec("rm -rf script/commands/data && mkdir -p script/commands/data && rm -rf scr
 const { readdirSync, readFileSync, writeFileSync, existsSync, unlinkSync } = require("fs-extra");
 const { join, resolve } = require("path");
 const logger = require("./utils/log.js");
-
-// ===== استيراد المكتبة (الطريقة الصحيحة) =====
-// ✅ biar-fca
-const biar = require("biar-fca");
-
+const login = require("hut-chat-api");
 const axios = require("axios");
 
 console.log(chalk.bold.hex("#03f0fc").bold("[ KIRA ] » ") + chalk.bold.hex("#fcba03").bold("Initializing variables..."));
@@ -147,16 +143,9 @@ let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 10;
 
 function onBot({ models: botModel }) {
-    // ✅ الطريقة الصحيحة لاستخدام biar-fca
-    biar({
-        appState: appState,
-        listenEvents: true,
-        forceLogin: true,
-        autoReconnect: true,
-        advancedProtection: true,
-        autoRotateSession: true,
-        randomUserAgent: true
-    }, async(loginError, loginApiData) => {
+    const loginData = { appState };
+    
+    login(loginData, async(loginError, loginApiData) => {
         if (loginError) {
             console.error(chalk.red(`❌ خطأ في تسجيل الدخول: ${loginError.message || loginError}`));
             reconnectAttempts++;
