@@ -193,7 +193,7 @@ module.exports = function({ api, models }) {
         try {
             
             // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            // 💬 MESSAGES
+            // 💬 MESSAGES (مع return لمنع التكرار)
             // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             
             if (type === "message" || type === "message_reply") {
@@ -203,7 +203,7 @@ module.exports = function({ api, models }) {
                 await handleReply({ event });
                 await handleCommandEvent({ event });
                 
-                return;
+                return; // ✅ منع التكرار
             }
 
             // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
