@@ -1,92 +1,72 @@
 module.exports.config = {
   name: "كنية",
-  version: "1.0.0",
-  hasPermssion: 1,
+  version: "2.0.0",
+  hasPermssion: 1,  // ← غيرتها من 0 إلى 1
   credits: "أبو هريرة",
-  description: "تغيير كنية عضو (الرد على رسالته)",
-  commandCategory: "admin",
-  usages: "كنية [الكنية الجديدة] (رد على رسالة العضو)",
+  description: "تغيير كنية جميع الأعضاء بتنسيق من اختيارك (للمطور فقط)",
+  commandCategory: "إدارة",
+  usages: "كنية [النص] أو كنية [النص] [رقم]",
   cooldowns: 5
 };
 
-module.exports.run = async function({ api, event, args }) {
-  const { threadID, messageID, senderID, messageReply } = event;
+module.exports.run = async ({ api, event, args }) => {
+  const { threadID, messageID, senderID } = event;
 
-  // التحقق من صلاحية الأدمن
-  const threadInfo = await api.getThreadInfo(threadID);
-  const isAdmin = threadInfo.adminIDs.some(admin => admin.id === senderID);
-  if (!isAdmin) {
+  // ===== التحقق من المطور =====
+  const ADMIN_ID = "61578581225040"; // ابو هريرة
+
+  if (senderID !== ADMIN_ID) {
     return api.sendMessage(
-      `⌬ ━━ HINA ADMIN ━━ ⌬\n\n⛔ هذا الأمر للأدمن فقط!`,
+      "🐿️ هذا الأمر للمطور فقط •-•",
       threadID,
       messageID
     );
   }
 
-  // التحقق من أن البوت أدمن
-  const isBotAdmin = threadInfo.adminIDs.some(admin => admin.id === api.getCurrentUserID());
-  if (!isBotAdmin) {
-    return api.sendMessage(
-      `⌬ ━━ HINA ADMIN ━━ ⌬\n\n⚠️ يجب أن أكون أدمن في المجموعة لتغيير الكنى.`,
-      threadID,
-      messageID
-    );
+  // ===== قراءة المدخلات =====
+  let customText = "طالب";
+  let customNumber = "00";
+
+  if (args.length > 0) {
+    const input = args.join(" ");
+    const numberMatch = input.match(/(\d+)$/);
+    if (numberMatch) {
+      customNumber = numberMatch[1].padStart(2, '0');
+      customText = input.replace(/\s*\d+$/, '').trim();
+    } else {
+      customText = input;
+    }
   }
-
-  // التحقق من وجود رد على رسالة
-  if (!messageReply) {
-    return api.sendMessage(
-      `⌬ ━━ HINA ADMIN ━━ ⌬\n\n📝 الاستخدام:\n• قم بالرد على رسالة العضو\n• اكتب: كنية [الكنية الجديدة]\n\nمثال: كنية أبو محمد`,
-      threadID,
-      messageID
-    );
-  }
-
-  // جلب معرف العضو من الرسالة التي تم الرد عليها
-  const targetID = messageReply.senderID;
-
-  // التحقق من أن المستهدف ليس البوت نفسه
-  if (targetID === api.getCurrentUserID()) {
-    return api.sendMessage(
-      `⌬ ━━ HINA ADMIN ━━ ⌬\n\n😅 لا يمكنني تغيير كنية نفسي!`,
-      threadID,
-      messageID
-    );
-  }
-
-  // جلب الكنية الجديدة
-  const newNickname = args.join(" ");
-  if (!newNickname) {
-    return api.sendMessage(
-      `⌬ ━━ HINA ADMIN ━━ ⌬\n\n📝 اكتب الكنية الجديدة بعد الأمر.\nمثال: كنية أبو محمد`,
-      threadID,
-      messageID
-    );
-  }
-
-  // جلب اسم العضو القديم
-  let oldName = "العضو";
-  try {
-    const userInfo = await api.getUserInfo(targetID);
-    oldName = userInfo[targetID]?.name || "العضو";
-  } catch (e) {}
 
   try {
-    // تغيير الكنية
-    await api.changeNickname(newNickname, threadID, targetID);
+    const threadInfo = await api.getThreadInfo(threadID);
+    const participants = threadInfo.participantIDs;
+
+    let count = 0;
+    let errors = 0;
+    const botID = api.getCurrentUserID();
+
+    for (const userID of participants) {
+      if (userID === botID) continue;
+
+      try {
+        const userInfo = await api.getUserInfo(userID);
+        const name = userInfo[userID]?.firstName || userInfo[userID]?.name || "مستخدم";
+        const newNickname = `•|${name} - ${customText}|• ${customNumber}`;
+        await api.changeNickname(newNickname, threadID, userID);
+        count++;
+      } catch (e) {
+        errors++;
+      }
+    }
 
     return api.sendMessage(
-      `⌬ ━━ HINA ADMIN ━━ ⌬\n\n✅ تم تغيير كنية العضو بنجاح!\n\n👤 العضو: ${oldName}\n🏷️ الكنية الجديدة: ${newNickname}`,
+      `🐿️ تم تغيير كنية ${count} عضو\n📌 التنسيق: •|الاسم - ${customText}|• ${customNumber}\n❌ فشل ${errors} عضو`,
       threadID,
       messageID
     );
 
   } catch (error) {
-    console.error("خطأ في تغيير الكنية:", error);
-    return api.sendMessage(
-      `⌬ ━━ HINA ADMIN ━━ ⌬\n\n❌ فشل تغيير الكنية:\n${error.message}`,
-      threadID,
-      messageID
-    );
+    return api.sendMessage("🐿️ حدث خطأ أثناء تنفيذ الأمر •-•", threadID, messageID);
   }
 };
