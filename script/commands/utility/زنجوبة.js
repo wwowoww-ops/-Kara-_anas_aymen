@@ -98,7 +98,7 @@ module.exports.run = async ({ api, event, args }) => {
   const prompt = args.join(" ");
   if (!prompt) return api.sendMessage("🐿️ اكتبي سؤالك بسرعة… مو عندي وقت هواي •-• 🌰", threadID, messageID);
 
-  api.sendTypingIndicator(threadID);
+  // ✅ حذف sendTypingIndicator
 
   // 🐿️ تفاعل بإيموجي سنجاب على رسالة المستخدم
   try {
@@ -194,7 +194,7 @@ module.exports.handleReply = async ({ api, event, handleReply }) => {
 
   if (!body.trim()) return;
 
-  api.sendTypingIndicator(threadID);
+  // ✅ حذف sendTypingIndicator
 
   // 🐿️ تفاعل بإيموجي سنجاب على رسالة المستخدم
   try {
