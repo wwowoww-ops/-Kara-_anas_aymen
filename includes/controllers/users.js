@@ -69,8 +69,8 @@ module.exports = function ({ models, api }) {
 
     async function createData(userID, defaults = {}) {
         try {
-            // إنشاء سجل جديد للعضو في السحاب
-            await mongodb.createUser(userID, defaults);
+            // ✅ التعديل هنا: استخدام ensureUser بدلاً من createUser
+            await mongodb.ensureUser(userID);
             return true;
         }
         catch (error) {
