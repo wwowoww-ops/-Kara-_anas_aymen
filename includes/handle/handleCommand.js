@@ -1,15 +1,9 @@
-const fs = require("fs-extra");
+const fs = require("fs");
 const path = require("path");
 const moment = require("moment-timezone");
 
 // ============================================================
-// منع تكرار تنفيذ الأوامر
-// ============================================================
-
-const commandExecuted = new Set();
-
-// ============================================================
-// مسارات الحظر الدائم
+// المسارات
 // ============================================================
 
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -20,14 +14,31 @@ const BANNED_GROUPS_FILE =
 const BANNED_USERS_FILE =
   path.join(DATA_DIR, "banned_users.json");
 
-fs.ensureDirSync(DATA_DIR);
 
 // ============================================================
-// قراءة JSON بأمان
+// إنشاء مجلد data بدون حذف أي شيء داخله
+// ============================================================
+
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+
+// ============================================================
+// منع تكرار تنفيذ الأمر
+// ============================================================
+
+const commandExecuted = new Set();
+
+
+// ============================================================
+// JSON آمن
 // ============================================================
 
 function readJSON(file) {
+
   try {
+
     if (!fs.existsSync(file)) {
       return {};
     }
@@ -39,12 +50,17 @@ function readJSON(file) {
       return {};
     }
 
-    return JSON.parse(content);
+    const data =
+      JSON.parse(content);
+
+    return data && typeof data === "object"
+      ? data
+      : {};
 
   } catch (error) {
 
     console.error(
-      "HINA JSON READ ERROR:",
+      "JSON READ ERROR:",
       file,
       error.message
     );
@@ -53,50 +69,124 @@ function readJSON(file) {
   }
 }
 
+
 // ============================================================
-// التحقق من حظر المجموعة
+// مزامنة الحظر من الملفات إلى global.data
 // ============================================================
 
-function isGroupBanned(threadID) {
+function syncBanData() {
 
-  const data =
-    readJSON(BANNED_GROUPS_FILE);
+  // -------------------------------
+  // حظر المجموعات
+  // -------------------------------
 
-  const id =
-    String(threadID);
+  try {
 
-  return !!(
-    data[id] &&
-    (
-      data[id] === true ||
-      data[id].banned === true
-    )
-  );
+    const bannedGroups =
+      readJSON(BANNED_GROUPS_FILE);
+
+    if (
+      global.data &&
+      global.data.threadBanned
+    ) {
+
+      if (
+        typeof global.data.threadBanned.clear ===
+        "function"
+      ) {
+
+        global.data.threadBanned.clear();
+
+      }
+
+      for (
+        const id of Object.keys(bannedGroups)
+      ) {
+
+        const item =
+          bannedGroups[id];
+
+        if (
+          item === true ||
+          item?.banned === true
+        ) {
+
+          global.data.threadBanned.set(
+            String(id),
+            true
+          );
+
+        }
+      }
+    }
+
+  } catch (error) {
+
+    console.error(
+      "SYNC GROUP BAN ERROR:",
+      error.message
+    );
+
+  }
+
+
+  // -------------------------------
+  // حظر المستخدمين
+  // -------------------------------
+
+  try {
+
+    const bannedUsers =
+      readJSON(BANNED_USERS_FILE);
+
+    if (
+      global.data &&
+      global.data.userBanned
+    ) {
+
+      if (
+        typeof global.data.userBanned.clear ===
+        "function"
+      ) {
+
+        global.data.userBanned.clear();
+
+      }
+
+      for (
+        const id of Object.keys(bannedUsers)
+      ) {
+
+        const item =
+          bannedUsers[id];
+
+        if (
+          item === true ||
+          item?.banned === true
+        ) {
+
+          global.data.userBanned.set(
+            String(id),
+            true
+          );
+
+        }
+      }
+    }
+
+  } catch (error) {
+
+    console.error(
+      "SYNC USER BAN ERROR:",
+      error.message
+    );
+
+  }
 }
 
-// ============================================================
-// التحقق من حظر المستخدم
-// ============================================================
-
-function isUserBanned(senderID) {
-
-  const data =
-    readJSON(BANNED_USERS_FILE);
-
-  const id =
-    String(senderID);
-
-  return !!(
-    data[id] &&
-    (
-      data[id] === true ||
-      data[id].banned === true
-    )
-  );
-}
 
 // ============================================================
-// منع تكرار الأوامر
+// تنظيف اسم الأمر
 // ============================================================
 
 function normalizeCommand(text) {
@@ -114,6 +204,7 @@ function normalizeCommand(text) {
     .replace(/\s+/g, "");
 }
 
+
 // ============================================================
 // Levenshtein
 // ============================================================
@@ -127,9 +218,7 @@ function levenshtein(a, b) {
     Array.from(
       { length: b.length + 1 },
       () =>
-        Array(
-          a.length + 1
-        ).fill(0)
+        Array(a.length + 1).fill(0)
     );
 
   for (
@@ -137,7 +226,9 @@ function levenshtein(a, b) {
     i <= b.length;
     i++
   ) {
+
     matrix[i][0] = i;
+
   }
 
   for (
@@ -145,7 +236,9 @@ function levenshtein(a, b) {
     j <= a.length;
     j++
   ) {
+
     matrix[0][j] = j;
+
   }
 
   for (
@@ -176,6 +269,7 @@ function levenshtein(a, b) {
             matrix[i][j - 1] + 1,
             matrix[i - 1][j - 1] + 1
           );
+
       }
     }
   }
@@ -183,14 +277,12 @@ function levenshtein(a, b) {
   return matrix[b.length][a.length];
 }
 
+
 // ============================================================
-// حساب التشابه
+// التشابه
 // ============================================================
 
-function similarityScore(
-  input,
-  command
-) {
+function similarityScore(input, command) {
 
   input =
     normalizeCommand(input);
@@ -198,16 +290,11 @@ function similarityScore(
   command =
     normalizeCommand(command);
 
-  if (
-    !input ||
-    !command
-  ) {
+  if (!input || !command) {
     return 0;
   }
 
-  if (
-    input === command
-  ) {
+  if (input === command) {
     return 1;
   }
 
@@ -256,6 +343,7 @@ function similarityScore(
   );
 }
 
+
 // ============================================================
 // أقرب أمر
 // ============================================================
@@ -282,11 +370,9 @@ function findClosestCommand(
       score > bestScore
     ) {
 
-      bestScore =
-        score;
+      bestScore = score;
+      bestCommand = command;
 
-      bestCommand =
-        command;
     }
   }
 
@@ -296,8 +382,9 @@ function findClosestCommand(
   };
 }
 
+
 // ============================================================
-// نظام المنشن
+// توحيد المنشنات
 // ============================================================
 
 function normalizeMentions(event) {
@@ -312,6 +399,7 @@ function normalizeMentions(event) {
   ) {
 
     event.mentions = {};
+
   }
 
   if (
@@ -325,9 +413,9 @@ function normalizeMentions(event) {
       event.mentions.entries()
     ) {
 
-      converted[
-        String(id)
-      ] = name;
+      converted[String(id)] =
+        name;
+
     }
 
     event.mentions =
@@ -338,19 +426,16 @@ function normalizeMentions(event) {
 
   for (
     const id of
-    Object.keys(
-      event.mentions
-    )
+    Object.keys(event.mentions)
   ) {
 
     if (!id) {
       continue;
     }
 
-    normalized[
-      String(id)
-    ] =
+    normalized[String(id)] =
       event.mentions[id];
+
   }
 
   event.mentions =
@@ -365,6 +450,7 @@ function normalizeMentions(event) {
       String(
         event.messageReply.senderID
       );
+
   }
 
   event.mentionIDs =
@@ -375,35 +461,31 @@ function normalizeMentions(event) {
     );
 }
 
+
 // ============================================================
 // أول منشن
 // ============================================================
 
 function getFirstMention(event) {
 
-  if (!event) {
-    return null;
-  }
-
   normalizeMentions(event);
 
   const ids =
     Object.keys(
-      event.mentions || {}
+      event?.mentions || {}
     );
 
-  if (!ids.length) {
-    return null;
-  }
-
-  return String(ids[0]);
+  return ids.length
+    ? String(ids[0])
+    : null;
 }
 
+
 // ============================================================
-// الحصول على المطور
+// معرفة المطور
 // ============================================================
 
-function getAdminIDs() {
+function getDeveloperIDs() {
 
   const ids = [];
 
@@ -425,10 +507,12 @@ function getAdminIDs() {
             String(id)
           );
         }
+
       }
     }
 
   } catch (e) {}
+
 
   try {
 
@@ -436,9 +520,11 @@ function getAdminIDs() {
       global.config?.KIRA_CONF?.dev;
 
     if (dev) {
+
       ids.push(
         String(dev)
       );
+
     }
 
   } catch (e) {}
@@ -448,19 +534,58 @@ function getAdminIDs() {
   ];
 }
 
-// ============================================================
-// هل المستخدم مطور؟
- // ============================================================
 
 function isDeveloper(senderID) {
 
-  const admins =
-    getAdminIDs();
+  return getDeveloperIDs()
+    .includes(
+      String(senderID)
+    );
 
-  return admins.includes(
-    String(senderID)
+}
+
+
+// ============================================================
+// التحقق من حظر المجموعة من الملف
+// ============================================================
+
+function isGroupBanned(threadID) {
+
+  const data =
+    readJSON(
+      BANNED_GROUPS_FILE
+    );
+
+  const item =
+    data[String(threadID)];
+
+  return (
+    item === true ||
+    item?.banned === true
   );
 }
+
+
+// ============================================================
+// التحقق من حظر المستخدم
+// ============================================================
+
+function isUserBanned(senderID) {
+
+  const data =
+    readJSON(
+      BANNED_USERS_FILE
+    );
+
+  const item =
+    data[String(senderID)];
+
+  return (
+    item === true ||
+    item?.banned === true
+  );
+}
+
 
 // ============================================================
 // معالجة الأمر
@@ -474,6 +599,10 @@ module.exports = function ({
   Currencies
 }) {
 
+  // مزامنة ملفات الحظر عند تحميل المعالج
+  syncBanData();
+
+
   return async function ({
     event
   }) {
@@ -486,46 +615,27 @@ module.exports = function ({
 
       normalizeMentions(event);
 
-      const dateNow =
-        Date.now();
-
-      const time =
-        moment
-          .tz(
-            "Africa/Casablanca"
-          )
-          .format(
-            "HH:mm:ss DD/MM/YYYY"
-          );
-
-      const config =
-        global.config || {};
-
-      const data =
-        global.data || {};
-
-      const client =
-        global.client || {};
 
       const {
-        PREFIX = ".",
-        ADMINBOT = [],
-        DeveloperMode = false
-      } = config;
+        allowInbox,
+        PREFIX,
+        ADMINBOT,
+        DeveloperMode,
+        YASSIN
+      } = global.config;
+
 
       const {
-        threadData,
         threadInfo,
+        threadData,
         commandBanned
-      } = data;
+      } = global.data;
+
 
       const {
         commands
-      } = client;
+      } = global.client;
 
-      if (!commands) {
-        return;
-      }
 
       let {
         body,
@@ -534,9 +644,11 @@ module.exports = function ({
         messageID
       } = event;
 
+
       if (!body) {
         return;
       }
+
 
       senderID =
         String(senderID);
@@ -544,153 +656,38 @@ module.exports = function ({
       threadID =
         String(threadID);
 
-      const adminIDs =
-        ADMINBOT.map(
-          id => String(id)
-        );
-
-      const developer =
-        isDeveloper(
-          senderID
-        );
 
       // ======================================================
-      // نظام كف
+      // مزامنة الحظر قبل معالجة الرسالة
       // ======================================================
 
-      const stopPath =
-        path.join(
-          process.cwd(),
-          "data",
-          "stop.json"
-        );
+      syncBanData();
 
-      if (
-        fs.existsSync(stopPath)
-      ) {
-
-        try {
-
-          const stopData =
-            readJSON(stopPath);
-
-          if (
-            stopData[threadID] &&
-            stopData[threadID].active
-          ) {
-
-            const check =
-              body
-                .trim()
-                .split(/\s+/)[0]
-                .toLowerCase();
-
-            if (
-              normalizeCommand(check) !==
-              normalizeCommand("كف")
-            ) {
-
-              return;
-            }
-          }
-
-        } catch (e) {
-
-          console.error(
-            "STOP SYSTEM ERROR:",
-            e.message
-          );
-        }
-      }
-
-      // ======================================================
-      // نظام التقييد
-      // ======================================================
-
-      const restrictPath =
-        path.join(
-          process.cwd(),
-          "data",
-          "restrict.json"
-        );
-
-      if (
-        fs.existsSync(
-          restrictPath
-        )
-      ) {
-
-        try {
-
-          const restrictData =
-            readJSON(
-              restrictPath
-            );
-
-          if (
-            restrictData[threadID] &&
-            restrictData[threadID].active
-          ) {
-
-            return;
-          }
-
-        } catch (e) {
-
-          console.error(
-            "RESTRICT SYSTEM ERROR:",
-            e.message
-          );
-        }
-      }
 
       // ======================================================
       // البادئة
       // ======================================================
 
-      let prefix =
-        PREFIX;
+      const currentThreadData =
+        threadData.get(
+          threadID
+        ) || {};
 
-      try {
 
-        const savedThreadData =
-          threadData?.get(
-            threadID
-          ) || {};
+      const prefix =
+        Object.prototype.hasOwnProperty.call(
+          currentThreadData,
+          "PREFIX"
+        )
+          ? currentThreadData.PREFIX
+          : PREFIX;
 
-        if (
-          Object.prototype.hasOwnProperty.call(
-            savedThreadData,
-            "PREFIX"
-          )
-        ) {
 
-          prefix =
-            savedThreadData.PREFIX;
-        }
+      const botID =
+        String(
+          api.getCurrentUserID()
+        );
 
-      } catch (e) {}
-
-      if (
-        !prefix
-      ) {
-        prefix = ".";
-      }
-
-      // ======================================================
-      // اكتشاف البادئة أو منشن البوت
-      // ======================================================
-
-      let botID = "";
-
-      try {
-
-        botID =
-          String(
-            api.getCurrentUserID()
-          );
-
-      } catch (e) {}
 
       const escapeRegex =
         str =>
@@ -699,35 +696,23 @@ module.exports = function ({
             "\\$&"
           );
 
-      let prefixRegex;
 
-      if (botID) {
+      const prefixRegex =
+        new RegExp(
+          `^(<@!?${botID}>|${escapeRegex(prefix)})\\s*`
+        );
 
-        prefixRegex =
-          new RegExp(
-            `^(<@!?${botID}>|${escapeRegex(prefix)})\\s*`
-          );
-
-      } else {
-
-        prefixRegex =
-          new RegExp(
-            `^${escapeRegex(prefix)}\\s*`
-          );
-      }
 
       const matchedPrefix =
         body.match(
           prefixRegex
-        )?.[0] || null;
+        )?.[0];
+
 
       if (!matchedPrefix) {
         return;
       }
 
-      // ======================================================
-      // محتوى الأمر
-      // ======================================================
 
       const content =
         body
@@ -736,9 +721,11 @@ module.exports = function ({
           )
           .trim();
 
+
       if (!content) {
         return;
       }
+
 
       // ======================================================
       // استخراج الأمر
@@ -751,104 +738,69 @@ module.exports = function ({
         args.shift();
 
       const commandName =
-        String(
+        normalizeCommand(
           commandNameRaw
-        ).toLowerCase();
+        );
+
 
       // ======================================================
       // البحث عن الأمر
       // ======================================================
 
-      let command =
-        commands.get(
+      let command = null;
+
+      for (
+        const [name, cmd] of
+        commands.entries()
+      ) {
+
+        if (
+          normalizeCommand(name) ===
           commandName
-        );
+        ) {
+
+          command = cmd;
+          break;
+
+        }
+      }
+
 
       // ======================================================
-      // 🔒 الحظر الدائم
-      // ======================================================
+      // الحظر قبل تشغيل الأمر
       //
       // مهم:
-      // أمر "حظر" نفسه يجب أن يعمل للمطور
-      // حتى بعد حظر المجموعة.
-      //
-      // لذلك نفحص الحظر بعد معرفة الأمر.
+      // المطور يستطيع استعمال "حظر ازالة"
+      // حتى لو كانت المجموعة محظورة.
       // ======================================================
 
-      const bannedGroup =
-        isGroupBanned(
-          threadID
-        );
+      const developer =
+        isDeveloper(senderID);
 
-      const bannedUser =
-        isUserBanned(
-          senderID
-        );
 
-      // ======================================================
-      // إذا كانت المجموعة محظورة
-      // ======================================================
-
-      if (
-        bannedGroup &&
-        !developer
-      ) {
-
-        return;
-      }
-
-      // ======================================================
-      // إذا كان المستخدم محظورًا
-      // ======================================================
-
-      if (
-        bannedUser &&
-        !developer
-      ) {
-
-        return;
-      }
-
-      // ======================================================
-      // الحظر القديم الموجود في global.data
-      // ======================================================
-
-      try {
+      if (!developer) {
 
         if (
-          data.threadBanned &&
-          typeof data.threadBanned.has ===
-          "function" &&
-          data.threadBanned.has(
-            threadID
-          ) &&
-          !developer
+          isGroupBanned(threadID)
         ) {
 
           return;
+
         }
 
-      } catch (e) {}
-
-      try {
-
         if (
-          data.userBanned &&
-          typeof data.userBanned.has ===
-          "function" &&
-          data.userBanned.has(
-            senderID
-          ) &&
-          !developer
+          isUserBanned(senderID)
         ) {
 
           return;
+
         }
 
-      } catch (e) {}
+      }
+
 
       // ======================================================
-      // اقتراح أمر
+      // إذا لم يوجد الأمر
       // ======================================================
 
       if (!command) {
@@ -861,7 +813,9 @@ module.exports = function ({
         if (
           allCommandNames.length === 0
         ) {
+
           return;
+
         }
 
         const result =
@@ -870,53 +824,42 @@ module.exports = function ({
             allCommandNames
           );
 
-        const closestMatch =
-          result.command;
-
-        const score =
-          result.score;
-
         if (
-          closestMatch &&
-          score >= 0.45
+          result.command &&
+          result.score >= 0.45
         ) {
 
-          const replies = [
-
-            `⌬ ━━ 𝗛𝗜𝗡𝗔 UTILITY ━━ ⌬\n\n` +
-            `❌ الأمر "${commandName}" غير موجود\n\n` +
-            `💡 ربما تقصد: "${closestMatch}"؟`,
-
-            `⌬ ━━ 𝗛𝗜𝗡𝗔 UTILITY ━━ ⌬\n\n` +
-            `⚠️ لم أجد الأمر "${commandName}"\n\n` +
-            `🔍 هل تقصد: "${closestMatch}"؟`,
-
-            `⌬ ━━ 𝗛𝗜𝗡𝗔 UTILITY ━━ ⌬\n\n` +
-            `🚫 الأمر "${commandName}" غير صحيح\n\n` +
-            `✨ ربما تقصد: "${closestMatch}"؟`
-
-          ];
-
           return api.sendMessage(
-            replies[
-              Math.floor(
-                Math.random() *
-                replies.length
-              )
-            ],
+
+            `⌬ ━━ 𝗛𝗜𝗡𝗔 UTILITY ━━ ⌬
+
+❌ الأمر "${commandNameRaw}" غير موجود
+
+💡 ربما تقصد:
+"${result.command}"؟`,
+
             threadID,
             messageID
+
           );
+
         }
 
         return api.sendMessage(
-          `⌬ ━━ 𝗛𝗜𝗡𝗔 UTILITY ━━ ⌬\n\n` +
-          `❌ الأمر "${commandName}" غير موجود.\n\n` +
-          `💡 استخدم ${prefix}مساعدة لرؤية جميع الأوامر.`,
+
+          `⌬ ━━ 𝗛𝗜𝗡𝗔 UTILITY ━━ ⌬
+
+❌ الأمر "${commandNameRaw}" غير موجود.
+
+💡 استخدم ${prefix}مساعدة لرؤية الأوامر.`,
+
           threadID,
           messageID
+
         );
+
       }
+
 
       // ======================================================
       // المنشن
@@ -925,9 +868,8 @@ module.exports = function ({
       normalizeMentions(event);
 
       const firstMention =
-        getFirstMention(
-          event
-        );
+        getFirstMention(event);
+
 
       if (
         DeveloperMode &&
@@ -935,124 +877,118 @@ module.exports = function ({
       ) {
 
         console.log(
-          "\n📌 HINA MENTION"
+          "[HINA MENTION]",
+          {
+            senderID,
+            mentionID: firstMention,
+            allMentions:
+              event.mentionIDs,
+            command: commandName
+          }
         );
 
-        console.log(
-          `Sender: ${senderID}`
-        );
-
-        console.log(
-          `Mention: ${firstMention}`
-        );
-
-        console.log(
-          "All Mentions:",
-          event.mentionIDs
-        );
-
-        console.log(
-          `Command: ${commandName}\n`
-        );
       }
+
 
       // ======================================================
       // حظر الأوامر
       // ======================================================
 
-      try {
+      if (
+        commandBanned &&
+        !developer
+      ) {
+
+        const threadBannedCommands =
+          commandBanned.get(
+            threadID
+          ) || [];
+
+        const userBannedCommands =
+          commandBanned.get(
+            senderID
+          ) || [];
+
 
         if (
-          commandBanned &&
-          typeof commandBanned.get ===
-          "function" &&
-          !developer
+          Array.isArray(
+            threadBannedCommands
+          ) &&
+          threadBannedCommands.includes(
+            command.config.name
+          )
         ) {
 
-          const banThreads =
-            commandBanned.get(
-              threadID
-            ) || [];
+          return api.sendMessage(
 
-          const banUsers =
-            commandBanned.get(
-              senderID
-            ) || [];
+            `⌬ ━━ 𝗛𝗜𝗡𝗔 ADMIN ━━ ⌬
 
-          if (
-            Array.isArray(
-              banThreads
-            ) &&
-            banThreads.includes(
-              command.config.name
-            )
-          ) {
+🚫 الأمر محظور في هذه المجموعة
 
-            return api.sendMessage(
-              `⌬ ━━ 𝗛𝗜𝗡𝗔 ADMIN ━━ ⌬\n\n` +
-              `🚫 الأمر محظور في هذه المجموعة\n` +
-              `الأمر: ${command.config.name}`,
-              threadID,
-              messageID
-            );
-          }
+الأمر:
+${command.config.name}`,
 
-          if (
-            Array.isArray(
-              banUsers
-            ) &&
-            banUsers.includes(
-              command.config.name
-            )
-          ) {
+            threadID,
+            messageID
 
-            return api.sendMessage(
-              `⌬ ━━ 𝗛𝗜𝗡𝗔 ADMIN ━━ ⌬\n\n` +
-              `⛔ أنت محظور من استخدام هذا الأمر`,
-              threadID,
-              messageID
-            );
-          }
+          );
+
         }
 
-      } catch (e) {
 
-        console.error(
-          "COMMAND BAN ERROR:",
-          e.message
-        );
+        if (
+          Array.isArray(
+            userBannedCommands
+          ) &&
+          userBannedCommands.includes(
+            command.config.name
+          )
+        ) {
+
+          return api.sendMessage(
+
+            `⌬ ━━ 𝗛𝗜𝗡𝗔 ADMIN ━━ ⌬
+
+⛔ أنت محظور من استخدام هذا الأمر`,
+
+            threadID,
+            messageID
+
+          );
+
+        }
+
       }
+
 
       // ======================================================
       // NSFW
       // ======================================================
 
-      try {
-
-        if (
-          command.config.commandCategory &&
-          String(
-            command.config.commandCategory
-          ).toLowerCase() ===
+      if (
+        command.config.commandCategory &&
+        command.config.commandCategory
+          .toLowerCase() ===
           "nsfw" &&
-          !(
-            data.threadAllowNSFW &&
-            data.threadAllowNSFW.includes(
-              threadID
-            )
-          ) &&
-          !developer
-        ) {
+        !global.data.threadAllowNSFW.includes(
+          threadID
+        ) &&
+        !developer
+      ) {
 
-          return api.sendMessage(
-            `⌬ ━━ 𝗛𝗜𝗡𝗔 UTILITY ━━ ⌬\n\n` +
-            `🔞 محتوى محظور في هذه المجموعة`,
-            threadID,
-            messageID
-          );
-        }
+        return api.sendMessage(
 
-      } catch (e) {}
+          `⌬ ━━ 𝗛𝗜𝗡𝗔 UTILITY ━━ ⌬
+
+🔞 محتوى محظور في هذه المجموعة`,
+
+          threadID,
+          messageID
+
+        );
+
+      }
+
 
       // ======================================================
       // الصلاحيات
@@ -1060,130 +996,126 @@ module.exports = function ({
 
       let permssion = 0;
 
-      let threadInfoData =
-        null;
 
-      try {
+      let info =
+        threadInfo.get(
+          threadID
+        );
 
-        threadInfoData =
-          threadInfo?.get(
-            threadID
-          );
 
-      } catch (e) {}
-
-      if (
-        !threadInfoData
-      ) {
+      if (!info) {
 
         try {
 
-          if (
-            Threads &&
-            typeof Threads.getInfo ===
-            "function"
-          ) {
+          info =
+            await Threads.getInfo(
+              threadID
+            );
 
-            threadInfoData =
-              await Threads.getInfo(
-                threadID
-              );
+          if (info) {
+
+            threadInfo.set(
+              threadID,
+              info
+            );
+
           }
 
-        } catch (e) {
+        } catch (error) {
 
           console.error(
-            "THREAD INFO ERROR:",
-            e.message
+            "GET THREAD INFO ERROR:",
+            error.message
           );
+
         }
+
       }
 
-      const adminList =
-        threadInfoData?.adminIDs ||
-        [];
 
-      const isThreadAdmin =
-        adminList.some(
+      const admins =
+        info?.adminIDs || [];
+
+
+      const isGroupAdmin =
+        admins.some(
           admin =>
-            String(
-              admin.id
-            ) ===
+            String(admin.id) ===
             String(senderID)
         );
 
-      if (
-        developer
-      ) {
+
+      if (developer) {
 
         permssion = 2;
 
       } else if (
-        isThreadAdmin
+        isGroupAdmin
       ) {
 
         permssion = 1;
+
       }
 
-      // ======================================================
-      // صلاحية الأمر
-      // ======================================================
-
-      const requiredPermission =
-        Number(
-          command.config.hasPermssion ||
-          0
-        );
 
       if (
-        requiredPermission >
+        Number(
+          command.config.hasPermssion || 0
+        ) >
         permssion
       ) {
 
         return api.sendMessage(
-          `⌬ ━━ 𝗛𝗜𝗡𝗔 ADMIN ━━ ⌬\n\n` +
-          `⚠️ ليس لديك صلاحية لتنفيذ هذا الأمر`,
+
+          `⌬ ━━ 𝗛𝗜𝗡𝗔 ADMIN ━━ ⌬
+
+⚠️ ليس لديك صلاحية لتنفيذ هذا الأمر`,
+
           threadID,
           messageID
+
         );
+
       }
+
 
       // ======================================================
       // Cooldown
       // ======================================================
 
       if (
-        !client.cooldowns.has(
+        !global.client.cooldowns.has(
           command.config.name
         )
       ) {
 
-        client.cooldowns.set(
+        global.client.cooldowns.set(
           command.config.name,
           new Map()
         );
+
       }
 
+
       const timestamps =
-        client.cooldowns.get(
+        global.client.cooldowns.get(
           command.config.name
         );
 
+
       const expirationTime =
-        Number(
-          command.config.cooldowns ||
-          1
+        (
+          Number(
+            command.config.cooldowns
+          ) || 1
         ) * 1000;
 
+
       if (
-        timestamps.has(
-          senderID
-        ) &&
-        dateNow <
-        timestamps.get(
-          senderID
-        ) +
-        expirationTime
+        timestamps.has(senderID) &&
+        Date.now() <
+          timestamps.get(senderID) +
+          expirationTime
       ) {
 
         return api.setMessageReaction(
@@ -1192,14 +1124,17 @@ module.exports = function ({
           () => {},
           true
         );
+
       }
 
+
       // ======================================================
-      // تنفيذ الأمر
+      // منع التكرار
       // ======================================================
 
       const commandKey =
         `${threadID}_${senderID}_${commandName}`;
+
 
       if (
         commandExecuted.has(
@@ -1208,11 +1143,14 @@ module.exports = function ({
       ) {
 
         return;
+
       }
+
 
       commandExecuted.add(
         commandKey
       );
+
 
       setTimeout(
         () => {
@@ -1225,8 +1163,9 @@ module.exports = function ({
         1000
       );
 
+
       // ======================================================
-      // Object الأمر
+      // بيانات الأمر
       // ======================================================
 
       const Obj = {
@@ -1248,19 +1187,15 @@ module.exports = function ({
         permssion,
 
         mentionID:
-          getFirstMention(
-            event
-          ),
+          getFirstMention(event),
 
         mentionIDs:
-          event.mentionIDs ||
-          [],
+          event.mentionIDs || [],
 
-        getText:
-          global.getText ||
-          (() => {})
+        getText: () => {}
 
       };
+
 
       // ======================================================
       // تشغيل الأمر
@@ -1270,37 +1205,39 @@ module.exports = function ({
         Obj
       );
 
+
       timestamps.set(
         senderID,
-        dateNow
+        Date.now()
       );
 
-      return;
 
-    } catch (e) {
+    } catch (error) {
 
       console.error(
-        `[${time}] COMMAND ERROR:`,
-        e
+        `[${moment().format("HH:mm:ss")}] COMMAND ERROR:`,
+        error
       );
+
 
       try {
 
         return api.sendMessage(
-          `⌬ ━━ 𝗛𝗜𝗡𝗔 DEVELOPER ━━ ⌬\n\n` +
-          `❌ حدث خطأ أثناء تنفيذ الأمر\n\n` +
-          `${e.message}`,
+
+          `⌬ ━━ 𝗛𝗜𝗡𝗔 DEVELOPER ━━ ⌬
+
+❌ حدث خطأ أثناء تنفيذ الأمر
+
+${error.message}`,
+
           event.threadID,
           event.messageID
+
         );
 
-      } catch (sendError) {
+      } catch (e) {}
 
-        console.error(
-          "SEND ERROR:",
-          sendError
-        );
-      }
     }
+
   };
 };
