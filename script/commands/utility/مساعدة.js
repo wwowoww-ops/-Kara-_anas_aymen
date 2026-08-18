@@ -2,7 +2,7 @@ module.exports.config = {
   name: "مساعدة",
   version: "1.0.0",
   hasPermssion: 0,
-  credits: "أأبو هريرة,
+  credits: "أبو هريرة" 
   description: "عرض قائمة الأوامر",
   commandCategory: "utility",
   usages: "[اسم الأمر] أو [الفئة]",
