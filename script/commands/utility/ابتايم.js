@@ -1,6 +1,6 @@
 module.exports.config = {
   name: "ابتايم",
-  version: "1.3.0",
+  version: "1.4.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
   description: "عرض حالة النظام وإحصائيات التشغيل",
@@ -10,53 +10,96 @@ module.exports.config = {
 };
 
 // ==================================================
-// حساب عدد المجموعات التي يعرفها البوت
-// بدون getThreadList
+// حساب المجموعات المعروفة
 // ==================================================
 
 function getKnownGroups() {
   const ids = new Set();
 
   try {
-    // global.data.allThreadID
     if (
       global.data &&
       Array.isArray(global.data.allThreadID)
     ) {
       for (const id of global.data.allThreadID) {
-        if (id) ids.add(String(id));
+        if (id) {
+          ids.add(String(id));
+        }
       }
     }
-  } catch (e) {}
+  } catch (e) {
+    console.log("HINA: خطأ allThreadID:", e.message);
+  }
 
   try {
-    // global.data.threadData
     if (
       global.data &&
       global.data.threadData
     ) {
-      const data = global.data.threadData;
+      const threadData = global.data.threadData;
 
-      if (data instanceof Map) {
-        for (const id of data.keys()) {
-          if (id) ids.add(String(id));
+      if (threadData instanceof Map) {
+        for (const id of threadData.keys()) {
+          if (id) {
+            ids.add(String(id));
+          }
         }
-      } else if (typeof data === "object") {
-        for (const id of Object.keys(data)) {
-          if (id) ids.add(String(id));
+      } else if (
+        typeof threadData === "object"
+      ) {
+        for (const id of Object.keys(threadData)) {
+          if (id) {
+            ids.add(String(id));
+          }
         }
       }
     }
-  } catch (e) {}
+  } catch (e) {
+    console.log("HINA: خطأ threadData:", e.message);
+  }
 
   return ids.size;
+}
+
+// ==================================================
+// حساب مدة التشغيل
+// ==================================================
+
+function getUptime() {
+  const uptime = process.uptime();
+
+  const days = Math.floor(
+    uptime / 86400
+  );
+
+  const hours = Math.floor(
+    (uptime % 86400) / 3600
+  );
+
+  const minutes = Math.floor(
+    (uptime % 3600) / 60
+  );
+
+  const seconds = Math.floor(
+    uptime % 60
+  );
+
+  return {
+    days,
+    hours,
+    minutes,
+    seconds
+  };
 }
 
 // ==================================================
 // RUN
 // ==================================================
 
-module.exports.run = async function({ api, event }) {
+module.exports.run = async function({
+  api,
+  event
+}) {
 
   const {
     threadID,
@@ -65,34 +108,13 @@ module.exports.run = async function({ api, event }) {
 
   try {
 
-    // ==================================================
-    // مدة التشغيل
-    // ==================================================
-
-    const uptime = process.uptime();
-
-    const days = Math.floor(
-      uptime / 86400
-    );
-
-    const hours = Math.floor(
-      (uptime % 86400) / 3600
-    );
-
-    const minutes = Math.floor(
-      (uptime % 3600) / 60
-    );
-
-    const seconds = Math.floor(
-      uptime % 60
-    );
+    const uptime = getUptime();
 
     const timeStr =
-      `${days} يوم، ${hours} ساعة، ${minutes} دقيقة، ${seconds} ثانية`;
-
-    // ==================================================
-    // عدد المجموعات
-    // ==================================================
+      `${uptime.days} يوم، ` +
+      `${uptime.hours} ساعة، ` +
+      `${uptime.minutes} دقيقة، ` +
+      `${uptime.seconds} ثانية`;
 
     const groupCount =
       getKnownGroups();
@@ -104,7 +126,10 @@ module.exports.run = async function({ api, event }) {
     const header =
 `⌬ ━━ 𝗛𝗜𝗡𝗔 DEVELOPER ━━ ⌬`;
 
-    const statusMsg =
+    const footer =
+`⌬ ━━━━━━━━━━━━ ⌬`;
+
+    const message =
 `${header}
 
 ⚙️ حـالـة الـنـظـام
@@ -119,14 +144,10 @@ module.exports.run = async function({ api, event }) {
 🤖 الحالة: متصل
 👑 المطور: أبو هريرة
 
-⌬ ━━━━━━━━━━━━ ⌬`;
-
-    // ==================================================
-    // إرسال الرسالة
-    // ==================================================
+${footer}`;
 
     return api.sendMessage(
-      statusMsg,
+      message,
       threadID,
       (err, info) => {
 
@@ -144,13 +165,15 @@ module.exports.run = async function({ api, event }) {
           info.messageID
         ) {
           setTimeout(() => {
-
             try {
               api.unsendMessage(
                 info.messageID
               );
-            } catch (e) {}
-
+            } catch (e) {
+              console.log(
+                "HINA: تعذر حذف رسالة الابتايم"
+              );
+            }
           }, 15000);
         }
 
@@ -166,7 +189,7 @@ module.exports.run = async function({ api, event }) {
     );
 
     return api.sendMessage(
-`⌬ ━━ 𝗛𝗜𝗡𝗔 DEVELOPER ━━ ⌬
+`${"⌬ ━━ 𝗛𝗜𝗡𝗔 DEVELOPER ━━ ⌬"}
 
 ❌ حدث خطأ أثناء تنفيذ الأمر
 
@@ -178,9 +201,3 @@ ${error.message}
     );
   }
 };
-
-هذا الإصدار لا يستخدم "getThreadList()" نهائيًا، وبالتالي خطأ:
-
-"Cannot read properties of undefined (reading 'uri')"
-
-لن يأتي من هذا الأمر. كما أنه يعرض الثواني ويحتفظ برسالة HINA والخروج التلقائي بعد 15 ثانية.
