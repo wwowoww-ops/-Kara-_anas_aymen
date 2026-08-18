@@ -5,931 +5,419 @@ const Jimp = require("jimp");
 
 module.exports.config = {
   name: "زوجيني",
-  version: "3.1.0",
+  version: "3.2.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
-  description: "زواج عشوائي مع صورة عالية الجودة تجمع الطرفين ونسبة التوافق",
+  description: "زواج عشوائي مع دمج صور الطرفين ونسبة التوافق",
   commandCategory: "fun",
   usages: "زوجيني",
-  cooldowns: 5,
-
-  dependencies: {
-    axios: "",
-    "fs-extra": "",
-    jimp: ""
-  }
+  cooldowns: 5
 };
 
+module.exports.run = async function ({ api, event, Users }) {
+  const { threadID, messageID, senderID } = event;
 
-/**
- * قص الصورة إلى مربع بدون تشويه
- */
-function cropToSquare(image) {
-  const width = image.bitmap.width;
-  const height = image.bitmap.height;
+  const cacheDir = path.join(__dirname, "cache");
 
-  const size = Math.min(width, height);
+  await fs.ensureDir(cacheDir);
 
-  const x = Math.floor((width - size) / 2);
-  const y = Math.floor((height - size) / 2);
-
-  return image.crop(
-    x,
-    y,
-    size,
-    size
-  );
-}
-
-
-/**
- * إنشاء قلب عالي الجودة
- */
-function createHeart(width, height) {
-  const heartCanvas = new Jimp(
-    width,
-    height,
-    0x00000000
+  const senderPath = path.join(
+    cacheDir,
+    `marry_sender_${senderID}.jpg`
   );
 
-  const red = {
-    r: 255,
-    g: 23,
-    b: 68,
-    a: 255
-  };
-
-  // قلب Pixel Art أكبر وأنعم بصريًا
-  const pattern = [
-    "  XX  XX  ",
-    " XXXXXXXXX ",
-    "XXXXXXXXXXX",
-    "XXXXXXXXXXX",
-    " XXXXXXXXX ",
-    "  XXXXXXX  ",
-    "   XXXXX   ",
-    "    XXX    ",
-    "     X     "
-  ];
-
-  const blockSize = 28;
-
-  const patternWidth =
-    11 * blockSize;
-
-  const patternHeight =
-    pattern.length * blockSize;
-
-  const startX =
-    Math.floor(
-      (width - patternWidth) / 2
-    );
-
-  const startY =
-    Math.floor(
-      (height - patternHeight) / 2
-    );
-
-  for (let y = 0; y < pattern.length; y++) {
-
-    for (let x = 0; x < pattern[y].length; x++) {
-
-      if (pattern[y][x] !== "X") {
-        continue;
-      }
-
-      heartCanvas.scan(
-        startX + x * blockSize,
-        startY + y * blockSize,
-        blockSize,
-        blockSize,
-        function(px, py) {
-
-          const index =
-            this.bitmap.index(
-              px,
-              py
-            );
-
-          this.bitmap.data[index] =
-            red.r;
-
-          this.bitmap.data[index + 1] =
-            red.g;
-
-          this.bitmap.data[index + 2] =
-            red.b;
-
-          this.bitmap.data[index + 3] =
-            red.a;
-        }
-      );
-    }
-  }
-
-  return heartCanvas;
-}
-
-
-module.exports.run = async function({
-  api,
-  event,
-  Users
-}) {
-
-  const {
-    threadID,
-    messageID,
-    senderID
-  } = event;
-
-  const tempDir =
-    path.join(
-      __dirname,
-      "cache"
-    );
+  let partnerID;
+  let senderName = "المستخدم";
+  let partnerName = "العضو المختار";
 
   try {
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ==========================================
     // جلب أعضاء المجموعة
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ==========================================
 
-    const threadInfo =
-      await api.getThreadInfo(
-        threadID
-      );
+    const threadInfo = await api.getThreadInfo(threadID);
 
-    const participants =
-      threadInfo.participantIDs || [];
+    const botID = String(api.getCurrentUserID());
 
-    const botID =
-      api.getCurrentUserID();
-
-    const members =
-      participants.filter(
-        id =>
-          String(id) !== String(botID) &&
-          String(id) !== String(senderID)
-      );
-
+    const members = (threadInfo.participantIDs || []).filter(
+      id =>
+        String(id) !== botID &&
+        String(id) !== String(senderID)
+    );
 
     if (members.length === 0) {
-
       return api.sendMessage(
-        `⌬ ━━ 𝗛𝗜𝗡𝗔 FUN ━━ ⌬\n\n` +
-        `❌ لا يوجد أعضاء كافيين في المجموعة للزواج!`,
+        `⌬ ━━ 𝗛𝗜𝗡𝗔 FUN ━━ ⌬
+
+❌ لا يوجد أعضاء كافيين في المجموعة للزواج!`,
         threadID,
         messageID
       );
     }
 
+    // ==========================================
+    // اختيار الشريك
+    // ==========================================
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // اختيار شخص عشوائي
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    partnerID =
+      members[Math.floor(Math.random() * members.length)];
 
-    const randomIndex =
-      Math.floor(
-        Math.random() *
-        members.length
-      );
+    const partnerPath = path.join(
+      cacheDir,
+      `marry_partner_${partnerID}.jpg`
+    );
 
-    const partnerID =
-      members[randomIndex];
+    const finalPath = path.join(
+      cacheDir,
+      `marry_${senderID}_${partnerID}_${Date.now()}.jpg`
+    );
 
+    // ==========================================
+    // معلومات المستخدمين
+    // ==========================================
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // جلب بيانات الطرفين
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-    const [
-      senderData,
-      partnerData
-    ] = await Promise.all([
+    const [senderData, partnerData] = await Promise.all([
       api.getUserInfo(senderID),
       api.getUserInfo(partnerID)
     ]);
 
-
-    const senderInfo =
-      senderData[senderID] || {};
-
-    const partnerInfo =
-      partnerData[partnerID] || {};
-
-
-    let senderName =
-      senderInfo.name;
-
-    let partnerName =
-      partnerInfo.name;
-
-
-    if (!senderName) {
-      try {
-        const data =
-          await Users.getData(
-            senderID
-          );
-
-        senderName =
-          data?.name;
-      } catch {}
-    }
-
-
-    if (!partnerName) {
-      try {
-        const data =
-          await Users.getData(
-            partnerID
-          );
-
-        partnerName =
-          data?.name;
-      } catch {}
-    }
-
+    const senderInfo = senderData[senderID] || {};
+    const partnerInfo = partnerData[partnerID] || {};
 
     senderName =
-      senderName ||
+      senderInfo.name ||
       "المستخدم";
 
     partnerName =
-      partnerName ||
+      partnerInfo.name ||
       "العضو المختار";
 
-
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // حساب نسبة التوافق
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-    const getCompatibility =
-      (name1, name2) => {
-
-        const base =
-          Math.floor(
-            Math.random() * 41
-          ) + 30;
-
-        const len1 =
-          name1.length;
-
-        const len2 =
-          name2.length;
-
-        const maxLen =
-          Math.max(
-            len1,
-            len2
-          );
-
-        const lenFactor =
-          maxLen > 0
-            ? Math.min(
-                len1,
-                len2
-              ) / maxLen
-            : 0;
-
-        const commonLetters =
-          [
-            ...new Set(
-              name1.split("")
-            )
-          ].filter(
-            c =>
-              name2.includes(c)
-          ).length;
-
-        const uniqueLetters =
-          [
-            ...new Set(
-              name1 + name2
-            )
-          ].length;
-
-        const letterFactor =
-          commonLetters /
-          Math.max(
-            uniqueLetters,
-            1
-          );
-
-        const finalPercent =
-          Math.round(
-            (
-              base +
-              lenFactor * 15 +
-              letterFactor * 15
-            ) / 1.3
-          );
-
-        return Math.min(
-          Math.max(
-            finalPercent,
-            0
-          ),
-          100
-        );
-      };
-
-
-    const lovePercent =
-      getCompatibility(
-        senderName,
-        partnerName
-      );
-
-
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // رسالة حسب النسبة
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-    let loveMessage = "";
-
-    if (lovePercent >= 90) {
-
-      loveMessage =
-        "💖 توافق خيالي! أنتما مثاليان لبعضكما!";
-
-    } else if (lovePercent >= 70) {
-
-      loveMessage =
-        "❤️ توافق رائع! علاقة قوية بإذن الله!";
-
-    } else if (lovePercent >= 50) {
-
-      loveMessage =
-        "💕 توافق جيد! مع الوقت ستزداد المحبة!";
-
-    } else if (lovePercent >= 30) {
-
-      loveMessage =
-        "💔 توافق متوسط... تحتاجون إلى عمل على العلاقة!";
-
-    } else {
-
-      loveMessage =
-        "💔 توافق ضعيف... الله يعينكم على بعض!";
-    }
-
-
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // الرد العشوائي
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-    const funnyReplies = [
-
-      `💍 ألف مبروك الزواج لـ ${senderName} و ${partnerName}! 🎉`,
-
-      `💕 تم الزواج! ${senderName} و ${partnerName} أصبحا زوجين!`,
-
-      `🌸 مبارك للعروسين ${senderName} و ${partnerName}!`,
-
-      `💖 زواج سعيد لـ ${senderName} و ${partnerName}!`
-    ];
-
-
-    const randomReply =
-      funnyReplies[
-        Math.floor(
-          Math.random() *
-          funnyReplies.length
-        )
-      ];
-
-
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // إنشاء مجلد الكاش
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-    await fs.ensureDir(
-      tempDir
-    );
-
-
-    const senderImagePath =
-      path.join(
-        tempDir,
-        `زوجيني_sender_${senderID}.jpg`
-      );
-
-
-    const partnerImagePath =
-      path.join(
-        tempDir,
-        `زوجيني_partner_${partnerID}.jpg`
-      );
-
-
-    const finalImagePath =
-      path.join(
-        tempDir,
-        `زوجيني_final_${senderID}_${partnerID}_${Date.now()}.jpg`
-      );
-
-
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ==========================================
     // روابط الصور
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ==========================================
 
     const senderImage =
       senderInfo.thumbSrc ||
       senderInfo.profilePicture ||
       senderInfo.profileUrl;
 
-
     const partnerImage =
       partnerInfo.thumbSrc ||
       partnerInfo.profilePicture ||
       partnerInfo.profileUrl;
 
+    if (!senderImage || !partnerImage) {
+      return api.sendMessage(
+        `⌬ ━━ 𝗛𝗜𝗡𝗔 FUN ━━ ⌬
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // تحميل الصور بأفضل جودة متاحة
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+❌ لم أتمكن من الحصول على صور الطرفين.`,
+        threadID,
+        messageID
+      );
+    }
 
-    const downloadImage =
-      async (
-        url,
-        filePath
-      ) => {
+    // ==========================================
+    // تحميل الصور
+    // ==========================================
 
-        if (!url) {
-          return false;
+    async function download(url, file) {
+      const response = await axios.get(url, {
+        responseType: "arraybuffer",
+        timeout: 20000,
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0"
         }
+      });
 
-        try {
+      await fs.writeFile(
+        file,
+        response.data
+      );
+    }
 
-          const response =
-            await axios({
-              method: "GET",
-              url: url,
-              responseType:
-                "arraybuffer",
-              timeout: 20000,
-              headers: {
-                "User-Agent":
-                  "Mozilla/5.0"
-              }
-            });
-
-
-          await fs.writeFile(
-            filePath,
-            response.data
-          );
-
-
-          return true;
-
-        } catch (error) {
-
-          console.error(
-            "فشل تحميل الصورة:",
-            error.message
-          );
-
-          return false;
-        }
-      };
-
-
-    const [
-      senderImageExists,
-      partnerImageExists
-    ] = await Promise.all([
-
-      downloadImage(
-        senderImage,
-        senderImagePath
-      ),
-
-      downloadImage(
-        partnerImage,
-        partnerImagePath
-      )
+    await Promise.all([
+      download(senderImage, senderPath),
+      download(partnerImage, partnerPath)
     ]);
 
+    // ==========================================
+    // قراءة الصور
+    // ==========================================
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // إنشاء الصورة عالية الجودة
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    const img1 =
+      await Jimp.read(senderPath);
 
-    let finalImageCreated =
-      false;
+    const img2 =
+      await Jimp.read(partnerPath);
 
+    // ==========================================
+    // حجم الصور
+    // ==========================================
 
-    if (
-      senderImageExists &&
-      partnerImageExists
-    ) {
+    const SIZE = 700;
 
-      try {
+    // قص الصور إلى مربع
+    function square(image) {
 
-        const senderImg =
-          await Jimp.read(
-            senderImagePath
-          );
+      const w = image.bitmap.width;
+      const h = image.bitmap.height;
 
-
-        const partnerImg =
-          await Jimp.read(
-            partnerImagePath
-          );
-
-
-        // حجم الصور النهائي
-        const photoSize =
-          800;
-
-
-        // المساحة بين الصورتين
-        const heartSpace =
-          220;
-
-
-        const finalWidth =
-          photoSize +
-          heartSpace +
-          photoSize;
-
-
-        const finalHeight =
-          photoSize;
-
-
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // قص بدون تشويه
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-        cropToSquare(
-          senderImg
-        );
-
-        cropToSquare(
-          partnerImg
-        );
-
-
-        // تصغير/تكبير بجودة أفضل
-        senderImg.resize(
-          photoSize,
-          photoSize,
-          Jimp.RESIZE_BICUBIC
-        );
-
-
-        partnerImg.resize(
-          photoSize,
-          photoSize,
-          Jimp.RESIZE_BICUBIC
-        );
-
-
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // إنشاء Canvas
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-        const canvas =
-          new Jimp(
-            finalWidth,
-            finalHeight,
-            0xffffffff
-          );
-
-
-        // الصورة الأولى
-        canvas.composite(
-          senderImg,
+      if (w > h) {
+        image.crop(
+          Math.floor((w - h) / 2),
           0,
-          0
+          h,
+          h
         );
-
-
-        // الصورة الثانية
-        canvas.composite(
-          partnerImg,
-          photoSize +
-          heartSpace,
-          0
+      } else if (h > w) {
+        image.crop(
+          0,
+          Math.floor((h - w) / 2),
+          w,
+          w
         );
+      }
 
+      return image;
+    }
 
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // إنشاء القلب
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    square(img1);
+    square(img2);
 
-        const heart =
-          createHeart(
-            heartSpace,
-            photoSize
+    // تصغير الصور
+    img1.resize(SIZE, SIZE);
+    img2.resize(SIZE, SIZE);
+
+    // ==========================================
+    // Canvas
+    // ==========================================
+
+    const GAP = 180;
+
+    const canvasWidth =
+      SIZE * 2 + GAP;
+
+    const canvasHeight =
+      SIZE;
+
+    const canvas =
+      new Jimp(
+        canvasWidth,
+        canvasHeight,
+        0xffffffff
+      );
+
+    // ==========================================
+    // وضع الصورة الأولى
+    // ==========================================
+
+    canvas.composite(
+      img1,
+      0,
+      0
+    );
+
+    // ==========================================
+    // وضع الصورة الثانية
+    // ==========================================
+
+    canvas.composite(
+      img2,
+      SIZE + GAP,
+      0
+    );
+
+    // ==========================================
+    // إنشاء القلب
+    // ==========================================
+
+    const heart = new Jimp(
+      120,
+      120,
+      0x00000000
+    );
+
+    // قلب بسيط باستخدام مربعات
+    const RED = 0xff1744ff;
+
+    const blocks = [
+      [20, 10],
+      [60, 10],
+
+      [10, 20],
+      [20, 20],
+      [30, 20],
+      [50, 20],
+      [60, 20],
+      [70, 20],
+
+      [10, 30],
+      [20, 30],
+      [30, 30],
+      [40, 30],
+      [50, 30],
+      [60, 30],
+      [70, 30],
+
+      [20, 40],
+      [30, 40],
+      [40, 40],
+      [50, 40],
+      [60, 40],
+
+      [30, 50],
+      [40, 50],
+      [50, 50],
+
+      [40, 60]
+    ];
+
+    for (const [x, y] of blocks) {
+
+      for (let px = x; px < x + 10; px++) {
+
+        for (let py = y; py < y + 10; py++) {
+
+          heart.setPixelColor(
+            RED,
+            px,
+            py
           );
 
-
-        canvas.composite(
-          heart,
-          photoSize,
-          0
-        );
-
-
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // جودة JPEG القصوى
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-        canvas.quality(100);
-
-        canvas.deflateLevel(0);
-
-        canvas.deflateStrategy(0);
-
-
-        await canvas.writeAsync(
-          finalImagePath
-        );
-
-
-        finalImageCreated =
-          true;
-
-
-      } catch (imageError) {
-
-        console.error(
-          "خطأ أثناء إنشاء الصورة:",
-          imageError
-        );
-
-        finalImageCreated =
-          false;
+        }
       }
     }
 
+    // ==========================================
+    // وضع القلب في المنتصف
+    // ==========================================
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // حفظ الزواج
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-    const marriagePath =
-      "./data/marriages.json";
-
-
-    await fs.ensureDir(
-      "./data"
+    canvas.composite(
+      heart,
+      SIZE + Math.floor((GAP - 120) / 2),
+      Math.floor((SIZE - 120) / 2)
     );
 
+    // ==========================================
+    // حفظ الصورة
+    // ==========================================
 
-    if (
-      !fs.existsSync(
-        marriagePath
-      )
-    ) {
+    canvas.quality(100);
 
-      await fs.writeFile(
-        marriagePath,
-        JSON.stringify({})
-      );
+    await canvas.writeAsync(
+      finalPath
+    );
+
+    // ==========================================
+    // نسبة التوافق
+    // ==========================================
+
+    const base =
+      Math.floor(
+        Math.random() * 41
+      ) + 50;
+
+    const lovePercent =
+      Math.min(base, 100);
+
+    let loveMessage;
+
+    if (lovePercent >= 90) {
+      loveMessage =
+        "💖 توافق خيالي! أنتما مثاليان لبعضكما!";
+    } else if (lovePercent >= 70) {
+      loveMessage =
+        "❤️ توافق رائع!";
+    } else if (lovePercent >= 50) {
+      loveMessage =
+        "💕 توافق جيد!";
+    } else {
+      loveMessage =
+        "💔 توافق ضعيف!";
     }
 
-
-    let marriages;
-
-
-    try {
-
-      marriages =
-        JSON.parse(
-          await fs.readFile(
-            marriagePath,
-            "utf8"
-          )
-        );
-
-    } catch {
-
-      marriages = {};
-    }
-
-
-    if (
-      !marriages[threadID]
-    ) {
-
-      marriages[threadID] = [];
-    }
-
-
-    const existingMarriage =
-      marriages[threadID].find(
-        m =>
-          String(m.user1) ===
-            String(senderID) ||
-          String(m.user2) ===
-            String(senderID)
-      );
-
-
-    if (
-      !existingMarriage
-    ) {
-
-      marriages[threadID].push({
-
-        user1:
-          String(senderID),
-
-        user2:
-          String(partnerID),
-
-        date:
-          new Date()
-            .toLocaleString("ar"),
-
-        timestamp:
-          Date.now()
-      });
-
-
-      await fs.writeFile(
-        marriagePath,
-        JSON.stringify(
-          marriages,
-          null,
-          2
-        )
-      );
-    }
-
-
-    const totalMarriages =
-      marriages[threadID].length;
-
-
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ==========================================
     // الرسالة
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ==========================================
 
     const message =
       `⌬ ━━ 𝗛𝗜𝗡𝗔 FUN ━━ ⌬\n\n` +
-      `${randomReply}\n\n` +
+      `💍 تم الزواج بنجاح!\n\n` +
       `👤 ${senderName}\n` +
       `❤️\n` +
       `💍 ${partnerName}\n\n` +
       `📊 نسبة التوافق: ${lovePercent}%\n` +
       `${loveMessage}\n\n` +
-      `📅 تاريخ الزواج: ${new Date().toLocaleString("ar")}\n` +
-      `📊 عدد الزيجات في المجموعة: ${totalMarriages}\n\n` +
       `✍️ المطور: أبو هريرة`;
 
-
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // إرسال الصورة
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-    if (
-      finalImageCreated
-    ) {
-
-      return api.sendMessage(
-        {
-          body:
-            message,
-
-          attachment:
-            fs.createReadStream(
-              finalImagePath
-            )
-        },
-
-        threadID,
-
-        async () => {
-
-          try {
-
-            if (
-              await fs.pathExists(
-                finalImagePath
-              )
-            ) {
-
-              await fs.remove(
-                finalImagePath
-              );
-            }
-
-
-            if (
-              await fs.pathExists(
-                senderImagePath
-              )
-            ) {
-
-              await fs.remove(
-                senderImagePath
-              );
-            }
-
-
-            if (
-              await fs.pathExists(
-                partnerImagePath
-              )
-            ) {
-
-              await fs.remove(
-                partnerImagePath
-              );
-            }
-
-          } catch (error) {
-
-            console.error(
-              "خطأ في حذف الملفات:",
-              error.message
-            );
-          }
-        },
-
-        messageID
-      );
-    }
-
-
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // في حال فشل دمج الصور
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-    const attachments = [];
-
-
-    if (
-      senderImageExists
-    ) {
-
-      attachments.push(
-        fs.createReadStream(
-          senderImagePath
-        )
-      );
-    }
-
-
-    if (
-      partnerImageExists
-    ) {
-
-      attachments.push(
-        fs.createReadStream(
-          partnerImagePath
-        )
-      );
-    }
-
-
-    if (
-      attachments.length > 0
-    ) {
-
-      return api.sendMessage(
-        {
-          body:
-            message,
-
-          attachment:
-            attachments
-        },
-
-        threadID,
-
-        messageID
-      );
-    }
-
+    // ==========================================
+    // إرسال الصورة المدمجة
+    // ==========================================
 
     return api.sendMessage(
-      message,
+      {
+        body: message,
+        attachment:
+          fs.createReadStream(finalPath)
+      },
       threadID,
+      async () => {
+
+        try {
+
+          if (
+            await fs.pathExists(finalPath)
+          ) {
+            await fs.remove(finalPath);
+          }
+
+          if (
+            await fs.pathExists(senderPath)
+          ) {
+            await fs.remove(senderPath);
+          }
+
+          if (
+            await fs.pathExists(partnerPath)
+          ) {
+            await fs.remove(partnerPath);
+          }
+
+        } catch (err) {
+          console.error(
+            "خطأ في حذف ملفات الكاش:",
+            err.message
+          );
+        }
+
+      },
       messageID
     );
-
 
   } catch (error) {
 
     console.error(
-      "❌ خطأ في أمر زوجيني:",
+      "خطأ في أمر زوجيني:",
       error
     );
 
+    // تنظيف الملفات
+    try {
+      if (await fs.pathExists(senderPath)) {
+        await fs.remove(senderPath);
+      }
+    } catch {}
 
     return api.sendMessage(
-      `⌬ ━━ 𝗛𝗜𝗡𝗔 FUN ━━ ⌬\n\n` +
-      `❌ حدث خطأ أثناء تنفيذ الأمر:\n` +
-      `${error.message}\n\n` +
-      `✍️ المطور: أبو هريرة`,
+      `⌬ ━━ 𝗛𝗜𝗡𝗔 FUN ━━ ⌬
+
+❌ حدث خطأ أثناء إنشاء صورة الزواج.
+
+${error.message}
+
+✍️ المطور: أبو هريرة`,
       threadID,
       messageID
     );
