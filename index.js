@@ -1,5 +1,3 @@
-أكيد، هذا index.js كاملًا بعد التعديل. التغيير الأساسي الوحيد هو إزالة تنظيف data وtad عند التشغيل، مع إبقاء بقية النظام كما هو.
-
 const express = require('express');
 const app = express();
 const chalk = require('chalk');
