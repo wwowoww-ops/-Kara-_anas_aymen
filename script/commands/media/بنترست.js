@@ -8,7 +8,7 @@ module.exports.config = {
   hasPermssion: 0,
   credits: "أبو هريرة",
   description: "جلب 5 صور من Pinterest مع دعم المزيد بالرد",
-  commandCategory: "fun",
+  commandCategory: "Media",
   usages: "بنترست [كلمة البحث]",
   cooldowns: 5
 };
