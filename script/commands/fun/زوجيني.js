@@ -5,97 +5,185 @@ const Jimp = require("jimp");
 
 module.exports.config = {
   name: "زوجيني",
-  version: "3.2.0",
+  version: "4.1.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
-  description: "زواج عشوائي مع دمج صور الطرفين ونسبة التوافق",
+  description: "زواج عشوائي مع دمج صور الطرفين ونسبة التوافق داخل القلب",
   commandCategory: "fun",
   usages: "زوجيني",
-  cooldowns: 5
+  cooldowns: 5,
+
+  dependencies: {
+    axios: "",
+    "fs-extra": "",
+    jimp: ""
+  }
 };
 
-module.exports.run = async function ({ api, event, Users }) {
-  const { threadID, messageID, senderID } = event;
+// ==========================================
+// رابط قالب الزواج
+// ==========================================
 
-  const cacheDir = path.join(__dirname, "cache");
+const TEMPLATE_URL =
+  "https://files.catbox.moe/8zlvjg.jpg";
+
+
+// ==========================================
+// الأمر
+// ==========================================
+
+module.exports.run = async function ({
+  api,
+  event,
+  Users
+}) {
+
+  const {
+    threadID,
+    messageID,
+    senderID
+  } = event;
+
+  const cacheDir =
+    path.join(__dirname, "cache");
 
   await fs.ensureDir(cacheDir);
 
-  const senderPath = path.join(
-    cacheDir,
-    `marry_sender_${senderID}.jpg`
-  );
+  const time = Date.now();
 
-  let partnerID;
-  let senderName = "المستخدم";
-  let partnerName = "العضو المختار";
+  const templatePath =
+    path.join(
+      cacheDir,
+      "marry_template.jpg"
+    );
+
+  const senderPath =
+    path.join(
+      cacheDir,
+      `marry_sender_${senderID}_${time}.jpg`
+    );
+
+  const partnerPath =
+    path.join(
+      cacheDir,
+      `marry_partner_${time}.jpg`
+    );
+
+  const finalPath =
+    path.join(
+      cacheDir,
+      `marry_final_${senderID}_${time}.jpg`
+    );
 
   try {
 
-    // ==========================================
+    // ========================================
     // جلب أعضاء المجموعة
-    // ==========================================
+    // ========================================
 
-    const threadInfo = await api.getThreadInfo(threadID);
+    const threadInfo =
+      await api.getThreadInfo(threadID);
 
-    const botID = String(api.getCurrentUserID());
+    const botID =
+      String(api.getCurrentUserID());
 
-    const members = (threadInfo.participantIDs || []).filter(
-      id =>
-        String(id) !== botID &&
-        String(id) !== String(senderID)
-    );
+    const members =
+      (threadInfo.participantIDs || []).filter(
+        id =>
+          String(id) !== botID &&
+          String(id) !== String(senderID)
+      );
 
     if (members.length === 0) {
-      return api.sendMessage(
-        `⌬ ━━ 𝗛𝗜𝗡𝗔 FUN ━━ ⌬
 
-❌ لا يوجد أعضاء كافيين في المجموعة للزواج!`,
+      return api.sendMessage(
+        `⌬ ━━ 𝗛𝗜𝗡𝗔 FUN ━━ ⌬\n\n` +
+        `❌ لا يوجد أعضاء كافيين في المجموعة!`,
         threadID,
         messageID
       );
     }
 
-    // ==========================================
-    // اختيار الشريك
-    // ==========================================
 
-    partnerID =
-      members[Math.floor(Math.random() * members.length)];
+    // ========================================
+    // اختيار الشخص العشوائي
+    // ========================================
 
-    const partnerPath = path.join(
-      cacheDir,
-      `marry_partner_${partnerID}.jpg`
-    );
+    const partnerID =
+      members[
+        Math.floor(
+          Math.random() *
+          members.length
+        )
+      ];
 
-    const finalPath = path.join(
-      cacheDir,
-      `marry_${senderID}_${partnerID}_${Date.now()}.jpg`
-    );
 
-    // ==========================================
-    // معلومات المستخدمين
-    // ==========================================
+    // ========================================
+    // جلب معلومات الطرفين
+    // ========================================
 
-    const [senderData, partnerData] = await Promise.all([
+    const [
+      senderData,
+      partnerData
+    ] = await Promise.all([
       api.getUserInfo(senderID),
       api.getUserInfo(partnerID)
     ]);
 
-    const senderInfo = senderData[senderID] || {};
-    const partnerInfo = partnerData[partnerID] || {};
+    const senderInfo =
+      senderData[senderID] || {};
+
+    const partnerInfo =
+      partnerData[partnerID] || {};
+
+
+    let senderName =
+      senderInfo.name;
+
+    let partnerName =
+      partnerInfo.name;
+
+
+    if (!senderName) {
+
+      try {
+
+        const data =
+          await Users.getData(senderID);
+
+        senderName =
+          data?.name;
+
+      } catch {}
+    }
+
+
+    if (!partnerName) {
+
+      try {
+
+        const data =
+          await Users.getData(partnerID);
+
+        partnerName =
+          data?.name;
+
+      } catch {}
+    }
+
 
     senderName =
-      senderInfo.name ||
+      senderName ||
       "المستخدم";
 
     partnerName =
-      partnerInfo.name ||
+      partnerName ||
       "العضو المختار";
 
-    // ==========================================
-    // روابط الصور
-    // ==========================================
+
+    // ========================================
+    // روابط صور البروفايل
+    // ========================================
 
     const senderImage =
       senderInfo.thumbSrc ||
@@ -107,317 +195,506 @@ module.exports.run = async function ({ api, event, Users }) {
       partnerInfo.profilePicture ||
       partnerInfo.profileUrl;
 
-    if (!senderImage || !partnerImage) {
-      return api.sendMessage(
-        `⌬ ━━ 𝗛𝗜𝗡𝗔 FUN ━━ ⌬
 
-❌ لم أتمكن من الحصول على صور الطرفين.`,
+    if (
+      !senderImage ||
+      !partnerImage
+    ) {
+
+      return api.sendMessage(
+        `⌬ ━━ 𝗛𝗜𝗡𝗔 FUN ━━ ⌬\n\n` +
+        `❌ تعذر الحصول على صورة أحد الطرفين.`,
         threadID,
         messageID
       );
     }
 
-    // ==========================================
-    // تحميل الصور
-    // ==========================================
 
-    async function download(url, file) {
-      const response = await axios.get(url, {
-        responseType: "arraybuffer",
-        timeout: 20000,
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0"
-        }
-      });
+    // ========================================
+    // تحميل الملفات
+    // ========================================
+
+    async function downloadFile(
+      url,
+      filePath
+    ) {
+
+      const response =
+        await axios.get(
+          url,
+          {
+            responseType:
+              "arraybuffer",
+
+            timeout: 20000,
+
+            headers: {
+              "User-Agent":
+                "Mozilla/5.0"
+            }
+          }
+        );
 
       await fs.writeFile(
-        file,
+        filePath,
         response.data
       );
     }
 
+
+    // ========================================
+    // تحميل القالب
+    // ========================================
+
+    if (
+      !fs.existsSync(
+        templatePath
+      )
+    ) {
+
+      await downloadFile(
+        TEMPLATE_URL,
+        templatePath
+      );
+    }
+
+
+    // ========================================
+    // تحميل صور الطرفين
+    // ========================================
+
     await Promise.all([
-      download(senderImage, senderPath),
-      download(partnerImage, partnerPath)
+
+      downloadFile(
+        senderImage,
+        senderPath
+      ),
+
+      downloadFile(
+        partnerImage,
+        partnerPath
+      )
+
     ]);
 
-    // ==========================================
+
+    // ========================================
     // قراءة الصور
-    // ==========================================
+    // ========================================
 
-    const img1 =
-      await Jimp.read(senderPath);
+    const template =
+      await Jimp.read(
+        templatePath
+      );
 
-    const img2 =
-      await Jimp.read(partnerPath);
+    const senderAvatar =
+      await Jimp.read(
+        senderPath
+      );
 
-    // ==========================================
-    // حجم الصور
-    // ==========================================
+    const partnerAvatar =
+      await Jimp.read(
+        partnerPath
+      );
 
-    const SIZE = 700;
 
-    // قص الصور إلى مربع
-    function square(image) {
+    // ========================================
+    // قص الصورة إلى مربع
+    // ========================================
 
-      const w = image.bitmap.width;
-      const h = image.bitmap.height;
+    function cropSquare(image) {
 
-      if (w > h) {
-        image.crop(
-          Math.floor((w - h) / 2),
-          0,
-          h,
-          h
+      const width =
+        image.bitmap.width;
+
+      const height =
+        image.bitmap.height;
+
+      const size =
+        Math.min(
+          width,
+          height
         );
-      } else if (h > w) {
-        image.crop(
-          0,
-          Math.floor((h - w) / 2),
-          w,
-          w
+
+      const x =
+        Math.floor(
+          (width - size) / 2
         );
-      }
+
+      const y =
+        Math.floor(
+          (height - size) / 2
+        );
+
+      image.crop(
+        x,
+        y,
+        size,
+        size
+      );
 
       return image;
     }
 
-    square(img1);
-    square(img2);
 
-    // تصغير الصور
-    img1.resize(SIZE, SIZE);
-    img2.resize(SIZE, SIZE);
-
-    // ==========================================
-    // Canvas
-    // ==========================================
-
-    const GAP = 180;
-
-    const canvasWidth =
-      SIZE * 2 + GAP;
-
-    const canvasHeight =
-      SIZE;
-
-    const canvas =
-      new Jimp(
-        canvasWidth,
-        canvasHeight,
-        0xffffffff
-      );
-
-    // ==========================================
-    // وضع الصورة الأولى
-    // ==========================================
-
-    canvas.composite(
-      img1,
-      0,
-      0
+    cropSquare(
+      senderAvatar
     );
 
-    // ==========================================
-    // وضع الصورة الثانية
-    // ==========================================
-
-    canvas.composite(
-      img2,
-      SIZE + GAP,
-      0
+    cropSquare(
+      partnerAvatar
     );
 
-    // ==========================================
-    // إنشاء القلب
-    // ==========================================
 
-    const heart = new Jimp(
-      120,
-      120,
-      0x00000000
+    // ========================================
+    // حجم صور البروفايل
+    // ========================================
+
+    const AVATAR_SIZE =
+      153;
+
+
+    senderAvatar.resize(
+      AVATAR_SIZE,
+      AVATAR_SIZE,
+      Jimp.RESIZE_BICUBIC
     );
 
-    // قلب بسيط باستخدام مربعات
-    const RED = 0xff1744ff;
-
-    const blocks = [
-      [20, 10],
-      [60, 10],
-
-      [10, 20],
-      [20, 20],
-      [30, 20],
-      [50, 20],
-      [60, 20],
-      [70, 20],
-
-      [10, 30],
-      [20, 30],
-      [30, 30],
-      [40, 30],
-      [50, 30],
-      [60, 30],
-      [70, 30],
-
-      [20, 40],
-      [30, 40],
-      [40, 40],
-      [50, 40],
-      [60, 40],
-
-      [30, 50],
-      [40, 50],
-      [50, 50],
-
-      [40, 60]
-    ];
-
-    for (const [x, y] of blocks) {
-
-      for (let px = x; px < x + 10; px++) {
-
-        for (let py = y; py < y + 10; py++) {
-
-          heart.setPixelColor(
-            RED,
-            px,
-            py
-          );
-
-        }
-      }
-    }
-
-    // ==========================================
-    // وضع القلب في المنتصف
-    // ==========================================
-
-    canvas.composite(
-      heart,
-      SIZE + Math.floor((GAP - 120) / 2),
-      Math.floor((SIZE - 120) / 2)
+    partnerAvatar.resize(
+      AVATAR_SIZE,
+      AVATAR_SIZE,
+      Jimp.RESIZE_BICUBIC
     );
 
-    // ==========================================
-    // حفظ الصورة
-    // ==========================================
 
-    canvas.quality(100);
+    // ========================================
+    // تحويل الصور إلى دوائر
+    // ========================================
 
-    await canvas.writeAsync(
-      finalPath
+    senderAvatar.circle();
+
+    partnerAvatar.circle();
+
+
+    // ========================================
+    // إحداثيات الصور داخل القالب
+    // ========================================
+
+    const leftX =
+      67;
+
+    const leftY =
+      163;
+
+    const rightX =
+      619;
+
+    const rightY =
+      163;
+
+
+    // ========================================
+    // وضع صور البروفايل
+    // ========================================
+
+    template.composite(
+      senderAvatar,
+      leftX,
+      leftY
     );
 
-    // ==========================================
-    // نسبة التوافق
-    // ==========================================
+    template.composite(
+      partnerAvatar,
+      rightX,
+      rightY
+    );
 
-    const base =
-      Math.floor(
-        Math.random() * 41
-      ) + 50;
+
+    // ========================================
+    // حساب نسبة التوافق
+    // ========================================
 
     const lovePercent =
-      Math.min(base, 100);
+      Math.floor(
+        Math.random() * 51
+      ) + 50;
+
+
+    // ========================================
+    // اختيار الرسالة
+    // ========================================
 
     let loveMessage;
 
     if (lovePercent >= 90) {
+
       loveMessage =
         "💖 توافق خيالي! أنتما مثاليان لبعضكما!";
-    } else if (lovePercent >= 70) {
+
+    } else if (lovePercent >= 75) {
+
       loveMessage =
         "❤️ توافق رائع!";
-    } else if (lovePercent >= 50) {
+
+    } else if (lovePercent >= 60) {
+
       loveMessage =
         "💕 توافق جيد!";
+
     } else {
+
       loveMessage =
-        "💔 توافق ضعيف!";
+        "💔 توافق متوسط!";
     }
 
-    // ==========================================
-    // الرسالة
-    // ==========================================
+
+    // ========================================
+    // تحميل خط النسبة
+    // ========================================
+
+    const font =
+      await Jimp.loadFont(
+        Jimp.FONT_SANS_32_WHITE
+      );
+
+
+    // ========================================
+    // نص النسبة
+    // ========================================
+
+    const percentText =
+      `${lovePercent}%`;
+
+
+    // ========================================
+    // أبعاد النص
+    // ========================================
+
+    const textWidth =
+      Jimp.measureText(
+        font,
+        percentText
+      );
+
+    const textHeight =
+      Jimp.measureTextHeight(
+        font,
+        percentText,
+        200
+      );
+
+
+    // ========================================
+    // مركز القلب
+    //
+    // القالب 850×478 تقريبًا
+    // القلب في المنتصف تقريبًا
+    // ========================================
+
+    const heartCenterX =
+      Math.floor(
+        template.bitmap.width / 2
+      );
+
+    const heartCenterY =
+      Math.floor(
+        template.bitmap.height / 2
+      );
+
+
+    // ========================================
+    // وضع النسبة داخل القلب
+    // ========================================
+
+    const textX =
+      heartCenterX -
+      Math.floor(
+        textWidth / 2
+      );
+
+    const textY =
+      heartCenterY -
+      Math.floor(
+        textHeight / 2
+      );
+
+
+    template.print(
+      font,
+      textX,
+      textY,
+      percentText
+    );
+
+
+    // ========================================
+    // جودة الصورة
+    // ========================================
+
+    template.quality(100);
+
+
+    // ========================================
+    // حفظ الصورة النهائية
+    // ========================================
+
+    await template.writeAsync(
+      finalPath
+    );
+
+
+    // ========================================
+    // الرسالة النهائية
+    // ========================================
 
     const message =
       `⌬ ━━ 𝗛𝗜𝗡𝗔 FUN ━━ ⌬\n\n` +
+
       `💍 تم الزواج بنجاح!\n\n` +
+
       `👤 ${senderName}\n` +
+
       `❤️\n` +
+
       `💍 ${partnerName}\n\n` +
+
       `📊 نسبة التوافق: ${lovePercent}%\n` +
+
       `${loveMessage}\n\n` +
+
       `✍️ المطور: أبو هريرة`;
 
-    // ==========================================
+
+    // ========================================
     // إرسال الصورة المدمجة
-    // ==========================================
+    // ========================================
 
     return api.sendMessage(
       {
-        body: message,
+        body:
+          message,
+
         attachment:
-          fs.createReadStream(finalPath)
+          fs.createReadStream(
+            finalPath
+          )
       },
+
       threadID,
+
       async () => {
 
         try {
 
           if (
-            await fs.pathExists(finalPath)
+            await fs.pathExists(
+              finalPath
+            )
           ) {
-            await fs.remove(finalPath);
+
+            await fs.remove(
+              finalPath
+            );
           }
+
 
           if (
-            await fs.pathExists(senderPath)
+            await fs.pathExists(
+              senderPath
+            )
           ) {
-            await fs.remove(senderPath);
+
+            await fs.remove(
+              senderPath
+            );
           }
+
 
           if (
-            await fs.pathExists(partnerPath)
+            await fs.pathExists(
+              partnerPath
+            )
           ) {
-            await fs.remove(partnerPath);
+
+            await fs.remove(
+              partnerPath
+            );
           }
 
-        } catch (err) {
+        } catch (error) {
+
           console.error(
             "خطأ في حذف ملفات الكاش:",
-            err.message
+            error.message
           );
         }
-
       },
+
       messageID
     );
+
 
   } catch (error) {
 
     console.error(
-      "خطأ في أمر زوجيني:",
+      "❌ خطأ في أمر زوجيني:",
       error
     );
 
-    // تنظيف الملفات
+
+    // ========================================
+    // تنظيف الملفات عند حدوث خطأ
+    // ========================================
+
     try {
-      if (await fs.pathExists(senderPath)) {
-        await fs.remove(senderPath);
+
+      if (
+        await fs.pathExists(
+          senderPath
+        )
+      ) {
+
+        await fs.remove(
+          senderPath
+        );
       }
+
+
+      if (
+        await fs.pathExists(
+          partnerPath
+        )
+      ) {
+
+        await fs.remove(
+          partnerPath
+        );
+      }
+
+
+      if (
+        await fs.pathExists(
+          finalPath
+        )
+      ) {
+
+        await fs.remove(
+          finalPath
+        );
+      }
+
     } catch {}
 
+
     return api.sendMessage(
-      `⌬ ━━ 𝗛𝗜𝗡𝗔 FUN ━━ ⌬
+      `⌬ ━━ 𝗛𝗜𝗡𝗔 FUN ━━ ⌬\n\n` +
 
-❌ حدث خطأ أثناء إنشاء صورة الزواج.
+      `❌ حدث خطأ أثناء إنشاء صورة الزواج.\n\n` +
 
-${error.message}
+      `${error.message}\n\n` +
 
-✍️ المطور: أبو هريرة`,
+      `✍️ المطور: أبو هريرة`,
+
       threadID,
       messageID
     );
