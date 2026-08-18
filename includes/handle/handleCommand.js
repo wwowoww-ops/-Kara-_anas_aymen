@@ -1,14 +1,18 @@
 const fs = require("fs");
 const moment = require("moment-timezone");
 
+
+// ============================================================
 // منع تكرار تنفيذ الأوامر
+// ============================================================
+
 const commandExecuted = new Set();
 
 
-/**
- * تنظيف اسم الأمر للمقارنة
- * يساعد على التعامل مع بعض الاختلافات والأخطاء العربية
- */
+// ============================================================
+// تنظيف اسم الأمر
+// ============================================================
+
 function normalizeCommand(text) {
   return String(text || "")
     .toLowerCase()
@@ -24,10 +28,10 @@ function normalizeCommand(text) {
 }
 
 
-/**
- * مسافة التحرير
- * لمعرفة عدد الأحرف التي يجب تغييرها للوصول إلى الكلمة الصحيحة
- */
+// ============================================================
+// Levenshtein
+// ============================================================
+
 function levenshtein(a, b) {
   a = String(a);
   b = String(b);
@@ -46,15 +50,22 @@ function levenshtein(a, b) {
   }
 
   for (let i = 1; i <= b.length; i++) {
+
     for (let j = 1; j <= a.length; j++) {
+
       if (b[i - 1] === a[j - 1]) {
-        matrix[i][j] = matrix[i - 1][j - 1];
+
+        matrix[i][j] =
+          matrix[i - 1][j - 1];
+
       } else {
+
         matrix[i][j] = Math.min(
           matrix[i - 1][j] + 1,
           matrix[i][j - 1] + 1,
           matrix[i - 1][j - 1] + 1
         );
+
       }
     }
   }
@@ -63,10 +74,12 @@ function levenshtein(a, b) {
 }
 
 
-/**
- * حساب نسبة التشابه بين أمرين
- */
+// ============================================================
+// حساب التشابه
+// ============================================================
+
 function similarityScore(input, command) {
+
   input = normalizeCommand(input);
   command = normalizeCommand(command);
 
@@ -74,59 +87,83 @@ function similarityScore(input, command) {
     return 0;
   }
 
-  // تطابق كامل
   if (input === command) {
     return 1;
   }
 
-  // أحدهما يبدأ بالآخر
   if (
     command.startsWith(input) ||
     input.startsWith(command)
   ) {
-    const shorter = Math.min(
-      input.length,
-      command.length
-    );
 
-    const longer = Math.max(
-      input.length,
-      command.length
-    );
+    const shorter =
+      Math.min(
+        input.length,
+        command.length
+      );
 
-    return 0.75 + (shorter / longer) * 0.25;
+    const longer =
+      Math.max(
+        input.length,
+        command.length
+      );
+
+    return (
+      0.75 +
+      (shorter / longer) * 0.25
+    );
   }
 
-  const distance = levenshtein(input, command);
-  const maxLength = Math.max(
-    input.length,
-    command.length
-  );
+  const distance =
+    levenshtein(
+      input,
+      command
+    );
+
+  const maxLength =
+    Math.max(
+      input.length,
+      command.length
+    );
 
   if (maxLength === 0) {
     return 0;
   }
 
-  return 1 - distance / maxLength;
+  return (
+    1 -
+    distance / maxLength
+  );
 }
 
 
-/**
- * البحث عن أقرب أمر
- */
-function findClosestCommand(input, commands) {
+// ============================================================
+// إيجاد أقرب أمر
+// ============================================================
+
+function findClosestCommand(
+  input,
+  commands
+) {
+
   let bestCommand = null;
   let bestScore = 0;
 
-  for (const command of commands) {
-    const score = similarityScore(
-      input,
-      command
-    );
+  for (
+    const command of commands
+  ) {
+
+    const score =
+      similarityScore(
+        input,
+        command
+      );
 
     if (score > bestScore) {
+
       bestScore = score;
       bestCommand = command;
+
     }
   }
 
@@ -137,6 +174,140 @@ function findClosestCommand(input, commands) {
 }
 
 
+// ============================================================
+// 🔥 نظام المنشن المركزي
+// ============================================================
+
+function normalizeMentions(event) {
+
+  if (!event) {
+    return;
+  }
+
+
+  // ----------------------------------------------------------
+  // إنشاء mentions إذا لم تكن موجودة
+  // ----------------------------------------------------------
+
+  if (
+    !event.mentions ||
+    typeof event.mentions !== "object"
+  ) {
+
+    event.mentions = {};
+
+  }
+
+
+  // ----------------------------------------------------------
+  // تحويل Map إلى Object إذا كانت موجودة
+  // ----------------------------------------------------------
+
+  if (
+    event.mentions instanceof Map
+  ) {
+
+    const converted = {};
+
+    for (
+      const [id, name] of
+      event.mentions.entries()
+    ) {
+
+      converted[String(id)] =
+        name;
+
+    }
+
+    event.mentions =
+      converted;
+  }
+
+
+  // ----------------------------------------------------------
+  // توحيد IDs
+  // ----------------------------------------------------------
+
+  const normalized = {};
+
+  for (
+    const id of
+    Object.keys(event.mentions)
+  ) {
+
+    if (!id) {
+      continue;
+    }
+
+    normalized[String(id)] =
+      event.mentions[id];
+  }
+
+  event.mentions =
+    normalized;
+
+
+  // ----------------------------------------------------------
+  // دعم الرد
+  // ----------------------------------------------------------
+
+  if (
+    event.type === "message_reply" &&
+    event.messageReply &&
+    event.messageReply.senderID
+  ) {
+
+    event.messageReply.senderID =
+      String(
+        event.messageReply.senderID
+      );
+
+  }
+
+
+  // ----------------------------------------------------------
+  // إذا كان هناك منشن فعلي
+  // نضع قائمة IDs مساعدة
+  // ----------------------------------------------------------
+
+  event.mentionIDs =
+    Object.keys(
+      event.mentions
+    ).map(id =>
+      String(id)
+    );
+}
+
+
+// ============================================================
+// الحصول على أول منشن
+// ============================================================
+
+function getFirstMention(event) {
+
+  if (!event) {
+    return null;
+  }
+
+  normalizeMentions(event);
+
+  const ids =
+    Object.keys(
+      event.mentions || {}
+    );
+
+  if (ids.length > 0) {
+    return String(ids[0]);
+  }
+
+  return null;
+}
+
+
+// ============================================================
+// معالجة الأمر
+// ============================================================
+
 module.exports = function ({
   api,
   models,
@@ -145,13 +316,27 @@ module.exports = function ({
   Currencies
 }) {
 
-  return async function ({ event }) {
+  return async function ({
+    event
+  }) {
 
-    const dateNow = Date.now();
+    const dateNow =
+      Date.now();
 
-    const time = moment
-      .tz("Africa/Casablanca")
-      .format("HH:mm:ss DD/MM/YYYY");
+    const time =
+      moment
+        .tz("Africa/Casablanca")
+        .format(
+          "HH:mm:ss DD/MM/YYYY"
+        );
+
+
+    // ========================================================
+    // حماية event + المنشن
+    // ========================================================
+
+    normalizeMentions(event);
+
 
     const {
       allowInbox,
@@ -162,6 +347,7 @@ module.exports = function ({
       YASSIN
     } = global.config;
 
+
     const {
       userBanned,
       threadBanned,
@@ -170,9 +356,9 @@ module.exports = function ({
       commandBanned
     } = global.data;
 
+
     const {
-      commands,
-      cooldowns
+      commands
     } = global.client;
 
 
@@ -184,32 +370,40 @@ module.exports = function ({
     } = event;
 
 
-    // لا توجد رسالة نصية
     if (!body) {
       return;
     }
 
 
-    senderID = String(senderID);
-    threadID = String(threadID);
+    senderID =
+      String(senderID);
+
+    threadID =
+      String(threadID);
 
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // نظام الإيقاف - كف
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ========================================================
+    // نظام كف
+    // ========================================================
 
-    const stopPath = "./data/stop.json";
+    const stopPath =
+      "./data/stop.json";
 
-    if (fs.existsSync(stopPath)) {
+
+    if (
+      fs.existsSync(stopPath)
+    ) {
 
       try {
 
-        const stopData = JSON.parse(
-          fs.readFileSync(
-            stopPath,
-            "utf8"
-          )
-        );
+        const stopData =
+          JSON.parse(
+            fs.readFileSync(
+              stopPath,
+              "utf8"
+            )
+          );
+
 
         if (
           stopData[threadID] &&
@@ -223,28 +417,41 @@ module.exports = function ({
               .split(/ +/)[0]
               .toLowerCase();
 
-          if (commandNameCheck !== "كف") {
+
+          if (
+            commandNameCheck !==
+            "كف"
+          ) {
+
             return;
+
           }
         }
 
       } catch (error) {
+
         console.error(
           "STOP SYSTEM ERROR:",
           error
         );
+
       }
     }
 
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ========================================================
     // نظام التقييد
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ========================================================
 
     const restrictPath =
       "./data/restrict.json";
 
-    if (fs.existsSync(restrictPath)) {
+
+    if (
+      fs.existsSync(
+        restrictPath
+      )
+    ) {
 
       try {
 
@@ -256,28 +463,36 @@ module.exports = function ({
             )
           );
 
+
         if (
           restrictData[threadID] &&
           restrictData[threadID].active
         ) {
+
           return;
+
         }
 
       } catch (error) {
+
         console.error(
           "RESTRICT SYSTEM ERROR:",
           error
         );
+
       }
     }
 
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // تحديد البادئة
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ========================================================
+    // البادئة
+    // ========================================================
 
     const threadSetting =
-      threadData.get(threadID) || {};
+      threadData.get(
+        threadID
+      ) || {};
+
 
     const prefix =
       Object.prototype.hasOwnProperty.call(
@@ -289,38 +504,45 @@ module.exports = function ({
 
 
     const botID =
-      api.getCurrentUserID();
-
-
-    const escapeRegex = (str) =>
-      String(str).replace(
-        /[.*+?^${}()|[\]\\]/g,
-        "\\$&"
+      String(
+        api.getCurrentUserID()
       );
 
 
-    const prefixRegex = new RegExp(
-      `^(<@!?${botID}>|${escapeRegex(prefix)})\\s*`
-    );
+    const escapeRegex =
+      str =>
+        String(str).replace(
+          /[.*+?^${}()|[\]\\]/g,
+          "\\$&"
+        );
+
+
+    const prefixRegex =
+      new RegExp(
+        `^(<@!?${botID}>|${escapeRegex(prefix)})\\s*`
+      );
 
 
     const matchedPrefix =
-      body.match(prefixRegex)?.[0] || null;
+      body.match(
+        prefixRegex
+      )?.[0] || null;
 
 
-    // ليست رسالة أمر
     if (!matchedPrefix) {
       return;
     }
 
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // استخراج الأمر والـ arguments
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ========================================================
+    // محتوى الأمر
+    // ========================================================
 
     const content =
       body
-        .slice(matchedPrefix.length)
+        .slice(
+          matchedPrefix.length
+        )
         .trim();
 
 
@@ -329,60 +551,93 @@ module.exports = function ({
     }
 
 
+    // ========================================================
+    // arguments
+    // ========================================================
+
     const args =
       content
         .split(/\s+/);
 
 
+    const commandNameRaw =
+      args.shift();
+
+
     const commandName =
-      args.shift().toLowerCase();
+      String(
+        commandNameRaw
+      ).toLowerCase();
 
 
     let command =
-      commands.get(commandName);
+      commands.get(
+        commandName
+      );
 
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // التحقق من الحظر العام
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ========================================================
+    // الحظر
+    // ========================================================
 
     if (
-      threadBanned.has(threadID) &&
-      !ADMINBOT.includes(senderID)
+      threadBanned.has(
+        threadID
+      ) &&
+      !ADMINBOT.includes(
+        senderID
+      )
     ) {
+
       return;
+
     }
 
 
     if (
-      userBanned.has(senderID) &&
-      !ADMINBOT.includes(senderID)
+      userBanned.has(
+        senderID
+      ) &&
+      !ADMINBOT.includes(
+        senderID
+      )
     ) {
+
       return;
+
     }
 
 
     if (
       YASSIN === "true" &&
-      !ADMINBOT.includes(senderID)
+      !ADMINBOT.includes(
+        senderID
+      )
     ) {
+
       return;
+
     }
 
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // نظام اقتراح الأوامر
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ========================================================
+    // اقتراح الأمر
+    // ========================================================
 
     if (!command) {
 
       const allCommandNames =
-        Array.from(commands.keys());
+        Array.from(
+          commands.keys()
+        );
+
 
       if (
         allCommandNames.length === 0
       ) {
+
         return;
+
       }
 
 
@@ -396,22 +651,17 @@ module.exports = function ({
       const closestMatch =
         result.command;
 
+
       const score =
         result.score;
 
 
-      /*
-       * حد الاقتراح
-       *
-       * 0.45 مناسب للأوامر القصيرة
-       * وخصوصاً الأوامر العربية
-       */
       if (
         closestMatch &&
         score >= 0.45
       ) {
 
-        const funnyReplies = [
+        const replies = [
 
           `⌬ ━━ 𝗛𝗜𝗡𝗔 UTILITY ━━ ⌬\n\n` +
           `❌ الأمر "${commandName}" غير موجود\n\n` +
@@ -424,14 +674,15 @@ module.exports = function ({
           `⌬ ━━ 𝗛𝗜𝗡𝗔 UTILITY ━━ ⌬\n\n` +
           `🚫 الأمر "${commandName}" غير صحيح\n\n` +
           `✨ ربما تقصد: "${closestMatch}"؟`
+
         ];
 
 
         return api.sendMessage(
-          funnyReplies[
+          replies[
             Math.floor(
               Math.random() *
-              funnyReplies.length
+              replies.length
             )
           ],
           threadID,
@@ -440,7 +691,6 @@ module.exports = function ({
       }
 
 
-      // لا يوجد أمر قريب
       return api.sendMessage(
         `⌬ ━━ 𝗛𝗜𝗡𝗔 UTILITY ━━ ⌬\n\n` +
         `❌ الأمر "${commandName}" غير موجود.\n\n` +
@@ -451,24 +701,74 @@ module.exports = function ({
     }
 
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // حظر الأمر داخل المجموعة أو للمستخدم
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ========================================================
+    // 🔥 تأكيد المنشن قبل تشغيل الأمر
+    // ========================================================
+
+    normalizeMentions(event);
+
+
+    const firstMention =
+      getFirstMention(event);
+
 
     if (
-      commandBanned.get(threadID) ||
-      commandBanned.get(senderID)
+      DeveloperMode &&
+      firstMention
+    ) {
+
+      console.log(
+        `\n📌 HINA MENTION`
+      );
+
+      console.log(
+        `   Sender: ${senderID}`
+      );
+
+      console.log(
+        `   Mention: ${firstMention}`
+      );
+
+      console.log(
+        `   All Mentions:`,
+        event.mentionIDs
+      );
+
+      console.log(
+        `   Command: ${commandName}\n`
+      );
+    }
+
+
+    // ========================================================
+    // حظر الأمر
+    // ========================================================
+
+    if (
+      commandBanned.get(
+        threadID
+      ) ||
+      commandBanned.get(
+        senderID
+      )
     ) {
 
       if (
-        !ADMINBOT.includes(senderID)
+        !ADMINBOT.includes(
+          senderID
+        )
       ) {
 
         const banThreads =
-          commandBanned.get(threadID) || [];
+          commandBanned.get(
+            threadID
+          ) || [];
+
 
         const banUsers =
-          commandBanned.get(senderID) || [];
+          commandBanned.get(
+            senderID
+          ) || [];
 
 
         if (
@@ -500,14 +800,15 @@ module.exports = function ({
             threadID,
             messageID
           );
+
         }
       }
     }
 
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // حماية أوامر NSFW
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ========================================================
+    // NSFW
+    // ========================================================
 
     if (
       command.config.commandCategory &&
@@ -516,7 +817,9 @@ module.exports = function ({
       !global.data.threadAllowNSFW.includes(
         threadID
       ) &&
-      !ADMINBOT.includes(senderID)
+      !ADMINBOT.includes(
+        senderID
+      )
     ) {
 
       return api.sendMessage(
@@ -528,20 +831,25 @@ module.exports = function ({
     }
 
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ========================================================
     // الصلاحيات
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ========================================================
 
     let permssion = 0;
 
+
     const threadInfoo2 =
-      threadInfo.get(threadID) ||
-      await Threads.getInfo(threadID);
+      threadInfo.get(
+        threadID
+      ) ||
+      await Threads.getInfo(
+        threadID
+      );
 
 
     const find =
       threadInfoo2.adminIDs.find(
-        (el) =>
+        el =>
           String(el.id) ===
           String(senderID)
       );
@@ -549,7 +857,7 @@ module.exports = function ({
 
     if (
       ADMINBOT.includes(
-        senderID.toString()
+        senderID
       )
     ) {
 
@@ -558,6 +866,7 @@ module.exports = function ({
     } else if (find) {
 
       permssion = 1;
+
     }
 
 
@@ -575,9 +884,9 @@ module.exports = function ({
     }
 
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // نظام الانتظار Cooldown
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ========================================================
+    // Cooldown
+    // ========================================================
 
     if (
       !global.client.cooldowns.has(
@@ -589,6 +898,7 @@ module.exports = function ({
         command.config.name,
         new Map()
       );
+
     }
 
 
@@ -599,14 +909,20 @@ module.exports = function ({
 
 
     const expirationTime =
-      (command.config.cooldowns || 1) *
-      1000;
+      (
+        command.config.cooldowns ||
+        1
+      ) * 1000;
 
 
     if (
-      timestamps.has(senderID) &&
+      timestamps.has(
+        senderID
+      ) &&
       dateNow <
-        timestamps.get(senderID) +
+        timestamps.get(
+          senderID
+        ) +
         expirationTime
     ) {
 
@@ -616,12 +932,13 @@ module.exports = function ({
         () => {},
         true
       );
+
     }
 
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ========================================================
     // تنفيذ الأمر
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ========================================================
 
     try {
 
@@ -629,14 +946,14 @@ module.exports = function ({
         `${threadID}_${senderID}_${commandName}`;
 
 
-      /*
-       * منع تنفيذ نفس الأمر مرتين
-       * خلال ثانية واحدة
-       */
       if (
-        commandExecuted.has(commandKey)
+        commandExecuted.has(
+          commandKey
+        )
       ) {
+
         return;
+
       }
 
 
@@ -645,27 +962,60 @@ module.exports = function ({
       );
 
 
-      setTimeout(() => {
-        commandExecuted.delete(
-          commandKey
-        );
-      }, 1000);
+      setTimeout(
+        () => {
 
+          commandExecuted.delete(
+            commandKey
+          );
+
+        },
+        1000
+      );
+
+
+      // ======================================================
+      // 🔥 Object الخاص بالأمر
+      // ======================================================
 
       const Obj = {
+
         api,
+
         event,
+
         args,
+
         models,
+
         Users,
+
         Threads,
+
         Currencies,
+
         permssion,
+
+        // ID أول منشن متاح للأوامر التي تريد استخدامه
+        mentionID:
+          getFirstMention(event),
+
+        // جميع المنشنات
+        mentionIDs:
+          event.mentionIDs || [],
+
         getText: () => {}
+
       };
 
 
-      await command.run(Obj);
+      // ======================================================
+      // تشغيل الأمر
+      // ======================================================
+
+      await command.run(
+        Obj
+      );
 
 
       timestamps.set(
