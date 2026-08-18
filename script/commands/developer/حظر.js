@@ -3,21 +3,30 @@ const path = require("path");
 
 module.exports.config = {
   name: "حظر",
-  aliases: ["بان"],
   version: "2.0.0",
-  hasPermssion: 2,
+  hasPermssion: 0,
   credits: "أبو هريرة",
   description: "حظر وإلغاء حظر المجموعات والمستخدمين",
   commandCategory: "developer",
-  usages: "حظر | حظر ازالة | بان [ID] | بان ازالة [ID]",
+  usages: "حظر | حظر ازالة ID | بان ID | بان ازالة ID",
   cooldowns: 3
 };
 
-const DEV_ID = "61578581225040";
+// ======================================================
+// الإعدادات
+// ======================================================
 
 const DATA_DIR = path.join(process.cwd(), "data");
-const GROUP_BAN_FILE = path.join(DATA_DIR, "banned.json");
-const USER_BAN_FILE = path.join(DATA_DIR, "bannedUsers.json");
+
+const BANNED_GROUPS = path.join(
+  DATA_DIR,
+  "banned.json"
+);
+
+const BANNED_USERS = path.join(
+  DATA_DIR,
+  "banned_users.json"
+);
 
 fs.ensureDirSync(DATA_DIR);
 
@@ -25,7 +34,38 @@ fs.ensureDirSync(DATA_DIR);
 // زخرفة HINA DEVELOPER
 // ======================================================
 
-const HEADER = `⌬ ━━ HINA DEVELOPER ━━ ⌬`;
+const HEADER =
+`⌬ ━━ HINA DEVELOPER ━━ ⌬`;
+
+// ======================================================
+// قراءة config
+// ======================================================
+
+function getDeveloperID() {
+  try {
+    const configPath = path.join(
+      process.cwd(),
+      "config.json"
+    );
+
+    if (!fs.existsSync(configPath)) {
+      return null;
+    }
+
+    const config = JSON.parse(
+      fs.readFileSync(configPath, "utf8")
+    );
+
+    return String(
+      config.KIRA_CONF?.dev ||
+      config.ADMINBOT?.[0] ||
+      ""
+    );
+
+  } catch (e) {
+    return null;
+  }
+}
 
 // ======================================================
 // JSON
@@ -37,20 +77,16 @@ function readJSON(file) {
       return {};
     }
 
-    const text = fs.readFileSync(file, "utf8").trim();
+    const content =
+      fs.readFileSync(file, "utf8").trim();
 
-    if (!text) {
+    if (!content) {
       return {};
     }
 
-    const data = JSON.parse(text);
+    return JSON.parse(content);
 
-    return data && typeof data === "object"
-      ? data
-      : {};
-
-  } catch (error) {
-    console.error("HINA JSON READ ERROR:", error);
+  } catch (e) {
     return {};
   }
 }
@@ -64,163 +100,159 @@ function writeJSON(file, data) {
     );
 
     return true;
-  } catch (error) {
-    console.error("HINA JSON WRITE ERROR:", error);
+
+  } catch (e) {
+    console.error(
+      "HINA BAN WRITE ERROR:",
+      e
+    );
+
     return false;
   }
 }
 
 // ======================================================
-// المطور
+// التحقق من المطور
 // ======================================================
 
 function isDeveloper(senderID) {
-  return String(senderID) === DEV_ID;
+  const devID = getDeveloperID();
+
+  if (!devID) {
+    return false;
+  }
+
+  return String(senderID) === String(devID);
 }
 
 // ======================================================
-// تحديد نوع الأمر الحقيقي
+// حظر مجموعة
 // ======================================================
 
-function getCommandType(event) {
+function banGroup(threadID) {
+  const groups =
+    readJSON(BANNED_GROUPS);
 
-  const body = String(event.body || "").trim();
+  const id = String(threadID);
 
-  if (!body) {
-    return "حظر";
-  }
+  groups[id] = {
+    banned: true,
+    time: Date.now(),
+    reason: "حظر بواسطة المطور"
+  };
 
-  const firstWord = body
-    .split(/\s+/)[0]
-    .toLowerCase();
-
-  if (
-    firstWord === "بان" ||
-    firstWord === "ban"
-  ) {
-    return "بان";
-  }
-
-  return "حظر";
-}
-
-// ======================================================
-// تنظيف كلمة الإزالة
-// ======================================================
-
-function isRemoveWord(word) {
-  const value = String(word || "")
-    .trim()
-    .toLowerCase();
-
-  return (
-    value === "ازالة" ||
-    value === "إزالة" ||
-    value === "الغاء" ||
-    value === "إلغاء" ||
-    value === "remove" ||
-    value === "unban"
+  return writeJSON(
+    BANNED_GROUPS,
+    groups
   );
 }
 
 // ======================================================
-// استخراج ID من المنشن
+// فك حظر مجموعة
 // ======================================================
 
-function getMentionID(event) {
-  try {
-    if (
-      event.mentions &&
-      typeof event.mentions === "object"
-    ) {
-      const ids = Object.keys(event.mentions);
+function unbanGroup(threadID) {
+  const groups =
+    readJSON(BANNED_GROUPS);
 
-      if (ids.length > 0) {
-        return String(ids[0]);
-      }
-    }
-  } catch (e) {}
+  const id = String(threadID);
 
-  return null;
-}
-
-// ======================================================
-// استخراج المستخدم المستهدف للبان
-// ======================================================
-
-function getTargetUserID(event, args) {
-
-  // الرد على رسالة
   if (
-    event.messageReply &&
-    event.messageReply.senderID
+    Object.prototype.hasOwnProperty.call(
+      groups,
+      id
+    )
   ) {
-    return String(event.messageReply.senderID);
+    delete groups[id];
   }
 
-  // المنشن
-  const mentionID = getMentionID(event);
-
-  if (mentionID) {
-    return mentionID;
-  }
-
-  // ID مكتوب
-  if (args && args.length > 0) {
-
-    for (const arg of args) {
-
-      if (
-        /^\d{5,}$/.test(String(arg))
-      ) {
-        return String(arg);
-      }
-    }
-  }
-
-  return null;
-}
-
-// ======================================================
-// تحديث global.data للحظر
-// ======================================================
-
-function updateGlobalBan(threadID, value) {
+  // تحديث global إن كان موجودًا
   try {
-
     if (
       global.data &&
       global.data.threadBanned
     ) {
-
       if (
-        value &&
-        typeof global.data.threadBanned.set === "function"
+        typeof global.data.threadBanned.delete ===
+        "function"
       ) {
-        global.data.threadBanned.set(
-          String(threadID),
-          true
-        );
-      }
-
-      if (
-        !value &&
-        typeof global.data.threadBanned.delete === "function"
-      ) {
-        global.data.threadBanned.delete(
-          String(threadID)
-        );
+        global.data.threadBanned.delete(id);
       }
     }
-
   } catch (e) {}
+
+  return writeJSON(
+    BANNED_GROUPS,
+    groups
+  );
+}
+
+// ======================================================
+// حظر مستخدم
+// ======================================================
+
+function banUser(userID) {
+  const users =
+    readJSON(BANNED_USERS);
+
+  const id = String(userID);
+
+  users[id] = {
+    banned: true,
+    time: Date.now(),
+    reason: "حظر بواسطة المطور"
+  };
+
+  return writeJSON(
+    BANNED_USERS,
+    users
+  );
+}
+
+// ======================================================
+// فك حظر مستخدم
+// ======================================================
+
+function unbanUser(userID) {
+  const users =
+    readJSON(BANNED_USERS);
+
+  const id = String(userID);
+
+  if (
+    Object.prototype.hasOwnProperty.call(
+      users,
+      id
+    )
+  ) {
+    delete users[id];
+  }
+
+  return writeJSON(
+    BANNED_USERS,
+    users
+  );
+}
+
+// ======================================================
+// إرسال رسالة
+// ======================================================
+
+function send(api, event, text) {
+  return api.sendMessage(
+`${HEADER}
+
+${text}`,
+    event.threadID,
+    event.messageID
+  );
 }
 
 // ======================================================
 // RUN
 // ======================================================
 
-module.exports.run = async function ({
+module.exports.run = async function({
   api,
   event,
   args
@@ -228,8 +260,8 @@ module.exports.run = async function ({
 
   const {
     threadID,
-    messageID,
-    senderID
+    senderID,
+    messageReply
   } = event;
 
   // ====================================================
@@ -237,341 +269,272 @@ module.exports.run = async function ({
   // ====================================================
 
   if (!isDeveloper(senderID)) {
-
-    return api.sendMessage(
-`${HEADER}
-
-⛔ هذا الأمر للمطور الأساسي فقط!`,
-      threadID,
-      messageID
+    return send(
+      api,
+      event,
+      `⛔ هذا الأمر للمطور فقط.`
     );
   }
 
   try {
 
-    const commandType =
-      getCommandType(event);
+    const first =
+      String(args?.[0] || "")
+        .trim()
+        .toLowerCase();
 
-    const commandArgs =
-      Array.isArray(args)
-        ? args.map(x => String(x).trim())
-        : [];
+    const second =
+      String(args?.[1] || "")
+        .trim();
 
     // ==================================================
-    // حظر المجموعة
+    // ================= حظر المجموعة ===================
     // ==================================================
 
-    if (commandType === "حظر") {
+    if (
+      first === "حظر" ||
+      first === "حظر_مجموعة"
+    ) {
 
-      const action =
-        commandArgs[0] || "";
-
-      const banned =
-        readJSON(GROUP_BAN_FILE);
-
-      const groupID =
-        String(threadID);
-
-      // ----------------------------------------------
-      // إزالة حظر المجموعة
       // حظر ازالة
-      // ----------------------------------------------
-
-      if (isRemoveWord(action)) {
-
-        if (!banned[groupID]) {
-
-          return api.sendMessage(
-`${HEADER}
-
-⚠️ هذه المجموعة غير محظورة أصلاً.`,
-            threadID,
-            messageID
-          );
-        }
-
-        delete banned[groupID];
-
-        if (
-          !writeJSON(
-            GROUP_BAN_FILE,
-            banned
-          )
-        ) {
-
-          return api.sendMessage(
-`${HEADER}
-
-❌ حدث خطأ أثناء إزالة حظر المجموعة.`,
-            threadID,
-            messageID
-          );
-        }
-
-        updateGlobalBan(
-          groupID,
-          false
-        );
-
-        return api.sendMessage(
-`${HEADER}
-
-✅ تم إزالة حظر المجموعة.
-
-⪼ ID:
-${groupID}`,
-          threadID,
-          messageID
-        );
-      }
-
-      // ----------------------------------------------
-      // حظر المجموعة
-      // ----------------------------------------------
-
-      if (banned[groupID]) {
-
-        return api.sendMessage(
-`${HEADER}
-
-⚠️ هذه المجموعة محظورة بالفعل.`,
-          threadID,
-          messageID
-        );
-      }
-
-      banned[groupID] = {
-        banned: true,
-        reason: "حظر بواسطة المطور أبو هريرة",
-        time: Date.now()
-      };
-
       if (
-        !writeJSON(
-          GROUP_BAN_FILE,
-          banned
-        )
+        second === "ازالة" ||
+        second === "إزالة"
       ) {
 
-        return api.sendMessage(
-`${HEADER}
+        const groupID =
+          String(
+            args?.[2] ||
+            ""
+          ).trim();
 
-❌ حدث خطأ أثناء حفظ حظر المجموعة.`,
-          threadID,
-          messageID
-        );
-      }
+        if (!groupID) {
+          return send(
+            api,
+            event,
+            `⚠️ يجب كتابة ID المجموعة.
 
-      updateGlobalBan(
-        groupID,
-        true
-      );
+مثال:
+حظر ازالة 123456789`
+          );
+        }
 
-      return api.sendMessage(
-`${HEADER}
+        const success =
+          unbanGroup(groupID);
 
-🔒 تم حظر هذه المجموعة من استعمال البوت.
+        if (!success) {
+          return send(
+            api,
+            event,
+            `❌ فشل إلغاء حظر المجموعة.
+
+⪼ ID:
+${groupID}`
+          );
+        }
+
+        return send(
+          api,
+          event,
+          `✅ تم إلغاء حظر المجموعة بنجاح.
 
 ⪼ ID:
 ${groupID}
 
-⪼ بواسطة:
-المطور أبو هريرة`,
-        threadID,
-        messageID
+يمكن للبوت العودة لاستخدامها إذا كان نظام البوت يسمح بذلك.`
+        );
+      }
+
+      // الحظر الحالي
+      const success =
+        banGroup(threadID);
+
+      if (!success) {
+        return send(
+          api,
+          event,
+          `❌ حدث خطأ أثناء حظر المجموعة.`
+        );
+      }
+
+      // تحديث global
+      try {
+        if (
+          global.data &&
+          global.data.threadBanned
+        ) {
+          if (
+            typeof global.data.threadBanned.set ===
+            "function"
+          ) {
+            global.data.threadBanned.set(
+              String(threadID),
+              true
+            );
+          }
+        }
+      } catch (e) {}
+
+      return send(
+        api,
+        event,
+        `🔒 تم حظر هذه المجموعة.
+
+⪼ ID:
+${threadID}
+
+⚠️ لن يستجيب البوت لأوامر هذه المجموعة حسب نظام الحظر.
+
+لفك الحظر استخدم من مجموعة أخرى:
+
+حظر ازالة ${threadID}`
       );
     }
 
     // ==================================================
-    // بان المستخدم
+    // ===================== بان =========================
     // ==================================================
 
-    if (commandType === "بان") {
-
-      const firstArg =
-        commandArgs[0] || "";
-
-      const removing =
-        isRemoveWord(firstArg);
-
-      let targetID = null;
+    if (
+      first === "بان" ||
+      first === "ban"
+    ) {
 
       // ----------------------------------------------
-      // بان ازالة ID
-      // ----------------------------------------------
-
-      if (removing) {
-
-        targetID =
-          getTargetUserID(
-            event,
-            commandArgs.slice(1)
-          );
-
-      } else {
-
-        // --------------------------------------------
-        // بان ID
-        // --------------------------------------------
-
-        targetID =
-          getTargetUserID(
-            event,
-            commandArgs
-          );
-      }
-
-      // ----------------------------------------------
-      // لا يوجد مستخدم
-      // ----------------------------------------------
-
-      if (!targetID) {
-
-        return api.sendMessage(
-`${HEADER}
-
-⚠️ يجب تحديد المستخدم.
-
-يمكنك استخدام:
-
-• بان [ID]
-• الرد على رسالة المستخدم ثم كتابة بان
-• بان @منشن
-
-ولإزالة البان:
-
-• بان ازالة [ID]
-• الرد على المستخدم ثم كتابة بان ازالة`,
-          threadID,
-          messageID
-        );
-      }
-
-      // ----------------------------------------------
-      // حماية المطور
+      // بان ازالة
       // ----------------------------------------------
 
       if (
-        String(targetID) === DEV_ID
+        second === "ازالة" ||
+        second === "إزالة"
       ) {
 
-        return api.sendMessage(
-`${HEADER}
+        let userID =
+          String(
+            args?.[2] ||
+            ""
+          ).trim();
 
-🛡️ لا يمكن حظر المطور أبو هريرة.`,
-          threadID,
-          messageID
-        );
-      }
-
-      const bannedUsers =
-        readJSON(
-          USER_BAN_FILE
-        );
-
-      // ----------------------------------------------
-      // إزالة البان
-      // ----------------------------------------------
-
-      if (removing) {
-
-        if (!bannedUsers[targetID]) {
-
-          return api.sendMessage(
-`${HEADER}
-
-⚠️ هذا المستخدم غير محظور أصلاً.
-
-⪼ ID:
-${targetID}`,
-            threadID,
-            messageID
-          );
-        }
-
-        delete bannedUsers[targetID];
-
+        // إذا كان الأمر ردًا على مستخدم
         if (
-          !writeJSON(
-            USER_BAN_FILE,
-            bannedUsers
-          )
+          !userID &&
+          messageReply
         ) {
+          userID =
+            String(
+              messageReply.senderID
+            );
+        }
 
-          return api.sendMessage(
-`${HEADER}
+        if (!userID) {
+          return send(
+            api,
+            event,
+            `⚠️ يجب تحديد ID المستخدم.
 
-❌ حدث خطأ أثناء إزالة البان.`,
-            threadID,
-            messageID
+مثال:
+بان ازالة 100000000000
+
+أو استخدم الأمر بالرد على رسالة الشخص.`
           );
         }
 
-        return api.sendMessage(
-`${HEADER}
+        const success =
+          unbanUser(userID);
 
-✅ تم إزالة البان عن المستخدم.
+        if (!success) {
+          return send(
+            api,
+            event,
+            `❌ فشل إلغاء حظر المستخدم.
 
 ⪼ ID:
-${targetID}
+${userID}`
+          );
+        }
 
-يمكنه الآن استعمال البوت.`,
-          threadID,
-          messageID
+        return send(
+          api,
+          event,
+          `✅ تم إلغاء حظر المستخدم.
+
+⪼ ID:
+${userID}`
         );
       }
 
       // ----------------------------------------------
-      // إضافة البان
+      // بان المستخدم
       // ----------------------------------------------
 
-      if (bannedUsers[targetID]) {
+      let userID =
+        String(
+          second || ""
+        ).trim();
 
-        return api.sendMessage(
-`${HEADER}
-
-⚠️ هذا المستخدم محظور بالفعل من استعمال البوت.
-
-⪼ ID:
-${targetID}`,
-          threadID,
-          messageID
-        );
-      }
-
-      bannedUsers[targetID] = {
-        banned: true,
-        reason: "بان بواسطة المطور أبو هريرة",
-        time: Date.now()
-      };
-
+      // إذا كان بالرد
       if (
-        !writeJSON(
-          USER_BAN_FILE,
-          bannedUsers
-        )
+        !userID &&
+        messageReply
       ) {
+        userID =
+          String(
+            messageReply.senderID
+          );
+      }
 
-        return api.sendMessage(
-`${HEADER}
+      if (!userID) {
+        return send(
+          api,
+          event,
+          `⚠️ يجب تحديد المستخدم.
 
-❌ حدث خطأ أثناء حفظ البان.`,
-          threadID,
-          messageID
+استخدم:
+
+بان 100000000000
+
+أو استخدم:
+بان
+
+بالرد على رسالة المستخدم.`
         );
       }
 
-      return api.sendMessage(
-`${HEADER}
+      // حماية المطور
+      if (
+        String(userID) ===
+        String(getDeveloperID())
+      ) {
+        return send(
+          api,
+          event,
+          `🛡️ لا يمكن حظر المطور الأساسي.`
+        );
+      }
 
-🚫 تم حظر المستخدم من استعمال البوت.
+      const success =
+        banUser(userID);
+
+      if (!success) {
+        return send(
+          api,
+          event,
+          `❌ حدث خطأ أثناء حظر المستخدم.
 
 ⪼ ID:
-${targetID}
+${userID}`
+        );
+      }
 
-لن يتمكن من استعمال أوامر البوت.`,
-        threadID,
-        messageID
+      return send(
+        api,
+        event,
+        `🚫 تم حظر المستخدم من استعمال البوت.
+
+⪼ ID:
+${userID}
+
+سيتم رفض أوامر المستخدم إذا كان نظام تشغيل الأوامر يفحص ملف banned_users.json.`
       );
     }
 
@@ -579,47 +542,45 @@ ${targetID}
     // الاستخدام
     // ==================================================
 
-    return api.sendMessage(
-`${HEADER}
-
-📋 الأوامر المتاحة:
+    return send(
+      api,
+      event,
+`⚙️ الاستخدام:
 
 🔒 حظر المجموعة:
 حظر
 
-🔓 إزالة حظر المجموعة:
-حظر ازالة
+🔓 فك حظر المجموعة:
+حظر ازالة ID
 
 🚫 حظر مستخدم:
-بان [ID]
+بان ID
 
-🚫 حظر مستخدم بالرد:
-الرد على رسالته ثم اكتب بان
+أو:
+بان
+بالرد على رسالته
 
-🔓 إزالة البان:
-بان ازالة [ID]
+✅ فك حظر مستخدم:
+بان ازالة ID
 
-⌬ ━━━━━━━━━━━━ ⌬`,
-      threadID,
-      messageID
+أو:
+بان ازالة
+بالرد على رسالته`
     );
 
   } catch (error) {
 
     console.error(
-      "HINA DEVELOPER BAN ERROR:",
+      "HINA BAN ERROR:",
       error
     );
 
-    return api.sendMessage(
-`${HEADER}
+    return send(
+      api,
+      event,
+`❌ حدث خطأ أثناء تنفيذ الأمر.
 
-❌ حدث خطأ أثناء تنفيذ الأمر.
-
-⪼ الخطأ:
-${error.message}`,
-      threadID,
-      messageID
+⪼ ${error.message}`
     );
   }
 };
