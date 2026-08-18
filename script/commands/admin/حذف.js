@@ -1,6 +1,8 @@
+const fs = require("fs-extra");
+
 module.exports.config = {
   name: "حذف",
-  version: "1.0.0",
+  version: "2.0.0",
   hasPermssion: 1,
   credits: "أبو هريرة",
   description: "حذف رسالة معينة أو عدد من الرسائل",
@@ -9,75 +11,290 @@ module.exports.config = {
   cooldowns: 5
 };
 
-module.exports.run = async function({ api, event, args }) {
-  const { threadID, messageID, senderID, messageReply } = event;
+// ======================================================
+// جلب ID المطور
+// ======================================================
+
+function getDeveloperID() {
+  try {
+    const config = JSON.parse(
+      fs.readFileSync("./config.json", "utf8")
+    );
+
+    return String(
+      config.KIRA_CONF?.dev ||
+      config.ADMINBOT?.[0] ||
+      ""
+    );
+  } catch (e) {
+    return "";
+  }
+}
+
+// ======================================================
+// التحقق من أدمن المجموعة
+// ======================================================
+
+function isAdmin(threadInfo, userID) {
+  try {
+    if (
+      !threadInfo ||
+      !Array.isArray(threadInfo.adminIDs)
+    ) {
+      return false;
+    }
+
+    return threadInfo.adminIDs.some(admin => {
+      const id =
+        typeof admin === "object"
+          ? admin.id
+          : admin;
+
+      return String(id) === String(userID);
+    });
+  } catch (e) {
+    return false;
+  }
+}
+
+// ======================================================
+// تنفيذ حذف رسالة
+// ======================================================
+
+async function deleteMessage(api, messageID) {
+  try {
+    if (!messageID) return false;
+
+    await api.unsendMessage(messageID);
+
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// ======================================================
+// الأمر
+// ======================================================
+
+module.exports.run = async function({
+  api,
+  event,
+  args
+}) {
+
+  const {
+    threadID,
+    messageID,
+    senderID,
+    messageReply
+  } = event;
+
+  const header = `⌬ ━━ HINA ━━ ⌬`;
 
   try {
-    const threadInfo = await api.getThreadInfo(threadID);
-    const isAdmin = threadInfo.adminIDs.some(admin => admin.id === senderID);
-    const isBotAdmin = threadInfo.adminIDs.some(admin => admin.id === api.getCurrentUserID());
 
-    if (!isAdmin) {
+    // ==================================================
+    // جلب معلومات المجموعة
+    // ==================================================
+
+    let threadInfo;
+
+    try {
+      threadInfo =
+        await api.getThreadInfo(threadID);
+    } catch (e) {
+      threadInfo = null;
+    }
+
+    // ==================================================
+    // المطور
+    // ==================================================
+
+    const devID = getDeveloperID();
+
+    const isDeveloper =
+      devID &&
+      String(senderID) === String(devID);
+
+    // ==================================================
+    // أدمن المجموعة
+    // ==================================================
+
+    const isGroupAdmin =
+      isAdmin(
+        threadInfo,
+        senderID
+      );
+
+    // ==================================================
+    // الصلاحية:
+    // المطور أو أدمن المجموعة
+    // ==================================================
+
+    if (
+      !isDeveloper &&
+      !isGroupAdmin
+    ) {
       return api.sendMessage(
-        `⌬ ━━ HINA ━━ ⌬\n\n⛔ هذا الأمر للأدمن فقط!`,
+        `${header}\n\n⛔ هذا الأمر للأدمن أو المطور فقط!`,
         threadID,
         messageID
       );
     }
 
-    if (!isBotAdmin) {
-      return api.sendMessage(
-        `⌬ ━━ HINA ━━ ⌬\n\n⚠️ يجب أن أكون أدمن في المجموعة لحذف الرسائل.`,
-        threadID,
-        messageID
-      );
-    }
+    // ==================================================
+    // الحالة 1:
+    // حذف رسالة محددة بالرد عليها
+    // ==================================================
 
-    // حالة 1: حذف رسالة محددة (رد على رسالة)
     if (messageReply) {
-      await api.unsendMessage(messageReply.messageID);
-      return api.sendMessage(
-        `⌬ ━━ HINA ━━ ⌬\n\n✅ تم حذف الرسالة المحددة.`,
-        threadID,
-        messageID
-      );
-    }
 
-    // حالة 2: حذف عدد من الرسائل
-    const num = parseInt(args[0]);
-    if (num && num > 0 && num <= 50) {
-      const messages = await api.getThreadHistory(threadID, num);
-      const msgIDs = messages.map(msg => msg.messageID);
-      
-      // حذف الرسائل (باستثناء رسالة الأمر)
-      const filtered = msgIDs.filter(id => id !== messageID);
-      
-      for (const id of filtered) {
-        try {
-          await api.unsendMessage(id);
-        } catch (e) {
-          // تجاهل الأخطاء (قد تكون رسائل قديمة)
-        }
+      const targetMessageID =
+        messageReply.messageID;
+
+      const deleted =
+        await deleteMessage(
+          api,
+          targetMessageID
+        );
+
+      if (!deleted) {
+        return api.sendMessage(
+          `${header}\n\n❌ حدث خطأ أثناء حذف الرسالة المحددة.`,
+          threadID,
+          messageID
+        );
       }
-      
+
       return api.sendMessage(
-        `⌬ ━━ HINA ━━ ⌬\n\n✅ تم حذف ${filtered.length} رسالة.`,
+        `${header}\n\n✅ تم حذف الرسالة المحددة.`,
         threadID,
         messageID
       );
     }
 
-    // إذا لم يحدد المستخدم شيئاً
+    // ==================================================
+    // الحالة 2:
+    // حذف عدد من الرسائل
+    // ==================================================
+
+    const num =
+      parseInt(
+        args && args[0],
+        10
+      );
+
+    if (
+      Number.isInteger(num) &&
+      num > 0
+    ) {
+
+      const count =
+        Math.min(num, 50);
+
+      let messages;
+
+      try {
+
+        messages =
+          await api.getThreadHistory(
+            threadID,
+            count + 1
+          );
+
+      } catch (e) {
+
+        return api.sendMessage(
+          `${header}\n\n❌ حدث خطأ أثناء جلب الرسائل:\n${e.message}`,
+          threadID,
+          messageID
+        );
+      }
+
+      if (
+        !Array.isArray(messages) ||
+        messages.length === 0
+      ) {
+
+        return api.sendMessage(
+          `${header}\n\n⚠️ لم يتم العثور على رسائل للحذف.`,
+          threadID,
+          messageID
+        );
+      }
+
+      // ------------------------------------------------
+      // استخراج IDs مع استثناء رسالة الأمر
+      // ------------------------------------------------
+
+      const msgIDs =
+        messages
+          .filter(msg =>
+            msg &&
+            msg.messageID &&
+            String(msg.messageID) !==
+              String(messageID)
+          )
+          .map(msg =>
+            msg.messageID
+          );
+
+      // ------------------------------------------------
+      // حذف الرسائل
+      // ------------------------------------------------
+
+      let deletedCount = 0;
+
+      for (
+        const id of msgIDs
+      ) {
+
+        try {
+
+          await api.unsendMessage(id);
+
+          deletedCount++;
+
+        } catch (e) {
+          // تجاهل الرسائل التي تعذر حذفها
+        }
+
+        // تأخير بسيط بين عمليات الحذف
+        await new Promise(
+          resolve =>
+            setTimeout(
+              resolve,
+              150
+            )
+        );
+      }
+
+      // ------------------------------------------------
+      // النتيجة
+      // ------------------------------------------------
+
+      return api.sendMessage(
+        `${header}\n\n✅ تم حذف ${deletedCount} رسالة.`,
+        threadID,
+        messageID
+      );
+    }
+
+    // ==================================================
+    // لا يوجد رقم أو رد
+    // ==================================================
+
     return api.sendMessage(
-      `⌬ ━━ HINA ━━ ⌬\n\n📝 الاستخدام:\n• حذف [عدد] (لحذف عدد من الرسائل)\n• حذف (رداً على رسالة) لحذفها\n• الحد الأقصى: 50 رسالة`,
+      `${header}\n\n📝 الاستخدام:\n• حذف [عدد] (لحذف عدد من الرسائل)\n• حذف (رداً على رسالة) لحذفها\n• الحد الأقصى: 50 رسالة`,
       threadID,
       messageID
     );
 
   } catch (error) {
-    console.error("حذف - خطأ:", error);
+
     return api.sendMessage(
-      `⌬ ━━ HINA ━━ ⌬\n\n❌ حدث خطأ: ${error.message}`,
+      `${header}\n\n❌ حدث خطأ: ${error.message}`,
       threadID,
       messageID
     );
