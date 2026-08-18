@@ -1,6 +1,8 @@
+const fs = require("fs-extra");
+
 module.exports.config = {
   name: "اطردني",
-  version: "2.1.0",
+  version: "2.2.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
   description: "مغادرة المجموعة عبر الطرد",
@@ -9,64 +11,264 @@ module.exports.config = {
   cooldowns: 5
 };
 
-module.exports.run = async function ({ api, event }) {
-  const { threadID, senderID, messageID } = event;
-  const header = `⌬ ━━━━━━━━━━━━ ⌬\n      🚪 مـغـادرة الـنـظـام\n⌬ ━━━━━━━━━━━━ ⌬`;
-  
-  // جلب أيدي المطور من الكونسل للحماية
-  const config = JSON.parse(fs.readFileSync("./config.json"));
-  const adminID = config.KIRA_CONF?.dev || config.ADMINBOT[0];
+// ======================================================
+// إرسال رسالة مؤقتة
+// ======================================================
+
+async function sendTemporaryMessage(api, threadID, text, time = 4000) {
+  return new Promise(resolve => {
+    api.sendMessage(text, threadID, (err, info) => {
+
+      if (!err && info?.messageID) {
+        setTimeout(() => {
+          api.unsendMessage(info.messageID).catch(() => {});
+        }, time);
+      }
+
+      resolve(info);
+    });
+  });
+}
+
+// ======================================================
+// قراءة إعدادات البوت
+// ======================================================
+
+function getAdminID() {
+  try {
+
+    const configPath = "./config.json";
+
+    if (!fs.existsSync(configPath)) {
+      console.error("❌ config.json غير موجود");
+      return null;
+    }
+
+    const config =
+      JSON.parse(
+        fs.readFileSync(
+          configPath,
+          "utf8"
+        )
+      );
+
+    return (
+      config?.KIRA_CONF?.dev ||
+      config?.ADMINBOT?.[0] ||
+      null
+    );
+
+  } catch (error) {
+
+    console.error(
+      "❌ خطأ في قراءة config.json:",
+      error
+    );
+
+    return null;
+  }
+}
+
+// ======================================================
+// الحصول على اسم المستخدم
+// ======================================================
+
+async function getUserName(api, userID) {
 
   try {
-    // حماية المطور: البوت يرفض طردك
-    if (senderID === adminID) {
-      return api.sendMessage(
-        `🥺 تعال يا أبو هريرة 💕\n\nمامي ما سمحتلك تخرج! 😤\nمين سمحلك تطلب الطرد؟ 🌸✨\n\n🛡️ أنت المطور، ما تطلعش غير بإذن مامي 💖`,
+
+    const info =
+      await api.getUserInfo(
+        String(userID)
+      );
+
+    return (
+      info?.[String(userID)]?.name ||
+      "حبيبي"
+    );
+
+  } catch (error) {
+
+    return "حبيبي";
+  }
+}
+
+// ======================================================
+// تنفيذ الأمر
+// ======================================================
+
+module.exports.run = async function ({
+  api,
+  event
+}) {
+
+  const {
+    threadID,
+    senderID,
+    messageID
+  } = event;
+
+  try {
+
+    // ==================================================
+    // حماية المطور
+    // ==================================================
+
+    const adminID =
+      getAdminID();
+
+    if (
+      adminID &&
+      String(senderID) ===
+      String(adminID)
+    ) {
+
+      return sendTemporaryMessage(
+        api,
         threadID,
-        (err, info) => {
-          setTimeout(() => api.unsendMessage(info.messageID), 4000);
-        },
-        messageID
+
+`🥺 تعال يا أبو هريرة
+
+مامي ما سمحتلك تخرج!
+
+مين سمحلك تطلب الطرد؟
+
+🛡️ أنت المطور، ما تطلعش غير بإذن مامي`
       );
     }
 
-    const info = await api.getThreadInfo(threadID);
-    const botID = api.getCurrentUserID();
-    const isBotAdmin = info.adminIDs.some(e => e.id == botID);
+    // ==================================================
+    // جلب معلومات المجموعة
+    // ==================================================
+
+    const threadInfo =
+      await api.getThreadInfo(
+        threadID
+      );
+
+    if (!threadInfo) {
+
+      return sendTemporaryMessage(
+        api,
+        threadID,
+`❌ تعذر الحصول على معلومات المجموعة.`
+      );
+    }
+
+    // ==================================================
+    // الحصول على ID البوت
+    // ==================================================
+
+    const botID =
+      api.getCurrentUserID();
+
+    // ==================================================
+    // التأكد أن البوت أدمن
+    // ==================================================
+
+    const adminIDs =
+      Array.isArray(threadInfo.adminIDs)
+        ? threadInfo.adminIDs
+        : [];
+
+    const isBotAdmin =
+      adminIDs.some(
+        admin =>
+          String(admin.id) ===
+          String(botID)
+      );
 
     if (!isBotAdmin) {
-      return api.sendMessage(
-        `🥺 تعال يا قلبي 💕\n\nمامي ما تقدر تخرجك لأني مش أدمن! 😤\nخلي الأدمن يضيفني أولاً 🌸✨`,
+
+      return sendTemporaryMessage(
+        api,
         threadID,
-        (err, info) => {
-          setTimeout(() => api.unsendMessage(info.messageID), 4000);
-        },
-        messageID
+
+`🥺 تعال يا قلبي
+
+مامي ما تقدر تخرجك لأني مش أدمن!
+
+خلي أحد الأدمن يضيفني كمسؤول أولاً.`
       );
     }
 
-    // جلب اسم العضو
-    let userName = "حبيبي";
-    try {
-      const userInfo = await api.getUserInfo(senderID);
-      userName = userInfo[senderID]?.name || "حبيبي";
-    } catch (e) {}
+    // ==================================================
+    // الحصول على اسم المستخدم
+    // ==================================================
 
-    // إرسال رسالة الوداع من مامي
-    await api.sendMessage(
-      `🥺 تعال يا ${userName} 💕\n\nمامي بتسلم عليك وتقولك:\n"خلاص، أنت طلعت من المجموعة، بس افتكرني دايم 🌸"\n\n💔 مع السلامة، نلتقي قريباً إن شاء الله 💖`,
-      threadID
+    const userName =
+      await getUserName(
+        api,
+        senderID
+      );
+
+    // ==================================================
+    // رسالة الوداع
+    // ==================================================
+
+    await new Promise(resolve => {
+
+      api.sendMessage(
+`🥺 تعال يا ${userName}
+
+مامي بتسلم عليك وتقولك:
+
+"خلاص، أنت طلعت من المجموعة، بس افتكرني دايم 🌸"
+
+💔 مع السلامة، نلتقي قريباً إن شاء الله`,
+        threadID,
+        () => resolve()
+      );
+
+    });
+
+    // ==================================================
+    // انتظار بسيط حتى تظهر رسالة الوداع
+    // ==================================================
+
+    await new Promise(
+      resolve =>
+        setTimeout(resolve, 1000)
     );
-    
-    // تنفيذ الطرد
-    return api.removeUserFromGroup(senderID, threadID);
 
-  } catch (err) {
-    console.error("❌ خطأ في اطردني:", err);
-    return api.sendMessage(
-      `🥺 مامي آسفة 💕\n\nحدث خطأ أثناء محاولة طردك 😤\nجرب مرة أخرى 🌸✨`,
+    // ==================================================
+    // طرد المستخدم
+    // ==================================================
+
+    await api.removeUserFromGroup(
+      String(senderID),
+      String(threadID)
+    );
+
+    return;
+
+  } catch (error) {
+
+    // ==================================================
+    // تسجيل الخطأ في Console
+    // ==================================================
+
+    console.error(
+      "❌ خطأ في أمر اطردني:",
+      error
+    );
+
+    // ==================================================
+    // إرسال رسالة الخطأ
+    // ==================================================
+
+    return sendTemporaryMessage(
+      api,
       threadID,
-      messageID
+
+`🥺 مامي آسفة
+
+حدث خطأ أثناء محاولة طردك.
+
+تأكد أن البوت أدمن في المجموعة وحاول مرة أخرى.
+
+❌ الخطأ:
+${error?.message || "خطأ غير معروف"}`
     );
   }
 };
