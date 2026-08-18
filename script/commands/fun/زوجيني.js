@@ -1,38 +1,92 @@
 const axios = require("axios");
 const fs = require("fs-extra");
 const path = require("path");
-const Jimp = require("jimp");
+const jimp = require("jimp");
 
 module.exports.config = {
   name: "زوجيني",
-  version: "4.1.0",
+  version: "5.2.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
-  description: "زواج عشوائي مع دمج صور الطرفين ونسبة التوافق داخل القلب",
+  description: "زواج عشوائي مع صور الطرفين ونسبة التوافق",
   commandCategory: "fun",
   usages: "زوجيني",
   cooldowns: 5,
-
   dependencies: {
     axios: "",
     "fs-extra": "",
+    path: "",
     jimp: ""
   }
 };
 
-// ==========================================
-// رابط قالب الزواج
-// ==========================================
+// ==================================================
+// رابط القالب
+// ==================================================
 
 const TEMPLATE_URL =
   "https://files.catbox.moe/8zlvjg.jpg";
 
 
-// ==========================================
-// الأمر
-// ==========================================
+// ==================================================
+// تحويل الصورة إلى دائرة
+// ==================================================
 
-module.exports.run = async function ({
+async function circle(image) {
+  const img = await jimp.read(image);
+  img.circle();
+
+  return await img.getBufferAsync("image/png");
+}
+
+
+// ==================================================
+// تحميل صورة العضو بدون Token
+// ==================================================
+
+async function downloadAvatar(api, uid, savePath) {
+
+  const info = await api.getUserInfo(uid);
+  const user = info[uid];
+
+  if (!user) {
+    throw new Error("تعذر الحصول على معلومات العضو");
+  }
+
+  const imageUrl =
+    user.thumbSrc ||
+    user.profilePicture ||
+    user.profileUrl;
+
+  if (!imageUrl) {
+    throw new Error("تعذر الحصول على صورة البروفايل");
+  }
+
+  const response = await axios.get(
+    imageUrl,
+    {
+      responseType: "arraybuffer",
+      timeout: 20000,
+      headers: {
+        "User-Agent": "Mozilla/5.0"
+      }
+    }
+  );
+
+  fs.writeFileSync(
+    savePath,
+    Buffer.from(response.data)
+  );
+
+  return user.name || "المستخدم";
+}
+
+
+// ==================================================
+// الأمر
+// ==================================================
+
+module.exports.run = async function({
   api,
   event,
   Users
@@ -45,188 +99,182 @@ module.exports.run = async function ({
   } = event;
 
   const cacheDir =
-    path.join(__dirname, "cache");
+    path.join(
+      __dirname,
+      "cache",
+      "canvas"
+    );
 
   await fs.ensureDir(cacheDir);
 
   const time = Date.now();
 
-  const templatePath =
-    path.join(
-      cacheDir,
-      "marry_template.jpg"
-    );
-
-  const senderPath =
-    path.join(
-      cacheDir,
-      `marry_sender_${senderID}_${time}.jpg`
-    );
-
-  const partnerPath =
-    path.join(
-      cacheDir,
-      `marry_partner_${time}.jpg`
-    );
-
   const finalPath =
     path.join(
       cacheDir,
-      `marry_final_${senderID}_${time}.jpg`
+      `زوجيني_${senderID}_${time}.png`
     );
+
+  const senderAvatarPath =
+    path.join(
+      cacheDir,
+      `زوجيني_sender_${senderID}_${time}.png`
+    );
+
+  const partnerAvatarPath =
+    path.join(
+      cacheDir,
+      `زوجيني_partner_${time}.png`
+    );
+
+  const backgroundPath =
+    path.join(
+      cacheDir,
+      "زوجيني_background.jpg"
+    );
+
 
   try {
 
-    // ========================================
+    // ==================================================
     // جلب أعضاء المجموعة
-    // ========================================
+    // ==================================================
 
     const threadInfo =
       await api.getThreadInfo(threadID);
 
+    const participants =
+      threadInfo.participantIDs || [];
+
     const botID =
       String(api.getCurrentUserID());
 
+    const senderIDString =
+      String(senderID);
+
+
+    // ==================================================
+    // استبعاد البوت وصاحب الأمر
+    // ==================================================
+
     const members =
-      (threadInfo.participantIDs || []).filter(
-        id =>
-          String(id) !== botID &&
-          String(id) !== String(senderID)
+      participants.filter(
+        id => {
+
+          const uid =
+            String(id);
+
+          return (
+            uid !== botID &&
+            uid !== senderIDString
+          );
+
+        }
       );
+
 
     if (members.length === 0) {
 
       return api.sendMessage(
-        `⌬ ━━ 𝗛𝗜𝗡𝗔 FUN ━━ ⌬\n\n` +
+        `⌬ ━━ HINA FUN ━━ ⌬\n\n` +
         `❌ لا يوجد أعضاء كافيين في المجموعة!`,
         threadID,
         messageID
       );
+
     }
 
 
-    // ========================================
-    // اختيار الشخص العشوائي
-    // ========================================
+    // ==================================================
+    // اختيار عضو عشوائي
+    // ==================================================
 
     const partnerID =
-      members[
-        Math.floor(
-          Math.random() *
-          members.length
-        )
-      ];
+      String(
+        members[
+          Math.floor(
+            Math.random() *
+            members.length
+          )
+        ]
+      );
 
 
-    // ========================================
-    // جلب معلومات الطرفين
-    // ========================================
+    // ==================================================
+    // تحميل صور الطرفين
+    // ==================================================
 
-    const [
-      senderData,
-      partnerData
-    ] = await Promise.all([
-      api.getUserInfo(senderID),
-      api.getUserInfo(partnerID)
-    ]);
-
-    const senderInfo =
-      senderData[senderID] || {};
-
-    const partnerInfo =
-      partnerData[partnerID] || {};
+    let senderName;
+    let partnerName;
 
 
-    let senderName =
-      senderInfo.name;
+    try {
 
-    let partnerName =
-      partnerInfo.name;
+      senderName =
+        await downloadAvatar(
+          api,
+          senderID,
+          senderAvatarPath
+        );
 
-
-    if (!senderName) {
+    } catch (error) {
 
       try {
-
-        const data =
-          await Users.getData(senderID);
-
         senderName =
-          data?.name;
+          await Users.getNameUser(senderID);
+      } catch {
+        senderName = "المستخدم";
+      }
 
-      } catch {}
+      throw new Error(
+        `تعذر تحميل صورة ${senderName}: ${error.message}`
+      );
+
     }
 
 
-    if (!partnerName) {
+    try {
+
+      partnerName =
+        await downloadAvatar(
+          api,
+          partnerID,
+          partnerAvatarPath
+        );
+
+    } catch (error) {
 
       try {
-
-        const data =
-          await Users.getData(partnerID);
-
         partnerName =
-          data?.name;
+          await Users.getNameUser(partnerID);
+      } catch {
+        partnerName = "العضو المختار";
+      }
 
-      } catch {}
+      throw new Error(
+        `تعذر تحميل صورة ${partnerName}: ${error.message}`
+      );
+
     }
 
 
-    senderName =
-      senderName ||
-      "المستخدم";
-
-    partnerName =
-      partnerName ||
-      "العضو المختار";
-
-
-    // ========================================
-    // روابط صور البروفايل
-    // ========================================
-
-    const senderImage =
-      senderInfo.thumbSrc ||
-      senderInfo.profilePicture ||
-      senderInfo.profileUrl;
-
-    const partnerImage =
-      partnerInfo.thumbSrc ||
-      partnerInfo.profilePicture ||
-      partnerInfo.profileUrl;
-
+    // ==================================================
+    // تحميل القالب
+    // ==================================================
 
     if (
-      !senderImage ||
-      !partnerImage
-    ) {
-
-      return api.sendMessage(
-        `⌬ ━━ 𝗛𝗜𝗡𝗔 FUN ━━ ⌬\n\n` +
-        `❌ تعذر الحصول على صورة أحد الطرفين.`,
-        threadID,
-        messageID
-      );
-    }
-
-
-    // ========================================
-    // تحميل الملفات
-    // ========================================
-
-    async function downloadFile(
-      url,
-      filePath
+      !fs.existsSync(backgroundPath)
     ) {
 
       const response =
         await axios.get(
-          url,
+          TEMPLATE_URL,
           {
             responseType:
               "arraybuffer",
 
-            timeout: 20000,
+            timeout:
+              20000,
 
             headers: {
               "User-Agent":
@@ -235,184 +283,73 @@ module.exports.run = async function ({
           }
         );
 
-      await fs.writeFile(
-        filePath,
-        response.data
+      fs.writeFileSync(
+        backgroundPath,
+        Buffer.from(
+          response.data
+        )
       );
     }
 
 
-    // ========================================
-    // تحميل القالب
-    // ========================================
+    // ==================================================
+    // قراءة القالب
+    // ==================================================
 
-    if (
-      !fs.existsSync(
-        templatePath
-      )
-    ) {
-
-      await downloadFile(
-        TEMPLATE_URL,
-        templatePath
-      );
-    }
-
-
-    // ========================================
-    // تحميل صور الطرفين
-    // ========================================
-
-    await Promise.all([
-
-      downloadFile(
-        senderImage,
-        senderPath
-      ),
-
-      downloadFile(
-        partnerImage,
-        partnerPath
-      )
-
-    ]);
-
-
-    // ========================================
-    // قراءة الصور
-    // ========================================
-
-    const template =
-      await Jimp.read(
-        templatePath
-      );
-
-    const senderAvatar =
-      await Jimp.read(
-        senderPath
-      );
-
-    const partnerAvatar =
-      await Jimp.read(
-        partnerPath
+    const baseImage =
+      await jimp.read(
+        backgroundPath
       );
 
 
-    // ========================================
-    // قص الصورة إلى مربع
-    // ========================================
-
-    function cropSquare(image) {
-
-      const width =
-        image.bitmap.width;
-
-      const height =
-        image.bitmap.height;
-
-      const size =
-        Math.min(
-          width,
-          height
-        );
-
-      const x =
-        Math.floor(
-          (width - size) / 2
-        );
-
-      const y =
-        Math.floor(
-          (height - size) / 2
-        );
-
-      image.crop(
-        x,
-        y,
-        size,
-        size
-      );
-
-      return image;
-    }
-
-
-    cropSquare(
-      senderAvatar
-    );
-
-    cropSquare(
-      partnerAvatar
-    );
-
-
-    // ========================================
-    // حجم صور البروفايل
-    // ========================================
-
-    const AVATAR_SIZE =
-      153;
-
-
-    senderAvatar.resize(
-      AVATAR_SIZE,
-      AVATAR_SIZE,
-      Jimp.RESIZE_BICUBIC
-    );
-
-    partnerAvatar.resize(
-      AVATAR_SIZE,
-      AVATAR_SIZE,
-      Jimp.RESIZE_BICUBIC
-    );
-
-
-    // ========================================
+    // ==================================================
     // تحويل الصور إلى دوائر
-    // ========================================
+    // ==================================================
 
-    senderAvatar.circle();
+    const circleOne =
+      await jimp.read(
+        await circle(
+          senderAvatarPath
+        )
+      );
 
-    partnerAvatar.circle();
-
-
-    // ========================================
-    // إحداثيات الصور داخل القالب
-    // ========================================
-
-    const leftX =
-      67;
-
-    const leftY =
-      163;
-
-    const rightX =
-      619;
-
-    const rightY =
-      163;
+    const circleTwo =
+      await jimp.read(
+        await circle(
+          partnerAvatarPath
+        )
+      );
 
 
-    // ========================================
-    // وضع صور البروفايل
-    // ========================================
+    // ==================================================
+    // إحداثيات القالب القديم
+    // لا يتم تغييرها
+    // ==================================================
 
-    template.composite(
-      senderAvatar,
-      leftX,
-      leftY
-    );
+    baseImage
+      .composite(
+        circleOne.resize(
+          150,
+          150,
+          jimp.RESIZE_BICUBIC
+        ),
+        320,
+        100
+      )
+      .composite(
+        circleTwo.resize(
+          130,
+          130,
+          jimp.RESIZE_BICUBIC
+        ),
+        280,
+        280
+      );
 
-    template.composite(
-      partnerAvatar,
-      rightX,
-      rightY
-    );
 
-
-    // ========================================
-    // حساب نسبة التوافق
-    // ========================================
+    // ==================================================
+    // نسبة التوافق
+    // ==================================================
 
     const lovePercent =
       Math.floor(
@@ -420,16 +357,16 @@ module.exports.run = async function ({
       ) + 50;
 
 
-    // ========================================
-    // اختيار الرسالة
-    // ========================================
+    // ==================================================
+    // رسالة حسب النسبة
+    // ==================================================
 
     let loveMessage;
 
     if (lovePercent >= 90) {
 
       loveMessage =
-        "💖 توافق خيالي! أنتما مثاليان لبعضكما!";
+        "💖 توافق خيالي!";
 
     } else if (lovePercent >= 75) {
 
@@ -448,63 +385,47 @@ module.exports.run = async function ({
     }
 
 
-    // ========================================
-    // تحميل خط النسبة
-    // ========================================
+    // ==================================================
+    // كتابة النسبة داخل القلب
+    // ==================================================
 
     const font =
-      await Jimp.loadFont(
-        Jimp.FONT_SANS_32_WHITE
+      await jimp.loadFont(
+        jimp.FONT_SANS_32_WHITE
       );
-
-
-    // ========================================
-    // نص النسبة
-    // ========================================
 
     const percentText =
       `${lovePercent}%`;
 
 
-    // ========================================
-    // أبعاد النص
-    // ========================================
-
     const textWidth =
-      Jimp.measureText(
+      jimp.measureText(
         font,
         percentText
       );
 
     const textHeight =
-      Jimp.measureTextHeight(
+      jimp.measureTextHeight(
         font,
         percentText,
         200
       );
 
 
-    // ========================================
+    // ==================================================
     // مركز القلب
-    //
-    // القالب 850×478 تقريبًا
-    // القلب في المنتصف تقريبًا
-    // ========================================
+    // ==================================================
 
     const heartCenterX =
       Math.floor(
-        template.bitmap.width / 2
+        baseImage.bitmap.width / 2
       );
 
     const heartCenterY =
       Math.floor(
-        template.bitmap.height / 2
+        baseImage.bitmap.height / 2
       );
 
-
-    // ========================================
-    // وضع النسبة داخل القلب
-    // ========================================
 
     const textX =
       heartCenterX -
@@ -519,7 +440,11 @@ module.exports.run = async function ({
       );
 
 
-    template.print(
+    // ==================================================
+    // وضع النسبة
+    // ==================================================
+
+    baseImage.print(
       font,
       textX,
       textY,
@@ -527,52 +452,74 @@ module.exports.run = async function ({
     );
 
 
-    // ========================================
-    // جودة الصورة
-    // ========================================
+    // ==================================================
+    // حفظ الصورة بصيغة PNG
+    // ==================================================
 
-    template.quality(100);
+    const buffer =
+      await baseImage.getBufferAsync(
+        "image/png"
+      );
 
-
-    // ========================================
-    // حفظ الصورة النهائية
-    // ========================================
-
-    await template.writeAsync(
-      finalPath
+    fs.writeFileSync(
+      finalPath,
+      buffer
     );
 
 
-    // ========================================
+    // ==================================================
+    // الردود
+    // ==================================================
+
+    const funnyReplies = [
+
+      `💍 ألف مبروك الزواج لـ ${senderName} و ${partnerName}! 🎉`,
+
+      `💕 تم الزواج! ${senderName} و ${partnerName} أصبحا زوجين!`,
+
+      `🌸 مبارك للعروسين ${senderName} و ${partnerName}! 💐`,
+
+      `💖 زواج سعيد لـ ${senderName} و ${partnerName}! 🎊`
+
+    ];
+
+
+    const randomReply =
+      funnyReplies[
+        Math.floor(
+          Math.random() *
+          funnyReplies.length
+        )
+      ];
+
+
+    // ==================================================
     // الرسالة النهائية
-    // ========================================
+    // ==================================================
 
     const message =
-      `⌬ ━━ 𝗛𝗜𝗡𝗔 FUN ━━ ⌬\n\n` +
+      `⌬ ━━ HINA FUN ━━ ⌬\n\n` +
 
-      `💍 تم الزواج بنجاح!\n\n` +
+      `${randomReply}\n\n` +
 
       `👤 ${senderName}\n` +
 
-      `❤️\n` +
+      `❤️ ${lovePercent}%\n` +
 
       `💍 ${partnerName}\n\n` +
 
-      `📊 نسبة التوافق: ${lovePercent}%\n` +
+      `📊 ${loveMessage}\n\n` +
 
-      `${loveMessage}\n\n` +
-
-      `✍️ المطور: أبو هريرة`;
+      `✦ المطور: أبو هريرة`;
 
 
-    // ========================================
-    // إرسال الصورة المدمجة
-    // ========================================
+    // ==================================================
+    // إرسال الصورة
+    // ==================================================
 
     return api.sendMessage(
       {
-        body:
-          message,
+        body: message,
 
         attachment:
           fs.createReadStream(
@@ -582,52 +529,49 @@ module.exports.run = async function ({
 
       threadID,
 
-      async () => {
+      () => {
 
         try {
 
           if (
-            await fs.pathExists(
+            fs.existsSync(
               finalPath
             )
           ) {
-
-            await fs.remove(
+            fs.unlinkSync(
               finalPath
             );
           }
 
-
           if (
-            await fs.pathExists(
-              senderPath
+            fs.existsSync(
+              senderAvatarPath
             )
           ) {
-
-            await fs.remove(
-              senderPath
+            fs.unlinkSync(
+              senderAvatarPath
             );
           }
 
-
           if (
-            await fs.pathExists(
-              partnerPath
+            fs.existsSync(
+              partnerAvatarPath
             )
           ) {
-
-            await fs.remove(
-              partnerPath
+            fs.unlinkSync(
+              partnerAvatarPath
             );
           }
 
         } catch (error) {
 
           console.error(
-            "خطأ في حذف ملفات الكاش:",
+            "خطأ في حذف الملفات:",
             error.message
           );
+
         }
+
       },
 
       messageID
@@ -637,49 +581,34 @@ module.exports.run = async function ({
   } catch (error) {
 
     console.error(
-      "❌ خطأ في أمر زوجيني:",
+      "❌ خطأ في زوجيني:",
       error
     );
 
 
-    // ========================================
-    // تنظيف الملفات عند حدوث خطأ
-    // ========================================
-
     try {
 
       if (
-        await fs.pathExists(
-          senderPath
-        )
+        fs.existsSync(finalPath)
       ) {
-
-        await fs.remove(
-          senderPath
+        fs.unlinkSync(
+          finalPath
         );
       }
 
-
       if (
-        await fs.pathExists(
-          partnerPath
-        )
+        fs.existsSync(senderAvatarPath)
       ) {
-
-        await fs.remove(
-          partnerPath
+        fs.unlinkSync(
+          senderAvatarPath
         );
       }
 
-
       if (
-        await fs.pathExists(
-          finalPath
-        )
+        fs.existsSync(partnerAvatarPath)
       ) {
-
-        await fs.remove(
-          finalPath
+        fs.unlinkSync(
+          partnerAvatarPath
         );
       }
 
@@ -687,16 +616,13 @@ module.exports.run = async function ({
 
 
     return api.sendMessage(
-      `⌬ ━━ 𝗛𝗜𝗡𝗔 FUN ━━ ⌬\n\n` +
-
-      `❌ حدث خطأ أثناء إنشاء صورة الزواج.\n\n` +
-
-      `${error.message}\n\n` +
-
-      `✍️ المطور: أبو هريرة`,
+      `⌬ ━━ HINA FUN ━━ ⌬\n\n` +
+      `❌ حدث خطأ أثناء إنشاء الصورة.\n\n` +
+      `📝 ${error.message}`,
 
       threadID,
       messageID
     );
+
   }
 };
