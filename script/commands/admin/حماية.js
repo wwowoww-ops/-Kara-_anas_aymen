@@ -1,4 +1,4 @@
-const fs = require("fs");
+const fs = require("fs-extra");
 const path = require("path");
 
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -15,89 +15,31 @@ module.exports.config = {
   cooldowns: 5
 };
 
-// ==================================================
-// إنشاء ملف البيانات
-// ==================================================
+function ensureData() {
+  fs.ensureDirSync(DATA_DIR);
 
-function ensureDataFile() {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-
-    if (!fs.existsSync(DATA_FILE)) {
-      fs.writeFileSync(
-        DATA_FILE,
-        JSON.stringify({}, null, 2),
-        "utf8"
-      );
-    }
-  } catch (error) {
-    console.error(
-      "❌ HINA PROTECTION DATA ERROR:",
-      error
-    );
+  if (!fs.existsSync(DATA_FILE)) {
+    fs.writeJsonSync(DATA_FILE, {}, { spaces: 2 });
   }
 }
 
-// ==================================================
-// قراءة البيانات
-// ==================================================
-
-function readData() {
-  ensureDataFile();
+function loadData() {
+  ensureData();
 
   try {
-    const data = fs.readFileSync(
-      DATA_FILE,
-      "utf8"
-    );
-
-    if (!data.trim()) {
-      return {};
-    }
-
-    return JSON.parse(data);
-  } catch (error) {
-    console.error(
-      "❌ HINA PROTECTION READ ERROR:",
-      error
-    );
-
+    return fs.readJsonSync(DATA_FILE);
+  } catch (e) {
+    console.error("Protection JSON Error:", e.message);
     return {};
   }
 }
 
-// ==================================================
-// حفظ البيانات
-// ==================================================
-
 function saveData(data) {
-  ensureDataFile();
-
-  try {
-    fs.writeFileSync(
-      DATA_FILE,
-      JSON.stringify(data, null, 2),
-      "utf8"
-    );
-
-    return true;
-  } catch (error) {
-    console.error(
-      "❌ HINA PROTECTION SAVE ERROR:",
-      error
-    );
-
-    return false;
-  }
+  ensureData();
+  fs.writeJsonSync(DATA_FILE, data, { spaces: 2 });
 }
 
-// ==================================================
-// إعداد مجموعة جديدة
-// ==================================================
-
-function createDefaultSettings() {
+function defaultThread() {
   return {
     enabled: false,
 
@@ -108,242 +50,159 @@ function createDefaultSettings() {
       groupImage: false,
       theme: false,
       emoji: false
+    },
+
+    original: {
+      groupName: null,
+      theme: null,
+      emoji: null,
+      groupImage: null,
+      nicknames: {}
     }
   };
 }
 
-function getThreadSettings(data, threadID) {
+async function isAdmin(api, threadID, userID) {
+  try {
+    const info = await api.getThreadInfo(threadID);
+
+    if (!info || !Array.isArray(info.adminIDs)) {
+      return false;
+    }
+
+    return info.adminIDs.some(
+      x => String(x.id) === String(userID)
+    );
+  } catch (e) {
+    console.error("Protection admin check:", e.message);
+    return false;
+  }
+}
+
+function getThreadData(data, threadID) {
   if (!data[threadID]) {
-    data[threadID] =
-      createDefaultSettings();
+    data[threadID] = defaultThread();
   }
 
   if (!data[threadID].settings) {
-    data[threadID].settings = {};
+    data[threadID].settings = defaultThread().settings;
   }
 
-  const defaults =
-    createDefaultSettings().settings;
-
-  for (const key of Object.keys(defaults)) {
-    if (
-      typeof data[threadID].settings[key] !==
-      "boolean"
-    ) {
-      data[threadID].settings[key] =
-        defaults[key];
-    }
-  }
-
-  if (
-    typeof data[threadID].enabled !==
-    "boolean"
-  ) {
-    data[threadID].enabled = false;
+  if (!data[threadID].original) {
+    data[threadID].original = defaultThread().original;
   }
 
   return data[threadID];
 }
 
-// ==================================================
-// التحقق من أدمن المجموعة
-// ==================================================
-
-async function isGroupAdmin(api, threadID, senderID) {
-  try {
-    const threadInfo =
-      await api.getThreadInfo(threadID);
-
-    if (
-      !threadInfo ||
-      !Array.isArray(threadInfo.adminIDs)
-    ) {
-      return false;
-    }
-
-    return threadInfo.adminIDs.some(
-      admin =>
-        String(admin.id) ===
-        String(senderID)
-    );
-
-  } catch (error) {
-    console.error(
-      "❌ HINA ADMIN CHECK ERROR:",
-      error
-    );
-
-    return false;
-  }
-}
-
-// ==================================================
-// القائمة
-// ==================================================
-
-function createMenu(settings) {
-  const status =
-    settings.enabled
-      ? "✅ مـفـعـل"
-      : "❌ مـعـطـل";
-
-  const getStatus = key =>
-    settings.settings[key]
-      ? "✅"
-      : "❌";
-
-  return `
-⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬
-
-🛡️ نـظـام حـمـايـة الـمـجـمـوعـة
-
-📋 اخـتـار رقـم الإعـداد:
-
-1 ≻ 🔒 الحماية الكلية ${status}
-2 ≻ 🏷️ حماية الكنيات ${getStatus("nicknames")}
-3 ≻ ➕ حماية إضافة الأعضاء ${getStatus("addMember")}
-4 ≻ 📛 حماية اسم المجموعة ${getStatus("groupName")}
-5 ≻ 🖼️ حماية صورة المجموعة ${getStatus("groupImage")}
-6 ≻ 🎨 حماية السمة ${getStatus("theme")}
-7 ≻ 😊 حماية الإيموجي ${getStatus("emoji")}
-
-━━━━━━━━━━━━━━━━━━
-
-📝 أرسل رقمًا من 1 إلى 7
-❌ للإلغاء أرسل: خروج
-
-⌬ ━━━━━━━━━━━━ ⌬
-`;
-}
-
-// ==================================================
-// RUN
-// ==================================================
-
-module.exports.run = async function({
-  api,
-  event
-}) {
-
+module.exports.run = async function({ api, event }) {
   const {
     threadID,
     messageID,
     senderID
   } = event;
 
-  try {
-
-    // التحقق من الأدمن
-    const admin =
-      await isGroupAdmin(
-        api,
-        threadID,
-        senderID
-      );
-
-    if (!admin) {
-      return api.sendMessage(
-`⌬ ━━ 𝗛𝗜𝗡𝗔 ADMIN ━━ ⌬
-
-🥺 مـامـي مـا سـمـحـتـلـك تـغـيـر شـي يـا قـلـبـي
-
-⛔ هـذا الأمـر لـلأدمـن فـقـط
-
-⌬ ━━━━━━━━━━━━ ⌬`,
-        threadID,
-        messageID
-      );
-    }
-
-    const data =
-      readData();
-
-    const settings =
-      getThreadSettings(
-        data,
-        threadID
-      );
-
-    saveData(data);
-
-    const menu =
-      createMenu(settings);
-
-    // إرسال القائمة أولًا
+  if (!(await isAdmin(api, threadID, senderID))) {
     return api.sendMessage(
-      menu,
-      threadID,
-      (err, info) => {
-
-        if (err) {
-          console.error(
-            "❌ HINA PROTECTION MENU ERROR:",
-            err
-          );
-          return;
-        }
-
-        if (!info || !info.messageID) {
-          return;
-        }
-
-        // تسجيل الرد على رسالة القائمة
-        if (!global.client.handleReply) {
-          global.client.handleReply = [];
-        }
-
-        global.client.handleReply.push({
-          name:
-            module.exports.config.name,
-
-          messageID:
-            info.messageID,
-
-          author:
-            String(senderID),
-
-          threadID:
-            String(threadID),
-
-          type: "protection_menu"
-        });
-
-      },
-      messageID
-    );
-
-  } catch (error) {
-
-    console.error(
-      "❌ HINA PROTECTION ERROR:",
-      error
-    );
-
-    return api.sendMessage(
-`⌬ ━━ 𝗛𝗜𝗡𝗔 ADMIN ━━ ⌬
-
-❌ حـدث خـطـأ أثـنـاء تـشـغـيـل نـظـام الـحـمـايـة
-
-📌 ${error.message}
-
-⌬ ━━━━━━━━━━━━ ⌬`,
+      "⌬ ━━ HINA PROTECTION ━━ ⌬\n\n❌ هذا الأمر مخصص لمشرفي المجموعة فقط.",
       threadID,
       messageID
     );
   }
+
+  const data = loadData();
+  const protection = getThreadData(data, threadID);
+
+  /*
+   * نحاول أخذ الحالة الحالية للمجموعة
+   * حتى تكون هي الحالة التي ستتم حمايتها.
+   */
+  try {
+    const info = await api.getThreadInfo(threadID);
+
+    if (info) {
+      if (info.threadName) {
+        protection.original.groupName = info.threadName;
+      }
+
+      if (info.threadTheme) {
+        protection.original.theme = info.threadTheme;
+      }
+
+      if (info.emoji) {
+        protection.original.emoji = info.emoji;
+      }
+
+      if (Array.isArray(info.nicknames)) {
+        for (const item of info.nicknames) {
+          if (item && item.userID) {
+            protection.original.nicknames[String(item.userID)] =
+              item.nickname || "";
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.log(
+      "تعذر حفظ الحالة الأصلية:",
+      e.message
+    );
+  }
+
+  saveData(data);
+
+  const s = protection.settings;
+
+  const menu =
+`⌬ ━━ HINA PROTECTION ━━ ⌬
+
+🛡️ نظام حماية المجموعة
+
+الحماية العامة:
+${protection.enabled ? "✅ مفعلة" : "❌ معطلة"}
+
+━━━━━━━━━━━━━━━━━━
+
+1 ┃ ${protection.enabled ? "🔴 إيقاف" : "🟢 تفعيل"} الحماية العامة
+
+2 ┃ ${s.nicknames ? "🟢" : "🔴"} حماية الكنيات
+3 ┃ ${s.addMember ? "🟢" : "🔴"} حماية إضافة الأعضاء
+4 ┃ ${s.groupName ? "🟢" : "🔴"} حماية اسم المجموعة
+5 ┃ ${s.groupImage ? "🟢" : "🔴"} حماية صورة المجموعة
+6 ┃ ${s.theme ? "🟢" : "🔴"} حماية السمة
+7 ┃ ${s.emoji ? "🟢" : "🔴"} حماية الإيموجي
+
+━━━━━━━━━━━━━━━━━━
+
+↩️ أرسل رقم الإعداد
+❌ أرسل "خروج" للإلغاء`;
+
+  return api.sendMessage(
+    menu,
+    threadID,
+    (err, info) => {
+      if (err || !info) return;
+
+      if (!global.client.handleReply) {
+        global.client.handleReply = [];
+      }
+
+      global.client.handleReply.push({
+        name: "حماية",
+        messageID: info.messageID,
+        author: senderID,
+        threadID
+      });
+    },
+    messageID
+  );
 };
 
-// ==================================================
-// HANDLE REPLY
-// ==================================================
-
-module.exports.handleReply =
-async function({
+module.exports.handleReply = async function({
   api,
   event,
   handleReply
 }) {
-
   const {
     threadID,
     messageID,
@@ -351,249 +210,125 @@ async function({
     body
   } = event;
 
-  // ==================================================
-  // التحقق من صاحب القائمة
-  // ==================================================
-
   if (
-    String(handleReply.author) !==
-    String(senderID)
+    String(senderID) !==
+    String(handleReply.author)
   ) {
     return;
   }
 
-  // ==================================================
-  // التحقق من نفس المجموعة
-  // ==================================================
-
-  if (
-    String(handleReply.threadID) !==
-    String(threadID)
-  ) {
-    return;
-  }
-
-  // ==================================================
-  // التحقق من الأدمن
-  // ==================================================
-
-  const admin =
-    await isGroupAdmin(
-      api,
-      threadID,
-      senderID
-    );
-
-  if (!admin) {
+  if (!(await isAdmin(api, threadID, senderID))) {
     return api.sendMessage(
-`⌬ ━━ 𝗛𝗜𝗡𝗔 ADMIN ━━ ⌬
-
-⛔ لم تعد تملك صلاحية أدمن المجموعة.
-
-⌬ ━━━━━━━━━━━━ ⌬`,
+      "❌ يجب أن تكون مشرفًا لتغيير إعدادات الحماية.",
       threadID,
       messageID
     );
   }
 
-  if (
-    !body ||
-    !body.trim()
-  ) {
-    return;
-  }
-
-  const choice =
-    body.trim();
-
-  // ==================================================
-  // خروج
-  // ==================================================
+  const choice = String(body || "").trim();
 
   if (
     choice === "خروج" ||
     choice.toLowerCase() === "cancel"
   ) {
-
     return api.sendMessage(
-`⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬
-
-❌ تم إلغاء إعدادات الحماية.
-
-⌬ ━━━━━━━━━━━━ ⌬`,
+      "✅ تم إلغاء إعداد الحماية.",
       threadID,
       messageID
     );
   }
 
-  // ==================================================
-  // التحقق من الرقم
-  // ==================================================
+  const number = Number(choice);
 
-  if (!/^[1-7]$/.test(choice)) {
-
+  if (!Number.isInteger(number) || number < 1 || number > 7) {
     return api.sendMessage(
-`⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬
-
-⚠️ رقم غير صحيح.
-
-📌 اختر رقمًا من 1 إلى 7
-❌ أو أرسل: خروج
-
-⌬ ━━━━━━━━━━━━ ⌬`,
+      "❌ اختيار غير صحيح.\nأرسل رقمًا من 1 إلى 7.",
       threadID,
       messageID
     );
   }
 
-  const data =
-    readData();
+  const data = loadData();
+  const protection = getThreadData(data, threadID);
 
-  const settings =
-    getThreadSettings(
-      data,
-      threadID
-    );
+  /*
+   * قبل التفعيل نحفظ الحالة الحالية.
+   */
+  try {
+    const info = await api.getThreadInfo(threadID);
 
-  // ==================================================
-  // الخيارات
-  // ==================================================
+    if (info) {
+      if (info.threadName) {
+        protection.original.groupName =
+          info.threadName;
+      }
 
-  const options = {
-    "2": {
-      key: "nicknames",
-      name: "حماية الكنيات"
-    },
+      if (info.threadTheme) {
+        protection.original.theme =
+          info.threadTheme;
+      }
 
-    "3": {
-      key: "addMember",
-      name: "حماية إضافة الأعضاء"
-    },
-
-    "4": {
-      key: "groupName",
-      name: "حماية اسم المجموعة"
-    },
-
-    "5": {
-      key: "groupImage",
-      name: "حماية صورة المجموعة"
-    },
-
-    "6": {
-      key: "theme",
-      name: "حماية السمة"
-    },
-
-    "7": {
-      key: "emoji",
-      name: "حماية الإيموجي"
+      if (info.emoji) {
+        protection.original.emoji =
+          info.emoji;
+      }
     }
+  } catch (e) {
+    console.log(
+      "Snapshot error:",
+      e.message
+    );
+  }
+
+  const settings = {
+    2: ["nicknames", "حماية الكنيات"],
+    3: ["addMember", "حماية إضافة الأعضاء"],
+    4: ["groupName", "حماية اسم المجموعة"],
+    5: ["groupImage", "حماية صورة المجموعة"],
+    6: ["theme", "حماية السمة"],
+    7: ["emoji", "حماية الإيموجي"]
   };
 
-  // ==================================================
-  // الحماية الكلية
-  // ==================================================
+  if (number === 1) {
+    protection.enabled =
+      !protection.enabled;
 
-  if (choice === "1") {
-
-    settings.enabled =
-      !settings.enabled;
-
-    const saved =
-      saveData(data);
-
-    if (!saved) {
-      return api.sendMessage(
-`⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬
-
-❌ تعذر حفظ إعداد الحماية.
-
-⌬ ━━━━━━━━━━━━ ⌬`,
-        threadID,
-        messageID
-      );
-    }
-
-    try {
-      api.setMessageReaction(
-        settings.enabled
-          ? "✅"
-          : "❌",
-        messageID,
-        () => {},
-        true
-      );
-    } catch (e) {}
-
-    return api.sendMessage(
-`⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬
-
-🛡️ الحماية الكلية:
-${settings.enabled ? "✅ تم تفعيلها" : "❌ تم إيقافها"}
-
-📌 المجموعة:
-${threadID}
-
-⌬ ━━━━━━━━━━━━ ⌬`,
-      threadID,
-      messageID
-    );
-  }
-
-  // ==================================================
-  // إعداد فرعي
-  // ==================================================
-
-  const selected =
-    options[choice];
-
-  if (!selected) {
-    return;
-  }
-
-  const key =
-    selected.key;
-
-  settings.settings[key] =
-    !settings.settings[key];
-
-  const saved =
     saveData(data);
 
-  if (!saved) {
     return api.sendMessage(
-`⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬
+      `⌬ ━━ HINA PROTECTION ━━ ⌬
 
-❌ تعذر حفظ إعداد الحماية.
+${protection.enabled
+  ? "🟢 تم تفعيل الحماية العامة."
+  : "🔴 تم إيقاف الحماية العامة."}
 
-⌬ ━━━━━━━━━━━━ ⌬`,
+🛡️ الحماية الآن:
+${protection.enabled ? "مفعلة" : "معطلة"}`,
       threadID,
       messageID
     );
   }
 
-  try {
-    api.setMessageReaction(
-      settings.settings[key]
-        ? "✅"
-        : "❌",
-      messageID,
-      () => {},
-      true
-    );
-  } catch (e) {}
+  const selected = settings[number];
+
+  if (!selected) return;
+
+  const [key, name] = selected;
+
+  protection.settings[key] =
+    !protection.settings[key];
+
+  saveData(data);
 
   return api.sendMessage(
-`⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬
+    `⌬ ━━ HINA PROTECTION ━━ ⌬
 
-🛡️ ${selected.name}
+${protection.settings[key]
+  ? "🟢 تم تفعيل"
+  : "🔴 تم إيقاف"} ${name}
 
-${settings.settings[key]
-  ? "✅ تم التفعيل"
-  : "❌ تم الإيقاف"}
-
-⌬ ━━━━━━━━━━━━ ⌬`,
+🛡️ الحماية العامة:
+${protection.enabled ? "مفعلة" : "معطلة"}`,
     threadID,
     messageID
   );
