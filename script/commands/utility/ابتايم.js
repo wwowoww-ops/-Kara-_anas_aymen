@@ -1,40 +1,186 @@
 module.exports.config = {
   name: "ابتايم",
-  version: "1.2.0",
+  version: "1.3.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
   description: "عرض حالة النظام وإحصائيات التشغيل",
   commandCategory: "utility",
+  usages: "ابتايم",
   cooldowns: 5
 };
 
-module.exports.run = async ({ api, event }) => {
-  const { threadID, messageID } = event;
+// ==================================================
+// حساب عدد المجموعات التي يعرفها البوت
+// بدون getThreadList
+// ==================================================
 
-  // حساب وقت التشغيل
-  const uptime = process.uptime();
-  const days = Math.floor(uptime / (24 * 60 * 60));
-  const hours = Math.floor((uptime % (24 * 60 * 60)) / (60 * 60));
-  const minutes = Math.floor((uptime % (60 * 60)) / 60);
-  const seconds = Math.floor(uptime % 60);
+function getKnownGroups() {
+  const ids = new Set();
 
-  // إحصائيات المجموعات
-  const threadList = await api.getThreadList(100, null, ["INBOX"]) || [];
-  const groupCount = threadList.filter(thread => thread.isGroup).length;
-  
-  const timeStr = `${days} يوم، ${hours} ساعة، ${minutes} دقيقة`;
-  const header = `⌬ ━━━━━━━━━━━━ ⌬\n      ⚙️ حـالـة الـنـظـام\n⌬ ━━━━━━━━━━━━ ⌬`;
+  try {
+    // global.data.allThreadID
+    if (
+      global.data &&
+      Array.isArray(global.data.allThreadID)
+    ) {
+      for (const id of global.data.allThreadID) {
+        if (id) ids.add(String(id));
+      }
+    }
+  } catch (e) {}
 
-  const statusMsg = `${header}\n\n` +
-                   `⏳ مـدة الـتـشـغـيـل:\n» ${timeStr}\n\n` +
-                   `📊 الإحـصـائـيـات:\n` +
-                   `• المجموعات النشطة: ${groupCount}\n` +
-                   `• سرعة الاستجابة: مستقرة\n\n` +
-                   `🤖 الحالة: متصل\n` +
-                   `👑 المطور: أبو هريرة`;
+  try {
+    // global.data.threadData
+    if (
+      global.data &&
+      global.data.threadData
+    ) {
+      const data = global.data.threadData;
 
-  return api.sendMessage(statusMsg, threadID, (err, info) => {
-      // حذف الرسالة تلقائياً بعد 15 ثانية
-      setTimeout(() => api.unsendMessage(info.messageID), 15000);
-  }, messageID);
+      if (data instanceof Map) {
+        for (const id of data.keys()) {
+          if (id) ids.add(String(id));
+        }
+      } else if (typeof data === "object") {
+        for (const id of Object.keys(data)) {
+          if (id) ids.add(String(id));
+        }
+      }
+    }
+  } catch (e) {}
+
+  return ids.size;
+}
+
+// ==================================================
+// RUN
+// ==================================================
+
+module.exports.run = async function({ api, event }) {
+
+  const {
+    threadID,
+    messageID
+  } = event;
+
+  try {
+
+    // ==================================================
+    // مدة التشغيل
+    // ==================================================
+
+    const uptime = process.uptime();
+
+    const days = Math.floor(
+      uptime / 86400
+    );
+
+    const hours = Math.floor(
+      (uptime % 86400) / 3600
+    );
+
+    const minutes = Math.floor(
+      (uptime % 3600) / 60
+    );
+
+    const seconds = Math.floor(
+      uptime % 60
+    );
+
+    const timeStr =
+      `${days} يوم، ${hours} ساعة، ${minutes} دقيقة، ${seconds} ثانية`;
+
+    // ==================================================
+    // عدد المجموعات
+    // ==================================================
+
+    const groupCount =
+      getKnownGroups();
+
+    // ==================================================
+    // زخرفة HINA
+    // ==================================================
+
+    const header =
+`⌬ ━━ 𝗛𝗜𝗡𝗔 DEVELOPER ━━ ⌬`;
+
+    const statusMsg =
+`${header}
+
+⚙️ حـالـة الـنـظـام
+
+⏳ مـدة الـتـشـغـيـل:
+» ${timeStr}
+
+📊 الإحـصـائـيـات:
+• المجموعات المعروفة: ${groupCount}
+• سرعة الاستجابة: مستقرة
+
+🤖 الحالة: متصل
+👑 المطور: أبو هريرة
+
+⌬ ━━━━━━━━━━━━ ⌬`;
+
+    // ==================================================
+    // إرسال الرسالة
+    // ==================================================
+
+    return api.sendMessage(
+      statusMsg,
+      threadID,
+      (err, info) => {
+
+        if (err) {
+          console.error(
+            "❌ HINA UPTIME SEND ERROR:",
+            err
+          );
+          return;
+        }
+
+        // حذف الرسالة بعد 15 ثانية
+        if (
+          info &&
+          info.messageID
+        ) {
+          setTimeout(() => {
+
+            try {
+              api.unsendMessage(
+                info.messageID
+              );
+            } catch (e) {}
+
+          }, 15000);
+        }
+
+      },
+      messageID
+    );
+
+  } catch (error) {
+
+    console.error(
+      "❌ HINA UPTIME ERROR:",
+      error
+    );
+
+    return api.sendMessage(
+`⌬ ━━ 𝗛𝗜𝗡𝗔 DEVELOPER ━━ ⌬
+
+❌ حدث خطأ أثناء تنفيذ الأمر
+
+${error.message}
+
+⌬ ━━━━━━━━━━━━ ⌬`,
+      threadID,
+      messageID
+    );
+  }
 };
+
+هذا الإصدار لا يستخدم "getThreadList()" نهائيًا، وبالتالي خطأ:
+
+"Cannot read properties of undefined (reading 'uri')"
+
+لن يأتي من هذا الأمر. كما أنه يعرض الثواني ويحتفظ برسالة HINA والخروج التلقائي بعد 15 ثانية.
