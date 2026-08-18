@@ -3,11 +3,11 @@ const path = require("path");
 
 module.exports.config = {
   name: "فعالية",
-  version: "6.0.0",
+  version: "8.0.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
-  description: "نظام فعاليات متنوعة بالنقاط والتحديات",
-  commandCategory: "fun",
+  description: "نظام فعاليات زنجوبة المتنوعة بالنقاط والتحديات",
+  commandCategory: "Fun",
   usages: "فعالية إنشاء 10",
   cooldowns: 3
 };
@@ -25,18 +25,16 @@ if (!fs.existsSync(DATA_FILE)) {
   fs.writeFileSync(DATA_FILE, "{}");
 }
 
+// ======================================================
+// إعدادات الفعالية
+// ======================================================
+
+const ANSWER_TIME = 15000;
+const NEXT_ROUND_DELAY = 3000;
+const PREVIEW_TIME = 3000;
 
 // ======================================================
-// الذاكرة
-// ======================================================
-
-if (!global.zanjoubaEvents) {
-  global.zanjoubaEvents = new Map();
-}
-
-
-// ======================================================
-// قراءة البيانات
+// أدوات البيانات
 // ======================================================
 
 function loadData() {
@@ -49,11 +47,6 @@ function loadData() {
   }
 }
 
-
-// ======================================================
-// حفظ البيانات
-// ======================================================
-
 function saveData(data) {
   try {
     fs.writeFileSync(
@@ -61,60 +54,55 @@ function saveData(data) {
       JSON.stringify(data, null, 2)
     );
   } catch (e) {
-    console.error("EVENT SAVE ERROR:", e);
+    console.error(
+      "ZANJOUBA EVENT SAVE ERROR:",
+      e
+    );
   }
 }
 
-
 // ======================================================
-// إنشاء بيانات فعالية
+// إنشاء فعالية
 // ======================================================
 
 function createEvent(creator, winPoints) {
   return {
     active: true,
-
     started: false,
 
     creator: String(creator),
-
     winPoints: Number(winPoints),
 
     gameType: "متنوع",
 
     participants: [],
-
     scores: {},
 
     round: 0,
 
-    maxRounds: 0,
-
     currentChallenge: null,
 
+    currentListMessageID: null,
+    currentPreviewMessageID: null,
     currentQuestionMessageID: null,
 
-    currentListMessageID: null,
+    roundToken: null,
 
-    currentPreviewMessageID: null,
-
-    questionStartedAt: 0,
-
+    waitingForAnswer: false,
     answered: false,
 
     timeoutID: null,
+    nextTimer: null,
 
-    nextTimer: null
+    processingRound: false
   };
 }
-
 
 // ======================================================
 // تطبيع الإجابات
 // ======================================================
 
 function normalizeAnswer(text) {
-
   return String(text || "")
     .toLowerCase()
     .trim()
@@ -129,23 +117,88 @@ function normalizeAnswer(text) {
     .replace(/\s+/g, " ");
 }
 
-
-// ======================================================
-// التحقق من الإجابة
-// ======================================================
-
 function checkAnswer(input, answers) {
+  const normalized = normalizeAnswer(input);
 
-  const normalized =
-    normalizeAnswer(input);
-
-  return answers.some(answer => {
-
-    return normalized ===
-      normalizeAnswer(answer);
-  });
+  return answers.some(answer =>
+    normalized === normalizeAnswer(answer)
+  );
 }
 
+// ======================================================
+// تحدي القلب
+// ======================================================
+
+const HEART_COLORS = [
+  {
+    color: "الأحمر",
+    emoji: "❤️"
+  },
+  {
+    color: "البرتقالي",
+    emoji: "🧡"
+  },
+  {
+    color: "الأصفر",
+    emoji: "💛"
+  },
+  {
+    color: "الأخضر",
+    emoji: "💚"
+  },
+  {
+    color: "الأزرق",
+    emoji: "💙"
+  },
+  {
+    color: "البنفسجي",
+    emoji: "💜"
+  },
+  {
+    color: "الأسود",
+    emoji: "🖤"
+  },
+  {
+    color: "الأبيض",
+    emoji: "🤍"
+  },
+  {
+    color: "البني",
+    emoji: "🤎"
+  },
+  {
+    color: "الوردي",
+    emoji: "🩷"
+  },
+  {
+    color: "السماوي",
+    emoji: "🩵"
+  },
+  {
+    color: "الرمادي",
+    emoji: "🩶"
+  }
+];
+
+function getHeartChallenge() {
+  const selected =
+    HEART_COLORS[
+      Math.floor(
+        Math.random() *
+        HEART_COLORS.length
+      )
+    ];
+
+  return {
+    type: "جلب قلب",
+    question:
+      `أرسل قلبًا باللون ${selected.color}\n\n` +
+      `المطلوب: ${selected.color} فقط`,
+    answers: [selected.emoji],
+    targetColor: selected.color,
+    targetEmoji: selected.emoji
+  };
+}
 
 // ======================================================
 // التحديات
@@ -154,7 +207,7 @@ function checkAnswer(input, answers) {
 const CHALLENGES = [
 
   // =========================
-  // ثقافة
+  // ثقافة عامة
   // =========================
 
   {
@@ -162,61 +215,67 @@ const CHALLENGES = [
     question: "ما هي عاصمة فرنسا؟",
     answers: ["باريس"]
   },
-
   {
     type: "سؤال ثقافي",
     question: "ما هي عاصمة اليابان؟",
     answers: ["طوكيو"]
   },
-
-  {
-    type: "سؤال ثقافي",
-    question: "ما هي أكبر قارة في العالم؟",
-    answers: ["اسيا", "آسيا"]
-  },
-
   {
     type: "سؤال ثقافي",
     question: "ما هي عاصمة إيطاليا؟",
     answers: ["روما"]
   },
-
   {
     type: "سؤال ثقافي",
     question: "ما هي عاصمة ألمانيا؟",
     answers: ["برلين"]
   },
-
-  {
-    type: "سؤال ثقافي",
-    question: "كم عدد قارات العالم؟",
-    answers: ["7", "سبع", "سبعة"]
-  },
-
-  {
-    type: "سؤال ثقافي",
-    question: "ما هو أكبر محيط في العالم؟",
-    answers: ["المحيط الهادئ", "الهادئ"]
-  },
-
   {
     type: "سؤال ثقافي",
     question: "ما هي عاصمة تونس؟",
     answers: ["تونس"]
   },
-
   {
     type: "سؤال ثقافي",
     question: "ما هي عاصمة الجزائر؟",
     answers: ["الجزائر"]
   },
-
   {
     type: "سؤال ثقافي",
     question: "ما هي عاصمة المغرب؟",
     answers: ["الرباط"]
   },
-
+  {
+    type: "سؤال ثقافي",
+    question: "كم عدد قارات العالم؟",
+    answers: ["7", "سبعة", "سبع"]
+  },
+  {
+    type: "سؤال ثقافي",
+    question: "ما هي أكبر قارة في العالم؟",
+    answers: ["اسيا", "آسيا"]
+  },
+  {
+    type: "سؤال ثقافي",
+    question: "ما هو أكبر محيط في العالم؟",
+    answers: [
+      "المحيط الهادئ",
+      "الهادئ"
+    ]
+  },
+  {
+    type: "سؤال ثقافي",
+    question: "ما هو أعلى جبل في العالم؟",
+    answers: [
+      "ايفرست",
+      "إيفرست"
+    ]
+  },
+  {
+    type: "سؤال ثقافي",
+    question: "كم عدد أيام الأسبوع؟",
+    answers: ["7", "سبعة"]
+  },
 
   // =========================
   // ديني
@@ -227,53 +286,64 @@ const CHALLENGES = [
     question: "كم عدد أركان الإسلام؟",
     answers: ["5", "خمسة"]
   },
-
   {
     type: "سؤال ديني",
     question: "كم عدد أركان الإيمان؟",
-    answers: ["6", "ستة", "سته"]
+    answers: [
+      "6",
+      "ستة",
+      "سته"
+    ]
   },
-
   {
     type: "سؤال ديني",
     question: "ما أول سورة في القرآن؟",
-    answers: ["الفاتحه", "الفاتحة"]
+    answers: [
+      "الفاتحة",
+      "الفاتحه"
+    ]
   },
-
   {
     type: "سؤال ديني",
     question: "ما آخر سورة في القرآن؟",
     answers: ["الناس"]
   },
-
   {
     type: "سؤال ديني",
-    question: "كم عدد الصلوات المفروضة في اليوم؟",
+    question: "كم عدد الصلوات المفروضة؟",
     answers: ["5", "خمسة"]
   },
-
   {
     type: "سؤال ديني",
     question: "ما هو شهر الصيام؟",
     answers: ["رمضان"]
   },
-
   {
     type: "سؤال ديني",
     question: "من هو خاتم الأنبياء؟",
     answers: [
       "محمد",
-      "محمد صلى الله عليه وسلم",
-      "النبي محمد"
+      "النبي محمد",
+      "محمد صلى الله عليه وسلم"
     ]
   },
-
   {
     type: "سؤال ديني",
-    question: "ما هي قبلة المسلمين؟",
-    answers: ["الكعبة", "الكعبه"]
+    question: "ما قبلة المسلمين؟",
+    answers: [
+      "الكعبة",
+      "الكعبه"
+    ]
   },
-
+  {
+    type: "سؤال ديني",
+    question: "كم عدد أشهر السنة الهجرية؟",
+    answers: [
+      "12",
+      "اثنا عشر",
+      "اثني عشر"
+    ]
+  },
 
   // =========================
   // أنمي
@@ -281,60 +351,74 @@ const CHALLENGES = [
 
   {
     type: "سؤال أنمي",
-    question: "ما اسم بطل أنمي One Piece؟",
-    answers: ["لوفي", "مونكي دي لوفي", "مونكي دي. لوفي"]
+    question: "ما اسم بطل One Piece؟",
+    answers: [
+      "لوفي",
+      "مونكي دي لوفي",
+      "مونكي دي. لوفي"
+    ]
   },
-
   {
     type: "سؤال أنمي",
     question: "ما اسم بطل Dragon Ball؟",
-    answers: ["غوكو", "جوكو"]
+    answers: [
+      "غوكو",
+      "جوكو"
+    ]
   },
-
   {
     type: "سؤال أنمي",
-    question: "ما اسم أخ ناروتو؟",
-    answers: ["لا يوجد"]
-  },
-
-  {
-    type: "سؤال أنمي",
-    question: "ما اسم القرية التي ينتمي إليها ناروتو؟",
+    question: "ما اسم قرية ناروتو؟",
     answers: [
       "كونوها",
       "قرية الورق",
       "قرية كونوها"
     ]
   },
-
-  {
-    type: "سؤال أنمي",
-    question: "ما اسم سيف إيتشيغو الشهير؟",
-    answers: ["زангتسو", "زانغيتسو", "زانجيتسو"]
-  },
-
-  {
-    type: "سؤال أنمي",
-    question: "ما اسم قائد فرقة الاستطلاع في هجوم العمالقة؟",
-    answers: ["إروين", "إروين سميث", "اروين", "اروين سميث"]
-  },
-
   {
     type: "سؤال أنمي",
     question: "ما اسم بطل Solo Leveling؟",
     answers: [
       "سونغ جين وو",
-      "سونغ جين ووو",
       "جين وو"
     ]
   },
-
   {
     type: "سؤال أنمي",
-    question: "ما اسم أخ زورو؟",
-    answers: ["لا يوجد"]
+    question: "ما اسم قائد فرقة الاستطلاع في هجوم العمالقة؟",
+    answers: [
+      "إروين",
+      "إروين سميث",
+      "اروين",
+      "اروين سميث"
+    ]
   },
-
+  {
+    type: "سؤال أنمي",
+    question: "ما اسم بطل Bleach؟",
+    answers: [
+      "إيتشيغو",
+      "ايتشيغو",
+      "إيتشيغو كوروساكي"
+    ]
+  },
+  {
+    type: "سؤال أنمي",
+    question: "ما اسم أخ ساسكي؟",
+    answers: [
+      "إيتاتشي",
+      "ايتاتشي"
+    ]
+  },
+  {
+    type: "سؤال أنمي",
+    question: "ما اسم سيف إيتشيغو؟",
+    answers: [
+      "زانغيتسو",
+      "زانجيتسو",
+      "زангتسو"
+    ]
+  },
 
   // =========================
   // رياضيات
@@ -343,33 +427,59 @@ const CHALLENGES = [
   {
     type: "سؤال رياضي",
     question: "كم يساوي 5 + 5؟",
-    answers: ["10", "عشرة"]
+    answers: [
+      "10",
+      "عشرة"
+    ]
   },
-
   {
     type: "سؤال رياضي",
     question: "كم يساوي 10 × 2؟",
-    answers: ["20", "عشرون"]
+    answers: [
+      "20",
+      "عشرون"
+    ]
   },
-
   {
     type: "سؤال رياضي",
     question: "كم يساوي 100 ÷ 10؟",
-    answers: ["10", "عشرة"]
+    answers: [
+      "10",
+      "عشرة"
+    ]
   },
-
   {
     type: "سؤال رياضي",
     question: "كم يساوي 9 × 9؟",
-    answers: ["81", "واحد وثمانون"]
+    answers: [
+      "81",
+      "واحد وثمانون"
+    ]
   },
-
   {
     type: "سؤال رياضي",
     question: "كم يساوي 50 - 20؟",
-    answers: ["30", "ثلاثون"]
+    answers: [
+      "30",
+      "ثلاثون"
+    ]
   },
-
+  {
+    type: "سؤال رياضي",
+    question: "كم يساوي 12 × 3؟",
+    answers: [
+      "36",
+      "ستة وثلاثون"
+    ]
+  },
+  {
+    type: "سؤال رياضي",
+    question: "كم يساوي 100 - 25؟",
+    answers: [
+      "75",
+      "خمسة وسبعون"
+    ]
+  },
 
   // =========================
   // إيموجي
@@ -384,11 +494,9 @@ const CHALLENGES = [
       "🩷",
       "💕",
       "💖",
-      "💗",
-      "💓"
+      "💗"
     ]
   },
-
   {
     type: "تحدي إيموجي",
     question: "أرسل إيموجي يعبر عن الضحك.",
@@ -397,7 +505,6 @@ const CHALLENGES = [
       "🤣"
     ]
   },
-
   {
     type: "تحدي إيموجي",
     question: "أرسل إيموجي يعبر عن الغضب.",
@@ -407,7 +514,6 @@ const CHALLENGES = [
       "🤬"
     ]
   },
-
   {
     type: "تحدي إيموجي",
     question: "أرسل إيموجي يعبر عن النوم.",
@@ -416,10 +522,27 @@ const CHALLENGES = [
       "💤"
     ]
   },
-
+  {
+    type: "تحدي إيموجي",
+    question: "أرسل إيموجي يعبر عن البرد.",
+    answers: [
+      "🥶",
+      "❄️",
+      "🧊"
+    ]
+  },
+  {
+    type: "تحدي إيموجي",
+    question: "أرسل إيموجي يعبر عن الحزن.",
+    answers: [
+      "😢",
+      "😭",
+      "☹️"
+    ]
+  },
 
   // =========================
-  // تجميع كلمات
+  // تجميع
   // =========================
 
   {
@@ -427,31 +550,36 @@ const CHALLENGES = [
     question: "جمّع الحروف: م - د - ر - س - ة",
     answers: ["مدرسة"]
   },
-
   {
     type: "تجميع",
     question: "جمّع الحروف: ك - ت - ا - ب",
     answers: ["كتاب"]
   },
-
   {
     type: "تجميع",
     question: "جمّع الحروف: ش - م - س",
     answers: ["شمس"]
   },
-
   {
     type: "تجميع",
     question: "جمّع الحروف: ق - م - ر",
     answers: ["قمر"]
   },
-
   {
     type: "تجميع",
     question: "جمّع الحروف: ب - ح - ر",
     answers: ["بحر"]
   },
-
+  {
+    type: "تجميع",
+    question: "جمّع الحروف: ن - ج - م",
+    answers: ["نجم"]
+  },
+  {
+    type: "تجميع",
+    question: "جمّع الحروف: س - ح - ا - ب",
+    answers: ["سحاب"]
+  },
 
   // =========================
   // تفكيك
@@ -466,7 +594,6 @@ const CHALLENGES = [
       "م د ر س ه"
     ]
   },
-
   {
     type: "تفكيك",
     question: "فكك كلمة: كتاب",
@@ -475,7 +602,6 @@ const CHALLENGES = [
       "ك-ت-ا-ب"
     ]
   },
-
   {
     type: "تفكيك",
     question: "فكك كلمة: قمر",
@@ -484,7 +610,22 @@ const CHALLENGES = [
       "ق-م-ر"
     ]
   },
-
+  {
+    type: "تفكيك",
+    question: "فكك كلمة: شمس",
+    answers: [
+      "ش م س",
+      "ش-م-س"
+    ]
+  },
+  {
+    type: "تفكيك",
+    question: "فكك كلمة: بحر",
+    answers: [
+      "ب ح ر",
+      "ب-ح-ر"
+    ]
+  },
 
   // =========================
   // معلومات عامة
@@ -495,50 +636,64 @@ const CHALLENGES = [
     question: "ما هو الكوكب الأحمر؟",
     answers: ["المريخ"]
   },
-
   {
     type: "معلومات عامة",
-    question: "ما هو الحيوان المعروف بسفينة الصحراء؟",
+    question: "ما الحيوان المعروف بسفينة الصحراء؟",
     answers: ["الجمل"]
   },
-
   {
     type: "معلومات عامة",
-    question: "ما هو أسرع حيوان بري؟",
+    question: "ما أسرع حيوان بري؟",
     answers: ["الفهد"]
   },
-
   {
     type: "معلومات عامة",
-    question: "ما هو أكبر حيوان على الأرض؟",
-    answers: ["الحوت الأزرق", "الحوت الازرق"]
+    question: "ما أكبر حيوان على الأرض؟",
+    answers: [
+      "الحوت الأزرق",
+      "الحوت الازرق"
+    ]
   },
-
   {
     type: "معلومات عامة",
-    question: "كم عدد أيام الأسبوع؟",
-    answers: ["7", "سبعة"]
+    question: "ما الغاز الذي يحتاجه الإنسان للتنفس؟",
+    answers: [
+      "الأكسجين",
+      "الاكسجين"
+    ]
+  },
+  {
+    type: "معلومات عامة",
+    question: "كم عدد ألوان قوس قزح؟",
+    answers: [
+      "7",
+      "سبعة"
+    ]
   }
 ];
 
-
 // ======================================================
-// جلب تحدي عشوائي
+// اختيار تحدي
 // ======================================================
 
-function getRandomChallenge(previous = null) {
+function getRandomChallenge(previousQuestion = null) {
+
+  // احتمال ظهور تحدي القلب
+  if (Math.random() < 0.25) {
+    return getHeartChallenge();
+  }
 
   let available =
     CHALLENGES.filter(
-      challenge =>
-        challenge.question !== previous
+      item =>
+        item.question !== previousQuestion
     );
 
   if (!available.length) {
     available = CHALLENGES;
   }
 
-  const challenge =
+  const item =
     available[
       Math.floor(
         Math.random() *
@@ -547,26 +702,26 @@ function getRandomChallenge(previous = null) {
     ];
 
   return {
-    type: challenge.type,
-    question: challenge.question,
-    answers: challenge.answers
+    type: item.type,
+    question: item.question,
+    answers: item.answers
   };
 }
 
-
 // ======================================================
-// اسم المستخدم
+// اسم العضو
 // ======================================================
 
 async function getName(api, id) {
-
   try {
 
     const info =
-      await api.getUserInfo(String(id));
+      await api.getUserInfo(
+        String(id)
+      );
 
     return (
-      info?.[id]?.name ||
+      info?.[String(id)]?.name ||
       "عضو"
     );
 
@@ -575,106 +730,54 @@ async function getName(api, id) {
   }
 }
 
-
 // ======================================================
 // ترتيب المشاركين
 // ======================================================
 
 function getSortedParticipants(eventData) {
 
-  return [...eventData.participants]
-    .sort(
-      (a, b) =>
-        (eventData.scores[b] || 0) -
-        (eventData.scores[a] || 0)
-    );
-}
-
-
-// ======================================================
-// إنشاء قائمة المشاركين
-// ======================================================
-
-async function buildParticipantsList(api, eventData) {
-
-  const sorted =
-    getSortedParticipants(eventData);
-
-  let list = "";
-
-  for (let i = 0; i < sorted.length; i++) {
-
-    const id = sorted[i];
-
-    const name =
-      await getName(api, id);
-
-    const score =
-      eventData.scores[id] || 0;
-
-    list +=
-      `❖- ${name} : ${score} نقطة\n`;
-  }
-
-  return list;
-}
-
-
-// ======================================================
-// قائمة الفعالية
-// ======================================================
-
-async function buildEventList(api, eventData) {
-
-  const list =
-    await buildParticipantsList(
-      api,
-      eventData
-    );
-
-  return (
-`فــعـالـيـة زنـجـوبة
-••••••••••••••••••••••••••
-
-${list}
-✹✹✹✹✹✹✹✹✹✹✹✹✹✹
-❇ الـحـكـم : زنجوبة ✪
-☯ نقاط الفوز : ${eventData.winPoints} ✪
-✳ نـوع الـفـعـالـيـة : متنوع ✪
-✹✹✹✹✹✹✹✹✹✹✹✹✹✹
-
-- الـمـركـز الـذهـبـي 🥇 : ${await getWinnerName(api, eventData, 0)}
-- الـمـركـز الـفـضـي 🥈 : ${await getWinnerName(api, eventData, 1)}
-- الـمـركـز الـبـرونـزي 🥉 : ${await getWinnerName(api, eventData, 2)}`
+  return [
+    ...eventData.participants
+  ].sort(
+    (a, b) =>
+      (eventData.scores[b] || 0) -
+      (eventData.scores[a] || 0)
   );
 }
 
-
 // ======================================================
-// أسماء المراكز الحالية
+// اسم المركز
 // ======================================================
 
-async function getWinnerName(api, eventData, index) {
+async function getWinnerName(
+  api,
+  eventData,
+  index
+) {
 
   const sorted =
-    getSortedParticipants(eventData);
+    getSortedParticipants(
+      eventData
+    );
 
   if (!sorted[index]) {
     return "";
   }
 
-  return await getName(
+  return getName(
     api,
     sorted[index]
   );
 }
 
-
 // ======================================================
-// حذف رسالة
+// حذف رسالة بأمان
 // ======================================================
 
-async function deleteMessage(api, messageID) {
+async function deleteMessage(
+  api,
+  messageID
+) {
 
   if (!messageID) {
     return;
@@ -682,41 +785,165 @@ async function deleteMessage(api, messageID) {
 
   try {
     await api.unsendMessage(
-      messageID
+      String(messageID)
     );
   } catch (e) {}
 }
 
-
 // ======================================================
-// حذف قائمة قديمة وسؤال قديم
+// إزالة Reply الخاص بالفعالية
 // ======================================================
 
-async function deleteOldMessages(api, eventData) {
+function removeEventReply(threadID) {
 
-  await deleteMessage(
-    api,
-    eventData.currentListMessageID
-  );
+  if (!global.client.handleReply) {
+    return;
+  }
 
-  await deleteMessage(
-    api,
-    eventData.currentQuestionMessageID
-  );
+  global.client.handleReply =
+    global.client.handleReply.filter(
+      item => {
 
-  await deleteMessage(
-    api,
-    eventData.currentPreviewMessageID
-  );
-
-  eventData.currentListMessageID = null;
-  eventData.currentQuestionMessageID = null;
-  eventData.currentPreviewMessageID = null;
+        return !(
+          item.name === "فعالية" &&
+          item.type === "eventQuestion" &&
+          String(item.threadID) ===
+            String(threadID)
+        );
+      }
+    );
 }
 
+// ======================================================
+// تسجيل Reply
+// ======================================================
+
+function registerQuestionReply(
+  eventData,
+  threadID
+) {
+
+  if (!global.client.handleReply) {
+    global.client.handleReply = [];
+  }
+
+  removeEventReply(threadID);
+
+  global.client.handleReply.push({
+
+    name: "فعالية",
+
+    type: "eventQuestion",
+
+    threadID:
+      String(threadID),
+
+    messageID:
+      String(
+        eventData.currentQuestionMessageID
+      ),
+
+    roundToken:
+      String(
+        eventData.roundToken
+      )
+  });
+}
 
 // ======================================================
-// إرسال قائمة المشاركين
+// قائمة المشاركين
+// ======================================================
+
+async function buildParticipants(
+  api,
+  eventData
+) {
+
+  const sorted =
+    getSortedParticipants(
+      eventData
+    );
+
+  let result = "";
+
+  for (
+    let i = 0;
+    i < sorted.length;
+    i++
+  ) {
+
+    const id = sorted[i];
+
+    const name =
+      await getName(
+        api,
+        id
+      );
+
+    const score =
+      eventData.scores[id] || 0;
+
+    result +=
+      `❖- ${name} : ${score} نقطة\n`;
+  }
+
+  return result;
+}
+
+// ======================================================
+// قائمة الفعالية
+// ======================================================
+
+async function buildEventList(
+  api,
+  eventData
+) {
+
+  const participants =
+    await buildParticipants(
+      api,
+      eventData
+    );
+
+  const first =
+    await getWinnerName(
+      api,
+      eventData,
+      0
+    );
+
+  const second =
+    await getWinnerName(
+      api,
+      eventData,
+      1
+    );
+
+  const third =
+    await getWinnerName(
+      api,
+      eventData,
+      2
+    );
+
+  return `فــعـالـيـة زنـجـوبة
+••••••••••••••••••••••••••
+
+${participants}
+
+✹✹✹✹✹✹✹✹✹✹✹✹✹✹
+❇ الـحـكـم : زنجوبة ✪
+☯ نقاط الفوز : ${eventData.winPoints} ✪
+✳ نـوع الـفـعـالـيـة : متنوع ✪
+✹✹✹✹✹✹✹✹✹✹✹✹✹✹
+
+- الـمـركـز الـذهـبـي 🥇 : ${first}
+- الـمـركـز الـفـضـي 🥈 : ${second}
+- الـمـركـز الـبـرونـزي 🥉 : ${third}`;
+}
+
+// ======================================================
+// إرسال القائمة
 // ======================================================
 
 async function sendParticipantsList(
@@ -725,7 +952,7 @@ async function sendParticipantsList(
   eventData
 ) {
 
-  const message =
+  const text =
     await buildEventList(
       api,
       eventData
@@ -734,7 +961,7 @@ async function sendParticipantsList(
   return new Promise(resolve => {
 
     api.sendMessage(
-      message,
+      text,
       threadID,
       (err, info) => {
 
@@ -744,20 +971,46 @@ async function sendParticipantsList(
         ) {
 
           eventData.currentListMessageID =
-            String(info.messageID);
-
+            String(
+              info.messageID
+            );
         }
 
         resolve(info);
       }
     );
-
   });
 }
 
+// ======================================================
+// تنظيف المؤقتات
+// ======================================================
+
+function clearEventTimers(
+  eventData
+) {
+
+  if (eventData.timeoutID) {
+
+    clearTimeout(
+      eventData.timeoutID
+    );
+
+    eventData.timeoutID = null;
+  }
+
+  if (eventData.nextTimer) {
+
+    clearTimeout(
+      eventData.nextTimer
+    );
+
+    eventData.nextTimer = null;
+  }
+}
 
 // ======================================================
-// إرسال التحدي بعد 3 ثوانٍ
+// جدولة الجولة القادمة
 // ======================================================
 
 function scheduleNextChallenge(
@@ -767,14 +1020,20 @@ function scheduleNextChallenge(
   data
 ) {
 
-  if (!eventData.active) {
+  if (
+    !eventData.active ||
+    !eventData.started
+  ) {
     return;
   }
 
   if (eventData.nextTimer) {
+
     clearTimeout(
       eventData.nextTimer
     );
+
+    eventData.nextTimer = null;
   }
 
   eventData.nextTimer =
@@ -798,13 +1057,12 @@ function scheduleNextChallenge(
         );
 
       },
-      3000
+      NEXT_ROUND_DELAY
     );
 }
 
-
 // ======================================================
-// إرسال التحدي
+// إرسال تحدي
 // ======================================================
 
 async function sendChallenge(
@@ -821,6 +1079,24 @@ async function sendChallenge(
     return;
   }
 
+  if (eventData.processingRound) {
+    return;
+  }
+
+  eventData.processingRound = true;
+
+  removeEventReply(threadID);
+
+  eventData.currentQuestionMessageID =
+    null;
+
+  eventData.currentPreviewMessageID =
+    null;
+
+  eventData.answered = false;
+
+  eventData.waitingForAnswer = false;
+
   eventData.round++;
 
   const challenge =
@@ -831,25 +1107,24 @@ async function sendChallenge(
   eventData.currentChallenge =
     challenge;
 
-  eventData.answered = false;
-
-  eventData.questionStartedAt =
-    Date.now();
+  eventData.roundToken =
+    String(Date.now()) +
+    "_" +
+    Math.random();
 
   saveData(data);
 
-
-  // ----------------------------------------------------
-  // رسالة الإعلان عن التحدي
-  // ----------------------------------------------------
+  // ====================================================
+  // إعلان نوع التحدي
+  // ====================================================
 
   const preview =
-`فــعـالـيـة زنـجـوبة
+    `فــعـالـيـة زنـجـوبة
 
 ✳ التحدي القادم
 🎮 النوع : ${challenge.type}
 
-⏳ سيظهر السؤال بعد 3 ثوانٍ...`;
+⏳ السؤال سيظهر بعد 3 ثوانٍ...`;
 
   await new Promise(resolve => {
 
@@ -864,39 +1139,35 @@ async function sendChallenge(
         ) {
 
           eventData.currentPreviewMessageID =
-            String(info.messageID);
-
+            String(
+              info.messageID
+            );
         }
 
         resolve();
       }
     );
-
   });
-
-
-  // ----------------------------------------------------
-  // الانتظار 3 ثوانٍ
-  // ----------------------------------------------------
 
   await new Promise(
     resolve =>
-      setTimeout(resolve, 3000)
+      setTimeout(
+        resolve,
+        PREVIEW_TIME
+      )
   );
-
 
   if (
     !eventData.active ||
     !eventData.started ||
     eventData.answered
   ) {
+
+    eventData.processingRound =
+      false;
+
     return;
   }
-
-
-  // ----------------------------------------------------
-  // حذف الإعلان فقط
-  // ----------------------------------------------------
 
   await deleteMessage(
     api,
@@ -906,13 +1177,12 @@ async function sendChallenge(
   eventData.currentPreviewMessageID =
     null;
 
+  // ====================================================
+  // نص السؤال
+  // ====================================================
 
-  // ----------------------------------------------------
-  // إرسال السؤال
-  // ----------------------------------------------------
-
-  const questionMessage =
-`فــعـالـيـة زنـجـوبة
+  let questionText =
+    `فــعـالـيـة زنـجـوبة
 
 ━━━━━━━━━━━━━━
 🎮 النوع : ${challenge.type}
@@ -921,13 +1191,39 @@ async function sendChallenge(
 
 ❖ ${challenge.question}
 
-⏳ لديك 10 ثوانٍ للإجابة
+⏳ لديك 15 ثانية للإجابة
 ↩️ يجب الرد على هذه الرسالة`;
+
+  // إظهار الإيموجي المطلوب بشكل أوضح
+  if (
+    challenge.type === "جلب قلب"
+  ) {
+
+    questionText =
+      `فــعـالـيـة زنـجـوبة
+
+━━━━━━━━━━━━━━
+💗 تـحـدي جـلـب الـقـلـب
+📊 الجولة : ${eventData.round}
+━━━━━━━━━━━━━━
+
+🎯 اللون المطلوب:
+${challenge.targetColor}
+
+❖ أرسل القلب باللون المطلوب فقط
+
+⏳ لديك 15 ثانية
+↩️ يجب الرد على هذه الرسالة`;
+  }
+
+  // ====================================================
+  // إرسال السؤال
+  // ====================================================
 
   await new Promise(resolve => {
 
     api.sendMessage(
-      questionMessage,
+      questionText,
       threadID,
       (err, info) => {
 
@@ -937,113 +1233,124 @@ async function sendChallenge(
         ) {
 
           eventData.currentQuestionMessageID =
-            String(info.messageID);
+            String(
+              info.messageID
+            );
+
+          eventData.waitingForAnswer =
+            true;
 
           registerQuestionReply(
-            api,
             eventData,
             threadID
           );
-
         }
 
         resolve();
       }
     );
-
   });
+
+  eventData.processingRound =
+    false;
 
   saveData(data);
 
-
-  // ----------------------------------------------------
-  // مؤقت 10 ثوانٍ
-  // ----------------------------------------------------
+  // ====================================================
+  // مؤقت 15 ثانية
+  // ====================================================
 
   if (eventData.timeoutID) {
 
     clearTimeout(
       eventData.timeoutID
     );
+
+    eventData.timeoutID = null;
   }
+
+  const roundToken =
+    String(
+      eventData.roundToken
+    );
 
   eventData.timeoutID =
     setTimeout(
       async () => {
 
+        const currentData =
+          loadData();
+
+        const currentEvent =
+          currentData[
+            String(threadID)
+          ];
+
         if (
-          !eventData.active ||
-          eventData.answered
+          !currentEvent ||
+          !currentEvent.active ||
+          !currentEvent.started ||
+          String(
+            currentEvent.roundToken
+          ) !== roundToken
         ) {
           return;
         }
 
-        eventData.answered = true;
+        if (
+          currentEvent.answered === true
+        ) {
+          return;
+        }
+
+        currentEvent.answered = true;
+
+        currentEvent.waitingForAnswer =
+          false;
+
+        clearEventTimers(
+          currentEvent
+        );
+
+        removeEventReply(
+          threadID
+        );
 
         await deleteMessage(
           api,
-          eventData.currentQuestionMessageID
+          currentEvent.currentQuestionMessageID
         );
 
-        eventData.currentQuestionMessageID =
+        currentEvent.currentQuestionMessageID =
           null;
 
-        saveData(data);
+        saveData(currentData);
 
-        scheduleNextChallenge(
-          api,
-          threadID,
-          eventData,
-          data
-        );
+        if (
+          currentEvent.active &&
+          currentEvent.started
+        ) {
+
+          await sendParticipantsList(
+            api,
+            threadID,
+            currentEvent
+          );
+
+          saveData(currentData);
+
+          scheduleNextChallenge(
+            api,
+            threadID,
+            currentEvent,
+            currentData
+          );
+        }
 
       },
-      10000
+      ANSWER_TIME
     );
 }
-
-
-// ======================================================
-// تسجيل handleReply للسؤال
-// ======================================================
-
-function registerQuestionReply(
-  api,
-  eventData,
-  threadID
-) {
-
-  if (!global.client.handleReply) {
-    global.client.handleReply = [];
-  }
-
-  global.client.handleReply =
-    global.client.handleReply.filter(
-      item =>
-        item.name !== "فعالية"
-    );
-
-
-  global.client.handleReply.push({
-
-    name: "فعالية",
-
-    messageID:
-      eventData.currentQuestionMessageID,
-
-    author: null,
-
-    threadID: threadID,
-
-    type: "eventQuestion",
-
-    challenge:
-      eventData.currentChallenge,
-
-    eventData: eventData
-  });
-}
-
 
 // ======================================================
 // إنهاء الفعالية
@@ -1062,29 +1369,20 @@ async function finishEvent(
 
   eventData.active = false;
   eventData.started = false;
+
   eventData.answered = true;
 
+  eventData.waitingForAnswer =
+    false;
 
-  if (eventData.timeoutID) {
+  clearEventTimers(
+    eventData
+  );
 
-    clearTimeout(
-      eventData.timeoutID
-    );
+  removeEventReply(
+    threadID
+  );
 
-    eventData.timeoutID = null;
-  }
-
-  if (eventData.nextTimer) {
-
-    clearTimeout(
-      eventData.nextTimer
-    );
-
-    eventData.nextTimer = null;
-  }
-
-
-  // حذف السؤال والإعلان فقط
   await deleteMessage(
     api,
     eventData.currentQuestionMessageID
@@ -1095,26 +1393,24 @@ async function finishEvent(
     eventData.currentPreviewMessageID
   );
 
-
-  // القائمة القديمة لن تبقى
-  // سيتم استبدالها بالقائمة النهائية
-
   await deleteMessage(
     api,
     eventData.currentListMessageID
   );
 
+  eventData.currentQuestionMessageID =
+    null;
 
-  eventData.currentQuestionMessageID = null;
-  eventData.currentPreviewMessageID = null;
-  eventData.currentListMessageID = null;
+  eventData.currentPreviewMessageID =
+    null;
 
+  eventData.currentListMessageID =
+    null;
 
   const sorted =
     getSortedParticipants(
       eventData
     );
-
 
   let finalList = "";
 
@@ -1124,10 +1420,14 @@ async function finishEvent(
     i++
   ) {
 
-    const id = sorted[i];
+    const id =
+      sorted[i];
 
     const name =
-      await getName(api, id);
+      await getName(
+        api,
+        id
+      );
 
     const score =
       eventData.scores[id] || 0;
@@ -1136,22 +1436,29 @@ async function finishEvent(
       `${i + 1}. ${name} — ${score} نقطة\n`;
   }
 
-
   const first =
     sorted[0]
-      ? await getName(api, sorted[0])
+      ? await getName(
+          api,
+          sorted[0]
+        )
       : "لا يوجد";
 
   const second =
     sorted[1]
-      ? await getName(api, sorted[1])
+      ? await getName(
+          api,
+          sorted[1]
+        )
       : "لا يوجد";
 
   const third =
     sorted[2]
-      ? await getName(api, sorted[2])
+      ? await getName(
+          api,
+          sorted[2]
+        )
       : "لا يوجد";
-
 
   const finalMessage =
 `فــعـالـيـة زنـجـوبة
@@ -1160,6 +1467,7 @@ async function finishEvent(
 📊 الـنـتـائـج الـنـهـائـيـة
 
 ${finalList}
+
 ✹✹✹✹✹✹✹✹✹✹✹✹✹✹
 ❇ الـحـكـم : زنجوبة ✪
 ☯ نقاط الفوز : ${eventData.winPoints} ✪
@@ -1171,11 +1479,6 @@ ${finalList}
 - الـمـركـز الـبـرونـزي 🥉 : ${third}
 
 🏆 انتهت الفعالية!`;
-
-
-  // ----------------------------------------------------
-  // القائمة النهائية لا يتم حذفها
-  // ----------------------------------------------------
 
   await new Promise(resolve => {
 
@@ -1190,38 +1493,25 @@ ${finalList}
         ) {
 
           eventData.currentListMessageID =
-            String(info.messageID);
+            String(
+              info.messageID
+            );
         }
 
         resolve();
       }
     );
-
   });
 
-
   saveData(data);
-
-
-  // تنظيف handleReply الخاص بهذه الفعالية
-
-  if (global.client.handleReply) {
-
-    global.client.handleReply =
-      global.client.handleReply.filter(
-        item =>
-          item.threadID !== threadID ||
-          item.type !== "eventQuestion"
-      );
-  }
 }
 
-
 // ======================================================
-// handleReply
+// HANDLE REPLY
 // ======================================================
 
-module.exports.handleReply = async function ({
+module.exports.handleReply =
+async function ({
   api,
   event,
   handleReply
@@ -1232,49 +1522,39 @@ module.exports.handleReply = async function ({
     const {
       body = "",
       threadID,
-      senderID,
-      messageID
+      senderID
     } = event;
 
-
-    // ----------------------------------------------
-    // يجب أن يكون الرد على السؤال نفسه
-    // ----------------------------------------------
-
     if (
+      !handleReply ||
+      handleReply.name !== "فعالية" ||
       handleReply.type !== "eventQuestion"
     ) {
       return;
     }
 
-
-    if (
-      String(messageID) ===
-      String(handleReply.messageID)
-    ) {
-      return;
-    }
-
-
     const replyTo =
       event.messageReply?.messageID;
 
+    if (!replyTo) {
+      return;
+    }
 
     if (
-      !replyTo ||
       String(replyTo) !==
       String(handleReply.messageID)
     ) {
       return;
     }
 
-
     const data =
       loadData();
 
-    const eventData =
-      data[threadID];
+    const id =
+      String(threadID);
 
+    const eventData =
+      data[id];
 
     if (
       !eventData ||
@@ -1284,34 +1564,45 @@ module.exports.handleReply = async function ({
       return;
     }
 
-
-    // ----------------------------------------------
-    // منع صاحب السؤال من الإجابة بعد انتهاء الوقت
-    // ----------------------------------------------
-
     if (
-      eventData.answered
-    ) {
-      return;
-    }
-
-
-    // ----------------------------------------------
-    // يجب أن يكون من المشاركين
-    // ----------------------------------------------
-
-    if (
-      !eventData.participants.includes(
-        String(senderID)
+      String(
+        eventData.currentQuestionMessageID
+      ) !==
+      String(
+        handleReply.messageID
       )
     ) {
       return;
     }
 
+    if (
+      String(
+        eventData.roundToken
+      ) !==
+      String(
+        handleReply.roundToken
+      )
+    ) {
+      return;
+    }
 
-    // ----------------------------------------------
-    // التحقق من الإجابة
-    // ----------------------------------------------
+    if (
+      eventData.answered ||
+      !eventData.waitingForAnswer
+    ) {
+      return;
+    }
+
+    const userID =
+      String(senderID);
+
+    if (
+      !eventData.participants.includes(
+        userID
+      )
+    ) {
+      return;
+    }
 
     const challenge =
       eventData.currentChallenge;
@@ -1320,50 +1611,48 @@ module.exports.handleReply = async function ({
       return;
     }
 
-
     const correct =
       checkAnswer(
         body,
         challenge.answers
       );
 
-
     if (!correct) {
       return;
     }
 
-
-    // ----------------------------------------------
-    // قفل السؤال فوراً
-    // ----------------------------------------------
+    // ==================================================
+    // قفل الجولة فورًا
+    // ==================================================
 
     eventData.answered = true;
 
+    eventData.waitingForAnswer =
+      false;
 
-    if (eventData.timeoutID) {
+    clearEventTimers(
+      eventData
+    );
 
-      clearTimeout(
-        eventData.timeoutID
-      );
+    removeEventReply(
+      threadID
+    );
 
-      eventData.timeoutID = null;
-    }
-
-
-    // ----------------------------------------------
+    // ==================================================
     // إضافة النقطة
-    // ----------------------------------------------
+    // ==================================================
 
-    const id =
-      String(senderID);
+    eventData.scores[userID] =
+      (
+        eventData.scores[userID] ||
+        0
+      ) + 1;
 
-    eventData.scores[id] =
-      (eventData.scores[id] || 0) + 1;
+    saveData(data);
 
-
-    // ----------------------------------------------
-    // حذف السؤال والقائمة القديمة
-    // ----------------------------------------------
+    // ==================================================
+    // حذف السؤال والقائمة
+    // ==================================================
 
     await deleteMessage(
       api,
@@ -1375,26 +1664,20 @@ module.exports.handleReply = async function ({
       eventData.currentListMessageID
     );
 
-    await deleteMessage(
-      api,
-      eventData.currentPreviewMessageID
-    );
+    eventData.currentQuestionMessageID =
+      null;
 
-
-    eventData.currentQuestionMessageID = null;
-    eventData.currentListMessageID = null;
-    eventData.currentPreviewMessageID = null;
-
+    eventData.currentListMessageID =
+      null;
 
     saveData(data);
 
-
-    // ----------------------------------------------
-    // هل وصل إلى نقاط الفوز؟
-    // ----------------------------------------------
+    // ==================================================
+    // تحقق من الفوز
+    // ==================================================
 
     if (
-      eventData.scores[id] >=
+      eventData.scores[userID] >=
       eventData.winPoints
     ) {
 
@@ -1408,10 +1691,9 @@ module.exports.handleReply = async function ({
       return;
     }
 
-
-    // ----------------------------------------------
-    // القائمة الجديدة
-    // ----------------------------------------------
+    // ==================================================
+    // قائمة جديدة
+    // ==================================================
 
     await sendParticipantsList(
       api,
@@ -1419,13 +1701,11 @@ module.exports.handleReply = async function ({
       eventData
     );
 
-
     saveData(data);
 
-
-    // ----------------------------------------------
-    // إعلان التحدي القادم بعد 3 ثوانٍ
-    // ----------------------------------------------
+    // ==================================================
+    // تحدي جديد
+    // ==================================================
 
     scheduleNextChallenge(
       api,
@@ -1437,18 +1717,18 @@ module.exports.handleReply = async function ({
   } catch (error) {
 
     console.error(
-      "❌ ZANJOUBA EVENT REPLY ERROR:",
+      "❌ ZANJOUBA EVENT HANDLE REPLY ERROR:",
       error
     );
   }
 };
 
-
 // ======================================================
-// الأمر الرئيسي
+// RUN
 // ======================================================
 
-module.exports.run = async function ({
+module.exports.run =
+async function ({
   api,
   event,
   args
@@ -1460,18 +1740,14 @@ module.exports.run = async function ({
     senderID
   } = event;
 
+  const id =
+    String(threadID);
 
   const data =
     loadData();
 
-
-  const id =
-    String(threadID);
-
-
   let eventData =
     data[id];
-
 
   const action =
     String(
@@ -1480,9 +1756,8 @@ module.exports.run = async function ({
       .trim()
       .toLowerCase();
 
-
   // ====================================================
-  // إنشاء فعالية
+  // إنشاء
   // ====================================================
 
   if (
@@ -1494,9 +1769,10 @@ module.exports.run = async function ({
     const winPoints =
       Number(args?.[1]);
 
-
     if (
-      !Number.isInteger(winPoints) ||
+      !Number.isInteger(
+        winPoints
+      ) ||
       winPoints <= 0
     ) {
 
@@ -1514,7 +1790,6 @@ module.exports.run = async function ({
       );
     }
 
-
     if (
       eventData?.active
     ) {
@@ -1531,27 +1806,22 @@ module.exports.run = async function ({
       );
     }
 
-
     eventData =
       createEvent(
         senderID,
         winPoints
       );
 
-
     data[id] =
       eventData;
 
-
     saveData(data);
-
 
     const creatorName =
       await getName(
         api,
         senderID
       );
-
 
     return api.sendMessage(
 `فــعـالـيـة زنـجـوبة
@@ -1576,9 +1846,8 @@ module.exports.run = async function ({
     );
   }
 
-
   // ====================================================
-  // التحقق من وجود فعالية
+  // لا توجد فعالية
   // ====================================================
 
   if (!eventData?.active) {
@@ -1595,7 +1864,6 @@ module.exports.run = async function ({
     );
   }
 
-
   // ====================================================
   // الانضمام
   // ====================================================
@@ -1609,16 +1877,16 @@ module.exports.run = async function ({
     if (eventData.started) {
 
       return api.sendMessage(
-        `فــعـالـيـة زنـجـوبة\n\n⚠️ الفعالية بدأت بالفعل.`,
+`فــعـالـيـة زنـجـوبة
+
+⚠️ الفعالية بدأت بالفعل.`,
         threadID,
         messageID
       );
     }
 
-
     const userID =
       String(senderID);
-
 
     if (
       eventData.participants.includes(
@@ -1627,12 +1895,13 @@ module.exports.run = async function ({
     ) {
 
       return api.sendMessage(
-        `فــعـالـيـة زنـجـوبة\n\n⚠️ أنت مشترك بالفعل.`,
+`فــعـالـيـة زنـجـوبة
+
+⚠️ أنت مشترك بالفعل.`,
         threadID,
         messageID
       );
     }
-
 
     eventData.participants.push(
       userID
@@ -1641,16 +1910,13 @@ module.exports.run = async function ({
     eventData.scores[userID] =
       0;
 
-
     saveData(data);
-
 
     const name =
       await getName(
         api,
         userID
       );
-
 
     return api.sendMessage(
 `فــعـالـيـة زنـجـوبة
@@ -1660,16 +1926,15 @@ module.exports.run = async function ({
 👥 عدد المشاركين:
 ${eventData.participants.length}
 
-🏁 عندما يصبح الجميع جاهزاً:
+🏁 عندما يصبح الجميع جاهزًا:
 فعالية بدء`,
       threadID,
       messageID
     );
   }
 
-
   // ====================================================
-  // البدء
+  // بدء
   // ====================================================
 
   if (
@@ -1684,22 +1949,24 @@ ${eventData.participants.length}
     ) {
 
       return api.sendMessage(
-        `فــعـالـيـة زنـجـوبة\n\n⛔ المنشئ فقط يستطيع بدء الفعالية.`,
+`فــعـالـيـة زنـجـوبة
+
+⛔ المنشئ فقط يستطيع بدء الفعالية.`,
         threadID,
         messageID
       );
     }
-
 
     if (eventData.started) {
 
       return api.sendMessage(
-        `فــعـالـيـة زنـجـوبة\n\n⚠️ الفعالية بدأت بالفعل.`,
+`فــعـالـيـة زنـجـوبة
+
+⚠️ الفعالية بدأت بالفعل.`,
         threadID,
         messageID
       );
     }
-
 
     if (
       eventData.participants.length <
@@ -1707,24 +1974,41 @@ ${eventData.participants.length}
     ) {
 
       return api.sendMessage(
-        `فــعـالـيـة زنـجـوبة\n\n⚠️ لا يوجد مشاركون.\n\nيجب على الأعضاء استخدام:\nفعالية انضمام`,
+`فــعـالـيـة زنـجـوبة
+
+⚠️ لا يوجد مشاركون.
+
+يجب على الأعضاء استخدام:
+فعالية انضمام`,
         threadID,
         messageID
       );
     }
 
+    clearEventTimers(
+      eventData
+    );
 
-    eventData.started = true;
-    eventData.round = 0;
-    eventData.answered = false;
+    removeEventReply(
+      threadID
+    );
 
+    eventData.started =
+      true;
+
+    eventData.round =
+      0;
+
+    eventData.answered =
+      false;
+
+    eventData.waitingForAnswer =
+      false;
+
+    eventData.processingRound =
+      false;
 
     saveData(data);
-
-
-    // ----------------------------------------------
-    // إرسال قائمة المشاركين أولاً
-    // ----------------------------------------------
 
     await sendParticipantsList(
       api,
@@ -1732,13 +2016,7 @@ ${eventData.participants.length}
       eventData
     );
 
-
     saveData(data);
-
-
-    // ----------------------------------------------
-    // بعدها التحدي بعد 3 ثوانٍ
-    // ----------------------------------------------
 
     scheduleNextChallenge(
       api,
@@ -1747,13 +2025,11 @@ ${eventData.participants.length}
       data
     );
 
-
     return;
   }
 
-
   // ====================================================
-  // إنهاء يدوي
+  // إنهاء
   // ====================================================
 
   if (
@@ -1768,12 +2044,13 @@ ${eventData.participants.length}
     ) {
 
       return api.sendMessage(
-        `فــعـالـيـة زنـجـوبة\n\n⛔ المنشئ فقط يستطيع إنهاء الفعالية.`,
+`فــعـالـيـة زنـجـوبة
+
+⛔ المنشئ فقط يستطيع إنهاء الفعالية.`,
         threadID,
         messageID
       );
     }
-
 
     return finishEvent(
       api,
@@ -1782,7 +2059,6 @@ ${eventData.participants.length}
       data
     );
   }
-
 
   // ====================================================
   // الحالة
@@ -1799,14 +2075,12 @@ ${eventData.participants.length}
         eventData
       );
 
-
     return api.sendMessage(
       message,
       threadID,
       messageID
     );
   }
-
 
   // ====================================================
   // أمر غير معروف
