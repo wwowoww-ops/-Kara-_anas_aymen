@@ -1,9 +1,12 @@
 const fs = require("fs");
-const path = "./data/protection.json";
+const path = require("path");
+
+const DATA_DIR = path.join(process.cwd(), "data");
+const DATA_FILE = path.join(DATA_DIR, "protection.json");
 
 module.exports.config = {
   name: "حماية",
-  version: "1.0.0",
+  version: "2.0.0",
   hasPermssion: 1,
   credits: "أبو هريرة",
   description: "نظام حماية متكامل للمجموعة",
@@ -12,184 +15,585 @@ module.exports.config = {
   cooldowns: 5
 };
 
-module.exports.run = async function({ api, event, args }) {
-  const { threadID, messageID, senderID } = event;
+// ==================================================
+// إنشاء ملف البيانات
+// ==================================================
 
-  // التحقق من صلاحية الأدمن
-  const threadInfo = await api.getThreadInfo(threadID);
-  const isAdmin = threadInfo.adminIDs.some(admin => admin.id === senderID);
-  if (!isAdmin) {
+function ensureDataFile() {
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+
+    if (!fs.existsSync(DATA_FILE)) {
+      fs.writeFileSync(
+        DATA_FILE,
+        JSON.stringify({}, null, 2),
+        "utf8"
+      );
+    }
+  } catch (error) {
+    console.error(
+      "❌ HINA PROTECTION DATA ERROR:",
+      error
+    );
+  }
+}
+
+// ==================================================
+// قراءة البيانات
+// ==================================================
+
+function readData() {
+  ensureDataFile();
+
+  try {
+    const data = fs.readFileSync(
+      DATA_FILE,
+      "utf8"
+    );
+
+    if (!data.trim()) {
+      return {};
+    }
+
+    return JSON.parse(data);
+  } catch (error) {
+    console.error(
+      "❌ HINA PROTECTION READ ERROR:",
+      error
+    );
+
+    return {};
+  }
+}
+
+// ==================================================
+// حفظ البيانات
+// ==================================================
+
+function saveData(data) {
+  ensureDataFile();
+
+  try {
+    fs.writeFileSync(
+      DATA_FILE,
+      JSON.stringify(data, null, 2),
+      "utf8"
+    );
+
+    return true;
+  } catch (error) {
+    console.error(
+      "❌ HINA PROTECTION SAVE ERROR:",
+      error
+    );
+
+    return false;
+  }
+}
+
+// ==================================================
+// إعداد مجموعة جديدة
+// ==================================================
+
+function createDefaultSettings() {
+  return {
+    enabled: false,
+
+    settings: {
+      nicknames: false,
+      addMember: false,
+      groupName: false,
+      groupImage: false,
+      theme: false,
+      emoji: false
+    }
+  };
+}
+
+function getThreadSettings(data, threadID) {
+  if (!data[threadID]) {
+    data[threadID] =
+      createDefaultSettings();
+  }
+
+  if (!data[threadID].settings) {
+    data[threadID].settings = {};
+  }
+
+  const defaults =
+    createDefaultSettings().settings;
+
+  for (const key of Object.keys(defaults)) {
+    if (
+      typeof data[threadID].settings[key] !==
+      "boolean"
+    ) {
+      data[threadID].settings[key] =
+        defaults[key];
+    }
+  }
+
+  if (
+    typeof data[threadID].enabled !==
+    "boolean"
+  ) {
+    data[threadID].enabled = false;
+  }
+
+  return data[threadID];
+}
+
+// ==================================================
+// التحقق من أدمن المجموعة
+// ==================================================
+
+async function isGroupAdmin(api, threadID, senderID) {
+  try {
+    const threadInfo =
+      await api.getThreadInfo(threadID);
+
+    if (
+      !threadInfo ||
+      !Array.isArray(threadInfo.adminIDs)
+    ) {
+      return false;
+    }
+
+    return threadInfo.adminIDs.some(
+      admin =>
+        String(admin.id) ===
+        String(senderID)
+    );
+
+  } catch (error) {
+    console.error(
+      "❌ HINA ADMIN CHECK ERROR:",
+      error
+    );
+
+    return false;
+  }
+}
+
+// ==================================================
+// القائمة
+// ==================================================
+
+function createMenu(settings) {
+  const status =
+    settings.enabled
+      ? "✅ مـفـعـل"
+      : "❌ مـعـطـل";
+
+  const getStatus = key =>
+    settings.settings[key]
+      ? "✅"
+      : "❌";
+
+  return `
+⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬
+
+🛡️ نـظـام حـمـايـة الـمـجـمـوعـة
+
+📋 اخـتـار رقـم الإعـداد:
+
+1 ≻ 🔒 الحماية الكلية ${status}
+2 ≻ 🏷️ حماية الكنيات ${getStatus("nicknames")}
+3 ≻ ➕ حماية إضافة الأعضاء ${getStatus("addMember")}
+4 ≻ 📛 حماية اسم المجموعة ${getStatus("groupName")}
+5 ≻ 🖼️ حماية صورة المجموعة ${getStatus("groupImage")}
+6 ≻ 🎨 حماية السمة ${getStatus("theme")}
+7 ≻ 😊 حماية الإيموجي ${getStatus("emoji")}
+
+━━━━━━━━━━━━━━━━━━
+
+📝 أرسل رقمًا من 1 إلى 7
+❌ للإلغاء أرسل: خروج
+
+⌬ ━━━━━━━━━━━━ ⌬
+`;
+}
+
+// ==================================================
+// RUN
+// ==================================================
+
+module.exports.run = async function({
+  api,
+  event
+}) {
+
+  const {
+    threadID,
+    messageID,
+    senderID
+  } = event;
+
+  try {
+
+    // التحقق من الأدمن
+    const admin =
+      await isGroupAdmin(
+        api,
+        threadID,
+        senderID
+      );
+
+    if (!admin) {
+      return api.sendMessage(
+`⌬ ━━ 𝗛𝗜𝗡𝗔 ADMIN ━━ ⌬
+
+🥺 مـامـي مـا سـمـحـتـلـك تـغـيـر شـي يـا قـلـبـي
+
+⛔ هـذا الأمـر لـلأدمـن فـقـط
+
+⌬ ━━━━━━━━━━━━ ⌬`,
+        threadID,
+        messageID
+      );
+    }
+
+    const data =
+      readData();
+
+    const settings =
+      getThreadSettings(
+        data,
+        threadID
+      );
+
+    saveData(data);
+
+    const menu =
+      createMenu(settings);
+
+    // إرسال القائمة أولًا
     return api.sendMessage(
-      `🥺 مامي ما سمحتلك تغير شيء ي قلبي 💕\nهذا الأمر للأدمن فقط!`,
+      menu,
+      threadID,
+      (err, info) => {
+
+        if (err) {
+          console.error(
+            "❌ HINA PROTECTION MENU ERROR:",
+            err
+          );
+          return;
+        }
+
+        if (!info || !info.messageID) {
+          return;
+        }
+
+        // تسجيل الرد على رسالة القائمة
+        if (!global.client.handleReply) {
+          global.client.handleReply = [];
+        }
+
+        global.client.handleReply.push({
+          name:
+            module.exports.config.name,
+
+          messageID:
+            info.messageID,
+
+          author:
+            String(senderID),
+
+          threadID:
+            String(threadID),
+
+          type: "protection_menu"
+        });
+
+      },
+      messageID
+    );
+
+  } catch (error) {
+
+    console.error(
+      "❌ HINA PROTECTION ERROR:",
+      error
+    );
+
+    return api.sendMessage(
+`⌬ ━━ 𝗛𝗜𝗡𝗔 ADMIN ━━ ⌬
+
+❌ حـدث خـطـأ أثـنـاء تـشـغـيـل نـظـام الـحـمـايـة
+
+📌 ${error.message}
+
+⌬ ━━━━━━━━━━━━ ⌬`,
       threadID,
       messageID
     );
   }
-
-  // التأكد من وجود ملف الحماية
-  if (!fs.existsSync(path)) {
-    fs.writeFileSync(path, JSON.stringify({}));
-  }
-
-  let protectionData = JSON.parse(fs.readFileSync(path));
-  if (!protectionData[threadID]) {
-    protectionData[threadID] = {
-      enabled: false,
-      settings: {
-        nicknames: false,
-        addMember: false,
-        groupName: false,
-        groupImage: false,
-        theme: false,
-        emoji: false
-      }
-    };
-  }
-
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // عرض القائمة الرئيسية
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const menu = `
-🥺 مامي ما سمحتلك تغير شيء يا قلبي 💕
-
-⌬ ━━ HINA ━━ ⌬
-
-🛡️ نظام حماية المجموعة
-
-📋 اختار رقم الإعداد يلي تريد تعديله:
-
-1️⃣ 🔒 تفعيل/إيقاف الحماية (الكل)
-2️⃣ 🏷️ حماية الكنيات (الأسماء)
-3️⃣ ➕ حماية إضافة الأعضاء
-4️⃣ 📛 حماية اسم المجموعة
-5️⃣ 🖼️ حماية صورة المجموعة
-6️⃣ 🎨 حماية السمة (الثيم)
-7️⃣ 😊 حماية الإيموجي
-
-📌 الوضع الحالي:
-${protectionData[threadID].enabled ? '✅ مفعل' : '❌ معطل'}
-
-📝 اكتب الرقم يلي تريد تعديله، أو "خروج" للإلغاء.
-`;
-
-  // تخزين البيانات للرد
-  global.client.handleReply.push({
-    name: "حماية",
-    messageID: messageID,
-    threadID: threadID,
-    type: "menu"
-  });
-
-  return api.sendMessage(menu, threadID, messageID);
 };
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// معالج الردود
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-module.exports.handleReply = async function({ api, event, handleReply }) {
-  const { threadID, messageID, senderID, body } = event;
-  const fs = require("fs");
-  const path = "./data/protection.json";
+// ==================================================
+// HANDLE REPLY
+// ==================================================
 
-  // التحقق من الصلاحية
-  const threadInfo = await api.getThreadInfo(threadID);
-  const isAdmin = threadInfo.adminIDs.some(admin => admin.id === senderID);
-  if (!isAdmin) {
+module.exports.handleReply =
+async function({
+  api,
+  event,
+  handleReply
+}) {
+
+  const {
+    threadID,
+    messageID,
+    senderID,
+    body
+  } = event;
+
+  // ==================================================
+  // التحقق من صاحب القائمة
+  // ==================================================
+
+  if (
+    String(handleReply.author) !==
+    String(senderID)
+  ) {
+    return;
+  }
+
+  // ==================================================
+  // التحقق من نفس المجموعة
+  // ==================================================
+
+  if (
+    String(handleReply.threadID) !==
+    String(threadID)
+  ) {
+    return;
+  }
+
+  // ==================================================
+  // التحقق من الأدمن
+  // ==================================================
+
+  const admin =
+    await isGroupAdmin(
+      api,
+      threadID,
+      senderID
+    );
+
+  if (!admin) {
     return api.sendMessage(
-      `🥺 مامي ما سمحتلك تغير شيء يا قلبي 💕`,
+`⌬ ━━ 𝗛𝗜𝗡𝗔 ADMIN ━━ ⌬
+
+⛔ لم تعد تملك صلاحية أدمن المجموعة.
+
+⌬ ━━━━━━━━━━━━ ⌬`,
       threadID,
       messageID
     );
   }
 
-  // التحقق من أن الرد موجه لرسالة البوت
-  if (handleReply.author !== senderID) {
-    return api.sendMessage(
-      `🥺 هذا الأمر ليس لك يا قلبي 💕`,
-      threadID,
-      messageID
-    );
+  if (
+    !body ||
+    !body.trim()
+  ) {
+    return;
   }
 
-  let protectionData = JSON.parse(fs.readFileSync(path));
-  if (!protectionData[threadID]) {
-    protectionData[threadID] = {
-      enabled: false,
-      settings: {
-        nicknames: false,
-        addMember: false,
-        groupName: false,
-        groupImage: false,
-        theme: false,
-        emoji: false
-      }
-    };
-  }
+  const choice =
+    body.trim();
 
-  const choice = body.trim();
-
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // ==================================================
   // خروج
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  if (choice === "خروج" || choice === "cancel") {
+  // ==================================================
+
+  if (
+    choice === "خروج" ||
+    choice.toLowerCase() === "cancel"
+  ) {
+
     return api.sendMessage(
-      `🥺 اوكي حبيبي، خلاص مامي سامحتلك 💕🌸\n\n✅ تم إلغاء عملية الإعداد.`,
+`⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬
+
+❌ تم إلغاء إعدادات الحماية.
+
+⌬ ━━━━━━━━━━━━ ⌬`,
       threadID,
       messageID
     );
   }
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // معالجة الاختيار (تأكد من أن الإدخال رقم)
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const choiceNum = parseInt(choice);
-  if (isNaN(choiceNum) || choiceNum < 1 || choiceNum > 7) {
+  // ==================================================
+  // التحقق من الرقم
+  // ==================================================
+
+  if (!/^[1-7]$/.test(choice)) {
+
     return api.sendMessage(
-      `🥺 رقم غير صحيح يا قلبي 💕\nالرجاء اختيار رقم من 1 إلى 7.`,
+`⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬
+
+⚠️ رقم غير صحيح.
+
+📌 اختر رقمًا من 1 إلى 7
+❌ أو أرسل: خروج
+
+⌬ ━━━━━━━━━━━━ ⌬`,
       threadID,
       messageID
     );
   }
+
+  const data =
+    readData();
+
+  const settings =
+    getThreadSettings(
+      data,
+      threadID
+    );
+
+  // ==================================================
+  // الخيارات
+  // ==================================================
 
   const options = {
-    "1": { key: "enabled", name: "تفعيل/إيقاف الحماية (الكل)" },
-    "2": { key: "nicknames", name: "حماية الكنيات" },
-    "3": { key: "addMember", name: "حماية إضافة الأعضاء" },
-    "4": { key: "groupName", name: "حماية اسم المجموعة" },
-    "5": { key: "groupImage", name: "حماية صورة المجموعة" },
-    "6": { key: "theme", name: "حماية السمة" },
-    "7": { key: "emoji", name: "حماية الإيموجي" }
+    "2": {
+      key: "nicknames",
+      name: "حماية الكنيات"
+    },
+
+    "3": {
+      key: "addMember",
+      name: "حماية إضافة الأعضاء"
+    },
+
+    "4": {
+      key: "groupName",
+      name: "حماية اسم المجموعة"
+    },
+
+    "5": {
+      key: "groupImage",
+      name: "حماية صورة المجموعة"
+    },
+
+    "6": {
+      key: "theme",
+      name: "حماية السمة"
+    },
+
+    "7": {
+      key: "emoji",
+      name: "حماية الإيموجي"
+    }
   };
 
-  const selected = options[choice];
+  // ==================================================
+  // الحماية الكلية
+  // ==================================================
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // تفعيل/إيقاف الحماية الكلية
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   if (choice === "1") {
-    protectionData[threadID].enabled = !protectionData[threadID].enabled;
-    fs.writeFileSync(path, JSON.stringify(protectionData, null, 2));
-    
-    api.setMessageReaction("✅", messageID, () => {}, true);
-    
+
+    settings.enabled =
+      !settings.enabled;
+
+    const saved =
+      saveData(data);
+
+    if (!saved) {
+      return api.sendMessage(
+`⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬
+
+❌ تعذر حفظ إعداد الحماية.
+
+⌬ ━━━━━━━━━━━━ ⌬`,
+        threadID,
+        messageID
+      );
+    }
+
+    try {
+      api.setMessageReaction(
+        settings.enabled
+          ? "✅"
+          : "❌",
+        messageID,
+        () => {},
+        true
+      );
+    } catch (e) {}
+
     return api.sendMessage(
-      `⌬ ━━ HINA ━━ ⌬\n\n✅ ${protectionData[threadID].enabled ? 'تم تفعيل' : 'تم إيقاف'} الحماية الكلية للمجموعة!`,
+`⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬
+
+🛡️ الحماية الكلية:
+${settings.enabled ? "✅ تم تفعيلها" : "❌ تم إيقافها"}
+
+📌 المجموعة:
+${threadID}
+
+⌬ ━━━━━━━━━━━━ ⌬`,
       threadID,
       messageID
     );
   }
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // تفعيل/إيقاف إعداد معين
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  const settingKey = selected.key;
-  protectionData[threadID].settings[settingKey] = !protectionData[threadID].settings[settingKey];
-  fs.writeFileSync(path, JSON.stringify(protectionData, null, 2));
+  // ==================================================
+  // إعداد فرعي
+  // ==================================================
 
-  api.setMessageReaction("✅", messageID, () => {}, true);
+  const selected =
+    options[choice];
+
+  if (!selected) {
+    return;
+  }
+
+  const key =
+    selected.key;
+
+  settings.settings[key] =
+    !settings.settings[key];
+
+  const saved =
+    saveData(data);
+
+  if (!saved) {
+    return api.sendMessage(
+`⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬
+
+❌ تعذر حفظ إعداد الحماية.
+
+⌬ ━━━━━━━━━━━━ ⌬`,
+      threadID,
+      messageID
+    );
+  }
+
+  try {
+    api.setMessageReaction(
+      settings.settings[key]
+        ? "✅"
+        : "❌",
+      messageID,
+      () => {},
+      true
+    );
+  } catch (e) {}
 
   return api.sendMessage(
-    `⌬ ━━ HINA ━━ ⌬\n\n✅ تم ${protectionData[threadID].settings[settingKey] ? 'تفعيل' : 'إيقاف'} "${selected.name}"!`,
+`⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬
+
+🛡️ ${selected.name}
+
+${settings.settings[key]
+  ? "✅ تم التفعيل"
+  : "❌ تم الإيقاف"}
+
+⌬ ━━━━━━━━━━━━ ⌬`,
     threadID,
     messageID
   );
