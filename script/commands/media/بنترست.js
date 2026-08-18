@@ -4,7 +4,7 @@ const path = require("path");
 
 module.exports.config = {
   name: "بنترست",
-  version: "2.0.0",
+  version: "2.1.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
   description: "جلب 5 صور من Pinterest مع دعم المزيد",
@@ -39,11 +39,8 @@ async function downloadImage(url, filePath) {
           "https://www.pinterest.com/"
       },
 
-      maxContentLength:
-        20 * 1024 * 1024,
-
-      maxBodyLength:
-        20 * 1024 * 1024
+      maxContentLength: 20 * 1024 * 1024,
+      maxBodyLength: 20 * 1024 * 1024
     });
 
     if (!response.data) {
@@ -58,7 +55,6 @@ async function downloadImage(url, filePath) {
     return true;
 
   } catch (error) {
-
     console.error(
       "Pinterest image error:",
       error.message
@@ -78,35 +74,28 @@ async function searchPinterest(query) {
     "https://www.pinterest.com/search/pins/?q=" +
     encodeURIComponent(query);
 
-  const response =
-    await axios.get(url, {
-      timeout: 30000,
+  const response = await axios.get(url, {
+    timeout: 30000,
 
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/131.0.0.0 Mobile Safari/537.36",
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/131.0.0.0 Mobile Safari/537.36",
 
-        "Accept":
-          "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+      "Accept":
+        "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
 
-        "Accept-Language":
-          "ar,en-US;q=0.9,en;q=0.8",
+      "Accept-Language":
+        "ar,en-US;q=0.9,en;q=0.8",
 
-        "Cache-Control":
-          "no-cache"
-      }
-    });
+      "Cache-Control":
+        "no-cache"
+    }
+  });
 
-  const html =
-    response.data;
+  const html = response.data;
 
-  if (
-    !html ||
-    typeof html !== "string"
-  ) {
-    throw new Error(
-      "تعذر قراءة نتائج Pinterest"
-    );
+  if (!html || typeof html !== "string") {
+    throw new Error("تعذر قراءة نتائج Pinterest");
   }
 
   const results = [];
@@ -118,89 +107,39 @@ async function searchPinterest(query) {
   const regex =
     /https?:\\?\/\\?\/i\.pinimg\.com\\?\/[^"'\\\s<>]+/gi;
 
-  const matches =
-    html.match(regex) || [];
+  const matches = html.match(regex) || [];
 
-  for (
-    let imageURL of matches
-  ) {
+  for (let imageURL of matches) {
 
-    imageURL =
-      imageURL
-        .replace(
-          /\\u002F/g,
-          "/"
-        )
-        .replace(
-          /\\\//g,
-          "/"
-        )
-        .replace(
-          /\\/g,
-          ""
-        )
-        .replace(
-          /["']+$/,
-          ""
-        );
+    imageURL = imageURL
+      .replace(/\\u002F/g, "/")
+      .replace(/\\\//g, "/")
+      .replace(/\\/g, "")
+      .replace(/["']+$/, "");
 
-    if (
-      !imageURL.includes(
-        "i.pinimg.com"
-      )
-    ) {
+    if (!imageURL.includes("i.pinimg.com")) {
       continue;
     }
 
     // ==================================================
-    // محاولة استخدام أعلى جودة
+    // محاولة الوصول إلى أعلى جودة
     // ==================================================
 
-    imageURL =
-      imageURL
-        .replace(
-          "/75x75_RS/",
-          "/originals/"
-        )
-        .replace(
-          "/60x60/",
-          "/originals/"
-        )
-        .replace(
-          "/236x/",
-          "/originals/"
-        )
-        .replace(
-          "/474x/",
-          "/originals/"
-        )
-        .replace(
-          "/564x/",
-          "/originals/"
-        )
-        .replace(
-          "/736x/",
-          "/originals/"
-        )
-        .replace(
-          "/1200x/",
-          "/originals/"
-        );
+    imageURL = imageURL
+      .replace("/75x75_RS/", "/originals/")
+      .replace("/60x60/", "/originals/")
+      .replace("/236x/", "/originals/")
+      .replace("/474x/", "/originals/")
+      .replace("/564x/", "/originals/")
+      .replace("/736x/", "/originals/")
+      .replace("/1200x/", "/originals/");
 
-    if (
-      !results.includes(
-        imageURL
-      )
-    ) {
-      results.push(
-        imageURL
-      );
+    if (!results.includes(imageURL)) {
+      results.push(imageURL);
     }
   }
 
-  return [
-    ...new Set(results)
-  ];
+  return [...new Set(results)];
 }
 
 // ==================================================
@@ -209,7 +148,8 @@ async function searchPinterest(query) {
 
 module.exports.run = async function ({
   api,
-  event
+  event,
+  args
 }) {
 
   const {
@@ -218,18 +158,22 @@ module.exports.run = async function ({
     senderID
   } = event;
 
-  const args =
-    event.args ||
-    [];
-
   // ==================================================
-  // كلمة البحث
+  // IMPORTANT
+  // args تأتي من handleCommand وليس event.args
   // ==================================================
 
-  const query =
-    args
-      .join(" ")
-      .trim();
+  const searchArgs = Array.isArray(args)
+    ? args
+    : [];
+
+  const query = searchArgs
+    .join(" ")
+    .trim();
+
+  // ==================================================
+  // التحقق من البحث
+  // ==================================================
 
   if (!query) {
 
@@ -243,18 +187,17 @@ module.exports.run = async function ({
     );
   }
 
-  const cacheDir =
-    path.join(
-      __dirname,
-      "..",
-      "commands",
-      "cache",
-      "pinterest"
-    );
+  // ==================================================
+  // مجلد الكاش
+  // ==================================================
 
-  await fs.ensureDir(
-    cacheDir
+  const cacheDir = path.join(
+    __dirname,
+    "cache",
+    "pinterest"
   );
+
+  await fs.ensureDir(cacheDir);
 
   const files = [];
 
@@ -265,13 +208,9 @@ module.exports.run = async function ({
     // ==================================================
 
     const allImages =
-      await searchPinterest(
-        query
-      );
+      await searchPinterest(query);
 
-    if (
-      !allImages.length
-    ) {
+    if (!allImages.length) {
 
       return api.sendMessage(
         `⌬ ━━ 𝗛𝗜𝗡𝗔 PINTEREST ━━ ⌬\n\n` +
@@ -286,27 +225,18 @@ module.exports.run = async function ({
     // أول 5 صور
     // ==================================================
 
-    const urls =
-      allImages.slice(
-        0,
-        5
-      );
+    const urls = allImages.slice(0, 5);
 
     // ==================================================
     // تحميل الصور
     // ==================================================
 
-    for (
-      let i = 0;
-      i < urls.length;
-      i++
-    ) {
+    for (let i = 0; i < urls.length; i++) {
 
-      const filePath =
-        path.join(
-          cacheDir,
-          `pinterest_${Date.now()}_${i}.jpg`
-        );
+      const filePath = path.join(
+        cacheDir,
+        `pinterest_${senderID}_${Date.now()}_${i}.jpg`
+      );
 
       const success =
         await downloadImage(
@@ -315,33 +245,31 @@ module.exports.run = async function ({
         );
 
       if (success) {
-        files.push(
-          filePath
-        );
+        files.push(filePath);
       }
     }
 
-    if (
-      !files.length
-    ) {
+    // ==================================================
+    // التأكد من وجود صور
+    // ==================================================
+
+    if (!files.length) {
 
       return api.sendMessage(
         `⌬ ━━ 𝗛𝗜𝗡𝗔 PINTEREST ━━ ⌬\n\n` +
-        `❌ تعذر تحميل الصور.`,
+        `❌ تعذر تحميل الصور من Pinterest.`,
         threadID,
         messageID
       );
     }
 
     // ==================================================
-    // تجهيز الصور
+    // تجهيز المرفقات
     // ==================================================
 
-    const attachments =
-      files.map(
-        file =>
-          fs.createReadStream(file)
-      );
+    const attachments = files.map(
+      file => fs.createReadStream(file)
+    );
 
     // ==================================================
     // الرسالة
@@ -351,13 +279,13 @@ module.exports.run = async function ({
       `⌬ ━━ 𝗛𝗜𝗡𝗔 PINTEREST ━━ ⌬\n\n` +
       `🔎 البحث: ${query}\n\n` +
       `🖼️ تم جلب ${files.length} صور\n\n` +
-      `↪️ رد بـ "المزيد" للحصول على 5 صور أخرى`;
+      `↪️ رد على هذه الرسالة بـ "المزيد" للحصول على 5 صور أخرى`;
 
     // ==================================================
     // إرسال الصور
     // ==================================================
 
-    api.sendMessage(
+    return api.sendMessage(
       {
         body: message,
         attachment: attachments
@@ -368,34 +296,24 @@ module.exports.run = async function ({
       (error, info) => {
 
         // ==================================================
-        // حذف الصور بعد 30 ثانية
+        // حذف الملفات بعد 30 ثانية
         // ==================================================
 
-        setTimeout(
-          async () => {
+        setTimeout(async () => {
 
-            for (
-              const file of files
-            ) {
+          for (const file of files) {
 
-              try {
+            try {
 
-                if (
-                  await fs.pathExists(
-                    file
-                  )
-                ) {
-                  await fs.remove(
-                    file
-                  );
-                }
+              if (await fs.pathExists(file)) {
+                await fs.remove(file);
+              }
 
-              } catch {}
-            }
+            } catch (e) {}
 
-          },
-          30000
-        );
+          }
+
+        }, 30000);
 
         // ==================================================
         // حفظ جلسة البحث
@@ -408,33 +326,19 @@ module.exports.run = async function ({
         ) {
 
           global.pinterestSearches.set(
-            String(
-              info.messageID
-            ),
+            String(info.messageID),
             {
-              query:
-                query,
+              query: query,
 
-              // أول 5 صور تم إرسالها
-              nextIndex:
-                5,
+              nextIndex: 5,
 
-              // صاحب البحث
-              senderID:
-                String(
-                  senderID
-                ),
+              senderID: String(senderID),
 
-              // وقت إنشاء الجلسة
-              createdAt:
-                Date.now(),
+              createdAt: Date.now(),
 
-              loading:
-                false,
+              loading: false,
 
-              // حفظ الصور التي تم استخدامها
-              usedImages:
-                urls
+              usedImages: urls
             }
           );
 
@@ -453,26 +357,19 @@ module.exports.run = async function ({
     );
 
     // ==================================================
-    // تنظيف الملفات عند الخطأ
+    // تنظيف الملفات
     // ==================================================
 
-    for (
-      const file of files
-    ) {
+    for (const file of files) {
 
       try {
 
-        if (
-          await fs.pathExists(
-            file
-          )
-        ) {
-          await fs.remove(
-            file
-          );
+        if (await fs.pathExists(file)) {
+          await fs.remove(file);
         }
 
-      } catch {}
+      } catch (e) {}
+
     }
 
     return api.sendMessage(
