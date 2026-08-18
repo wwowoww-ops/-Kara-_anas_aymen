@@ -2,7 +2,7 @@ module.exports.config = {
   name: "مساعدة",
   version: "1.0.0",
   hasPermssion: 0,
-  credits: "أنس",
+  credits: "أأبو هريرة,
   description: "عرض قائمة الأوامر",
   commandCategory: "utility",
   usages: "[اسم الأمر] أو [الفئة]",
@@ -16,7 +16,7 @@ module.exports.run = async function({ api, event, args }) {
 
   if (!commands) {
     return api.sendMessage(
-      "⌬ ━━ SOMI UTILITY ━━ ⌬\n\n❌ فشل تحميل قائمة الأوامر",
+      "⌬ ━━ HINA UTILITY ━━ ⌬\n\n❌ فشل تحميل قائمة الأوامر",
       threadID,
       messageID
     );
@@ -38,8 +38,8 @@ module.exports.run = async function({ api, event, args }) {
       categories[category].push(name);
     });
 
-    let message = "⌬ ━━ SOMI UTILITY ━━ ⌬\n\n";
-    message += `🤖 البوت: كيرا\n`;
+    let message = "⌬ ━━ HINA UTILITY ━━ ⌬\n\n";
+    message += `🤖 البوت: زنجزوبة\n`;
     message += `🔑 البادئة: ${prefix}\n`;
     message += `📊 عدد الأوامر: ${commandsMap.size}\n\n`;
     message += `📂 الفئات:\n\n`;
@@ -76,7 +76,7 @@ module.exports.run = async function({ api, event, args }) {
     }
 
     return api.sendMessage(
-      `⌬ ━━ SOMI UTILITY ━━ ⌬\n\n❌ الأمر "${cmdName}" غير موجود`,
+      `⌬ ━━ HINA UTILITY ━━ ⌬\n\n❌ الأمر "${cmdName}" غير موجود`,
       threadID,
       messageID
     );
