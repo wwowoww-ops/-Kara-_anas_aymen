@@ -1,110 +1,194 @@
 const path = require("path");
 
-module.exports = function ({
-    models,
-    api
-}) {
+module.exports = function ({ models, api }) {
 
-    const mongodb =
-        require(
-            path.join(
-                process.cwd(),
-                "includes",
-                "mongodb.js"
-            )
-        );
+    const mongodb = require(
+        path.join(
+            process.cwd(),
+            "includes",
+            "mongodb.js"
+        )
+    );
+
 
     // ============================================================
-    // Facebook Thread Info
+    // جلب معلومات المجموعة
+    // يدعم FCA التي تستخدم Callback
     // ============================================================
 
     async function getInfo(threadID) {
 
-        try {
+        threadID = String(threadID);
 
-            if (
-                !threadID ||
-                !api ||
-                typeof api.getThreadInfo !==
-                "function"
-            ) {
+        return new Promise((resolve) => {
 
-                return null;
+            try {
+
+                if (
+                    !api ||
+                    typeof api.getThreadInfo !== "function"
+                ) {
+
+                    console.error(
+                        "❌ [Threads] api.getThreadInfo غير موجود"
+                    );
+
+                    resolve(null);
+                    return;
+
+                }
+
+
+                api.getThreadInfo(
+                    threadID,
+                    (error, info) => {
+
+                        if (error) {
+
+                            console.error(
+                                `❌ [Threads] فشل جلب المجموعة ${threadID}:`,
+                                error.message || error
+                            );
+
+                            resolve(null);
+                            return;
+
+                        }
+
+
+                        if (
+                            !info ||
+                            typeof info !== "object"
+                        ) {
+
+                            console.error(
+                                `❌ [Threads] معلومات المجموعة فارغة: ${threadID}`
+                            );
+
+                            resolve(null);
+                            return;
+
+                        }
+
+
+                        resolve(info);
+
+                    }
+                );
+
+            } catch (error) {
+
+                console.error(
+                    `❌ [Threads] خطأ في getInfo (${threadID}):`,
+                    error
+                );
+
+                resolve(null);
+
             }
 
-            return await api.getThreadInfo(
-                String(threadID)
-            );
+        });
 
-        } catch (error) {
-
-            console.error(
-                "THREADS GETINFO ERROR:",
-                error.message
-            );
-
-            return null;
-        }
     }
 
+
     // ============================================================
-    // All Threads
+    // جلب جميع المجموعات من MongoDB
     // ============================================================
 
     async function getAll() {
 
         try {
 
-            const result =
+            if (
+                !mongodb ||
+                typeof mongodb.getAllThreads !== "function"
+            ) {
+
+                return [];
+
+            }
+
+            const threads =
                 await mongodb.getAllThreads();
 
-            return Array.isArray(result)
-                ? result
+            return Array.isArray(threads)
+                ? threads
                 : [];
 
         } catch (error) {
 
             console.error(
-                "THREADS GETALL ERROR:",
+                "❌ [Threads] خطأ في getAll:",
                 error
             );
 
             return [];
+
         }
+
     }
 
+
     // ============================================================
-    // Thread Data
+    // جلب بيانات المجموعة من MongoDB
     // ============================================================
 
     async function getData(threadID) {
 
+        threadID = String(threadID);
+
         try {
 
-            if (!threadID) {
-                return null;
+            if (
+                !mongodb ||
+                typeof mongodb.getThreadData !== "function"
+            ) {
+
+                return {
+                    threadID,
+                    threadName: "KIRA Group",
+                    settings: {}
+                };
+
             }
+
 
             const data =
                 await mongodb.getThreadData(
-                    String(threadID)
+                    threadID
                 );
 
-            return data || null;
+
+            if (!data) {
+
+                return {
+                    threadID,
+                    threadName: "KIRA Group",
+                    settings: {}
+                };
+
+            }
+
+
+            return data;
 
         } catch (error) {
 
             console.error(
-                "THREADS GETDATA ERROR:",
+                `❌ [Threads] خطأ في getData (${threadID}):`,
                 error
             );
 
-            return null;
+            return false;
+
         }
+
     }
 
+
     // ============================================================
-    // Set Data
+    // تحديث بيانات المجموعة
     // ============================================================
 
     async function setData(
@@ -112,32 +196,58 @@ module.exports = function ({
         options = {}
     ) {
 
+        threadID = String(threadID);
+
         try {
 
-            if (!threadID) {
+            if (
+                !mongodb ||
+                typeof mongodb.updateThreadData !== "function"
+            ) {
+
+                console.error(
+                    "❌ [Threads] mongodb.updateThreadData غير موجود"
+                );
+
                 return false;
+
             }
 
+
+            if (
+                !options ||
+                typeof options !== "object"
+            ) {
+
+                options = {};
+
+            }
+
+
             await mongodb.updateThreadData(
-                String(threadID),
+                threadID,
                 options
             );
+
 
             return true;
 
         } catch (error) {
 
             console.error(
-                "THREADS SETDATA ERROR:",
+                `❌ [Threads] فشل تحديث بيانات المجموعة ${threadID}:`,
                 error
             );
 
             return false;
+
         }
+
     }
 
+
     // ============================================================
-    // Create
+    // إنشاء بيانات مجموعة
     // ============================================================
 
     async function createData(
@@ -145,58 +255,104 @@ module.exports = function ({
         defaults = {}
     ) {
 
+        threadID = String(threadID);
+
         try {
 
-            if (!threadID) {
+            if (
+                !mongodb ||
+                typeof mongodb.createThread !== "function"
+            ) {
+
+                console.error(
+                    "❌ [Threads] mongodb.createThread غير موجود"
+                );
+
                 return false;
+
             }
 
+
+            if (
+                !defaults ||
+                typeof defaults !== "object"
+            ) {
+
+                defaults = {};
+
+            }
+
+
             await mongodb.createThread(
-                String(threadID),
+                threadID,
                 defaults
             );
+
 
             return true;
 
         } catch (error) {
 
             console.error(
-                "THREADS CREATEDATA ERROR:",
+                `❌ [Threads] فشل إنشاء المجموعة ${threadID}:`,
                 error
             );
 
             return false;
+
         }
+
     }
 
+
     // ============================================================
-    // Delete
+    // حذف بيانات المجموعة
     // ============================================================
 
     async function delData(threadID) {
 
+        threadID = String(threadID);
+
         try {
 
-            if (!threadID) {
+            if (
+                !mongodb ||
+                typeof mongodb.deleteThread !== "function"
+            ) {
+
+                console.error(
+                    "❌ [Threads] mongodb.deleteThread غير موجود"
+                );
+
                 return false;
+
             }
 
+
             await mongodb.deleteThread(
-                String(threadID)
+                threadID
             );
+
 
             return true;
 
         } catch (error) {
 
             console.error(
-                "THREADS DELDATA ERROR:",
+                `❌ [Threads] فشل حذف المجموعة ${threadID}:`,
                 error
             );
 
             return false;
+
         }
+
     }
+
+
+    // ============================================================
+    // إرجاع الدوال
+    // ============================================================
 
     return {
 
@@ -208,9 +364,10 @@ module.exports = function ({
 
         setData,
 
-        createData,
+        delData,
 
-        delData
+        createData
 
     };
+
 };
