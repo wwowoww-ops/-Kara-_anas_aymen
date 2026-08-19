@@ -1,92 +1,216 @@
 const path = require("path");
 
-module.exports = function ({ models, api }) {
-    // استدعاء محرك المونغو لربط المجموعات
-    const mongodb = require(path.join(process.cwd(), "includes", "mongodb.js"));
+module.exports = function ({
+    models,
+    api
+}) {
+
+    const mongodb =
+        require(
+            path.join(
+                process.cwd(),
+                "includes",
+                "mongodb.js"
+            )
+        );
+
+    // ============================================================
+    // Facebook Thread Info
+    // ============================================================
 
     async function getInfo(threadID) {
+
         try {
-            // جلب المعلومات من فيسبوك مباشرة
-            return await api.getThreadInfo(threadID);
+
+            if (
+                !threadID ||
+                !api ||
+                typeof api.getThreadInfo !==
+                "function"
+            ) {
+
+                return null;
+            }
+
+            return await api.getThreadInfo(
+                String(threadID)
+            );
+
+        } catch (error) {
+
+            console.error(
+                "THREADS GETINFO ERROR:",
+                error.message
+            );
+
+            return null;
         }
-        catch (error) { 
-            console.error("❌ [Threads] خطأ في جلب معلومات المجموعة:", error);
-            return {};
-        };
     }
 
+    // ============================================================
+    // All Threads
+    // ============================================================
+
     async function getAll() {
+
         try {
-            // جلب جميع المجموعات المسجلة في KiraDB
-            return await mongodb.getAllThreads(); 
-        }
-        catch (error) {
-            console.error(error);
+
+            const result =
+                await mongodb.getAllThreads();
+
+            return Array.isArray(result)
+                ? result
+                : [];
+
+        } catch (error) {
+
+            console.error(
+                "THREADS GETALL ERROR:",
+                error
+            );
+
             return [];
         }
     }
 
+    // ============================================================
+    // Thread Data
+    // ============================================================
+
     async function getData(threadID) {
+
         try {
-            // جلب إعدادات المجموعة من المونغو
-            let data = await mongodb.getThreadData(threadID);
-            
-            if (!data) {
-                console.log(`📡 [KiraDB] تسجيل مجموعة جديدة: ${threadID}`);
-                // إذا لم توجد المجموعة، يتم إنشاؤها بإعدادات افتراضية
-                return { threadID, threadName: "KIRA Group", settings: {} };
+
+            if (!threadID) {
+                return null;
             }
-            
-            return data;
-        } 
-        catch (error) { 
-            console.error("❌ [Threads] خطأ في جلب بيانات المجموعة:", error);
+
+            const data =
+                await mongodb.getThreadData(
+                    String(threadID)
+                );
+
+            return data || null;
+
+        } catch (error) {
+
+            console.error(
+                "THREADS GETDATA ERROR:",
+                error
+            );
+
+            return null;
+        }
+    }
+
+    // ============================================================
+    // Set Data
+    // ============================================================
+
+    async function setData(
+        threadID,
+        options = {}
+    ) {
+
+        try {
+
+            if (!threadID) {
+                return false;
+            }
+
+            await mongodb.updateThreadData(
+                String(threadID),
+                options
+            );
+
+            return true;
+
+        } catch (error) {
+
+            console.error(
+                "THREADS SETDATA ERROR:",
+                error
+            );
+
             return false;
         }
     }
 
-    async function setData(threadID, options = {}) {
+    // ============================================================
+    // Create
+    // ============================================================
+
+    async function createData(
+        threadID,
+        defaults = {}
+    ) {
+
         try {
-            // تحديث إعدادات المجموعة في المونغو (مثل البادئة Prefix أو الترحيب)
-            await mongodb.updateThreadData(threadID, options);
-            console.log(`✅ [KiraDB] تم تحديث إعدادات المجموعة: ${threadID}`);
+
+            if (!threadID) {
+                return false;
+            }
+
+            await mongodb.createThread(
+                String(threadID),
+                defaults
+            );
+
             return true;
-        } catch (error) { 
-            console.error("❌ [Threads] فشل في تحديث البيانات:", error);
+
+        } catch (error) {
+
+            console.error(
+                "THREADS CREATEDATA ERROR:",
+                error
+            );
+
             return false;
         }
     }
 
-    async function createData(threadID, defaults = {}) {
-        try {
-            // إنشاء سجل جديد للمجموعة في القاعدة السحابية
-            await mongodb.createThread(threadID, defaults);
-            return true;
-        }
-        catch (error) {
-            console.error(error);
-            return false;
-        }
-    }
+    // ============================================================
+    // Delete
+    // ============================================================
 
     async function delData(threadID) {
+
         try {
-            // حذف المجموعة من القاعدة (اختياري)
-            await mongodb.deleteThread(threadID);
+
+            if (!threadID) {
+                return false;
+            }
+
+            await mongodb.deleteThread(
+                String(threadID)
+            );
+
             return true;
-        }
-        catch (error) {
-            console.error(error);
+
+        } catch (error) {
+
+            console.error(
+                "THREADS DELDATA ERROR:",
+                error
+            );
+
             return false;
         }
     }
 
     return {
+
         getInfo,
+
         getAll,
+
         getData,
+
         setData,
-        delData,
-        createData
+
+        createData,
+
+        delData
+
     };
 };
