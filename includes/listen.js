@@ -1,8 +1,6 @@
 /**
- * ╔═══════════════════════════════════════════════════════════════╗
- * ║                  KIRA LISTEN.JS — FIXED                      ║
- * ║              Central Event & Command Router                   ║
- * ╚═══════════════════════════════════════════════════════════════╝
+ * KIRA LISTEN.JS
+ * Central Event & Command Router
  */
 
 module.exports = function ({ api, models }) {
@@ -100,7 +98,7 @@ module.exports = function ({ api, models }) {
         });
 
     // ============================================================
-    // تحميل قاعدة البيانات
+    // Database Loader
     // ============================================================
 
     (async function () {
@@ -108,7 +106,7 @@ module.exports = function ({ api, models }) {
         try {
 
             logger(
-                "📊 جاري تحميل قاعدة البيانات...",
+                "جاري تحميل قاعدة البيانات...",
                 "[ DATABASE ]"
             );
 
@@ -119,93 +117,121 @@ module.exports = function ({ api, models }) {
             try {
 
                 const threads =
-                    await Threads.getAll([
-                        "threadID",
-                        "data",
-                        "threadInfo"
-                    ]);
+                    await Threads.getAll();
 
-                for (const thread of threads) {
+                if (Array.isArray(threads)) {
 
-                    const tid =
-                        String(thread.threadID);
+                    for (const thread of threads) {
 
-                    if (
-                        !global.data.allThreadID.includes(
-                            tid
-                        )
-                    ) {
+                        if (!thread) continue;
 
-                        global.data.allThreadID.push(
-                            tid
-                        );
+                        const tid =
+                            String(
+                                thread.threadID ||
+                                thread.id ||
+                                ""
+                            );
 
-                    }
-
-                    global.data.threadData.set(
-                        tid,
-                        thread.data || {}
-                    );
-
-                    global.data.threadInfo.set(
-                        tid,
-                        thread.threadInfo || {}
-                    );
-
-                    // حظر المجموعة
-                    if (
-                        thread.data &&
-                        (
-                            thread.data.banned == 1 ||
-                            thread.data.banned === true
-                        )
-                    ) {
-
-                        global.data.threadBanned.set(
-                            tid,
-                            {
-                                reason:
-                                    thread.data.reason || "",
-
-                                dateAdded:
-                                    thread.data.dateAdded ||
-                                    Date.now()
-                            }
-                        );
-
-                    }
-
-                    // حظر أوامر
-                    if (
-                        thread.data &&
-                        Array.isArray(
-                            thread.data.commandBanned
-                        ) &&
-                        thread.data.commandBanned.length
-                    ) {
-
-                        global.data.commandBanned.set(
-                            tid,
-                            thread.data.commandBanned
-                        );
-
-                    }
-
-                    // NSFW
-                    if (
-                        thread.data &&
-                        thread.data.NSFW
-                    ) {
+                        if (!tid) continue;
 
                         if (
-                            !global.data.threadAllowNSFW.includes(
-                                tid
+                            Array.isArray(
+                                global.data.allThreadID
+                            ) &&
+                            !global.data.allThreadID.includes(tid)
+                        ) {
+
+                            global.data.allThreadID.push(tid);
+
+                        }
+
+                        if (
+                            global.data.threadData &&
+                            typeof global.data.threadData.set ===
+                            "function"
+                        ) {
+
+                            global.data.threadData.set(
+                                tid,
+                                thread.data || {}
+                            );
+
+                        }
+
+                        if (
+                            global.data.threadInfo &&
+                            typeof global.data.threadInfo.set ===
+                            "function"
+                        ) {
+
+                            global.data.threadInfo.set(
+                                tid,
+                                thread.threadInfo || {}
+                            );
+
+                        }
+
+                        // حظر المجموعة
+                        if (
+                            thread.data &&
+                            (
+                                thread.data.banned === true ||
+                                thread.data.banned == 1
                             )
                         ) {
 
-                            global.data.threadAllowNSFW.push(
-                                tid
+                            global.data.threadBanned.set(
+                                tid,
+                                {
+                                    reason:
+                                        thread.data.reason || "",
+
+                                    dateAdded:
+                                        thread.data.dateAdded ||
+                                        Date.now()
+                                }
                             );
+
+                        }
+
+                        // حظر أوامر
+                        if (
+                            thread.data &&
+                            Array.isArray(
+                                thread.data.commandBanned
+                            )
+                        ) {
+
+                            if (
+                                thread.data.commandBanned.length
+                            ) {
+
+                                global.data.commandBanned.set(
+                                    tid,
+                                    thread.data.commandBanned
+                                );
+
+                            }
+
+                        }
+
+                        // NSFW
+                        if (
+                            thread.data &&
+                            thread.data.NSFW
+                        ) {
+
+                            if (
+                                !global.data.threadAllowNSFW.includes(
+                                    tid
+                                )
+                            ) {
+
+                                global.data.threadAllowNSFW.push(
+                                    tid
+                                );
+
+                            }
 
                         }
 
@@ -235,68 +261,77 @@ module.exports = function ({ api, models }) {
                         "data"
                     ]);
 
-                for (const user of users) {
+                if (Array.isArray(users)) {
 
-                    const uid =
-                        String(user.userID);
+                    for (const user of users) {
 
-                    if (
-                        !global.data.allUserID.includes(
-                            uid
-                        )
-                    ) {
+                        if (!user) continue;
 
-                        global.data.allUserID.push(
-                            uid
-                        );
+                        const uid =
+                            String(
+                                user.userID ||
+                                user.id ||
+                                ""
+                            );
 
-                    }
+                        if (!uid) continue;
 
-                    if (user.name) {
+                        if (
+                            !global.data.allUserID.includes(uid)
+                        ) {
 
-                        global.data.userName.set(
-                            uid,
-                            user.name
-                        );
+                            global.data.allUserID.push(uid);
 
-                    }
+                        }
 
-                    // حظر المستخدم
-                    if (
-                        user.data &&
-                        (
-                            user.data.banned == 1 ||
-                            user.data.banned === true
-                        )
-                    ) {
+                        if (
+                            user.name &&
+                            global.data.userName
+                        ) {
 
-                        global.data.userBanned.set(
-                            uid,
-                            {
-                                reason:
-                                    user.data.reason || "",
+                            global.data.userName.set(
+                                uid,
+                                user.name
+                            );
 
-                                dateAdded:
-                                    user.data.dateAdded ||
-                                    Date.now()
-                            }
-                        );
+                        }
 
-                    }
+                        if (
+                            user.data &&
+                            (
+                                user.data.banned === true ||
+                                user.data.banned == 1
+                            )
+                        ) {
 
-                    // حظر الأوامر
-                    if (
-                        user.data &&
-                        Array.isArray(
-                            user.data.commandBanned
-                        ) &&
-                        user.data.commandBanned.length
-                    ) {
+                            global.data.userBanned.set(
+                                uid,
+                                {
+                                    reason:
+                                        user.data.reason || "",
 
-                        global.data.commandBanned.set(
-                            uid,
-                            user.data.commandBanned
-                        );
+                                    dateAdded:
+                                        user.data.dateAdded ||
+                                        Date.now()
+                                }
+                            );
+
+                        }
+
+                        if (
+                            user.data &&
+                            Array.isArray(
+                                user.data.commandBanned
+                            ) &&
+                            user.data.commandBanned.length
+                        ) {
+
+                            global.data.commandBanned.set(
+                                uid,
+                                user.data.commandBanned
+                            );
+
+                        }
 
                     }
 
@@ -322,22 +357,33 @@ module.exports = function ({ api, models }) {
                         "userID"
                     ]);
 
-                for (
-                    const currency of currencies
-                ) {
+                if (Array.isArray(currencies)) {
 
-                    const uid =
-                        String(currency.userID);
-
-                    if (
-                        !global.data.allCurrenciesID.includes(
-                            uid
-                        )
+                    for (
+                        const currency of currencies
                     ) {
 
-                        global.data.allCurrenciesID.push(
-                            uid
-                        );
+                        if (!currency) continue;
+
+                        const uid =
+                            String(
+                                currency.userID ||
+                                ""
+                            );
+
+                        if (!uid) continue;
+
+                        if (
+                            !global.data.allCurrenciesID.includes(
+                                uid
+                            )
+                        ) {
+
+                            global.data.allCurrenciesID.push(
+                                uid
+                            );
+
+                        }
 
                     }
 
@@ -353,7 +399,7 @@ module.exports = function ({ api, models }) {
             }
 
             logger(
-                "✅ اكتمل تحميل قاعدة البيانات",
+                "اكتمل تحميل قاعدة البيانات",
                 "[ DATABASE ]"
             );
 
@@ -378,7 +424,7 @@ module.exports = function ({ api, models }) {
 ║                    KIRA SYSTEM ONLINE                        ║
 ║───────────────────────────────────────────────────────────────║
 ║ PREFIX: ${global.config.PREFIX || "."}
-║ STATUS: 🟢 ONLINE
+║ STATUS: ONLINE
 ╚═══════════════════════════════════════════════════════════════╝
 `,
         "[ SYSTEM ]"
@@ -393,7 +439,7 @@ module.exports = function ({ api, models }) {
         try {
 
             logger(
-                `📊 ${global.data.allThreadID.length} Groups | ` +
+                `${global.data.allThreadID.length} Groups | ` +
                 `${global.data.allUserID.length} Users | ` +
                 `${global.client.commands.size} Commands | ` +
                 `${global.client.events.size} Events`,
@@ -414,7 +460,10 @@ module.exports = function ({ api, models }) {
 
             try {
 
-                if (typeof handleNotification === "function") {
+                if (
+                    typeof handleNotification ===
+                    "function"
+                ) {
 
                     handleNotification({
                         api
@@ -445,10 +494,6 @@ module.exports = function ({ api, models }) {
             return;
         }
 
-        // ========================================================
-        // IDs
-        // ========================================================
-
         const threadID =
             String(event.threadID || "");
 
@@ -459,9 +504,33 @@ module.exports = function ({ api, models }) {
             String(event.type || "");
 
         const logMessageType =
-            String(
-                event.logMessageType || ""
-            );
+            String(event.logMessageType || "");
+
+        // ========================================================
+        // IMPORTANT:
+        // منع البوت من معالجة رسائله هو نفسه
+        // ========================================================
+
+        let botID = "";
+
+        try {
+
+            botID =
+                String(
+                    api.getCurrentUserID()
+                );
+
+        } catch (e) {}
+
+        if (
+            botID &&
+            senderID &&
+            senderID === botID
+        ) {
+
+            return;
+
+        }
 
         // ========================================================
         // Developer Debug
@@ -476,28 +545,13 @@ module.exports = function ({ api, models }) {
             );
 
             console.log(
-                "📡 KIRA EVENT RECEIVED"
+                "KIRA EVENT RECEIVED"
             );
 
-            console.log(
-                "TYPE:",
-                type
-            );
-
-            console.log(
-                "LOG TYPE:",
-                logMessageType
-            );
-
-            console.log(
-                "THREAD:",
-                threadID
-            );
-
-            console.log(
-                "SENDER:",
-                senderID
-            );
+            console.log("TYPE:", type);
+            console.log("LOG TYPE:", logMessageType);
+            console.log("THREAD:", threadID);
+            console.log("SENDER:", senderID);
 
             console.log(
                 "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -519,16 +573,14 @@ module.exports = function ({ api, models }) {
         }
 
         // ========================================================
-        // الحظر
+        // Ban
         // ========================================================
 
         try {
 
             if (
                 global.data.userBanned &&
-                global.data.userBanned.has(
-                    senderID
-                )
+                global.data.userBanned.has(senderID)
             ) {
 
                 return;
@@ -537,9 +589,7 @@ module.exports = function ({ api, models }) {
 
             if (
                 global.data.threadBanned &&
-                global.data.threadBanned.has(
-                    threadID
-                )
+                global.data.threadBanned.has(threadID)
             ) {
 
                 return;
@@ -555,7 +605,7 @@ module.exports = function ({ api, models }) {
         try {
 
             // ====================================================
-            // 1. MESSAGE
+            // MESSAGE
             // ====================================================
 
             if (
@@ -563,28 +613,31 @@ module.exports = function ({ api, models }) {
                 type === "message_reply"
             ) {
 
-                // تحديث قاعدة البيانات
+                // قاعدة البيانات أولاً
                 await handleCreateDatabase({
                     event
                 });
 
-                // تشغيل الأوامر
+                // الردود
+                if (event.messageReply) {
+
+                    await handleReply({
+                        event
+                    });
+
+                }
+
+                // الأوامر
                 await handleCommand({
                     event
                 });
 
-                // تشغيل الردود
-                await handleReply({
-                    event
-                });
-
-                // تشغيل command events
+                // Command Events
                 await handleCommandEvent({
                     event
                 });
 
-                // مهم جدًا
-                // تشغيل جميع Events على الرسائل
+                // Events العامة
                 await handleEvent({
                     event
                 });
@@ -593,7 +646,7 @@ module.exports = function ({ api, models }) {
             }
 
             // ====================================================
-            // 2. REACTION
+            // REACTION
             // ====================================================
 
             if (
@@ -612,7 +665,7 @@ module.exports = function ({ api, models }) {
             }
 
             // ====================================================
-            // 3. JOIN
+            // JOIN
             // ====================================================
 
             if (
@@ -632,26 +685,18 @@ module.exports = function ({ api, models }) {
                     event
                 });
 
-                // ----------------------------------------------
-                // إذا كان البوت هو الذي تمت إضافته
-                // ----------------------------------------------
+                // ------------------------------------------------
+                // Bot Added
+                // ------------------------------------------------
 
                 try {
 
                     const added =
-                        event.logMessageData &&
                         Array.isArray(
-                            event.logMessageData
-                                .addedParticipants
+                            event.logMessageData?.addedParticipants
                         )
-                            ? event.logMessageData
-                                .addedParticipants
+                            ? event.logMessageData.addedParticipants
                             : [];
-
-                    const botID =
-                        String(
-                            api.getCurrentUserID()
-                        );
 
                     const botAdded =
                         added.some(
@@ -682,12 +727,12 @@ module.exports = function ({ api, models }) {
 `
 ◈ ───『 ${global.config.BOTNAME || "KIRA"} 』─── ◈
 
-✅ تم الاتصال بنجاح!
+تم الاتصال بنجاح!
 
-📋 البادئة:
+البادئة:
 ${global.config.PREFIX}
 
-💡 اكتب:
+اكتب:
 ${global.config.PREFIX}أوامر
 
 ◈ ───────────────── ◈
@@ -712,7 +757,7 @@ ${global.config.PREFIX}أوامر
             }
 
             // ====================================================
-            // 4. LEAVE
+            // LEAVE
             // ====================================================
 
             if (
@@ -732,7 +777,7 @@ ${global.config.PREFIX}أوامر
             }
 
             // ====================================================
-            // 5. ADMIN CHANGE
+            // ADMIN
             // ====================================================
 
             if (
@@ -752,7 +797,7 @@ ${global.config.PREFIX}أوامر
             }
 
             // ====================================================
-            // 6. GROUP NAME
+            // GROUP NAME
             // ====================================================
 
             if (
@@ -772,12 +817,12 @@ ${global.config.PREFIX}أوامر
             }
 
             // ====================================================
-            // 7. GROUP IMAGE / ICON
+            // GROUP ICON
             // ====================================================
 
             if (
                 logMessageType ===
-                "log:thread-icon" ||
+                    "log:thread-icon" ||
                 type === "change_thread_image"
             ) {
 
@@ -793,7 +838,7 @@ ${global.config.PREFIX}أوامر
             }
 
             // ====================================================
-            // 8. GENERAL EVENT
+            // GENERAL EVENT
             // ====================================================
 
             if (
@@ -816,7 +861,7 @@ ${global.config.PREFIX}أوامر
             }
 
             // ====================================================
-            // 9. ANY UNKNOWN EVENT
+            // UNKNOWN
             // ====================================================
 
             await handleEvent({
@@ -825,16 +870,12 @@ ${global.config.PREFIX}أوامر
 
         } catch (error) {
 
-            // ====================================================
-            // ERROR
-            // ====================================================
-
             console.error(
                 "═══════════════════════════════════════"
             );
 
             console.error(
-                "❌ KIRA LISTEN ERROR"
+                "KIRA LISTEN ERROR"
             );
 
             console.error(
@@ -869,7 +910,7 @@ ${global.config.PREFIX}أوامر
             try {
 
                 logger(
-                    `❌ LISTEN ERROR
+                    `LISTEN ERROR
 TYPE: ${type}
 LOG TYPE: ${logMessageType}
 THREAD: ${threadID}
@@ -879,22 +920,19 @@ ERROR: ${error.message}`,
 
             } catch (e) {}
 
-            // ====================================================
-            // إرسال الخطأ للمطور
-            // ====================================================
-
+            // لا نرسل خطأ للمطور إذا كان الخطأ
+            // نفسه ممكن يؤدي إلى دورة رسائل
             if (
                 global.config.DeveloperMode &&
-                Array.isArray(
-                    global.config.ADMINBOT
-                ) &&
-                global.config.ADMINBOT[0]
+                Array.isArray(global.config.ADMINBOT) &&
+                global.config.ADMINBOT[0] &&
+                String(global.config.ADMINBOT[0]) !== botID
             ) {
 
                 try {
 
                     await api.sendMessage(
-                        `⚠️ KIRA LISTEN ERROR
+`KIRA LISTEN ERROR
 
 TYPE:
 ${type}
