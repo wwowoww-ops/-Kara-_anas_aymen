@@ -5,9 +5,9 @@ const jimp = require("jimp");
 
 module.exports.config = {
   name: "زوجيني",
-  version: "6.1.0",
-  credits: "أبو هريرة",
+  version: "7.0.0",
   hasPermssion: 0,
+  credits: "أبو هريرة",
   description: "زواج عشوائي مع صور الطرفين ونسبة التوافق",
   commandCategory: "Fun",
   usages: "زوجيني",
@@ -23,66 +23,356 @@ module.exports.config = {
 const TEMPLATE_URL =
   "https://files.catbox.moe/8zlvjg.jpg";
 
+
+// ==================================================
+// تحميل صورة البروفايل
+// ==================================================
+
 async function downloadAvatar(uid, savePath) {
+
   const url =
     `https://graph.facebook.com/${uid}/picture` +
     `?width=512&height=512` +
     `&access_token=6628568379%7Cc1e620fa708a1d5696fb991c1bde5662`;
 
-  const response = await axios.get(url, {
-    responseType: "arraybuffer",
-    timeout: 20000,
-    headers: {
-      "User-Agent": "Mozilla/5.0"
+  const response = await axios.get(
+    url,
+    {
+      responseType: "arraybuffer",
+      timeout: 20000,
+      headers: {
+        "User-Agent": "Mozilla/5.0"
+      }
     }
-  });
+  );
 
-  fs.writeFileSync(savePath, Buffer.from(response.data));
+  fs.writeFileSync(
+    savePath,
+    Buffer.from(response.data)
+  );
 
   return savePath;
 }
 
+
+// ==================================================
+// الحصول على معلومات المجموعة
+// ==================================================
+
+async function getGroupInfo(api, Threads, threadID) {
+
+  let info = null;
+
+  // ----------------------------------------------
+  // الطريقة الأولى: Threads
+  // ----------------------------------------------
+
+  try {
+
+    if (
+      Threads &&
+      typeof Threads.getInfo === "function"
+    ) {
+
+      info =
+        await Threads.getInfo(
+          String(threadID)
+        );
+
+    }
+
+  } catch (error) {
+
+    console.log(
+      "زوجيني Threads.getInfo:",
+      error.message
+    );
+
+  }
+
+
+  // ----------------------------------------------
+  // الطريقة الثانية: API
+  // ----------------------------------------------
+
+  if (!info) {
+
+    try {
+
+      if (
+        api &&
+        typeof api.getThreadInfo === "function"
+      ) {
+
+        info =
+          await api.getThreadInfo(
+            String(threadID)
+          );
+
+      }
+
+    } catch (error) {
+
+      console.log(
+        "زوجيني api.getThreadInfo:",
+        error.message
+      );
+
+    }
+
+  }
+
+
+  // ----------------------------------------------
+  // التأكد من أن البيانات صحيحة
+  // ----------------------------------------------
+
+  if (
+    !info ||
+    typeof info !== "object"
+  ) {
+
+    return null;
+
+  }
+
+  return info;
+}
+
+
+// ==================================================
+// استخراج IDs الأعضاء من جميع الصيغ المحتملة
+// ==================================================
+
+function getParticipantIDs(info) {
+
+  if (!info) {
+    return [];
+  }
+
+
+  // الصيغة الأساسية
+  if (
+    Array.isArray(
+      info.participantIDs
+    )
+  ) {
+
+    return info.participantIDs
+      .map(id => String(id))
+      .filter(Boolean);
+
+  }
+
+
+  // بعض نسخ FCA تستخدم participants
+  if (
+    Array.isArray(
+      info.participants
+    )
+  ) {
+
+    return info.participants
+      .map(user => {
+
+        if (
+          typeof user === "string" ||
+          typeof user === "number"
+        ) {
+
+          return String(user);
+
+        }
+
+        if (user && user.id) {
+
+          return String(user.id);
+
+        }
+
+        if (user && user.userID) {
+
+          return String(user.userID);
+
+        }
+
+        return null;
+
+      })
+      .filter(Boolean);
+
+  }
+
+
+  // صيغة userInfo
+  if (
+    Array.isArray(
+      info.userInfo
+    )
+  ) {
+
+    return info.userInfo
+      .map(user => {
+
+        if (
+          user &&
+          user.id
+        ) {
+
+          return String(user.id);
+
+        }
+
+        if (
+          user &&
+          user.userID
+        ) {
+
+          return String(user.userID);
+
+        }
+
+        return null;
+
+      })
+      .filter(Boolean);
+
+  }
+
+
+  return [];
+
+}
+
+
+// ==================================================
+// الحصول على اسم المستخدم
+// ==================================================
+
+async function getUserName(
+  api,
+  Users,
+  uid,
+  fallback
+) {
+
+  try {
+
+    if (
+      Users &&
+      typeof Users.getNameUser === "function"
+    ) {
+
+      const name =
+        await Users.getNameUser(
+          String(uid)
+        );
+
+      if (name) {
+        return name;
+      }
+
+    }
+
+  } catch (e) {}
+
+
+  try {
+
+    if (
+      api &&
+      typeof api.getUserInfo === "function"
+    ) {
+
+      const info =
+        await api.getUserInfo(
+          String(uid)
+        );
+
+      if (
+        info &&
+        info[String(uid)] &&
+        info[String(uid)].name
+      ) {
+
+        return info[String(uid)].name;
+
+      }
+
+    }
+
+  } catch (e) {}
+
+
+  return fallback;
+}
+
+
+// ==================================================
+// الأمر
+// ==================================================
+
 module.exports.run = async function ({
   api,
   event,
-  Users
+  Users,
+  Threads
 }) {
 
-  const {
-    threadID,
-    messageID,
-    senderID
-  } = event;
+  const threadID =
+    String(event.threadID);
 
-  const cacheDir = path.join(
-    __dirname,
-    "cache",
-    "canvas"
+  const messageID =
+    event.messageID;
+
+  const senderID =
+    String(event.senderID);
+
+
+  const cacheDir =
+    path.join(
+      __dirname,
+      "cache",
+      "canvas"
+    );
+
+
+  await fs.ensureDir(
+    cacheDir
   );
 
-  await fs.ensureDir(cacheDir);
 
-  const time = Date.now();
+  const time =
+    Date.now();
 
-  const finalPath = path.join(
-    cacheDir,
-    `زوجيني_${senderID}_${time}.png`
-  );
 
-  const senderAvatarPath = path.join(
-    cacheDir,
-    `زوجيني_sender_${senderID}_${time}.jpg`
-  );
+  const finalPath =
+    path.join(
+      cacheDir,
+      `زوجيني_${senderID}_${time}.png`
+    );
 
-  const partnerAvatarPath = path.join(
-    cacheDir,
-    `زوجيني_partner_${time}.jpg`
-  );
 
-  const backgroundPath = path.join(
-    cacheDir,
-    "زوجيني_background.jpg"
-  );
+  const senderAvatarPath =
+    path.join(
+      cacheDir,
+      `زوجيني_sender_${senderID}_${time}.jpg`
+    );
+
+
+  const partnerAvatarPath =
+    path.join(
+      cacheDir,
+      `زوجيني_partner_${time}.jpg`
+    );
+
+
+  const backgroundPath =
+    path.join(
+      cacheDir,
+      "زوجيني_background.jpg"
+    );
+
 
   try {
 
@@ -91,75 +381,41 @@ module.exports.run = async function ({
     // ==================================================
 
     const threadInfo =
-      await api.getThreadInfo(String(threadID));
+      await getGroupInfo(
+        api,
+        Threads,
+        threadID
+      );
 
-    // ==================================================
-    // التحقق من أن معلومات المجموعة موجودة
-    // ==================================================
 
-    if (
-      !threadInfo ||
-      typeof threadInfo !== "object"
-    ) {
+    if (!threadInfo) {
 
       return api.sendMessage(
-        `⌬ ━━ HINA FUN ━━ ⌬\n\n` +
-        `❌ تعذر الحصول على معلومات أعضاء المجموعة.\n\n` +
-        `📝 حاول استخدام الأمر مرة أخرى.`,
+
+        `⌬ ━━ HINA FUN ━━ ⌬
+
+❌ تعذر الحصول على معلومات المجموعة.
+
+📝 لم يتمكن البوت من قراءة أعضاء المجموعة.
+حاول استخدام الأمر مرة أخرى.`,
+
         threadID,
         messageID
+
       );
 
     }
 
-    // ==================================================
-    // الحصول على المشاركين بأمان
-    // ==================================================
-
-    let participants = [];
-
-    if (
-      Array.isArray(
-        threadInfo.participantIDs
-      )
-    ) {
-
-      participants =
-        threadInfo.participantIDs;
-
-    } else if (
-      Array.isArray(
-        threadInfo.participants
-      )
-    ) {
-
-      participants =
-        threadInfo.participants
-          .map(user => {
-
-            if (
-              typeof user === "string" ||
-              typeof user === "number"
-            ) {
-              return String(user);
-            }
-
-            return (
-              user?.userFbId ||
-              user?.id ||
-              user?.userID ||
-              null
-            );
-
-          })
-          .filter(Boolean)
-          .map(id => String(id));
-
-    }
 
     // ==================================================
-    // التحقق من وجود أعضاء
+    // استخراج الأعضاء بأمان
     // ==================================================
+
+    const participants =
+      getParticipantIDs(
+        threadInfo
+      );
+
 
     if (
       !Array.isArray(participants) ||
@@ -167,53 +423,71 @@ module.exports.run = async function ({
     ) {
 
       return api.sendMessage(
-        `⌬ ━━ HINA FUN ━━ ⌬\n\n` +
-        `❌ لم أستطع العثور على أعضاء المجموعة.`,
+
+        `⌬ ━━ HINA FUN ━━ ⌬
+
+❌ لا أستطيع العثور على أعضاء المجموعة.
+
+📝 تأكد أن البوت يستطيع قراءة معلومات المجموعة.`,
+
         threadID,
         messageID
+
       );
 
     }
+
+
+    // ==================================================
+    // IDs
+    // ==================================================
 
     const botID =
       String(
         api.getCurrentUserID()
       );
 
-    const currentUserID =
-      String(senderID);
 
     // ==================================================
     // استبعاد البوت وصاحب الأمر
     // ==================================================
 
     const members =
-      participants
-        .map(id => String(id))
-        .filter(id => {
+      participants.filter(
+        id => {
+
+          const uid =
+            String(id);
 
           return (
-            id !== botID &&
-            id !== currentUserID
+            uid !== botID &&
+            uid !== senderID
           );
 
-        });
+        }
+      );
+
 
     if (
       members.length === 0
     ) {
 
       return api.sendMessage(
-        `⌬ ━━ HINA FUN ━━ ⌬\n\n` +
-        `❌ لا يوجد أعضاء كافيين في المجموعة!`,
+
+        `⌬ ━━ HINA FUN ━━ ⌬
+
+❌ لا يوجد عضو آخر متاح للاختيار العشوائي.`,
+
         threadID,
         messageID
+
       );
 
     }
 
+
     // ==================================================
-    // اختيار شخص عشوائي
+    // اختيار الشريك
     // ==================================================
 
     const partnerID =
@@ -226,87 +500,28 @@ module.exports.run = async function ({
         ]
       );
 
+
     // ==================================================
-    // أسماء الأعضاء
+    // الأسماء
     // ==================================================
 
-    let senderName =
-      "المستخدم";
+    const senderName =
+      await getUserName(
+        api,
+        Users,
+        senderID,
+        "المستخدم"
+      );
 
-    let partnerName =
-      "العضو المختار";
 
-    try {
+    const partnerName =
+      await getUserName(
+        api,
+        Users,
+        partnerID,
+        "العضو المختار"
+      );
 
-      if (
-        Users &&
-        typeof Users.getNameUser ===
-        "function"
-      ) {
-
-        const name =
-          await Users.getNameUser(
-            senderID
-          );
-
-        if (name) {
-          senderName = name;
-        }
-
-      }
-
-    } catch (e) {
-
-      try {
-
-        const info =
-          await api.getUserInfo(
-            senderID
-          );
-
-        senderName =
-          info?.[senderID]?.name ||
-          "المستخدم";
-
-      } catch (e2) {}
-
-    }
-
-    try {
-
-      if (
-        Users &&
-        typeof Users.getNameUser ===
-        "function"
-      ) {
-
-        const name =
-          await Users.getNameUser(
-            partnerID
-          );
-
-        if (name) {
-          partnerName = name;
-        }
-
-      }
-
-    } catch (e) {
-
-      try {
-
-        const info =
-          await api.getUserInfo(
-            partnerID
-          );
-
-        partnerName =
-          info?.[partnerID]?.name ||
-          "العضو المختار";
-
-      } catch (e2) {}
-
-    }
 
     // ==================================================
     // تحميل الصور
@@ -326,6 +541,7 @@ module.exports.run = async function ({
 
     ]);
 
+
     // ==================================================
     // تحميل القالب
     // ==================================================
@@ -340,13 +556,20 @@ module.exports.run = async function ({
         await axios.get(
           TEMPLATE_URL,
           {
-            responseType: "arraybuffer",
-            timeout: 20000,
+            responseType:
+              "arraybuffer",
+
+            timeout:
+              20000,
+
             headers: {
-              "User-Agent": "Mozilla/5.0"
+              "User-Agent":
+                "Mozilla/5.0"
             }
+
           }
         );
+
 
       fs.writeFileSync(
         backgroundPath,
@@ -357,8 +580,9 @@ module.exports.run = async function ({
 
     }
 
+
     // ==================================================
-    // قراءة القالب
+    // قراءة الصور
     // ==================================================
 
     const baseImage =
@@ -366,29 +590,30 @@ module.exports.run = async function ({
         backgroundPath
       );
 
-    // ==================================================
-    // قراءة الصور
-    // ==================================================
 
     const senderImage =
       await jimp.read(
         senderAvatarPath
       );
 
+
     const partnerImage =
       await jimp.read(
         partnerAvatarPath
       );
 
+
     // ==================================================
-    // تحويل الصور إلى دوائر
+    // الدائرة
     // ==================================================
 
     senderImage.circle();
+
     partnerImage.circle();
 
+
     // ==================================================
-    // تصغير الصور
+    // الحجم
     // ==================================================
 
     senderImage.resize(
@@ -397,11 +622,13 @@ module.exports.run = async function ({
       jimp.RESIZE_BICUBIC
     );
 
+
     partnerImage.resize(
       153,
       153,
       jimp.RESIZE_BICUBIC
     );
+
 
     // ==================================================
     // وضع الصور
@@ -413,11 +640,13 @@ module.exports.run = async function ({
       163
     );
 
+
     baseImage.composite(
       partnerImage,
       619,
       163
     );
+
 
     // ==================================================
     // نسبة التوافق
@@ -428,7 +657,9 @@ module.exports.run = async function ({
         Math.random() * 51
       ) + 50;
 
+
     let loveMessage;
+
 
     if (
       lovePercent >= 90
@@ -458,6 +689,7 @@ module.exports.run = async function ({
 
     }
 
+
     // ==================================================
     // الخط
     // ==================================================
@@ -467,14 +699,17 @@ module.exports.run = async function ({
         jimp.FONT_SANS_32_WHITE
       );
 
+
     const percentText =
       `${lovePercent}%`;
+
 
     const textWidth =
       jimp.measureText(
         font,
         percentText
       );
+
 
     const textHeight =
       jimp.measureTextHeight(
@@ -483,11 +718,17 @@ module.exports.run = async function ({
         200
       );
 
+
+    // ==================================================
+    // مركز القلب
+    // ==================================================
+
     const heartCenterX =
       425;
 
     const heartCenterY =
       239;
+
 
     const textX =
       heartCenterX -
@@ -495,15 +736,13 @@ module.exports.run = async function ({
         textWidth / 2
       );
 
+
     const textY =
       heartCenterY -
       Math.floor(
         textHeight / 2
       );
 
-    // ==================================================
-    // وضع النسبة
-    // ==================================================
 
     baseImage.print(
       font,
@@ -512,8 +751,9 @@ module.exports.run = async function ({
       percentText
     );
 
+
     // ==================================================
-    // حفظ الصورة
+    // حفظ
     // ==================================================
 
     const buffer =
@@ -521,10 +761,12 @@ module.exports.run = async function ({
         "image/png"
       );
 
+
     fs.writeFileSync(
       finalPath,
       buffer
     );
+
 
     // ==================================================
     // الرد
@@ -532,15 +774,16 @@ module.exports.run = async function ({
 
     const funnyReplies = [
 
-      `💍 ألف مبروك الزواج لـ ${senderName} و ${partnerName}! 🎉`,
+      `ألف مبروك الزواج لـ ${senderName} و ${partnerName}!`,
 
-      `💕 تم الزواج! ${senderName} و ${partnerName} أصبحا زوجين!`,
+      `تم الزواج! ${senderName} و ${partnerName} أصبحا زوجين!`,
 
-      `🌸 مبارك للعروسين ${senderName} و ${partnerName}! 💐`,
+      `مبارك للعروسين ${senderName} و ${partnerName}!`,
 
-      `💖 زواج سعيد لـ ${senderName} و ${partnerName}! 🎊`
+      `زواج سعيد لـ ${senderName} و ${partnerName}!`
 
     ];
+
 
     const randomReply =
       funnyReplies[
@@ -550,33 +793,39 @@ module.exports.run = async function ({
         )
       ];
 
+
     const message =
-      `⌬ ━━ HINA FUN ━━ ⌬\n\n` +
+      `⌬ ━━ HINA FUN ━━ ⌬
 
-      `${randomReply}\n\n` +
+${randomReply}
 
-      `👤 ${senderName}\n` +
+👤 ${senderName}
 
-      `💍 ${partnerName}\n\n` +
+💍 ${partnerName}
 
-      `❤️ نسبة التوافق: ${lovePercent}%\n` +
+❤️ نسبة التوافق:
+${lovePercent}%
 
-      `${loveMessage}\n\n` +
+${loveMessage}
 
-      `✦ المطور: أبو هريرة`;
+✦ المطور: أبو هريرة`;
+
 
     // ==================================================
     // إرسال الصورة
     // ==================================================
 
     return api.sendMessage(
+
       {
-        body: message,
+        body:
+          message,
 
         attachment:
           fs.createReadStream(
             finalPath
           )
+
       },
 
       threadID,
@@ -590,54 +839,58 @@ module.exports.run = async function ({
               finalPath
             )
           ) {
+
             fs.unlinkSync(
               finalPath
             );
+
           }
+
 
           if (
             fs.existsSync(
               senderAvatarPath
             )
           ) {
+
             fs.unlinkSync(
               senderAvatarPath
             );
+
           }
+
 
           if (
             fs.existsSync(
               partnerAvatarPath
             )
           ) {
+
             fs.unlinkSync(
               partnerAvatarPath
             );
+
           }
 
-        } catch (error) {
-
-          console.error(
-            "خطأ في حذف الملفات:",
-            error.message
-          );
-
-        }
+        } catch (e) {}
 
       },
 
       messageID
+
     );
+
 
   } catch (error) {
 
     console.error(
-      "❌ خطأ في زوجيني:",
+      "❌ زوجيني ERROR:",
       error
     );
 
+
     // ==================================================
-    // تنظيف الملفات
+    // تنظيف
     // ==================================================
 
     try {
@@ -647,41 +900,58 @@ module.exports.run = async function ({
           finalPath
         )
       ) {
+
         fs.unlinkSync(
           finalPath
         );
+
       }
+
 
       if (
         fs.existsSync(
           senderAvatarPath
         )
       ) {
+
         fs.unlinkSync(
           senderAvatarPath
         );
+
       }
+
 
       if (
         fs.existsSync(
           partnerAvatarPath
         )
       ) {
+
         fs.unlinkSync(
           partnerAvatarPath
         );
+
       }
 
     } catch (e) {}
 
+
     return api.sendMessage(
-      `⌬ ━━ HINA FUN ━━ ⌬\n\n` +
-      `❌ حدث خطأ أثناء إنشاء الصورة.\n\n` +
-      `📝 ${error.message}`,
+
+      `⌬ ━━ HINA FUN ━━ ⌬
+
+❌ حدث خطأ أثناء إنشاء الصورة.
+
+📝 ${
+        error?.message ||
+        "خطأ غير معروف"
+      }`,
 
       threadID,
       messageID
+
     );
 
   }
+
 };
