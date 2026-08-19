@@ -1,69 +1,382 @@
-//Mod by Nhật Tân
-module.exports = function ({ Users, Threads, Currencies }) {
-    const logger =require("../../utils/log.js");
+module.exports = function ({
+    Users,
+    Threads,
+    Currencies
+}) {
+
+    const logger =
+        require("../../utils/log.js");
+
     return async function ({ event }) {
-        const { allUserID, allCurrenciesID, allThreadID, userName, threadInfo } = global.data; 
-        const { autoCreateDB } = global.config;
-        if (autoCreateDB == ![]) return;
-        var { senderID, threadID } = event;
-        senderID = String(senderID);
-        var threadID = String(threadID);
+
         try {
-            if (!allThreadID.includes(threadID) && event.isGroup == !![]) {
-                const threadIn4 = await Threads.getInfo(threadID);
-                const setting = {};
-                setting.threadName = threadIn4.threadName
-                setting.adminIDs = threadIn4.adminIDs
-                setting.nicknames = threadIn4.nicknames;
-                const dataThread = setting;
-                allThreadID.push(threadID)
-                threadInfo.set(threadID, dataThread);
-                var job = ["FF9900","FFFF33","33FFFF","FF99FF","FF3366","FFFF66","FF00FF","66FF99","00CCFF","FF0099","FF0066","008E97","F58220","38B6FF","7ED957","97FFFF","00BFFF","76EEC6","4EEE94","98F5FF","AFD788","00B2BF","9F79EE","00FA9A"];
-                const chalk = require('chalk');
-                var random = job[Math.floor(Math.random() * job.length)]      
-        var random1 = job[Math.floor(Math.random() * job.length)]
-        var random2 = job[Math.floor(Math.random() * job.length)]
-                const setting2 = {};
-                setting2.threadInfo = dataThread
-                setting2.data = {}
-                await Threads.setData(threadID, setting2);
-                for (singleData of threadIn4.userInfo) {
-                    userName.set(String(singleData.id), singleData.name);
-                    try {
-                        global.data.allUserID.includes(String(singleData.id)) ? (await Users.setData(String(singleData.id), 
-                        {
-                            'name': singleData.name
-                        }), 
-                        global.data.allUserID.push(singleData.id)) : (await Users.createData(singleData.id, 
-                        {
-                            'name': singleData.name,
-                            'data': {}
-                        }), 
-                        global.data.allUserID.push(String(singleData.id)), 
-                        global.data.allUserID.push(String(singleData.name)), 
-                        logger(global.getText('handleCreateDatabase', 'newUser', chalk.hex("#" + random)(`New user:  `) + chalk.hex("#" + random1)(`${singleData.name}`) + "  ||  " + chalk.hex("#" + random2)(`${singleData.id}`)), '[ USER ]'));
-                    } catch(e) { console.log(e) };
+
+            if (!event) {
+                return;
+            }
+
+            const {
+                allUserID,
+                allCurrenciesID,
+                allThreadID,
+                userName,
+                threadInfo,
+                threadData
+            } = global.data;
+
+            if (
+                global.config.autoCreateDB === false
+            ) {
+
+                return;
+            }
+
+            let senderID =
+                String(event.senderID || "");
+
+            let threadID =
+                String(event.threadID || "");
+
+            if (!senderID) {
+                return;
+            }
+
+            // ==================================================
+            // GROUP
+            // ==================================================
+
+            if (
+                threadID &&
+                event.isGroup === true &&
+                !allThreadID.includes(threadID)
+            ) {
+
+                const threadInfoFromFB =
+                    await Threads.getInfo(threadID);
+
+                if (
+                    !threadInfoFromFB ||
+                    typeof threadInfoFromFB !== "object"
+                ) {
+
+                    return;
                 }
-                logger(global.getText('handleCreateDatabase', 'newThread',chalk.hex("#" + random)(`New group: `) + chalk.hex("#" + random1)(`${threadID}`) + "  ||  " + chalk.hex("#" + random2)(`${threadIn4.threadName}`)), '[ THREAD ]');
+
+                const dataThread = {
+                    threadName:
+                        threadInfoFromFB.threadName || "",
+
+                    adminIDs:
+                        threadInfoFromFB.adminIDs || [],
+
+                    nicknames:
+                        threadInfoFromFB.nicknames || {}
+                };
+
+                allThreadID.push(threadID);
+
+                if (
+                    threadInfo &&
+                    typeof threadInfo.set === "function"
+                ) {
+
+                    threadInfo.set(
+                        threadID,
+                        dataThread
+                    );
+
+                }
+
+                if (
+                    threadData &&
+                    typeof threadData.set === "function"
+                ) {
+
+                    threadData.set(
+                        threadID,
+                        {}
+                    );
+
+                }
+
+                // إنشاء المجموعة في Mongo
+                try {
+
+                    const existing =
+                        await Threads.getData(
+                            threadID
+                        );
+
+                    if (
+                        !existing ||
+                        existing === false
+                    ) {
+
+                        await Threads.createData(
+                            threadID,
+                            {
+                                threadInfo:
+                                    dataThread,
+
+                                data: {}
+                            }
+                        );
+
+                    }
+
+                } catch (error) {
+
+                    console.error(
+                        "THREAD CREATE ERROR:",
+                        error
+                    );
+
+                }
+
+                // ==================================================
+                // USERS OF GROUP
+                // ==================================================
+
+                if (
+                    Array.isArray(
+                        threadInfoFromFB.userInfo
+                    )
+                ) {
+
+                    for (
+                        const singleData
+                        of threadInfoFromFB.userInfo
+                    ) {
+
+                        if (!singleData) {
+                            continue;
+                        }
+
+                        const uid =
+                            String(
+                                singleData.id || ""
+                            );
+
+                        if (!uid) {
+                            continue;
+                        }
+
+                        const name =
+                            singleData.name || "";
+
+                        if (
+                            userName &&
+                            typeof userName.set ===
+                            "function"
+                        ) {
+
+                            userName.set(
+                                uid,
+                                name
+                            );
+
+                        }
+
+                        // مهم:
+                        // لا نضيف الاسم إلى allUserID
+                        if (
+                            !allUserID.includes(uid)
+                        ) {
+
+                            try {
+
+                                await Users.createData(
+                                    uid,
+                                    {
+                                        name,
+                                        data: {}
+                                    }
+                                );
+
+                            } catch (error) {
+
+                                try {
+
+                                    await Users.setData(
+                                        uid,
+                                        {
+                                            name
+                                        }
+                                    );
+
+                                } catch (e) {}
+
+                            }
+
+                            allUserID.push(uid);
+
+                            logger(
+                                `New user: ${name} || ${uid}`,
+                                "[ USER ]"
+                            );
+
+                        }
+
+                    }
+
+                }
+
+                logger(
+                    `New group: ${threadID} || ${dataThread.threadName}`,
+                    "[ THREAD ]"
+                );
+
             }
-            if (!allUserID.includes(senderID) || !userName.has(senderID)) {
-                const infoUsers = await Users.getInfo(senderID),
-                    setting3 = {};
-                setting3.name = infoUsers.name
-                await Users.createData(senderID, setting3)
-                allUserID.push(senderID) 
-                userName.set(senderID, infoUsers.name)
-                logger(global.getText('handleCreateDatabase', 'newUser', chalk.hex("#" + random)(`New users: `) + chalk.hex("#" + random1)(`${singleData.name}`) + " || " + chalk.hex("#" + random2)(`${senderID}`)), '[ USER ]');
+
+            // ==================================================
+            // CURRENT USER
+            // ==================================================
+
+            if (
+                senderID &&
+                (
+                    !allUserID.includes(senderID) ||
+                    !userName.has(senderID)
+                )
+            ) {
+
+                try {
+
+                    const infoUser =
+                        await Users.getInfo(
+                            senderID
+                        );
+
+                    const name =
+                        infoUser?.name || "";
+
+                    if (
+                        !allUserID.includes(senderID)
+                    ) {
+
+                        try {
+
+                            await Users.createData(
+                                senderID,
+                                {
+                                    name,
+                                    data: {}
+                                }
+                            );
+
+                        } catch (error) {
+
+                            try {
+
+                                await Users.setData(
+                                    senderID,
+                                    {
+                                        name
+                                    }
+                                );
+
+                            } catch (e) {}
+
+                        }
+
+                        allUserID.push(
+                            senderID
+                        );
+
+                    } else {
+
+                        try {
+
+                            await Users.setData(
+                                senderID,
+                                {
+                                    name
+                                }
+                            );
+
+                        } catch (e) {}
+
+                    }
+
+                    if (
+                        userName &&
+                        typeof userName.set ===
+                        "function"
+                    ) {
+
+                        userName.set(
+                            senderID,
+                            name
+                        );
+
+                    }
+
+                    logger(
+                        `New user: ${name} || ${senderID}`,
+                        "[ USER ]"
+                    );
+
+                } catch (error) {
+
+                    console.error(
+                        "CURRENT USER DATABASE ERROR:",
+                        error
+                    );
+
+                }
+
             }
-            if (!allCurrenciesID.includes(senderID)) {
-                const setting4 = {};
-                setting4.data = {}
-                await Currencies.createData(senderID, setting4) 
-                allCurrenciesID.push(senderID);
+
+            // ==================================================
+            // CURRENCY
+            // ==================================================
+
+            if (
+                senderID &&
+                !allCurrenciesID.includes(senderID)
+            ) {
+
+                try {
+
+                    await Currencies.createData(
+                        senderID,
+                        {
+                            data: {}
+                        }
+                    );
+
+                } catch (error) {
+
+                    console.error(
+                        "CURRENCY CREATE ERROR:",
+                        error
+                    );
+
+                }
+
+                if (
+                    !allCurrenciesID.includes(
+                        senderID
+                    )
+                ) {
+
+                    allCurrenciesID.push(
+                        senderID
+                    );
+
+                }
+
             }
-            return;
-        } catch (err) {
-            return console.log(err);
+
+        } catch (error) {
+
+            console.error(
+                "HANDLE CREATE DATABASE ERROR:",
+                error
+            );
+
         }
+
     };
-}
+
+};
