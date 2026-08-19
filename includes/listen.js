@@ -1,6 +1,8 @@
 /**
- * KIRA LISTEN.JS
- * Central Event & Command Router
+ * ╔═══════════════════════════════════════════════════════════════╗
+ * ║                 KIRA — LISTEN SYSTEM                         ║
+ * ║              Event Router — Stable Version                   ║
+ * ╚═══════════════════════════════════════════════════════════════╝
  */
 
 module.exports = function ({ api, models }) {
@@ -29,84 +31,76 @@ module.exports = function ({ api, models }) {
     // Handlers
     // ============================================================
 
-    const handleCommand =
-        require("./handle/handleCommand")({
-            api,
-            models,
-            Users,
-            Threads,
-            Currencies
-        });
+    const handleCommand = require("./handle/handleCommand")({
+        api,
+        models,
+        Users,
+        Threads,
+        Currencies
+    });
 
-    const handleCommandEvent =
-        require("./handle/handleCommandEvent")({
-            api,
-            models,
-            Users,
-            Threads,
-            Currencies
-        });
+    const handleCommandEvent = require("./handle/handleCommandEvent")({
+        api,
+        models,
+        Users,
+        Threads,
+        Currencies
+    });
 
-    const handleReply =
-        require("./handle/handleReply")({
-            api,
-            models,
-            Users,
-            Threads,
-            Currencies
-        });
+    const handleReply = require("./handle/handleReply")({
+        api,
+        models,
+        Users,
+        Threads,
+        Currencies
+    });
 
-    const handleReaction =
-        require("./handle/handleReaction")({
-            api,
-            models,
-            Users,
-            Threads,
-            Currencies
-        });
+    const handleReaction = require("./handle/handleReaction")({
+        api,
+        models,
+        Users,
+        Threads,
+        Currencies
+    });
 
-    const handleEvent =
-        require("./handle/handleEvent")({
-            api,
-            models,
-            Users,
-            Threads,
-            Currencies
-        });
+    const handleEvent = require("./handle/handleEvent")({
+        api,
+        models,
+        Users,
+        Threads,
+        Currencies
+    });
 
-    const handleRefresh =
-        require("./handle/handleRefresh")({
-            api,
-            models,
-            Users,
-            Threads,
-            Currencies
-        });
+    const handleRefresh = require("./handle/handleRefresh")({
+        api,
+        models,
+        Users,
+        Threads,
+        Currencies
+    });
 
-    const handleCreateDatabase =
-        require("./handle/handleCreateDatabase")({
-            api,
-            Threads,
-            Users,
-            Currencies,
-            models
-        });
+    const handleCreateDatabase = require("./handle/handleCreateDatabase")({
+        api,
+        Threads,
+        Users,
+        Currencies,
+        models
+    });
 
-    const handleNotification =
-        require("./handle/handleNotification")({
-            api
-        });
+    const handleNotification = require("./handle/handleNotification")({
+        api
+    });
 
     // ============================================================
-    // Database Loader
+    // تحميل قاعدة البيانات
     // ============================================================
 
-    (async function () {
+    (async function loadDatabase() {
 
         try {
 
             logger(
-                "جاري تحميل قاعدة البيانات...",
+                "📊 جاري تحميل قاعدة البيانات...",
                 "[ DATABASE ]"
             );
 
@@ -114,302 +108,190 @@ module.exports = function ({ api, models }) {
             // Threads
             // ----------------------------------------------------
 
-            try {
+            const threads = await Threads.getAll([
+                "threadID",
+                "data",
+                "threadInfo"
+            ]);
 
-                const threads =
-                    await Threads.getAll();
+            for (const thread of threads) {
 
-                if (Array.isArray(threads)) {
+                const tid =
+                    String(thread.threadID);
 
-                    for (const thread of threads) {
+                if (
+                    !global.data.allThreadID.includes(tid)
+                ) {
 
-                        if (!thread) continue;
-
-                        const tid =
-                            String(
-                                thread.threadID ||
-                                thread.id ||
-                                ""
-                            );
-
-                        if (!tid) continue;
-
-                        if (
-                            Array.isArray(
-                                global.data.allThreadID
-                            ) &&
-                            !global.data.allThreadID.includes(tid)
-                        ) {
-
-                            global.data.allThreadID.push(tid);
-
-                        }
-
-                        if (
-                            global.data.threadData &&
-                            typeof global.data.threadData.set ===
-                            "function"
-                        ) {
-
-                            global.data.threadData.set(
-                                tid,
-                                thread.data || {}
-                            );
-
-                        }
-
-                        if (
-                            global.data.threadInfo &&
-                            typeof global.data.threadInfo.set ===
-                            "function"
-                        ) {
-
-                            global.data.threadInfo.set(
-                                tid,
-                                thread.threadInfo || {}
-                            );
-
-                        }
-
-                        // حظر المجموعة
-                        if (
-                            thread.data &&
-                            (
-                                thread.data.banned === true ||
-                                thread.data.banned == 1
-                            )
-                        ) {
-
-                            global.data.threadBanned.set(
-                                tid,
-                                {
-                                    reason:
-                                        thread.data.reason || "",
-
-                                    dateAdded:
-                                        thread.data.dateAdded ||
-                                        Date.now()
-                                }
-                            );
-
-                        }
-
-                        // حظر أوامر
-                        if (
-                            thread.data &&
-                            Array.isArray(
-                                thread.data.commandBanned
-                            )
-                        ) {
-
-                            if (
-                                thread.data.commandBanned.length
-                            ) {
-
-                                global.data.commandBanned.set(
-                                    tid,
-                                    thread.data.commandBanned
-                                );
-
-                            }
-
-                        }
-
-                        // NSFW
-                        if (
-                            thread.data &&
-                            thread.data.NSFW
-                        ) {
-
-                            if (
-                                !global.data.threadAllowNSFW.includes(
-                                    tid
-                                )
-                            ) {
-
-                                global.data.threadAllowNSFW.push(
-                                    tid
-                                );
-
-                            }
-
-                        }
-
-                    }
+                    global.data.allThreadID.push(tid);
 
                 }
 
-            } catch (error) {
-
-                console.error(
-                    "THREAD DATABASE ERROR:",
-                    error
+                global.data.threadData.set(
+                    tid,
+                    thread.data || {}
                 );
 
+                global.data.threadInfo.set(
+                    tid,
+                    thread.threadInfo || {}
+                );
+
+                // حظر المجموعة
+                if (
+                    thread.data &&
+                    thread.data.banned == 1
+                ) {
+
+                    global.data.threadBanned.set(
+                        tid,
+                        {
+                            reason:
+                                thread.data.reason || "",
+
+                            dateAdded:
+                                thread.data.dateAdded ||
+                                Date.now()
+                        }
+                    );
+                }
+
+                // حظر أوامر
+                if (
+                    thread.data &&
+                    Array.isArray(
+                        thread.data.commandBanned
+                    ) &&
+                    thread.data.commandBanned.length
+                ) {
+
+                    global.data.commandBanned.set(
+                        tid,
+                        thread.data.commandBanned
+                    );
+                }
+
+                // NSFW
+                if (
+                    thread.data &&
+                    thread.data.NSFW
+                ) {
+
+                    if (
+                        !global.data.threadAllowNSFW.includes(tid)
+                    ) {
+
+                        global.data.threadAllowNSFW.push(tid);
+
+                    }
+                }
             }
 
             // ----------------------------------------------------
             // Users
             // ----------------------------------------------------
 
-            try {
+            const users = await Users.getAll([
+                "userID",
+                "name",
+                "data"
+            ]);
 
-                const users =
-                    await Users.getAll([
-                        "userID",
-                        "name",
-                        "data"
-                    ]);
+            for (const user of users) {
 
-                if (Array.isArray(users)) {
+                const uid =
+                    String(user.userID);
 
-                    for (const user of users) {
+                if (
+                    !global.data.allUserID.includes(uid)
+                ) {
 
-                        if (!user) continue;
-
-                        const uid =
-                            String(
-                                user.userID ||
-                                user.id ||
-                                ""
-                            );
-
-                        if (!uid) continue;
-
-                        if (
-                            !global.data.allUserID.includes(uid)
-                        ) {
-
-                            global.data.allUserID.push(uid);
-
-                        }
-
-                        if (
-                            user.name &&
-                            global.data.userName
-                        ) {
-
-                            global.data.userName.set(
-                                uid,
-                                user.name
-                            );
-
-                        }
-
-                        if (
-                            user.data &&
-                            (
-                                user.data.banned === true ||
-                                user.data.banned == 1
-                            )
-                        ) {
-
-                            global.data.userBanned.set(
-                                uid,
-                                {
-                                    reason:
-                                        user.data.reason || "",
-
-                                    dateAdded:
-                                        user.data.dateAdded ||
-                                        Date.now()
-                                }
-                            );
-
-                        }
-
-                        if (
-                            user.data &&
-                            Array.isArray(
-                                user.data.commandBanned
-                            ) &&
-                            user.data.commandBanned.length
-                        ) {
-
-                            global.data.commandBanned.set(
-                                uid,
-                                user.data.commandBanned
-                            );
-
-                        }
-
-                    }
+                    global.data.allUserID.push(uid);
 
                 }
 
-            } catch (error) {
+                if (user.name) {
 
-                console.error(
-                    "USER DATABASE ERROR:",
-                    error
-                );
+                    global.data.userName.set(
+                        uid,
+                        user.name
+                    );
+                }
 
+                // حظر المستخدم
+                if (
+                    user.data &&
+                    user.data.banned == 1
+                ) {
+
+                    global.data.userBanned.set(
+                        uid,
+                        {
+                            reason:
+                                user.data.reason || "",
+
+                            dateAdded:
+                                user.data.dateAdded ||
+                                Date.now()
+                        }
+                    );
+                }
+
+                // حظر الأوامر
+                if (
+                    user.data &&
+                    Array.isArray(
+                        user.data.commandBanned
+                    ) &&
+                    user.data.commandBanned.length
+                ) {
+
+                    global.data.commandBanned.set(
+                        uid,
+                        user.data.commandBanned
+                    );
+                }
             }
 
             // ----------------------------------------------------
             // Currencies
             // ----------------------------------------------------
 
-            try {
+            const currencies =
+                await Currencies.getAll([
+                    "userID"
+                ]);
 
-                const currencies =
-                    await Currencies.getAll([
-                        "userID"
-                    ]);
+            for (const currency of currencies) {
 
-                if (Array.isArray(currencies)) {
+                const uid =
+                    String(currency.userID);
 
-                    for (
-                        const currency of currencies
-                    ) {
+                if (
+                    !global.data.allCurrenciesID.includes(uid)
+                ) {
 
-                        if (!currency) continue;
-
-                        const uid =
-                            String(
-                                currency.userID ||
-                                ""
-                            );
-
-                        if (!uid) continue;
-
-                        if (
-                            !global.data.allCurrenciesID.includes(
-                                uid
-                            )
-                        ) {
-
-                            global.data.allCurrenciesID.push(
-                                uid
-                            );
-
-                        }
-
-                    }
+                    global.data.allCurrenciesID.push(uid);
 
                 }
-
-            } catch (error) {
-
-                console.error(
-                    "CURRENCY DATABASE ERROR:",
-                    error
-                );
-
             }
 
             logger(
-                "اكتمل تحميل قاعدة البيانات",
+                "✅ اكتمل تحميل قاعدة البيانات",
                 "[ DATABASE ]"
             );
 
         } catch (error) {
 
             console.error(
-                "DATABASE LOAD ERROR:",
+                "❌ DATABASE LOAD ERROR:",
                 error
             );
 
+            logger(
+                `❌ فشل تحميل قاعدة البيانات: ${error.message}`,
+                "error"
+            );
         }
 
     })();
@@ -421,10 +303,12 @@ module.exports = function ({ api, models }) {
     logger(
 `
 ╔═══════════════════════════════════════════════════════════════╗
-║                    KIRA SYSTEM ONLINE                        ║
+║                  ${global.config.BOTNAME || "KIRA"} SYSTEM
 ║───────────────────────────────────────────────────────────────║
-║ PREFIX: ${global.config.PREFIX || "."}
-║ STATUS: ONLINE
+║ PREFIX : ${global.config.PREFIX || "."}
+║ STATUS : ONLINE
+║ COMMANDS: ${global.client.commands.size}
+║ EVENTS  : ${global.client.events.size}
 ╚═══════════════════════════════════════════════════════════════╝
 `,
         "[ SYSTEM ]"
@@ -439,14 +323,14 @@ module.exports = function ({ api, models }) {
         try {
 
             logger(
-                `${global.data.allThreadID.length} Groups | ` +
+                `📊 ${global.data.allThreadID.length} Groups | ` +
                 `${global.data.allUserID.length} Users | ` +
                 `${global.client.commands.size} Commands | ` +
                 `${global.client.events.size} Events`,
                 "[ STATS ]"
             );
 
-        } catch (e) {}
+        } catch (error) {}
 
     }, 1800000);
 
@@ -460,10 +344,7 @@ module.exports = function ({ api, models }) {
 
             try {
 
-                if (
-                    typeof handleNotification ===
-                    "function"
-                ) {
+                if (typeof handleNotification === "function") {
 
                     handleNotification({
                         api
@@ -471,17 +352,9 @@ module.exports = function ({ api, models }) {
 
                 }
 
-            } catch (error) {
-
-                console.error(
-                    "NOTIFICATION ERROR:",
-                    error
-                );
-
-            }
+            } catch (error) {}
 
         }, 60000);
-
     }
 
     // ============================================================
@@ -494,6 +367,10 @@ module.exports = function ({ api, models }) {
             return;
         }
 
+        // ========================================================
+        // IDs
+        // ========================================================
+
         const threadID =
             String(event.threadID || "");
 
@@ -504,76 +381,12 @@ module.exports = function ({ api, models }) {
             String(event.type || "");
 
         const logMessageType =
-            String(event.logMessageType || "");
-
-        // ========================================================
-        // IMPORTANT:
-        // منع البوت من معالجة رسائله هو نفسه
-        // ========================================================
-
-        let botID = "";
-
-        try {
-
-            botID =
-                String(
-                    api.getCurrentUserID()
-                );
-
-        } catch (e) {}
-
-        if (
-            botID &&
-            senderID &&
-            senderID === botID
-        ) {
-
-            return;
-
-        }
-
-        // ========================================================
-        // Developer Debug
-        // ========================================================
-
-        if (
-            global.config.DeveloperMode
-        ) {
-
-            console.log(
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            String(
+                event.logMessageType || ""
             );
 
-            console.log(
-                "KIRA EVENT RECEIVED"
-            );
-
-            console.log("TYPE:", type);
-            console.log("LOG TYPE:", logMessageType);
-            console.log("THREAD:", threadID);
-            console.log("SENDER:", senderID);
-
-            console.log(
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            );
-
-        }
-
         // ========================================================
-        // Inbox
-        // ========================================================
-
-        if (
-            global.config.allowInbox === false &&
-            senderID === threadID
-        ) {
-
-            return;
-
-        }
-
-        // ========================================================
-        // Ban
+        // حماية
         // ========================================================
 
         try {
@@ -583,8 +396,16 @@ module.exports = function ({ api, models }) {
                 global.data.userBanned.has(senderID)
             ) {
 
-                return;
+                // يسمح للمطور بالمرور
+                const admins =
+                    global.config.ADMINBOT || [];
 
+                if (
+                    !admins.includes(senderID)
+                ) {
+
+                    return;
+                }
             }
 
             if (
@@ -592,111 +413,271 @@ module.exports = function ({ api, models }) {
                 global.data.threadBanned.has(threadID)
             ) {
 
-                return;
+                const admins =
+                    global.config.ADMINBOT || [];
 
+                if (
+                    !admins.includes(senderID)
+                ) {
+
+                    return;
+                }
             }
 
-        } catch (e) {}
-
-        // ========================================================
-        // MAIN
-        // ========================================================
-
-        try {
-
             // ====================================================
-            // MESSAGE
+            // منع الخاص
             // ====================================================
 
             if (
-                type === "message" ||
-                type === "message_reply"
+                global.config.allowInbox === false &&
+                senderID === threadID
             ) {
 
-                // قاعدة البيانات أولاً
+                return;
+            }
+
+        } catch (error) {
+
+            console.error(
+                "❌ LISTEN FILTER ERROR:",
+                error
+            );
+        }
+
+        // ============================================================
+        // DEBUG
+        // ============================================================
+
+        if (
+            global.config.DeveloperMode
+        ) {
+
+            console.log(
+                `[LISTEN] type=${type} log=${logMessageType} thread=${threadID} sender=${senderID}`
+            );
+        }
+
+        // ============================================================
+        // MESSAGE
+        // ============================================================
+
+        if (
+            type === "message" ||
+            type === "message_reply"
+        ) {
+
+            try {
+
+                // إنشاء/تحديث قاعدة البيانات
                 await handleCreateDatabase({
                     event
                 });
 
-                // الردود
-                if (event.messageReply) {
+            } catch (error) {
 
-                    await handleReply({
-                        event
-                    });
+                console.error(
+                    "❌ handleCreateDatabase:",
+                    error
+                );
+            }
 
-                }
+            // ----------------------------------------------------
+            // الأوامر
+            // ----------------------------------------------------
 
-                // الأوامر
+            try {
+
                 await handleCommand({
                     event
                 });
 
-                // Command Events
+            } catch (error) {
+
+                console.error(
+                    "❌ handleCommand:",
+                    error
+                );
+            }
+
+            // ----------------------------------------------------
+            // Replies
+            // ----------------------------------------------------
+
+            try {
+
+                await handleReply({
+                    event
+                });
+
+            } catch (error) {
+
+                console.error(
+                    "❌ handleReply:",
+                    error
+                );
+            }
+
+            // ----------------------------------------------------
+            // Command Events
+            // ----------------------------------------------------
+
+            try {
+
                 await handleCommandEvent({
                     event
                 });
 
-                // Events العامة
+            } catch (error) {
+
+                console.error(
+                    "❌ handleCommandEvent:",
+                    error
+                );
+            }
+
+            // ----------------------------------------------------
+            // IMPORTANT
+            // Events على الرسائل
+            //
+            // هنا يتم تشغيل:
+            // منع الكلام
+            // مراقبة الرسائل
+            // anti-spam
+            // وغيرها
+            // ----------------------------------------------------
+
+            try {
+
                 await handleEvent({
                     event
                 });
 
-                return;
+            } catch (error) {
+
+                console.error(
+                    "❌ handleEvent MESSAGE:",
+                    error
+                );
             }
 
-            // ====================================================
-            // REACTION
-            // ====================================================
+            return;
+        }
 
-            if (
-                type === "message_reaction"
-            ) {
+        // ============================================================
+        // REACTION
+        // ============================================================
+
+        if (
+            type === "message_reaction"
+        ) {
+
+            try {
 
                 await handleReaction({
                     event
                 });
 
+            } catch (error) {
+
+                console.error(
+                    "❌ handleReaction:",
+                    error
+                );
+            }
+
+            // السماح أيضًا للإيفنتات التي تعتمد على reaction
+            try {
+
                 await handleEvent({
                     event
                 });
 
-                return;
+            } catch (error) {
+
+                console.error(
+                    "❌ handleEvent REACTION:",
+                    error
+                );
             }
 
-            // ====================================================
-            // JOIN
-            // ====================================================
+            return;
+        }
 
-            if (
-                logMessageType ===
-                "log:subscribe"
-            ) {
+        // ============================================================
+        // JOIN
+        // ============================================================
+
+        if (
+            logMessageType ===
+            "log:subscribe"
+        ) {
+
+            try {
 
                 await handleCreateDatabase({
                     event
                 });
 
+            } catch (error) {
+
+                console.error(
+                    "❌ Database JOIN:",
+                    error
+                );
+            }
+
+            // تشغيل Events
+            try {
+
                 await handleEvent({
                     event
                 });
+
+            } catch (error) {
+
+                console.error(
+                    "❌ handleEvent JOIN:",
+                    error
+                );
+            }
+
+            // تحديث البيانات
+            try {
 
                 await handleRefresh({
                     event
                 });
 
-                // ------------------------------------------------
-                // Bot Added
-                // ------------------------------------------------
+            } catch (error) {
 
-                try {
+                console.error(
+                    "❌ handleRefresh JOIN:",
+                    error
+                );
+            }
+
+            // ----------------------------------------------------
+            // رسالة دخول البوت
+            // ----------------------------------------------------
+
+            try {
+
+                if (
+                    global.config.notiGroup
+                ) {
 
                     const added =
+                        event.logMessageData &&
                         Array.isArray(
-                            event.logMessageData?.addedParticipants
+                            event.logMessageData.addedParticipants
                         )
                             ? event.logMessageData.addedParticipants
                             : [];
+
+                    const botID =
+                        String(
+                            api.getCurrentUserID()
+                        );
 
                     const botAdded =
                         added.some(
@@ -706,163 +687,263 @@ module.exports = function ({ api, models }) {
                                 ) === botID
                         );
 
-                    if (
-                        botAdded &&
-                        global.config.notiGroup
-                    ) {
+                    if (botAdded) {
 
-                        try {
+                        await api.changeNickname(
+                            `『 ${global.config.PREFIX} 』• ${global.config.BOTNAME}`,
+                            threadID,
+                            botID
+                        );
 
-                            await api.changeNickname(
-                                `『 ${global.config.PREFIX} 』• ${global.config.BOTNAME}`,
-                                threadID,
-                                botID
-                            );
-
-                        } catch (e) {}
-
-                        try {
-
-                            await api.sendMessage(
+                        await api.sendMessage(
 `
-◈ ───『 ${global.config.BOTNAME || "KIRA"} 』─── ◈
+◈ ───『 ✨ ${global.config.BOTNAME} ✨ 』─── ◈
 
-تم الاتصال بنجاح!
+✅ تم الاتصال بنجاح!
 
-البادئة:
+📋 البادئة:
 ${global.config.PREFIX}
 
-اكتب:
+💡 اكتب:
 ${global.config.PREFIX}أوامر
 
-◈ ───────────────── ◈
+◈ ────────────── ◈
 `,
-                                threadID
-                            );
-
-                        } catch (e) {}
-
+                            threadID
+                        );
                     }
-
-                } catch (error) {
-
-                    console.error(
-                        "BOT JOIN MESSAGE ERROR:",
-                        error
-                    );
-
                 }
 
-                return;
+            } catch (error) {
+
+                console.error(
+                    "❌ BOT JOIN MESSAGE:",
+                    error
+                );
             }
 
-            // ====================================================
-            // LEAVE
-            // ====================================================
+            return;
+        }
 
-            if (
-                logMessageType ===
-                "log:unsubscribe"
-            ) {
+        // ============================================================
+        // LEAVE
+        // ============================================================
+
+        if (
+            logMessageType ===
+            "log:unsubscribe"
+        ) {
+
+            try {
 
                 await handleEvent({
                     event
                 });
 
+            } catch (error) {
+
+                console.error(
+                    "❌ handleEvent LEAVE:",
+                    error
+                );
+            }
+
+            try {
+
                 await handleRefresh({
                     event
                 });
 
-                return;
+            } catch (error) {
+
+                console.error(
+                    "❌ handleRefresh LEAVE:",
+                    error
+                );
             }
 
-            // ====================================================
-            // ADMIN
-            // ====================================================
+            return;
+        }
 
-            if (
-                logMessageType ===
-                "log:thread-admins"
-            ) {
+        // ============================================================
+        // THREAD ADMINS
+        // ============================================================
+
+        if (
+            logMessageType ===
+            "log:thread-admins"
+        ) {
+
+            try {
 
                 await handleEvent({
                     event
                 });
 
-                await handleRefresh({
-                    event
-                });
+            } catch (error) {
 
-                return;
+                console.error(
+                    "❌ handleEvent ADMINS:",
+                    error
+                );
             }
 
-            // ====================================================
-            // GROUP NAME
-            // ====================================================
-
-            if (
-                logMessageType ===
-                "log:thread-name"
-            ) {
+            try {
 
                 await handleRefresh({
                     event
                 });
+
+            } catch (error) {
+
+                console.error(
+                    "❌ handleRefresh ADMINS:",
+                    error
+                );
+            }
+
+            return;
+        }
+
+        // ============================================================
+        // THREAD NAME
+        // ============================================================
+
+        if (
+            logMessageType ===
+            "log:thread-name"
+        ) {
+
+            try {
+
+                await handleRefresh({
+                    event
+                });
+
+            } catch (error) {
+
+                console.error(
+                    "❌ handleRefresh NAME:",
+                    error
+                );
+            }
+
+            try {
 
                 await handleEvent({
                     event
                 });
 
-                return;
+            } catch (error) {
+
+                console.error(
+                    "❌ handleEvent NAME:",
+                    error
+                );
             }
 
-            // ====================================================
-            // GROUP ICON
-            // ====================================================
+            return;
+        }
 
-            if (
-                logMessageType ===
-                    "log:thread-icon" ||
-                type === "change_thread_image"
-            ) {
+        // ============================================================
+        // THREAD IMAGE / ICON
+        // ============================================================
+
+        if (
+            logMessageType ===
+            "log:thread-icon" ||
+            type === "change_thread_image"
+        ) {
+
+            try {
 
                 await handleEvent({
                     event
                 });
 
+            } catch (error) {
+
+                console.error(
+                    "❌ handleEvent IMAGE:",
+                    error
+                );
+            }
+
+            try {
+
                 await handleRefresh({
                     event
                 });
 
-                return;
+            } catch (error) {
+
+                console.error(
+                    "❌ handleRefresh IMAGE:",
+                    error
+                );
             }
 
-            // ====================================================
-            // GENERAL EVENT
-            // ====================================================
+            return;
+        }
 
-            if (
-                type === "event"
-            ) {
+        // ============================================================
+        // GENERIC EVENT
+        // ============================================================
+
+        if (
+            type === "event"
+        ) {
+
+            try {
 
                 await handleCreateDatabase({
                     event
                 });
 
+            } catch (error) {
+
+                console.error(
+                    "❌ Database EVENT:",
+                    error
+                );
+            }
+
+            try {
+
                 await handleEvent({
                     event
                 });
+
+            } catch (error) {
+
+                console.error(
+                    "❌ handleEvent EVENT:",
+                    error
+                );
+            }
+
+            try {
 
                 await handleRefresh({
                     event
                 });
 
-                return;
+            } catch (error) {
+
+                console.error(
+                    "❌ handleRefresh EVENT:",
+                    error
+                );
             }
 
-            // ====================================================
-            // UNKNOWN
-            // ====================================================
+            return;
+        }
+
+        // ============================================================
+        // أي Event غير معروف
+        // ============================================================
+
+        try {
 
             await handleEvent({
                 event
@@ -871,86 +952,10 @@ ${global.config.PREFIX}أوامر
         } catch (error) {
 
             console.error(
-                "═══════════════════════════════════════"
-            );
-
-            console.error(
-                "KIRA LISTEN ERROR"
-            );
-
-            console.error(
-                "TYPE:",
-                type
-            );
-
-            console.error(
-                "LOG TYPE:",
-                logMessageType
-            );
-
-            console.error(
-                "THREAD:",
-                threadID
-            );
-
-            console.error(
-                "SENDER:",
-                senderID
-            );
-
-            console.error(
-                "ERROR:",
+                "❌ handleEvent UNKNOWN:",
                 error
             );
-
-            console.error(
-                "═══════════════════════════════════════"
-            );
-
-            try {
-
-                logger(
-                    `LISTEN ERROR
-TYPE: ${type}
-LOG TYPE: ${logMessageType}
-THREAD: ${threadID}
-ERROR: ${error.message}`,
-                    "error"
-                );
-
-            } catch (e) {}
-
-            // لا نرسل خطأ للمطور إذا كان الخطأ
-            // نفسه ممكن يؤدي إلى دورة رسائل
-            if (
-                global.config.DeveloperMode &&
-                Array.isArray(global.config.ADMINBOT) &&
-                global.config.ADMINBOT[0] &&
-                String(global.config.ADMINBOT[0]) !== botID
-            ) {
-
-                try {
-
-                    await api.sendMessage(
-`KIRA LISTEN ERROR
-
-TYPE:
-${type}
-
-LOG:
-${logMessageType}
-
-ERROR:
-${error.message}`,
-                        global.config.ADMINBOT[0]
-                    );
-
-                } catch (e) {}
-
-            }
-
         }
 
     };
-
 };
