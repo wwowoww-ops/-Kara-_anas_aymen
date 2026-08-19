@@ -5,11 +5,11 @@ const jimp = require("jimp");
 
 module.exports.config = {
   name: "زوجيني",
-  version: "6.0.0",
-  hasPermssion: 0,
+  version: "6.1.0",
   credits: "أبو هريرة",
+  hasPermssion: 0,
   description: "زواج عشوائي مع صور الطرفين ونسبة التوافق",
-  commandCategory: "fun",
+  commandCategory: "Fun",
   usages: "زوجيني",
   cooldowns: 5,
   dependencies: {
@@ -20,63 +20,29 @@ module.exports.config = {
   }
 };
 
-// ==================================================
-// قالب التصميم
-// ==================================================
-
 const TEMPLATE_URL =
   "https://files.catbox.moe/8zlvjg.jpg";
 
-
-// ==================================================
-// تحويل الصورة إلى دائرة
-// ==================================================
-
-async function circle(image) {
-  const img = await jimp.read(image);
-  img.circle();
-
-  return await img.getBufferAsync("image/png");
-}
-
-
-// ==================================================
-// تحميل صورة البروفايل بنفس طريقة أمر زواج
-// للحصول على أفضل جودة متاحة
-// ==================================================
-
 async function downloadAvatar(uid, savePath) {
-
   const url =
     `https://graph.facebook.com/${uid}/picture` +
     `?width=512&height=512` +
     `&access_token=6628568379%7Cc1e620fa708a1d5696fb991c1bde5662`;
 
-  const response = await axios.get(
-    url,
-    {
-      responseType: "arraybuffer",
-      timeout: 20000,
-      headers: {
-        "User-Agent": "Mozilla/5.0"
-      }
+  const response = await axios.get(url, {
+    responseType: "arraybuffer",
+    timeout: 20000,
+    headers: {
+      "User-Agent": "Mozilla/5.0"
     }
-  );
+  });
 
-  fs.writeFileSync(
-    savePath,
-    Buffer.from(response.data)
-  );
+  fs.writeFileSync(savePath, Buffer.from(response.data));
 
   return savePath;
 }
 
-
-// ==================================================
-// الأمر
-// ==================================================
-
-module.exports.run = async function({
+module.exports.run = async function ({
   api,
   event,
   Users
@@ -118,44 +84,124 @@ module.exports.run = async function({
     "زوجيني_background.jpg"
   );
 
-
   try {
 
     // ==================================================
-    // جلب أعضاء المجموعة
+    // جلب معلومات المجموعة
     // ==================================================
 
     const threadInfo =
-      await api.getThreadInfo(threadID);
+      await api.getThreadInfo(String(threadID));
 
-    const participants =
-      threadInfo.participantIDs || [];
+    // ==================================================
+    // التحقق من أن معلومات المجموعة موجودة
+    // ==================================================
+
+    if (
+      !threadInfo ||
+      typeof threadInfo !== "object"
+    ) {
+
+      return api.sendMessage(
+        `⌬ ━━ HINA FUN ━━ ⌬\n\n` +
+        `❌ تعذر الحصول على معلومات أعضاء المجموعة.\n\n` +
+        `📝 حاول استخدام الأمر مرة أخرى.`,
+        threadID,
+        messageID
+      );
+
+    }
+
+    // ==================================================
+    // الحصول على المشاركين بأمان
+    // ==================================================
+
+    let participants = [];
+
+    if (
+      Array.isArray(
+        threadInfo.participantIDs
+      )
+    ) {
+
+      participants =
+        threadInfo.participantIDs;
+
+    } else if (
+      Array.isArray(
+        threadInfo.participants
+      )
+    ) {
+
+      participants =
+        threadInfo.participants
+          .map(user => {
+
+            if (
+              typeof user === "string" ||
+              typeof user === "number"
+            ) {
+              return String(user);
+            }
+
+            return (
+              user?.userFbId ||
+              user?.id ||
+              user?.userID ||
+              null
+            );
+
+          })
+          .filter(Boolean)
+          .map(id => String(id));
+
+    }
+
+    // ==================================================
+    // التحقق من وجود أعضاء
+    // ==================================================
+
+    if (
+      !Array.isArray(participants) ||
+      participants.length === 0
+    ) {
+
+      return api.sendMessage(
+        `⌬ ━━ HINA FUN ━━ ⌬\n\n` +
+        `❌ لم أستطع العثور على أعضاء المجموعة.`,
+        threadID,
+        messageID
+      );
+
+    }
 
     const botID =
-      String(api.getCurrentUserID());
+      String(
+        api.getCurrentUserID()
+      );
 
     const currentUserID =
       String(senderID);
-
 
     // ==================================================
     // استبعاد البوت وصاحب الأمر
     // ==================================================
 
     const members =
-      participants.filter(id => {
+      participants
+        .map(id => String(id))
+        .filter(id => {
 
-        const uid = String(id);
+          return (
+            id !== botID &&
+            id !== currentUserID
+          );
 
-        return (
-          uid !== botID &&
-          uid !== currentUserID
-        );
+        });
 
-      });
-
-
-    if (members.length === 0) {
+    if (
+      members.length === 0
+    ) {
 
       return api.sendMessage(
         `⌬ ━━ HINA FUN ━━ ⌬\n\n` +
@@ -165,7 +211,6 @@ module.exports.run = async function({
       );
 
     }
-
 
     // ==================================================
     // اختيار شخص عشوائي
@@ -181,60 +226,90 @@ module.exports.run = async function({
         ]
       );
 
-
     // ==================================================
     // أسماء الأعضاء
     // ==================================================
 
-    let senderName = "المستخدم";
-    let partnerName = "العضو المختار";
+    let senderName =
+      "المستخدم";
 
+    let partnerName =
+      "العضو المختار";
 
     try {
 
-      senderName =
-        await Users.getNameUser(senderID);
+      if (
+        Users &&
+        typeof Users.getNameUser ===
+        "function"
+      ) {
+
+        const name =
+          await Users.getNameUser(
+            senderID
+          );
+
+        if (name) {
+          senderName = name;
+        }
+
+      }
 
     } catch (e) {
 
       try {
 
         const info =
-          await api.getUserInfo(senderID);
+          await api.getUserInfo(
+            senderID
+          );
 
         senderName =
-          info[senderID]?.name ||
+          info?.[senderID]?.name ||
           "المستخدم";
 
       } catch (e2) {}
 
     }
 
-
     try {
 
-      partnerName =
-        await Users.getNameUser(partnerID);
+      if (
+        Users &&
+        typeof Users.getNameUser ===
+        "function"
+      ) {
+
+        const name =
+          await Users.getNameUser(
+            partnerID
+          );
+
+        if (name) {
+          partnerName = name;
+        }
+
+      }
 
     } catch (e) {
 
       try {
 
         const info =
-          await api.getUserInfo(partnerID);
+          await api.getUserInfo(
+            partnerID
+          );
 
         partnerName =
-          info[partnerID]?.name ||
+          info?.[partnerID]?.name ||
           "العضو المختار";
 
       } catch (e2) {}
 
     }
 
-
     // ==================================================
-    // تحميل الصور بجودة 512
-    // نفس نظام أمر زواج
+    // تحميل الصور
     // ==================================================
 
     await Promise.all([
@@ -251,12 +326,15 @@ module.exports.run = async function({
 
     ]);
 
-
     // ==================================================
     // تحميل القالب
     // ==================================================
 
-    if (!fs.existsSync(backgroundPath)) {
+    if (
+      !fs.existsSync(
+        backgroundPath
+      )
+    ) {
 
       const response =
         await axios.get(
@@ -272,11 +350,12 @@ module.exports.run = async function({
 
       fs.writeFileSync(
         backgroundPath,
-        Buffer.from(response.data)
+        Buffer.from(
+          response.data
+        )
       );
 
     }
-
 
     // ==================================================
     // قراءة القالب
@@ -287,9 +366,8 @@ module.exports.run = async function({
         backgroundPath
       );
 
-
     // ==================================================
-    // قراءة الصور الأصلية
+    // قراءة الصور
     // ==================================================
 
     const senderImage =
@@ -302,7 +380,6 @@ module.exports.run = async function({
         partnerAvatarPath
       );
 
-
     // ==================================================
     // تحويل الصور إلى دوائر
     // ==================================================
@@ -310,9 +387,8 @@ module.exports.run = async function({
     senderImage.circle();
     partnerImage.circle();
 
-
     // ==================================================
-    // تحسين جودة التصغير
+    // تصغير الصور
     // ==================================================
 
     senderImage.resize(
@@ -327,9 +403,8 @@ module.exports.run = async function({
       jimp.RESIZE_BICUBIC
     );
 
-
     // ==================================================
-    // إحداثيات قالبك
+    // وضع الصور
     // ==================================================
 
     baseImage.composite(
@@ -338,13 +413,11 @@ module.exports.run = async function({
       163
     );
 
-
     baseImage.composite(
       partnerImage,
       619,
       163
     );
-
 
     // ==================================================
     // نسبة التوافق
@@ -355,24 +428,25 @@ module.exports.run = async function({
         Math.random() * 51
       ) + 50;
 
-
-    // ==================================================
-    // رسالة حسب النسبة
-    // ==================================================
-
     let loveMessage;
 
-    if (lovePercent >= 90) {
+    if (
+      lovePercent >= 90
+    ) {
 
       loveMessage =
         "💖 توافق خيالي!";
 
-    } else if (lovePercent >= 75) {
+    } else if (
+      lovePercent >= 75
+    ) {
 
       loveMessage =
         "❤️ توافق رائع!";
 
-    } else if (lovePercent >= 60) {
+    } else if (
+      lovePercent >= 60
+    ) {
 
       loveMessage =
         "💕 توافق جيد!";
@@ -384,7 +458,6 @@ module.exports.run = async function({
 
     }
 
-
     // ==================================================
     // الخط
     // ==================================================
@@ -394,14 +467,8 @@ module.exports.run = async function({
         jimp.FONT_SANS_32_WHITE
       );
 
-
     const percentText =
       `${lovePercent}%`;
-
-
-    // ==================================================
-    // قياس النسبة
-    // ==================================================
 
     const textWidth =
       jimp.measureText(
@@ -416,14 +483,11 @@ module.exports.run = async function({
         200
       );
 
+    const heartCenterX =
+      425;
 
-    // ==================================================
-    // مركز القلب في القالب
-    // ==================================================
-
-    const heartCenterX = 425;
-    const heartCenterY = 239;
-
+    const heartCenterY =
+      239;
 
     const textX =
       heartCenterX -
@@ -437,9 +501,8 @@ module.exports.run = async function({
         textHeight / 2
       );
 
-
     // ==================================================
-    // وضع النسبة داخل القلب
+    // وضع النسبة
     // ==================================================
 
     baseImage.print(
@@ -449,9 +512,8 @@ module.exports.run = async function({
       percentText
     );
 
-
     // ==================================================
-    // حفظ الصورة PNG بدون ضغط JPEG
+    // حفظ الصورة
     // ==================================================
 
     const buffer =
@@ -464,9 +526,8 @@ module.exports.run = async function({
       buffer
     );
 
-
     // ==================================================
-    // الردود
+    // الرد
     // ==================================================
 
     const funnyReplies = [
@@ -481,7 +542,6 @@ module.exports.run = async function({
 
     ];
 
-
     const randomReply =
       funnyReplies[
         Math.floor(
@@ -489,11 +549,6 @@ module.exports.run = async function({
           funnyReplies.length
         )
       ];
-
-
-    // ==================================================
-    // الرسالة
-    // ==================================================
 
     const message =
       `⌬ ━━ HINA FUN ━━ ⌬\n\n` +
@@ -509,7 +564,6 @@ module.exports.run = async function({
       `${loveMessage}\n\n` +
 
       `✦ المطور: أبو هريرة`;
-
 
     // ==================================================
     // إرسال الصورة
@@ -532,21 +586,33 @@ module.exports.run = async function({
         try {
 
           if (
-            fs.existsSync(finalPath)
+            fs.existsSync(
+              finalPath
+            )
           ) {
-            fs.unlinkSync(finalPath);
+            fs.unlinkSync(
+              finalPath
+            );
           }
 
           if (
-            fs.existsSync(senderAvatarPath)
+            fs.existsSync(
+              senderAvatarPath
+            )
           ) {
-            fs.unlinkSync(senderAvatarPath);
+            fs.unlinkSync(
+              senderAvatarPath
+            );
           }
 
           if (
-            fs.existsSync(partnerAvatarPath)
+            fs.existsSync(
+              partnerAvatarPath
+            )
           ) {
-            fs.unlinkSync(partnerAvatarPath);
+            fs.unlinkSync(
+              partnerAvatarPath
+            );
           }
 
         } catch (error) {
@@ -563,14 +629,12 @@ module.exports.run = async function({
       messageID
     );
 
-
   } catch (error) {
 
     console.error(
       "❌ خطأ في زوجيني:",
       error
     );
-
 
     // ==================================================
     // تنظيف الملفات
@@ -579,25 +643,36 @@ module.exports.run = async function({
     try {
 
       if (
-        fs.existsSync(finalPath)
+        fs.existsSync(
+          finalPath
+        )
       ) {
-        fs.unlinkSync(finalPath);
+        fs.unlinkSync(
+          finalPath
+        );
       }
 
       if (
-        fs.existsSync(senderAvatarPath)
+        fs.existsSync(
+          senderAvatarPath
+        )
       ) {
-        fs.unlinkSync(senderAvatarPath);
+        fs.unlinkSync(
+          senderAvatarPath
+        );
       }
 
       if (
-        fs.existsSync(partnerAvatarPath)
+        fs.existsSync(
+          partnerAvatarPath
+        )
       ) {
-        fs.unlinkSync(partnerAvatarPath);
+        fs.unlinkSync(
+          partnerAvatarPath
+        );
       }
 
     } catch (e) {}
-
 
     return api.sendMessage(
       `⌬ ━━ HINA FUN ━━ ⌬\n\n` +
