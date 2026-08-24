@@ -1,72 +1,113 @@
 module.exports.config = {
   name: "كنية",
-  version: "2.0.0",
-  hasPermssion: 1,  // ← غيرتها من 0 إلى 1
+  version: "3.2.0",
+  hasPermssion: 0,
   credits: "أبو هريرة",
-  description: "تغيير كنية جميع الأعضاء بتنسيق من اختيارك (للمطور فقط)",
+  description: "تغيير كنية الأعضاء الذين لا يملكون كنية",
   commandCategory: "إدارة",
-  usages: "كنية [النص] أو كنية [النص] [رقم]",
+  usages: "كنية",
   cooldowns: 5
 };
 
-module.exports.run = async ({ api, event, args }) => {
+module.exports.run = async ({ api, event }) => {
   const { threadID, messageID, senderID } = event;
 
-  // ===== التحقق من المطور =====
-  const ADMIN_ID = "61578581225040"; // ابو هريرة
+  // المطور الوحيد المسموح له باستخدام الأمر
+  const ADMIN_ID = "61578581225040";
 
+  // التحقق من المطور
   if (senderID !== ADMIN_ID) {
     return api.sendMessage(
-      "🐿️ هذا الأمر للمطور فقط •-•",
+      "هذا الأمر للمطور فقط",
       threadID,
       messageID
     );
   }
 
-  // ===== قراءة المدخلات =====
-  let customText = "طالب";
-  let customNumber = "00";
-
-  if (args.length > 0) {
-    const input = args.join(" ");
-    const numberMatch = input.match(/(\d+)$/);
-    if (numberMatch) {
-      customNumber = numberMatch[1].padStart(2, '0');
-      customText = input.replace(/\s*\d+$/, '').trim();
-    } else {
-      customText = input;
-    }
-  }
-
   try {
     const threadInfo = await api.getThreadInfo(threadID);
-    const participants = threadInfo.participantIDs;
 
-    let count = 0;
-    let errors = 0;
+    if (!threadInfo || !threadInfo.participantIDs) {
+      return api.sendMessage(
+        "تعذر الحصول على معلومات المجموعة",
+        threadID,
+        messageID
+      );
+    }
+
+    const participants = threadInfo.participantIDs;
     const botID = api.getCurrentUserID();
 
+    let changed = 0;
+    let skipped = 0;
+    let errors = 0;
+
     for (const userID of participants) {
+
+      // تجاهل البوت
       if (userID === botID) continue;
+
+      // تجاهل المطور نفسه
+      if (userID === ADMIN_ID) continue;
 
       try {
         const userInfo = await api.getUserInfo(userID);
-        const name = userInfo[userID]?.firstName || userInfo[userID]?.name || "مستخدم";
-        const newNickname = `•|${name} - ${customText}|• ${customNumber}`;
-        await api.changeNickname(newNickname, threadID, userID);
-        count++;
-      } catch (e) {
+
+        const name =
+          userInfo[userID]?.name ||
+          userInfo[userID]?.firstName ||
+          "مستخدم";
+
+        // الكنية الحالية
+        const currentNickname =
+          threadInfo.nicknames?.[userID] || "";
+
+        // إذا لديه كنية مسبقًا لا نغيرها
+        if (currentNickname.trim() !== "") {
+          skipped++;
+          continue;
+        }
+
+        // حماية اتجاه الاسم الإنجليزي
+        const safeName = `\u200E${name}\u200E`;
+
+        // الكنية الجديدة
+        const newNickname =
+          `※ ${safeName}「جـنــدي」【✯】※`;
+
+        await api.changeNickname(
+          newNickname,
+          threadID,
+          userID
+        );
+
+        changed++;
+
+      } catch (error) {
         errors++;
+        console.error(
+          `خطأ في تغيير كنية ${userID}:`,
+          error
+        );
       }
     }
 
     return api.sendMessage(
-      `🐿️ تم تغيير كنية ${count} عضو\n📌 التنسيق: •|الاسم - ${customText}|• ${customNumber}\n❌ فشل ${errors} عضو`,
+      `تم تنفيذ الأمر\n\n` +
+      `تم تغيير الكنية: ${changed}\n` +
+      `تم تجاهل أصحاب الكنيات: ${skipped}\n` +
+      `فشل: ${errors}`,
       threadID,
       messageID
     );
 
   } catch (error) {
-    return api.sendMessage("🐿️ حدث خطأ أثناء تنفيذ الأمر •-•", threadID, messageID);
+    console.error("خطأ أمر كنية:", error);
+
+    return api.sendMessage(
+      "حدث خطأ أثناء تنفيذ الأمر",
+      threadID,
+      messageID
+    );
   }
 };
