@@ -1,6 +1,6 @@
 module.exports.config = {
   name: "فحص",
-  version: "2.2.0",
+  version: "3.0.0",
   hasPermssion: 1,
   credits: "أبو هريرة",
   description: "فحص حساب Facebook والتحقق من بوابة النفي",
@@ -24,16 +24,32 @@ const NAFY_MESSAGE_LIMIT = 100;
 
 
 // ═══════════════════════════════════════════════
-// 🔗 التحقق من رابط Facebook
+// 🔗 تنظيف الرابط
+// ═══════════════════════════════════════════════
+
+function cleanURL(url) {
+
+  return String(url)
+    .trim()
+    .replace(
+      /[)\]}>,"'،؛.!؟]+$/g,
+      ""
+    );
+}
+
+
+// ═══════════════════════════════════════════════
+// 🔗 التحقق من Facebook
 // ═══════════════════════════════════════════════
 
 function isFacebookURL(url) {
 
   try {
 
-    const parsed = new URL(
-      String(url).trim()
-    );
+    const parsed =
+      new URL(
+        String(url).trim()
+      );
 
     const host =
       parsed.hostname
@@ -51,21 +67,6 @@ function isFacebookURL(url) {
 
     return false;
   }
-}
-
-
-// ═══════════════════════════════════════════════
-// 🔗 تنظيف الرابط
-// ═══════════════════════════════════════════════
-
-function cleanURL(url) {
-
-  return String(url)
-    .trim()
-    .replace(
-      /[)\]}>,"'،؛.!؟]+$/g,
-      ""
-    );
 }
 
 
@@ -95,11 +96,14 @@ function extractFacebookLinks(text) {
 
 
 // ═══════════════════════════════════════════════
-// 🆔 استخراج UID المباشر
+// 🆔 استخراج UID مباشر
 // ═══════════════════════════════════════════════
 
 function getDirectUID(url) {
 
+  url = cleanURL(url);
+
+  // profile.php?id=123
   try {
 
     const parsed =
@@ -110,7 +114,9 @@ function getDirectUID(url) {
 
     if (
       id &&
-      /^\d+$/.test(id)
+      /^\d{5,}$/.test(
+        String(id)
+      )
     ) {
 
       return String(id);
@@ -119,9 +125,10 @@ function getDirectUID(url) {
   } catch (_) {}
 
 
+  // ?id=123
   const idMatch =
-    String(url).match(
-      /[?&]id=(\d+)/i
+    url.match(
+      /[?&]id=(\d{5,})/i
     );
 
   if (idMatch) {
@@ -132,8 +139,9 @@ function getDirectUID(url) {
   }
 
 
+  // facebook.com/123456
   const numericPath =
-    String(url).match(
+    url.match(
       /(?:facebook\.com|fb\.com)\/(\d{5,})(?:[/?#]|$)/i
     );
 
@@ -150,7 +158,7 @@ function getDirectUID(url) {
 
 
 // ═══════════════════════════════════════════════
-// 👤 استخراج Username من الرابط
+// 🔎 استخراج Username من الرابط
 // ═══════════════════════════════════════════════
 
 function getUsernameFromURL(url) {
@@ -158,64 +166,66 @@ function getUsernameFromURL(url) {
   try {
 
     const parsed =
-      new URL(url);
-
-    const host =
-      parsed.hostname
-        .toLowerCase()
-        .replace(/^www\./, "");
-
-    if (
-      host !== "facebook.com" &&
-      host !== "m.facebook.com" &&
-      host !== "mbasic.facebook.com" &&
-      host !== "fb.com"
-    ) {
-
-      return null;
-    }
+      new URL(
+        cleanURL(url)
+      );
 
     const parts =
       parsed.pathname
         .split("/")
         .filter(Boolean);
 
+
     if (!parts.length) {
       return null;
     }
 
+
     const first =
       parts[0];
 
-    const reserved = [
+
+    // ليست Username
+    const ignored = [
       "profile.php",
-      "people",
-      "pages",
-      "groups",
       "share",
       "sharer",
+      "dialog",
+      "plugins",
+      "groups",
+      "pages",
+      "events",
       "watch",
-      "photo",
-      "photos",
+      "marketplace",
       "reel",
       "reels",
-      "story",
       "stories",
-      "marketplace",
-      "events",
-      "gaming",
+      "photo",
+      "photos",
+      "permalink",
       "login",
-      "home"
+      "recover"
     ];
 
+
     if (
-      reserved.includes(
+      ignored.includes(
         first.toLowerCase()
       )
     ) {
 
       return null;
     }
+
+
+    // رقم = ليس Username
+    if (
+      /^\d+$/.test(first)
+    ) {
+
+      return null;
+    }
+
 
     return first;
 
@@ -227,23 +237,27 @@ function getUsernameFromURL(url) {
 
 
 // ═══════════════════════════════════════════════
-// 🔢 البحث عن UID داخل نتيجة FCA
+// 🧩 تحليل نتيجة getUserID
 // ═══════════════════════════════════════════════
 
-function findUIDInResult(result) {
+function parseUIDResult(result) {
 
   if (!result) {
     return null;
   }
 
 
+  // ───────────────────────────────────────────
   // String
+  // ───────────────────────────────────────────
+
   if (
     typeof result === "string"
   ) {
 
     const value =
       result.trim();
+
 
     if (
       /^\d{5,}$/.test(value)
@@ -252,11 +266,48 @@ function findUIDInResult(result) {
       return value;
     }
 
+
+    // أحيانًا تكون النتيجة نصًا فيها UID
+    const match =
+      value.match(
+        /\b\d{5,}\b/
+      );
+
+
+    if (match) {
+
+      return match[0];
+    }
+
+
     return null;
   }
 
 
+  // ───────────────────────────────────────────
+  // Number
+  // ───────────────────────────────────────────
+
+  if (
+    typeof result === "number"
+  ) {
+
+    if (
+      Number.isSafeInteger(result) &&
+      result > 10000
+    ) {
+
+      return String(result);
+    }
+
+    return null;
+  }
+
+
+  // ───────────────────────────────────────────
   // Array
+  // ───────────────────────────────────────────
+
   if (
     Array.isArray(result)
   ) {
@@ -266,11 +317,11 @@ function findUIDInResult(result) {
       of result
     ) {
 
-      const found =
-        findUIDInResult(item);
+      const uid =
+        parseUIDResult(item);
 
-      if (found) {
-        return found;
+      if (uid) {
+        return uid;
       }
     }
 
@@ -278,7 +329,10 @@ function findUIDInResult(result) {
   }
 
 
+  // ───────────────────────────────────────────
   // Object
+  // ───────────────────────────────────────────
+
   if (
     typeof result === "object"
   ) {
@@ -288,10 +342,10 @@ function findUIDInResult(result) {
       "userId",
       "uid",
       "id",
+      "authorID",
+      "authorId",
       "profileID",
-      "profileId",
-      "entityID",
-      "entityId"
+      "profileId"
     ];
 
 
@@ -300,34 +354,59 @@ function findUIDInResult(result) {
       of keys
     ) {
 
-      const value =
-        result[key];
-
       if (
-        value !== undefined &&
-        value !== null &&
+        result[key] !== undefined &&
+        result[key] !== null &&
         /^\d{5,}$/.test(
-          String(value)
+          String(result[key])
         )
       ) {
 
-        return String(value);
+        return String(
+          result[key]
+        );
       }
     }
 
 
-    // بعض إصدارات FCA ترجع كائنًا
-    // مفاتيحه نفسها هي الـUID
-    for (
-      const key
-      of Object.keys(result)
-    ) {
+    // data
+    if (result.data) {
 
-      if (
-        /^\d{5,}$/.test(key)
-      ) {
+      const uid =
+        parseUIDResult(
+          result.data
+        );
 
-        return key;
+      if (uid) {
+        return uid;
+      }
+    }
+
+
+    // user
+    if (result.user) {
+
+      const uid =
+        parseUIDResult(
+          result.user
+        );
+
+      if (uid) {
+        return uid;
+      }
+    }
+
+
+    // result
+    if (result.result) {
+
+      const uid =
+        parseUIDResult(
+          result.result
+        );
+
+      if (uid) {
+        return uid;
       }
     }
   }
@@ -338,29 +417,37 @@ function findUIDInResult(result) {
 
 
 // ═══════════════════════════════════════════════
-// 🆔 استخراج UID من جميع أنواع الروابط
+// 🆔 استخراج UID
 // ═══════════════════════════════════════════════
 
 async function extractUID(api, url) {
 
-  const originalURL =
+  url =
     cleanURL(url);
 
 
   // ═══════════════════════════════════════════
-  // 1️⃣ UID موجود داخل الرابط
+  // 1️⃣ UID مباشر
   // ═══════════════════════════════════════════
 
   const directUID =
-    getDirectUID(
-      originalURL
-    );
+    getDirectUID(url);
+
 
   if (directUID) {
+
+    console.log(
+      "[HINA CHECK] DIRECT UID:",
+      directUID
+    );
 
     return directUID;
   }
 
+
+  // ═══════════════════════════════════════════
+  // 2️⃣ التأكد من FCA
+  // ═══════════════════════════════════════════
 
   if (
     typeof api.getUserID !==
@@ -368,7 +455,7 @@ async function extractUID(api, url) {
   ) {
 
     console.log(
-      "[HINA CHECK] api.getUserID غير متوفرة"
+      "[HINA CHECK] getUserID غير موجودة"
     );
 
     return null;
@@ -376,136 +463,108 @@ async function extractUID(api, url) {
 
 
   // ═══════════════════════════════════════════
-  // 2️⃣ تجهيز روابط متعددة للتجربة
+  // 3️⃣ تجهيز المحاولات
   // ═══════════════════════════════════════════
 
   const attempts = [];
 
-  const addAttempt = value => {
 
-    if (
-      !value ||
-      typeof value !== "string"
-    ) {
-
-      return;
-    }
-
-    const cleaned =
-      cleanURL(value);
-
-    if (
-      !attempts.includes(cleaned)
-    ) {
-
-      attempts.push(cleaned);
-    }
-  };
+  // الرابط الكامل
+  attempts.push(url);
 
 
-  // الرابط الأصلي
-  addAttempt(
-    originalURL
-  );
-
-
-  // الرابط بدون www
-  try {
-
-    const parsed =
-      new URL(
-        originalURL
-      );
-
-    const hostname =
-      parsed.hostname
-        .replace(/^www\./, "");
-
-    addAttempt(
-      `https://${hostname}${parsed.pathname}${parsed.search}${parsed.hash}`
-    );
-
-  } catch (_) {}
-
-
-  // ═══════════════════════════════════════════
-  // 3️⃣ تجربة username
-  // ═══════════════════════════════════════════
-
+  // Username
   const username =
-    getUsernameFromURL(
-      originalURL
-    );
+    getUsernameFromURL(url);
 
 
   if (username) {
 
-    addAttempt(
+    attempts.push(
       username
     );
 
-    addAttempt(
+    attempts.push(
       `https://www.facebook.com/${username}`
     );
 
-    addAttempt(
+    attempts.push(
       `https://facebook.com/${username}`
-    );
-
-    addAttempt(
-      `https://www.facebook.com/profile.php?username=${encodeURIComponent(username)}`
     );
   }
 
 
   // ═══════════════════════════════════════════
-  // 4️⃣ تجربة كل صيغة مع FCA
+  // 4️⃣ إزالة التكرار
+  // ═══════════════════════════════════════════
+
+  const uniqueAttempts =
+    [
+      ...new Set(
+        attempts
+      )
+    ];
+
+
+  // ═══════════════════════════════════════════
+  // 5️⃣ تجربة FCA
   // ═══════════════════════════════════════════
 
   for (
-    const attempt
-    of attempts
+    const target
+    of uniqueAttempts
   ) {
 
     try {
 
       console.log(
-        "[HINA CHECK] UID ATTEMPT:",
-        attempt
+        "[HINA CHECK] GET USER ID:",
+        target
       );
 
 
       const result =
         await api.getUserID(
-          attempt
+          target
         );
 
 
-      const found =
-        findUIDInResult(
+      const uid =
+        parseUIDResult(
           result
         );
 
 
-      if (found) {
+      if (uid) {
 
         console.log(
           "[HINA CHECK] UID FOUND:",
-          found
+          uid
         );
 
-        return found;
+        return uid;
       }
 
     } catch (error) {
 
       console.log(
         "[HINA CHECK] UID ATTEMPT ERROR:",
-        attempt,
-        error?.message || error
+        target,
+        error?.message ||
+        error
       );
     }
   }
+
+
+  // ═══════════════════════════════════════════
+  // 6️⃣ فشل
+  // ═══════════════════════════════════════════
+
+  console.log(
+    "[HINA CHECK] UID NOT FOUND:",
+    url
+  );
 
 
   return null;
@@ -513,10 +572,13 @@ async function extractUID(api, url) {
 
 
 // ═══════════════════════════════════════════════
-// 👤 فحص الحساب والصورة
+// 👤 فحص الحساب
 // ═══════════════════════════════════════════════
 
-async function checkAccount(api, uid) {
+async function checkAccount(
+  api,
+  uid
+) {
 
   try {
 
@@ -556,12 +618,6 @@ async function checkAccount(api, uid) {
       info[uid];
 
 
-    /*
-     * ملاحظة:
-     * هذه القيمة تثبت توفر صورة من FCA
-     * لكنها لا تثبت وحدها أن الصورة مخصصة.
-     */
-
     const picture =
       Boolean(
         user.thumbSrc ||
@@ -578,12 +634,15 @@ async function checkAccount(api, uid) {
       picture
     };
 
+
   } catch (error) {
 
     console.log(
       "[HINA CHECK] ACCOUNT ERROR:",
-      error?.message || error
+      error?.message ||
+      error
     );
+
 
     return {
       success: false,
@@ -595,7 +654,7 @@ async function checkAccount(api, uid) {
 
 
 // ═══════════════════════════════════════════════
-// 📜 قراءة آخر 100 رسالة
+// 📜 قراءة سجل بوابة النفي
 // ═══════════════════════════════════════════════
 
 function getThreadHistory(api) {
@@ -612,14 +671,15 @@ function getThreadHistory(api) {
           success: false,
           history: [],
           error:
-            "getThreadHistory غير متوفرة في نسخة FCA"
+            "getThreadHistory غير متوفرة في FCA"
         });
 
         return;
       }
 
 
-      let finished = false;
+      let finished =
+        false;
 
 
       const done =
@@ -631,6 +691,7 @@ function getThreadHistory(api) {
           if (finished) {
             return;
           }
+
 
           finished = true;
 
@@ -684,7 +745,9 @@ function getThreadHistory(api) {
                   return;
                 }
 
+
                 finished = true;
+
 
                 resolve({
                   success: true,
@@ -703,7 +766,9 @@ function getThreadHistory(api) {
                   return;
                 }
 
+
                 finished = true;
+
 
                 resolve({
                   success: false,
@@ -712,16 +777,17 @@ function getThreadHistory(api) {
                     error?.message ||
                     String(error)
                 });
-
               }
             );
         }
+
 
       } catch (error) {
 
         if (!finished) {
 
           finished = true;
+
 
           resolve({
             success: false,
@@ -738,18 +804,20 @@ function getThreadHistory(api) {
 
 
 // ═══════════════════════════════════════════════
-// 🔎 استخراج الروابط من الرسالة
+// 🔎 استخراج الروابط من الرسائل
 // ═══════════════════════════════════════════════
 
 function extractLinksFromMessage(message) {
 
   const links = [];
 
+
   if (!message) {
     return links;
   }
 
 
+  // النص
   if (message.body) {
 
     links.push(
@@ -760,6 +828,7 @@ function extractLinksFromMessage(message) {
   }
 
 
+  // Attachments
   if (
     Array.isArray(
       message.attachments
@@ -806,6 +875,7 @@ function extractLinksFromMessage(message) {
   }
 
 
+  // Reply
   if (
     message.messageReply
   ) {
@@ -868,6 +938,7 @@ async function checkNafy(
   const history =
     result.history;
 
+
   const foundLinks = [];
 
 
@@ -893,6 +964,7 @@ async function checkNafy(
         );
 
 
+      // UID مباشر
       if (
         directUID &&
         String(directUID) ===
@@ -907,6 +979,7 @@ async function checkNafy(
       }
 
 
+      // Username
       if (
         !directUID &&
         typeof api.getUserID ===
@@ -964,6 +1037,7 @@ function getProfileURL(
   args
 ) {
 
+  // من الأمر
   if (
     args &&
     args.length
@@ -994,6 +1068,7 @@ function getProfileURL(
   }
 
 
+  // من الرد
   if (
     event.messageReply
   ) {
@@ -1087,7 +1162,7 @@ async function({
 
 
     // ═══════════════════════════════════════════
-    // 🔗 الحصول على الرابط
+    // 🔗 الرابط
     // ═══════════════════════════════════════════
 
     const profileURL =
@@ -1102,10 +1177,8 @@ async function({
       return api.sendMessage(
         `⌬ ━━ HINA CHECK ━━ ⌬\n\n` +
         `❌ لم يتم العثور على رابط Facebook.\n\n` +
-
         `📝 الاستخدام:\n` +
         `.فحص https://facebook.com/username\n\n` +
-
         `أو قم بالرد على رسالة تحتوي رابط Facebook واكتب:\n` +
         `.فحص`,
         threadID,
@@ -1135,20 +1208,18 @@ async function({
 
     await api.sendMessage(
       `⌬ ━━ HINA CHECK ━━ ⌬\n\n` +
-
       `⏳ جارٍ فحص الحساب...\n\n` +
-
-      `🔗 صلاحية الرابط ✓\n` +
+      `🔗 الرابط ✓\n` +
       `🆔 استخراج UID ⏳\n` +
-      `👤 وجود الحساب\n` +
-      `🖼️ صورة الحساب\n` +
-      `🚫 قراءة آخر ${NAFY_MESSAGE_LIMIT} رسالة من بوابة النفي`,
+      `👤 الحساب\n` +
+      `🖼️ الصورة\n` +
+      `🚫 بوابة النفي`,
       threadID
     );
 
 
     // ═══════════════════════════════════════════
-    // 🆔 استخراج UID
+    // 🆔 UID
     // ═══════════════════════════════════════════
 
     const uid =
@@ -1160,23 +1231,49 @@ async function({
 
     if (!uid) {
 
+      const username =
+        getUsernameFromURL(
+          profileURL
+        );
+
+
+      let type =
+        "رابط Facebook";
+
+
+      if (username) {
+
+        type =
+          `Username: ${username}`;
+
+      } else if (
+        /\/share\//i.test(
+          profileURL
+        )
+      ) {
+
+        type =
+          "Facebook Share Link";
+      }
+
+
       return api.sendMessage(
         `⌬ ━━ HINA CHECK ━━ ⌬\n\n` +
 
         `📋 تقرير الفحص\n\n` +
 
         `🔗 الرابط: ✓ صالح\n` +
+
+        `🔎 النوع:\n` +
+        `${type}\n\n` +
+
         `🆔 UID: ✗ تعذر استخراجه\n\n` +
 
-        `🔎 نوع الرابط:\n` +
-        `${
-          getUsernameFromURL(profileURL)
-            ? "Username"
-            : "رابط غير رقمي"
-        }\n\n` +
-
         `⚠️ FCA لم يُرجع UID لهذا الرابط.\n` +
-        `❌ لا يمكن إكمال الفحص بدون UID.`,
+        `❌ لا يمكن إكمال الفحص بدون UID.\n\n` +
+
+        `📌 إذا كان الرابط Username،` +
+        ` فالمشكلة في قدرة نسخة FCA الحالية على تحويل Username إلى UID.`,
         threadID,
         messageID
       );
@@ -1184,7 +1281,7 @@ async function({
 
 
     // ═══════════════════════════════════════════
-    // 👤 فحص الحساب
+    // 👤 الحساب
     // ═══════════════════════════════════════════
 
     const account =
@@ -1198,13 +1295,10 @@ async function({
 
       return api.sendMessage(
         `⌬ ━━ HINA CHECK ━━ ⌬\n\n` +
-
         `📋 تقرير الفحص\n\n` +
-
         `🔗 الرابط: ✓ صالح\n` +
         `🆔 UID: ${uid}\n` +
         `👤 الحساب: ⚠️ تعذر التحقق\n\n` +
-
         `❌ لا يمكن إصدار نتيجة نهائية.`,
         threadID,
         messageID
@@ -1212,19 +1306,11 @@ async function({
     }
 
 
-    // ═══════════════════════════════════════════
-    // ❌ الحساب غير متاح
-    // ═══════════════════════════════════════════
-
-    if (
-      !account.exists
-    ) {
+    if (!account.exists) {
 
       return api.sendMessage(
         `⌬ ━━ HINA CHECK ━━ ⌬\n\n` +
-
         `📋 تقرير الفحص\n\n` +
-
         `🔗 الرابط: ✓ صالح\n` +
         `🆔 UID: ${uid}\n` +
         `👤 الحساب: ✗ غير متاح\n` +
@@ -1241,7 +1327,7 @@ async function({
 
 
     // ═══════════════════════════════════════════
-    // 🖼️ حالة الصورة
+    // 🖼️ الصورة
     // ═══════════════════════════════════════════
 
     let pictureStatus =
@@ -1265,7 +1351,7 @@ async function({
 
 
     // ═══════════════════════════════════════════
-    // 🚫 فحص بوابة النفي
+    // 🚫 النفي
     // ═══════════════════════════════════════════
 
     const nafy =
@@ -1274,10 +1360,6 @@ async function({
         uid
       );
 
-
-    // ═══════════════════════════════════════════
-    // ⚠️ تعذر قراءة النفي
-    // ═══════════════════════════════════════════
 
     if (!nafy.success) {
 
@@ -1326,7 +1408,6 @@ async function({
         `🖼️ صورة الحساب: ${pictureStatus}\n\n` +
 
         `🚫 بوابة النفي: ✗ موجود\n` +
-
         `「 ${NAFY_GROUP_NAME} 」\n\n` +
 
         `📨 تم فحص: ${nafy.checked} رسالة\n\n` +
@@ -1344,7 +1425,7 @@ async function({
 
 
     // ═══════════════════════════════════════════
-    // 🟢 مقبول مبدئيًا
+    // 🟢 النتيجة
     // ═══════════════════════════════════════════
 
     return api.sendMessage(
@@ -1356,7 +1437,7 @@ async function({
       `🆔 UID:\n${uid}\n\n` +
 
       `👤 الحساب: ✓ موجود\n` +
-      `🖼️ صورة الحساب: ${pictureStatus}\n` +
+      `🖼️ صورة الحساب: ${pictureStatus}\n\n` +
 
       `🚫 بوابة النفي:\n` +
       `✓ غير موجود\n` +
@@ -1371,8 +1452,9 @@ async function({
 
       `📌 معايير الفحص:\n` +
       `✓ رابط Facebook صالح\n` +
+      `✓ UID مستخرج\n` +
       `✓ الحساب موجود\n` +
-      `${account.picture === true ? "✓" : "⚠️"} صورة الحساب متاحة\n` +
+      `${account.picture === true ? "✓" : "⚠️"} صورة الحساب\n` +
       `✓ غير موجود ضمن روابط بوابة النفي\n\n` +
 
       `ملاحظة: اسم الحساب لا يدخل ضمن معايير الفحص.`,
@@ -1393,9 +1475,7 @@ async function({
 
       return api.sendMessage(
         `⌬ ━━ HINA CHECK ━━ ⌬\n\n` +
-
         `❌ حدث خطأ أثناء الفحص.\n\n` +
-
         `📝 ${
           error?.message ||
           "خطأ غير معروف"
