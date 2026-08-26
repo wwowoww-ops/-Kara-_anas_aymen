@@ -3,10 +3,10 @@ const path = require("path");
 
 module.exports.config = {
   name: "وين",
-  version: "1.0.0",
+  version: "2.0.0",
   hasPermssion: 2,
   credits: "أبو هريرة",
-  description: "تحديد مسار أمر داخل ملفات البوت",
+  description: "البحث عن مكان أمر داخل البوت",
   commandCategory: "Developer",
   usages: "وين [اسم الأمر]",
   cooldowns: 3,
@@ -15,56 +15,64 @@ module.exports.config = {
 
 
 // ═══════════════════════════════════════════════
-// ⚙️ إعدادات
+// ⚙️ الإعدادات
 // ═══════════════════════════════════════════════
 
 const DEV_ID = "61578581225040";
 
 
 // ═══════════════════════════════════════════════
-// 📁 العثور على مجلد commands
+// 🚫 مجلدات يتم تجاهلها
 // ═══════════════════════════════════════════════
 
-function findCommandsDirectory() {
+const IGNORED_DIRS = new Set([
+  "node_modules",
+  ".git",
+  ".github",
+  "cache",
+  "caches",
+  "logs",
+  "log",
+  "tmp",
+  "temp",
+  "uploads",
+  "downloads"
+]);
 
-  const possiblePaths = [
 
-    path.join(process.cwd(), "commands"),
+// ═══════════════════════════════════════════════
+// 📁 تحديد جذر البوت
+// ═══════════════════════════════════════════════
 
-    path.join(__dirname, "..", "commands"),
+function getBotRoot() {
 
-    path.join(__dirname, "commands")
+  /*
+   * process.cwd()
+   * هو المكان الذي تم منه تشغيل البوت
+   */
 
-  ];
+  try {
 
+    return path.resolve(
+      process.cwd()
+    );
 
-  for (const dir of possiblePaths) {
+  } catch (_) {
 
-    try {
-
-      if (
-        fs.existsSync(dir) &&
-        fs.statSync(dir).isDirectory()
-      ) {
-
-        return path.resolve(dir);
-
-      }
-
-    } catch (_) {}
+    return path.resolve(
+      __dirname,
+      ".."
+    );
 
   }
-
-
-  return null;
 }
 
 
 // ═══════════════════════════════════════════════
-// 📂 قراءة جميع ملفات JS بشكل Recursive
+// 📂 البحث عن ملفات JavaScript
 // ═══════════════════════════════════════════════
 
-function getJSFiles(directory) {
+function getJSFiles(rootDir) {
 
   const files = [];
 
@@ -72,7 +80,6 @@ function getJSFiles(directory) {
   function scan(currentDir) {
 
     let entries;
-
 
     try {
 
@@ -86,7 +93,7 @@ function getJSFiles(directory) {
 
     } catch (error) {
 
-      console.error(
+      console.log(
         "[HINA FIND] READ ERROR:",
         currentDir,
         error.message
@@ -98,30 +105,69 @@ function getJSFiles(directory) {
 
     for (const entry of entries) {
 
-      const fullPath =
-        path.join(
-          currentDir,
-          entry.name
+      const name =
+        entry.name;
+
+
+      // ═══════════════════════════════════════
+      // تجاهل المجلدات
+      // ═══════════════════════════════════════
+
+      if (
+        entry.isDirectory()
+      ) {
+
+        if (
+          IGNORED_DIRS.has(
+            name.toLowerCase()
+          )
+        ) {
+
+          continue;
+        }
+
+
+        /*
+         * تجاهل المجلدات المخفية
+         * باستثناء المجلدات المهمة
+         */
+
+        if (
+          name.startsWith(".")
+        ) {
+
+          continue;
+        }
+
+
+        scan(
+          path.join(
+            currentDir,
+            name
+          )
         );
-
-
-      // مجلد
-      if (entry.isDirectory()) {
-
-        scan(fullPath);
 
         continue;
       }
 
 
-      // ملف JavaScript فقط
+      // ═══════════════════════════════════════
+      // ملفات JavaScript
+      // ═══════════════════════════════════════
+
       if (
         entry.isFile() &&
-        entry.name.toLowerCase().endsWith(".js")
+        (
+          name.toLowerCase().endsWith(".js") ||
+          name.toLowerCase().endsWith(".cjs")
+        )
       ) {
 
         files.push(
-          fullPath
+          path.join(
+            currentDir,
+            name
+          )
         );
 
       }
@@ -131,7 +177,9 @@ function getJSFiles(directory) {
   }
 
 
-  scan(directory);
+  scan(
+    rootDir
+  );
 
 
   return files;
@@ -139,23 +187,31 @@ function getJSFiles(directory) {
 
 
 // ═══════════════════════════════════════════════
-// 🔎 استخراج config.name من الأمر
+// 🔎 قراءة config.name
 // ═══════════════════════════════════════════════
 
-function getCommandName(filePath) {
+function getCommandConfig(filePath) {
 
   try {
 
     /*
-     * نحاول تحميل الملف
+     * إزالة النسخة القديمة من الكاش
      */
-    delete require.cache[
-      require.resolve(filePath)
-    ];
+    try {
+
+      delete require.cache[
+        require.resolve(
+          filePath
+        )
+      ];
+
+    } catch (_) {}
 
 
     const command =
-      require(filePath);
+      require(
+        filePath
+      );
 
 
     if (
@@ -167,27 +223,53 @@ function getCommandName(filePath) {
     }
 
 
-    const name =
-      command.config.name;
+    const config =
+      command.config;
 
 
     if (
-      typeof name !== "string"
+      typeof config.name !==
+      "string"
     ) {
 
       return null;
     }
 
 
-    return name.trim();
+    const name =
+      config.name.trim();
+
+
+    if (!name) {
+
+      return null;
+    }
+
+
+    return {
+
+      name,
+
+      version:
+        config.version || "غير محدد",
+
+      category:
+        config.commandCategory ||
+        "غير محدد",
+
+      file:
+        filePath
+
+    };
 
   } catch (error) {
 
-    console.log(
-      "[HINA FIND] LOAD ERROR:",
-      filePath,
-      error.message
-    );
+    /*
+     * بعض ملفات البوت قد تحتوي على
+     * أكواد لا يمكن require لها مباشرة
+     *
+     * نتجاهلها بدل إيقاف البحث
+     */
 
     return null;
   }
@@ -198,72 +280,85 @@ function getCommandName(filePath) {
 // 🔍 البحث عن الأمر
 // ═══════════════════════════════════════════════
 
-function findCommands(
-  commandsDir,
+function findCommand(
+  rootDir,
   targetName
 ) {
 
   const files =
     getJSFiles(
-      commandsDir
+      rootDir
     );
 
 
   const results = [];
 
 
-  for (const file of files) {
+  for (
+    const file
+    of files
+  ) {
 
-    const commandName =
-      getCommandName(
+    const config =
+      getCommandConfig(
         file
       );
 
 
-    if (!commandName) {
+    if (!config) {
+
       continue;
     }
 
 
-    /*
-     * مطابقة الاسم من config.name
-     *
-     * لا نعتمد على اسم الملف
-     */
     if (
-      commandName.toLowerCase() ===
-      targetName.toLowerCase()
+      String(config.name)
+        .trim()
+        .toLowerCase() ===
+      String(targetName)
+        .trim()
+        .toLowerCase()
     ) {
 
-      results.push({
-
-        name:
-          commandName,
-
-        file:
-          file
-
-      });
+      results.push(
+        config
+      );
 
     }
 
   }
 
 
-  return results;
+  return {
+    scanned:
+      files.length,
+
+    results
+
+  };
 }
 
 
 // ═══════════════════════════════════════════════
-// 📌 تحويل المسار إلى مسار نسبي
+// 📍 الحصول على المسار النسبي
 // ═══════════════════════════════════════════════
 
-function getRelativePath(filePath) {
+function getRelativePath(
+  rootDir,
+  filePath
+) {
 
-  return path.relative(
-    process.cwd(),
-    filePath
-  );
+  const relative =
+    path.relative(
+      rootDir,
+      filePath
+    );
+
+
+  return relative ||
+    path.basename(
+      filePath
+    );
 }
 
 
@@ -288,7 +383,7 @@ async function ({
   try {
 
     // ═══════════════════════════════════════════
-    // 🔐 التحقق من المطور
+    // 🔐 المطور فقط
     // ═══════════════════════════════════════════
 
     if (
@@ -306,7 +401,7 @@ async function ({
 
 
     // ═══════════════════════════════════════════
-    // 📝 قراءة اسم الأمر
+    // 📝 اسم الأمر
     // ═══════════════════════════════════════════
 
     const targetName =
@@ -320,7 +415,7 @@ async function ({
       return api.sendMessage(
         `⌬ ━━ 𝗛𝗜𝗡𝗔 FIND ━━ ⌬\n\n` +
 
-        `❌ اكتب اسم الأمر الذي تريد البحث عنه.\n\n` +
+        `❌ اكتب اسم الأمر.\n\n` +
 
         `📝 الاستخدام:\n` +
         `.وين [اسم الأمر]\n\n` +
@@ -336,55 +431,44 @@ async function ({
 
 
     // ═══════════════════════════════════════════
-    // 📁 تحديد مجلد commands
+    // 📁 جذر البوت
     // ═══════════════════════════════════════════
 
-    const commandsDir =
-      findCommandsDirectory();
-
-
-    if (!commandsDir) {
-
-      return api.sendMessage(
-        `⌬ ━━ 𝗛𝗜𝗡𝗔 FIND ━━ ⌬\n\n` +
-
-        `❌ لم يتم العثور على مجلد commands.\n\n` +
-
-        `📂 تأكد أن مجلد الأوامر موجود داخل مجلد البوت.`,
-        
-        threadID,
-        messageID
-      );
-
-    }
+    const rootDir =
+      getBotRoot();
 
 
     // ═══════════════════════════════════════════
     // 🔎 البحث
     // ═══════════════════════════════════════════
 
-    const results =
-      findCommands(
-        commandsDir,
+    const search =
+      findCommand(
+        rootDir,
         targetName
       );
 
 
     // ═══════════════════════════════════════════
-    // ❌ لم يتم العثور
+    // ❌ لم يجد
     // ═══════════════════════════════════════════
 
-    if (!results.length) {
+    if (
+      !search.results.length
+    ) {
 
       return api.sendMessage(
         `⌬ ━━ 𝗛𝗜𝗡𝗔 FIND ━━ ⌬\n\n` +
 
-        `🔎 الأمر: ${targetName}\n\n` +
+        `🔎 الأمر:\n` +
+        `${targetName}\n\n` +
 
-        `❌ لم يتم العثور على هذا الأمر.\n\n` +
+        `❌ لم يتم العثور على الأمر.\n\n` +
 
-        `📂 تم البحث داخل:\n` +
-        `${commandsDir}`,
+        `📂 تم البحث في كامل مجلد البوت.\n` +
+
+        `📄 ملفات JavaScript المفحوصة:\n` +
+        `${search.scanned}`,
         
         threadID,
         messageID
@@ -394,21 +478,20 @@ async function ({
 
 
     // ═══════════════════════════════════════════
-    // 📋 تجهيز النتائج
+    // 📋 النتائج
     // ═══════════════════════════════════════════
 
     let output =
       `⌬ ━━ 𝗛𝗜𝗡𝗔 FIND ━━ ⌬\n\n` +
 
-      `🔎 الأمر: ${targetName}\n` +
+      `🔎 الأمر:\n` +
+      `${targetName}\n\n` +
 
-      `📁 مجلد البحث:\n` +
-      `${commandsDir}\n\n` +
-
-      `✓ تم العثور على ${results.length} نتيجة\n\n`;
+      `✓ تم العثور على:\n` +
+      `${search.results.length} نتيجة\n\n`;
 
 
-    results.forEach(
+    search.results.forEach(
       (result, index) => {
 
         const absolutePath =
@@ -419,6 +502,7 @@ async function ({
 
         const relativePath =
           getRelativePath(
+            rootDir,
             result.file
           );
 
@@ -431,21 +515,29 @@ async function ({
           `⚙️ config.name:\n` +
           `${result.name}\n\n` +
 
-          `📄 الملف:\n` +
+          `📦 الإصدار:\n` +
+          `${result.version}\n\n` +
+
+          `🗂️ التصنيف:\n` +
+          `${result.category}\n\n` +
+
+          `📄 اسم الملف:\n` +
           `${path.basename(result.file)}\n\n` +
 
           `📂 المسار النسبي:\n` +
-          `${relativePath || "."}\n\n` +
+          `${relativePath}\n\n` +
 
           `📍 المسار الكامل:\n` +
-          `${absolutePath}\n`;
+          `${absolutePath}\n\n`;
 
       }
     );
 
 
     output +=
-      `━━━━━━━━━━━━━━`;
+      `━━━━━━━━━━━━━━\n` +
+
+      `📊 تم فحص ${search.scanned} ملف JavaScript`;
 
 
     // ═══════════════════════════════════════════
@@ -472,7 +564,10 @@ async function ({
 
       `❌ حدث خطأ أثناء البحث.\n\n` +
 
-      `📝 ${error?.message || "خطأ غير معروف"}`,
+      `📝 ${
+        error?.message ||
+        "خطأ غير معروف"
+      }`,
       
       threadID,
       messageID
