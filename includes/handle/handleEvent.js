@@ -12,200 +12,142 @@ module.exports = function ({
     const logger = require("../../utils/log.js");
 
     // ==================================================
-    // إعدادات نظام السجل
+    // 📊 إعدادات نشاط الأعضاء
     // ==================================================
 
-    const LOG_DIR = path.join(
+    const ACTIVITY_DIR = path.join(
         process.cwd(),
         "data",
-        "groupLogs"
+        "groupActivity"
     );
 
-    const MAX_LOGS = 100;
+    const MAX_ACTIVITY_MEMBERS = 5000;
 
-    // إنشاء مجلد السجلات
     try {
-        if (!fs.existsSync(LOG_DIR)) {
-            fs.mkdirSync(LOG_DIR, {
-                recursive: true
-            });
+
+        if (
+            !fs.existsSync(
+                ACTIVITY_DIR
+            )
+        ) {
+
+            fs.mkdirSync(
+                ACTIVITY_DIR,
+                {
+                    recursive: true
+                }
+            );
         }
+
     } catch (error) {
+
         console.error(
-            "[GROUP LOG] فشل إنشاء مجلد السجلات:",
+            "[ACTIVITY] فشل إنشاء مجلد النشاط:",
             error.message
         );
     }
 
-    // ==================================================
-    // الحصول على اسم المستخدم
-    // ==================================================
-
-    async function getUserName(uid) {
-
-        try {
-
-            if (
-                Users &&
-                typeof Users.getNameUser === "function"
-            ) {
-
-                const name =
-                    await Users.getNameUser(
-                        String(uid)
-                    );
-
-                if (name) {
-                    return name;
-                }
-            }
-
-        } catch (e) {}
-
-        try {
-
-            if (
-                api &&
-                typeof api.getUserInfo === "function"
-            ) {
-
-                const info =
-                    await api.getUserInfo(
-                        String(uid)
-                    );
-
-                if (
-                    info &&
-                    info[String(uid)] &&
-                    info[String(uid)].name
-                ) {
-
-                    return info[String(uid)].name;
-                }
-            }
-
-        } catch (e) {}
-
-        return "مستخدم غير معروف";
-    }
 
     // ==================================================
-    // مسار سجل المجموعة
+    // 📁 ملف نشاط المجموعة
     // ==================================================
 
-    function getLogFile(threadID) {
+    function getActivityFile(
+        threadID
+    ) {
 
         return path.join(
-            LOG_DIR,
+            ACTIVITY_DIR,
             `${String(threadID)}.json`
         );
     }
 
+
     // ==================================================
-    // قراءة سجل المجموعة
+    // 📖 قراءة نشاط المجموعة
     // ==================================================
 
-    function readLogs(threadID) {
+    function loadActivity(
+        threadID
+    ) {
 
         const file =
-            getLogFile(threadID);
+            getActivityFile(
+                threadID
+            );
 
         try {
 
-            if (!fs.existsSync(file)) {
-                return [];
+            if (
+                !fs.existsSync(
+                    file
+                )
+            ) {
+
+                return {};
             }
 
-            const data =
+            const content =
                 fs.readFileSync(
                     file,
                     "utf8"
                 );
 
-            if (!data.trim()) {
-                return [];
+            if (
+                !content.trim()
+            ) {
+
+                return {};
             }
 
-            const logs =
-                JSON.parse(data);
+            const data =
+                JSON.parse(
+                    content
+                );
 
-            return Array.isArray(logs)
-                ? logs
-                : [];
+            if (
+                !data ||
+                typeof data !== "object" ||
+                Array.isArray(data)
+            ) {
+
+                return {};
+            }
+
+            return data;
 
         } catch (error) {
 
             console.error(
-                "[GROUP LOG] خطأ في قراءة السجل:",
+                `[ACTIVITY] فشل قراءة ${threadID}:`,
                 error.message
             );
 
-            return [];
+            return {};
         }
     }
 
+
     // ==================================================
-    // حفظ حدث جديد
+    // 💾 حفظ نشاط المجموعة
     // ==================================================
 
-    function saveLog(
+    function saveActivity(
         threadID,
-        data
+        activity
     ) {
-
-        if (!threadID) {
-            return;
-        }
 
         try {
 
-            const logs =
-                readLogs(threadID);
-
-            logs.push({
-
-                event:
-                    data.event ||
-                    "حدث غير معروف",
-
-                name:
-                    data.name ||
-                    "غير معروف",
-
-                userID:
-                    data.userID
-                    ? String(data.userID)
-                    : null,
-
-                target:
-                    data.target ||
-                    null,
-
-                time:
-                    new Date().toLocaleString(
-                        "ar-TN",
-                        {
-                            timeZone:
-                                "Africa/Tunis"
-                        }
-                    ),
-
-                timestamp:
-                    Date.now()
-
-            });
-
-            // الاحتفاظ بآخر 100 حدث فقط
-            const limitedLogs =
-                logs.slice(-MAX_LOGS);
-
             const file =
-                getLogFile(threadID);
+                getActivityFile(
+                    threadID
+                );
 
             fs.writeFileSync(
                 file,
                 JSON.stringify(
-                    limitedLogs,
+                    activity,
                     null,
                     2
                 ),
@@ -215,430 +157,219 @@ module.exports = function ({
         } catch (error) {
 
             console.error(
-                "[GROUP LOG] فشل حفظ الحدث:",
+                `[ACTIVITY] فشل حفظ ${threadID}:`,
                 error.message
             );
         }
     }
 
-    // ==================================================
-    // استخراج الأعضاء من حدث الدخول
-    // ==================================================
-
-    async function handleSubscribe(event) {
-
-        if (
-            !event ||
-            !Array.isArray(event.logMessageData?.addedParticipants)
-        ) {
-            return;
-        }
-
-        for (
-            const participant
-            of event.logMessageData.addedParticipants
-        ) {
-
-            const uid =
-                participant.userFbId ||
-                participant.userID ||
-                participant.id;
-
-            if (!uid) {
-                continue;
-            }
-
-            const name =
-                participant.fullName ||
-                await getUserName(uid);
-
-            saveLog(
-                event.threadID,
-                {
-                    event:
-                        "دخول عضو",
-
-                    name,
-
-                    userID:
-                        uid
-                }
-            );
-        }
-    }
 
     // ==================================================
-    // استخراج الأعضاء من حدث الخروج
+    // 📈 تسجيل رسالة العضو
     // ==================================================
 
-    async function handleUnsubscribe(event) {
-
-        const data =
-            event.logMessageData;
-
-        if (!data) {
-            return;
-        }
-
-        let users = [];
+    function registerActivity(
+        threadID,
+        senderID
+    ) {
 
         if (
-            Array.isArray(
-                data.leftParticipantFbId
-            )
+            !threadID ||
+            !senderID
         ) {
-
-            users =
-                data.leftParticipantFbId;
-
-        } else if (
-            data.leftParticipantFbId
-        ) {
-
-            users = [
-                data.leftParticipantFbId
-            ];
-        }
-
-        // بعض نسخ FCA تستخدم هذا الاسم
-        if (
-            users.length === 0 &&
-            Array.isArray(
-                data.removedParticipants
-            )
-        ) {
-
-            users =
-                data.removedParticipants.map(
-                    user =>
-                        user.userFbId ||
-                        user.userID ||
-                        user.id
-                );
-        }
-
-        for (
-            const uid
-            of users
-        ) {
-
-            if (!uid) {
-                continue;
-            }
-
-            const name =
-                await getUserName(uid);
-
-            saveLog(
-                event.threadID,
-                {
-                    event:
-                        "خروج عضو",
-
-                    name,
-
-                    userID:
-                        uid
-                }
-            );
-        }
-    }
-
-    // ==================================================
-    // أحداث تغيير المجموعة
-    // ==================================================
-
-    async function handleThreadChange(event) {
-
-        const data =
-            event.logMessageData || {};
-
-        const senderID =
-            event.author ||
-            event.senderID;
-
-        const senderName =
-            senderID
-                ? await getUserName(senderID)
-                : "غير معروف";
-
-        const type =
-            event.logMessageType;
-
-        // ----------------------------------------------
-        // تغيير اسم المجموعة
-        // ----------------------------------------------
-
-        if (
-            type === "log:thread-name"
-        ) {
-
-            const newName =
-                data.name ||
-                data.threadName ||
-                "اسم غير معروف";
-
-            saveLog(
-                event.threadID,
-                {
-                    event:
-                        "تغيير اسم المجموعة",
-
-                    name:
-                        senderName,
-
-                    userID:
-                        senderID,
-
-                    target:
-                        `الاسم الجديد: ${newName}`
-                }
-            );
 
             return;
         }
 
-        // ----------------------------------------------
-        // تغيير صورة المجموعة
-        // ----------------------------------------------
-
+        // الخاص لا يدخل في إحصائيات المجموعات
         if (
-            type === "log:thread-image"
+            String(threadID) ===
+            String(senderID)
         ) {
-
-            saveLog(
-                event.threadID,
-                {
-                    event:
-                        "تغيير صورة المجموعة",
-
-                    name:
-                        senderName,
-
-                    userID:
-                        senderID
-                }
-            );
 
             return;
         }
-
-        // ----------------------------------------------
-        // تغيير لون المجموعة
-        // ----------------------------------------------
-
-        if (
-            type === "log:thread-color"
-        ) {
-
-            saveLog(
-                event.threadID,
-                {
-                    event:
-                        "تغيير لون المجموعة",
-
-                    name:
-                        senderName,
-
-                    userID:
-                        senderID
-                }
-            );
-
-            return;
-        }
-
-        // ----------------------------------------------
-        // تغيير أيقونة المجموعة
-        // ----------------------------------------------
-
-        if (
-            type === "log:thread-icon"
-        ) {
-
-            saveLog(
-                event.threadID,
-                {
-                    event:
-                        "تغيير أيقونة المجموعة",
-
-                    name:
-                        senderName,
-
-                    userID:
-                        senderID
-                }
-            );
-
-            return;
-        }
-
-        // ----------------------------------------------
-        // تغيير إعدادات الإدارة
-        // ----------------------------------------------
-
-        if (
-            type === "log:thread-admins"
-        ) {
-
-            saveLog(
-                event.threadID,
-                {
-                    event:
-                        "تغيير إدارة المجموعة",
-
-                    name:
-                        senderName,
-
-                    userID:
-                        senderID
-                }
-            );
-
-            return;
-        }
-
-        // ----------------------------------------------
-        // تغيير الموافقة على الأعضاء
-        // ----------------------------------------------
-
-        if (
-            type === "log:thread-approval-mode"
-        ) {
-
-            saveLog(
-                event.threadID,
-                {
-                    event:
-                        "تغيير إعدادات الموافقة",
-
-                    name:
-                        senderName,
-
-                    userID:
-                        senderID
-                }
-            );
-
-            return;
-        }
-    }
-
-    // ==================================================
-    // نظام مراقبة الأحداث
-    // ==================================================
-
-    async function processGroupLog(event) {
-
-        if (
-            !event ||
-            !event.threadID
-        ) {
-            return;
-        }
-
-        const type =
-            event.type;
-
-        // ----------------------------------------------
-        // دخول عضو
-        // ----------------------------------------------
-
-        if (
-            type === "event" &&
-            event.logMessageType ===
-            "log:subscribe"
-        ) {
-
-            await handleSubscribe(
-                event
-            );
-
-            return;
-        }
-
-        // ----------------------------------------------
-        // خروج عضو
-        // ----------------------------------------------
-
-        if (
-            type === "event" &&
-            event.logMessageType ===
-            "log:unsubscribe"
-        ) {
-
-            await handleUnsubscribe(
-                event
-            );
-
-            return;
-        }
-
-        // ----------------------------------------------
-        // تغييرات المجموعة
-        // ----------------------------------------------
-
-        if (
-            type === "event" &&
-            typeof event.logMessageType ===
-            "string" &&
-            event.logMessageType.startsWith(
-                "log:thread-"
-            )
-        ) {
-
-            await handleThreadChange(
-                event
-            );
-        }
-    }
-
-    // ==================================================
-    // HANDLE EVENT الرئيسي
-    // ==================================================
-
-    return async function ({ event }) {
 
         try {
 
-            if (!event) {
+            const activity =
+                loadActivity(
+                    threadID
+                );
+
+            const uid =
+                String(senderID);
+
+            if (
+                !activity[uid]
+            ) {
+
+                activity[uid] = {
+                    messages: 0,
+                    lastMessage: 0
+                };
+            }
+
+            activity[uid].messages =
+                Number(
+                    activity[uid].messages || 0
+                ) + 1;
+
+            activity[uid].lastMessage =
+                Date.now();
+
+
+            // ==================================================
+            // حماية من تضخم الملف
+            // ==================================================
+
+            const users =
+                Object.keys(
+                    activity
+                );
+
+            if (
+                users.length >
+                MAX_ACTIVITY_MEMBERS
+            ) {
+
+                users.sort(
+                    (a, b) => {
+
+                        const countA =
+                            Number(
+                                activity[a]?.messages || 0
+                            );
+
+                        const countB =
+                            Number(
+                                activity[b]?.messages || 0
+                            );
+
+                        return countB - countA;
+                    }
+                );
+
+                const keep =
+                    users.slice(
+                        0,
+                        MAX_ACTIVITY_MEMBERS
+                    );
+
+                const cleaned = {};
+
+                for (
+                    const uid
+                    of keep
+                ) {
+
+                    cleaned[uid] =
+                        activity[uid];
+                }
+
+                saveActivity(
+                    threadID,
+                    cleaned
+                );
+
                 return;
             }
 
+            saveActivity(
+                threadID,
+                activity
+            );
+
+        } catch (error) {
+
+            console.error(
+                "[ACTIVITY ERROR]",
+                error
+            );
+        }
+    }
+
+
+    // ==================================================
+    // 🚀 Handle Event
+    // ==================================================
+
+    return async function ({
+        event
+    }) {
+
+        try {
+
             // ==================================================
-            // تشغيل نظام السجل
+            // التأكد من وجود Event
+            // ==================================================
+
+            if (
+                !event
+            ) {
+
+                return;
+            }
+
+
+            // ==================================================
+            // تسجيل النشاط
             // ==================================================
 
             try {
 
-                await processGroupLog(
-                    event
-                );
+                if (
+                    event.type === "message" &&
+                    event.threadID &&
+                    event.senderID
+                ) {
+
+                    registerActivity(
+                        String(
+                            event.threadID
+                        ),
+                        String(
+                            event.senderID
+                        )
+                    );
+                }
 
             } catch (error) {
 
                 console.error(
-                    "[GROUP LOG ERROR]",
-                    error
+                    "[ACTIVITY EVENT ERROR]",
+                    error.message
                 );
             }
 
+
             // ==================================================
-            // بيانات البوت
+            // الإعدادات
             // ==================================================
 
             const {
                 allowInbox
             } = global.config;
 
+
+            // ==================================================
+            // البيانات العامة
+            // ==================================================
+
             const {
                 userBanned,
                 threadBanned
             } = global.data;
 
+
+            // ==================================================
+            // أوامر البوت
+            // ==================================================
+
             const {
                 commands
             } = global.client;
+
 
             // ==================================================
             // IDs
@@ -646,22 +377,22 @@ module.exports = function ({
 
             const senderID =
                 String(
-                    event.senderID ||
-                    ""
+                    event.senderID || ""
                 );
 
             const threadID =
                 String(
-                    event.threadID ||
-                    ""
+                    event.threadID || ""
                 );
 
+
             // ==================================================
-            // منع المستخدمين المحظورين
+            // 🚫 المستخدم المحظور
             // ==================================================
 
             if (
                 userBanned &&
+                typeof userBanned.has === "function" &&
                 userBanned.has(
                     senderID
                 )
@@ -670,12 +401,14 @@ module.exports = function ({
                 return;
             }
 
+
             // ==================================================
-            // منع المجموعات المحظورة
+            // 🚫 المجموعة المحظورة
             // ==================================================
 
             if (
                 threadBanned &&
+                typeof threadBanned.has === "function" &&
                 threadBanned.has(
                     threadID
                 )
@@ -684,8 +417,9 @@ module.exports = function ({
                 return;
             }
 
+
             // ==================================================
-            // منع الخاص
+            // 🚫 منع الخاص
             // ==================================================
 
             if (
@@ -696,13 +430,18 @@ module.exports = function ({
                 return;
             }
 
+
             // ==================================================
-            // الحصول على Events المسجلة
+            // الحصول على Events
             // ==================================================
 
             let registeredEvents = [];
 
+
+            // ==================================================
             // الطريقة الأساسية
+            // ==================================================
+
             if (
                 global.client.events &&
                 global.client.events instanceof Map
@@ -714,7 +453,11 @@ module.exports = function ({
                     );
             }
 
+
+            // ==================================================
             // دعم eventRegistered
+            // ==================================================
+
             if (
                 Array.isArray(
                     global.client.eventRegistered
@@ -729,19 +472,34 @@ module.exports = function ({
                     of global.client.eventRegistered
                 ) {
 
-                    const eventModule =
-                        global.client.events?.get(
-                            eventName
-                        );
+                    try {
 
-                    if (eventModule) {
+                        const eventModule =
+                            global.client.events?.get(
+                                eventName
+                            );
 
-                        oldEvents.push([
-                            eventName,
+                        if (
                             eventModule
-                        ]);
+                        ) {
+
+                            oldEvents.push(
+                                [
+                                    eventName,
+                                    eventModule
+                                ]
+                            );
+                        }
+
+                    } catch (error) {
+
+                        console.error(
+                            `[EVENT REGISTER ERROR] ${eventName}`,
+                            error.message
+                        );
                     }
                 }
+
 
                 if (
                     oldEvents.length > 0
@@ -751,6 +509,7 @@ module.exports = function ({
                         oldEvents;
                 }
             }
+
 
             // ==================================================
             // لا توجد Events
@@ -772,8 +531,9 @@ module.exports = function ({
                 return;
             }
 
+
             // ==================================================
-            // تشغيل جميع Events
+            // تشغيل Events
             // ==================================================
 
             for (
@@ -784,11 +544,18 @@ module.exports = function ({
                 of registeredEvents
             ) {
 
-                if (!eventModule) {
+                if (
+                    !eventModule
+                ) {
+
                     continue;
                 }
 
-                // يجب أن يحتوي الملف على handleEvent
+
+                // ==================================================
+                // التأكد من handleEvent
+                // ==================================================
+
                 if (
                     typeof eventModule.handleEvent !==
                     "function"
@@ -797,14 +564,17 @@ module.exports = function ({
                     continue;
                 }
 
+
                 // ==================================================
                 // getText
                 // ==================================================
 
                 let getText =
                     function () {
+
                         return "";
                     };
+
 
                 if (
                     eventModule.languages &&
@@ -821,10 +591,12 @@ module.exports = function ({
                                     global.config.language ||
                                     "ar";
 
+
                                 const languageData =
                                     eventModule.languages[
                                         language
                                     ];
+
 
                                 if (
                                     !languageData
@@ -833,10 +605,12 @@ module.exports = function ({
                                     return "";
                                 }
 
+
                                 let text =
                                     languageData[
                                         values[0]
                                     ] || "";
+
 
                                 for (
                                     let i = 1;
@@ -858,6 +632,7 @@ module.exports = function ({
                                         );
                                 }
 
+
                                 return text;
 
                             } catch (error) {
@@ -866,6 +641,7 @@ module.exports = function ({
                             }
                         };
                 }
+
 
                 // ==================================================
                 // Object الخاص بالـEvent
@@ -889,6 +665,7 @@ module.exports = function ({
 
                 };
 
+
                 // ==================================================
                 // تشغيل Event
                 // ==================================================
@@ -909,6 +686,7 @@ module.exports = function ({
                         error
                     );
 
+
                     try {
 
                         logger(
@@ -922,10 +700,15 @@ module.exports = function ({
 
         } catch (error) {
 
+            // ==================================================
+            // خطأ عام
+            // ==================================================
+
             console.error(
                 "❌ HANDLE EVENT ERROR:",
                 error
             );
+
 
             try {
 
@@ -938,3 +721,28 @@ module.exports = function ({
         }
     };
 };
+
+ماذا أصبح عندك؟
+
+عند وصول رسالة في مجموعة، سيُحفظ مثلًا:
+
+data/
+└── groupActivity/
+    └── 123456789.json
+
+ومحتوى الملف يكون بهذا الشكل:
+
+{
+  "10001": {
+    "messages": 245,
+    "lastMessage": 1787731200000
+  },
+  "10002": {
+    "messages": 181,
+    "lastMessage": 1787731250000
+  }
+}
+
+وبالتالي أمر ".احصائيات" يستطيع ترتيب الأعضاء حسب عدد رسائلهم.
+
+ملاحظة مهمة: هذا النظام يبدأ الإحصاء من لحظة وضع النسخة الجديدة من "handleEvent.js" وتشغيل البوت، ولا يستطيع استرجاع الرسائل القديمة التي لم تكن مسجلة.
