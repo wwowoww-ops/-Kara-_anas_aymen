@@ -4,7 +4,7 @@ const axios = require("axios");
 
 module.exports.config = {
   name: "غادري",
-  version: "1.2.7",
+  version: "1.2.8",
   hasPermssion: 2,
   credits: "أبو هريرة",
   description: "مغادرة البوت للمجموعة",
@@ -15,63 +15,202 @@ module.exports.config = {
 };
 
 module.exports.run = async ({ api, event, args }) => {
-  const { threadID, senderID } = event;
-  const { devID } = module.exports.config;
 
-  if (String(senderID) !== String(devID)) {
-    return api.sendMessage("⛔ هذا الأمر مخصص للمطور فقط.", threadID);
+  const {
+    threadID,
+    senderID
+  } = event;
+
+  const {
+    devID
+  } = module.exports.config;
+
+
+  // ═══════════════════════════════════════
+  // 🔐 التحقق من المطور
+  // ═══════════════════════════════════════
+
+  if (
+    String(senderID) !==
+    String(devID)
+  ) {
+
+    return api.sendMessage(
+      "! ماني قاعدة فبيت اهلك انا",
+      threadID
+    );
   }
 
-  const targetID = args[0] ? String(args[0]).trim() : threadID;
-  const cacheDir = path.join(__dirname, "cache");
-  const pathGif = path.join(cacheDir, "bye.gif");
 
-  const leaveGroup = (target) => {
-    try {
-      api.removeUserFromGroup(api.getCurrentUserID(), target);
-    } catch (err) {
-      console.error("خطأ أثناء المغادرة:", err);
-    }
-  };
+  // ═══════════════════════════════════════
+  // 🆔 تحديد المجموعة
+  // ═══════════════════════════════════════
 
-  const cleanUp = () => {
-    try {
-      if (fs.existsSync(pathGif)) fs.unlinkSync(pathGif);
-    } catch (_) {}
-  };
+  const targetID =
+    args &&
+    args[0]
+      ? String(args[0]).trim()
+      : threadID;
 
-  try {
-    fs.ensureDirSync(cacheDir);
 
-    const response = await axios.get(
-      "https://media.giphy.com/media/kaBU6pgv0OsPHz2yxy/giphy.gif",
-      { responseType: "arraybuffer", timeout: 10000 }
+  // ═══════════════════════════════════════
+  // 📁 إعداد الكاش
+  // ═══════════════════════════════════════
+
+  const cacheDir =
+    path.join(
+      __dirname,
+      "cache"
     );
 
-    fs.writeFileSync(pathGif, Buffer.from(response.data));
+  const pathGif =
+    path.join(
+      cacheDir,
+      "bye.gif"
+    );
 
-    // ✅ إرسال الرسالة أولاً
+
+  // ═══════════════════════════════════════
+  // 🚪 مغادرة المجموعة
+  // ═══════════════════════════════════════
+
+  const leaveGroup =
+    target => {
+
+      try {
+
+        const botID =
+          api.getCurrentUserID();
+
+        api.removeUserFromGroup(
+          botID,
+          target
+        );
+
+      } catch (err) {
+
+        console.error(
+          "خطأ أثناء المغادرة:",
+          err
+        );
+      }
+    };
+
+
+  // ═══════════════════════════════════════
+  // 🧹 حذف ملف GIF
+  // ═══════════════════════════════════════
+
+  const cleanUp =
+    () => {
+
+      try {
+
+        if (
+          fs.existsSync(
+            pathGif
+          )
+        ) {
+
+          fs.unlinkSync(
+            pathGif
+          );
+        }
+
+      } catch (_) {}
+    };
+
+
+  // ═══════════════════════════════════════
+  // 🚀 التنفيذ
+  // ═══════════════════════════════════════
+
+  try {
+
+    fs.ensureDirSync(
+      cacheDir
+    );
+
+
+    // ═════════════════════════════════════
+    // 🎞️ تحميل GIF
+    // ═════════════════════════════════════
+
+    const response =
+      await axios.get(
+        "https://media.giphy.com/media/kaBU6pgv0OsPHz2yxy/giphy.gif",
+        {
+          responseType:
+            "arraybuffer",
+          timeout: 10000
+        }
+      );
+
+
+    fs.writeFileSync(
+      pathGif,
+      Buffer.from(
+        response.data
+      )
+    );
+
+
+    // ═════════════════════════════════════
+    // 💬 رسالة المغادرة
+    // ═════════════════════════════════════
+
     await api.sendMessage(
-      `⌬ ━━ HINA ━━ ⌬\n\nأنا في خدمتك دائماً يا سيدي 💖\n\nنغادر الآن بكل احترام.. إلى اللقاء 👋`,
+      `⌬ ━━ HINA ━━ ⌬\n\n` +
+      `أنا في خدمتك دائماً يا سيدي 💖\n\n` +
+      `نغادر الآن بكل احترام.. إلى اللقاء 👋`,
       targetID
     );
 
-    // ✅ ثم إرسال الـ GIF
+
+    // ═════════════════════════════════════
+    // 🎞️ إرسال GIF
+    // ═════════════════════════════════════
+
     await api.sendMessage(
       {
-        attachment: fs.createReadStream(pathGif)
+        attachment:
+          fs.createReadStream(
+            pathGif
+          )
       },
       targetID
     );
 
-    setTimeout(() => {
-      leaveGroup(targetID);
-      cleanUp();
-    }, 1500);
+
+    // ═════════════════════════════════════
+    // ⏳ المغادرة بعد 1.5 ثانية
+    // ═════════════════════════════════════
+
+    setTimeout(
+      () => {
+
+        leaveGroup(
+          targetID
+        );
+
+        cleanUp();
+
+      },
+      1500
+    );
+
 
   } catch (e) {
-    console.error("خطأ في أمر غادري:", e);
+
+    console.error(
+      "خطأ في أمر غادري:",
+      e
+    );
+
     cleanUp();
-    leaveGroup(targetID);
+
+    leaveGroup(
+      targetID
+    );
   }
 };
