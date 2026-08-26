@@ -1,132 +1,93 @@
-const fs = require("fs-extra");
-const path = require("path");
 const axios = require("axios");
 
 module.exports.config = {
   name: "فحص",
-  version: "7.0.0",
+  version: "5.0.0",
   hasPermssion: 1,
   credits: "أبو هريرة",
-  description: "فحص حساب Facebook وفق معايير القبول والنفي",
+  description: "فحص الحساب والتحقق من وجوده في مجموعة النفي",
   commandCategory: "admin",
   usages: "فحص رابط الحساب",
   cooldowns: 5
 };
 
-// ═══════════════════════════════════════════════
-// 🚫 مجموعة النفي
-// ═══════════════════════════════════════════════
-
 const NAFY_GROUP_NAME = "| شات حࢪس البوابة |";
 const NAFY_THREAD_ID = "1722791398974114";
 
-const MAX_NAFY_MESSAGES = 1000;
-
-
-// ═══════════════════════════════════════════════
-// 🔗 التحقق من رابط Facebook
-// ═══════════════════════════════════════════════
-
 function isFacebookURL(url) {
-
   try {
-
     const parsed = new URL(url);
 
     const host = parsed.hostname
       .toLowerCase()
       .replace(/^www\./, "");
 
-    return [
-      "facebook.com",
-      "m.facebook.com",
-      "mbasic.facebook.com",
-      "fb.com"
-    ].includes(host);
+    return (
+      host === "facebook.com" ||
+      host === "m.facebook.com" ||
+      host === "mbasic.facebook.com" ||
+      host === "fb.com"
+    );
 
   } catch (_) {
-
     return false;
   }
 }
 
-
-// ═══════════════════════════════════════════════
-// 🆔 استخراج UID من الرابط
-// ═══════════════════════════════════════════════
-
-function extractDirectUID(url) {
+async function extractUID(api, profileURL) {
 
   try {
 
-    const parsed = new URL(url);
+    const url = decodeURIComponent(
+      String(profileURL).trim()
+    );
 
-    const id =
-      parsed.searchParams.get("id");
+    try {
 
-    if (
-      id &&
-      /^\d+$/.test(id)
-    ) {
+      const parsedURL = new URL(url);
 
-      return String(id);
-    }
+      const id =
+        parsedURL.searchParams.get("id");
 
-  } catch (_) {}
+      if (
+        id &&
+        /^\d+$/.test(id)
+      ) {
+        return String(id);
+      }
 
-  const idMatch =
-    String(url).match(
+    } catch (_) {}
+
+    const idMatch = url.match(
       /[?&]id=(\d+)/i
     );
 
-  if (idMatch) {
+    if (idMatch) {
+      return String(idMatch[1]);
+    }
 
-    return String(idMatch[1]);
-  }
-
-  const numericMatch =
-    String(url).match(
+    const numericPath = url.match(
       /facebook\.com\/(\d{5,})(?:[/?#]|$)/i
     );
 
-  if (numericMatch) {
+    if (numericPath) {
+      return String(numericPath[1]);
+    }
 
-    return String(numericMatch[1]);
-  }
-
-  return null;
-}
-
-
-// ═══════════════════════════════════════════════
-// 🆔 استخراج UID من أي رابط Facebook
-// ═══════════════════════════════════════════════
-
-async function extractUID(api, url) {
-
-  // أولًا نحاول الاستخراج المباشر
-  const directUID =
-    extractDirectUID(url);
-
-  if (directUID) {
-
-    return directUID;
-  }
-
-  // روابط username
-  if (
-    typeof api.getUserID !== "function"
-  ) {
-
-    return null;
-  }
-
-  try {
+    if (
+      typeof api.getUserID !== "function"
+    ) {
+      return null;
+    }
 
     const result =
       await api.getUserID(url);
 
     if (Array.isArray(result)) {
+
+      if (!result.length) {
+        return null;
+      }
 
       for (const item of result) {
 
@@ -147,7 +108,6 @@ async function extractUID(api, url) {
     }
 
     if (
-      result &&
       typeof result === "object"
     ) {
 
@@ -168,25 +128,21 @@ async function extractUID(api, url) {
       typeof result === "string" &&
       /^\d+$/.test(result)
     ) {
-
       return result;
     }
 
+    return null;
+
   } catch (error) {
 
-    console.log(
+    console.error(
       "❌ خطأ استخراج UID:",
       error.message
     );
+
+    return null;
   }
-
-  return null;
 }
-
-
-// ═══════════════════════════════════════════════
-// 👤 فحص الحساب + الصورة
-// ═══════════════════════════════════════════════
 
 async function checkAccount(api, uid) {
 
@@ -195,12 +151,9 @@ async function checkAccount(api, uid) {
     if (
       typeof api.getUserInfo !== "function"
     ) {
-
       return {
         success: false,
-        exists: false,
-        hasProfilePicture: null,
-        name: null
+        exists: false
       };
     }
 
@@ -211,44 +164,15 @@ async function checkAccount(api, uid) {
       !info ||
       !info[uid]
     ) {
-
       return {
         success: true,
-        exists: false,
-        hasProfilePicture: false,
-        name: null
+        exists: false
       };
-    }
-
-    const user =
-      info[uid];
-
-    // لا نستخدم الاسم في قرار القبول
-    const name =
-      user.name || null;
-
-    // محاولة معرفة صورة الحساب
-    let hasProfilePicture = null;
-
-    if (
-      user.thumbSrc ||
-      user.profileUrl ||
-      user.imageSrc ||
-      user.avatar
-    ) {
-
-      hasProfilePicture = true;
-
-    } else {
-
-      hasProfilePicture = false;
     }
 
     return {
       success: true,
-      exists: true,
-      hasProfilePicture,
-      name
+      exists: true
     };
 
   } catch (error) {
@@ -260,348 +184,61 @@ async function checkAccount(api, uid) {
 
     return {
       success: false,
-      exists: false,
-      hasProfilePicture: null,
-      name: null
+      exists: false
     };
   }
 }
-
-
-// ═══════════════════════════════════════════════
-// 🖼️ محاولة الحصول على رابط صورة الحساب
-// ═══════════════════════════════════════════════
-
-async function getProfilePicture(api, uid) {
-
-  try {
-
-    if (
-      typeof api.getUserInfo !== "function"
-    ) {
-
-      return null;
-    }
-
-    const info =
-      await api.getUserInfo(uid);
-
-    if (
-      !info ||
-      !info[uid]
-    ) {
-
-      return null;
-    }
-
-    const user =
-      info[uid];
-
-    return (
-      user.thumbSrc ||
-      user.imageSrc ||
-      user.profilePic ||
-      user.avatar ||
-      null
-    );
-
-  } catch (_) {
-
-    return null;
-  }
-}
-
-
-// ═══════════════════════════════════════════════
-// 🔗 استخراج روابط Facebook من الرسالة
-// ═══════════════════════════════════════════════
-
-function extractFacebookLinks(text) {
-
-  if (!text) {
-
-    return [];
-  }
-
-  const regex =
-    /https?:\/\/(?:www\.|m\.|mbasic\.)?(?:facebook\.com|fb\.com)\/[^\s<>"']+/gi;
-
-  const matches =
-    String(text).match(regex) || [];
-
-  return matches.map(link => {
-
-    return link.replace(
-      /[)\]}>,"'،؛.!؟]+$/g,
-      ""
-    );
-
-  });
-}
-
-
-// ═══════════════════════════════════════════════
-// 🚫 قراءة روابط مجموعة النفي
-// ═══════════════════════════════════════════════
 
 async function checkNafy(api, targetID) {
 
   try {
 
-    if (
-      typeof api.getThreadHistory !== "function"
-    ) {
-
-      return {
-        success: false,
-        denied: false,
-        messagesChecked: 0,
-        linksChecked: 0
-      };
-    }
-
-    const messages =
-      await api.getThreadHistory(
-        NAFY_THREAD_ID,
-        MAX_NAFY_MESSAGES,
-        null
+    const info =
+      await api.getThreadInfo(
+        NAFY_THREAD_ID
       );
 
     if (
-      !Array.isArray(messages)
+      !info ||
+      !Array.isArray(
+        info.participantIDs
+      )
     ) {
 
       return {
         success: false,
-        denied: false,
-        messagesChecked: 0,
-        linksChecked: 0
+        denied: false
       };
     }
 
-    let linksChecked = 0;
+    const participants =
+      info.participantIDs.map(
+        String
+      );
 
-    // ═══════════════════════════════════════════
-    // 🔍 فحص الرسائل
-    // ═══════════════════════════════════════════
-
-    for (
-      const message
-      of messages
-    ) {
-
-      if (!message) {
-        continue;
-      }
-
-      let text =
-        message.body || "";
-
-      // الروابط الموجودة داخل attachments
-      if (
-        Array.isArray(
-          message.attachments
-        )
-      ) {
-
-        for (
-          const attachment
-          of message.attachments
-        ) {
-
-          if (!attachment) {
-            continue;
-          }
-
-          if (attachment.url) {
-
-            text +=
-              " " +
-              attachment.url;
-          }
-
-          if (attachment.href) {
-
-            text +=
-              " " +
-              attachment.href;
-          }
-        }
-      }
-
-      const links =
-        extractFacebookLinks(text);
-
-      // ═════════════════════════════════════════
-      // 🔗 فحص كل رابط
-      // ═════════════════════════════════════════
-
-      for (
-        const link
-        of links
-      ) {
-
-        linksChecked++;
-
-        const uid =
-          await extractUID(
-            api,
-            link
-          );
-
-        if (!uid) {
-          continue;
-        }
-
-        // ═══════════════════════════════════════
-        // 🎯 المطابقة
-        // ═══════════════════════════════════════
-
-        if (
-          String(uid) ===
-          String(targetID)
-        ) {
-
-          return {
-            success: true,
-            denied: true,
-            foundLink: link,
-            messagesChecked:
-              messages.length,
-            linksChecked
-          };
-        }
-      }
-    }
+    const denied =
+      participants.includes(
+        String(targetID)
+      );
 
     return {
       success: true,
-      denied: false,
-      foundLink: null,
-      messagesChecked:
-        messages.length,
-      linksChecked
+      denied
     };
 
   } catch (error) {
 
     console.error(
-      "❌ خطأ قراءة مجموعة النفي:",
+      "❌ خطأ فحص مجموعة النفي:",
       error.message
     );
 
     return {
       success: false,
-      denied: false,
-      foundLink: null,
-      messagesChecked: 0,
-      linksChecked: 0
+      denied: false
     };
   }
 }
-
-
-// ═══════════════════════════════════════════════
-// 📋 تقرير المعايير
-// ═══════════════════════════════════════════════
-
-function buildCriteria(
-  account,
-  nafy,
-  uid
-) {
-
-  const criteria = [];
-
-  criteria.push(
-    "🔗 رابط Facebook: ✓ صالح"
-  );
-
-  criteria.push(
-    `🆔 استخراج UID: ✓ ${uid}`
-  );
-
-  if (account.exists) {
-
-    criteria.push(
-      "👤 الحساب قابل للوصول: ✓"
-    );
-
-  } else {
-
-    criteria.push(
-      "👤 الحساب قابل للوصول: ✗"
-    );
-  }
-
-  // ═══════════════════════════════════════════
-  // 🖼️ صورة الحساب
-  // ═══════════════════════════════════════════
-
-  if (
-    account.hasProfilePicture === true
-  ) {
-
-    criteria.push(
-      "🖼️ صورة الحساب: ✓ موجودة"
-    );
-
-  } else if (
-    account.hasProfilePicture === false
-  ) {
-
-    criteria.push(
-      "🖼️ صورة الحساب: ✗ غير موجودة"
-    );
-
-  } else {
-
-    criteria.push(
-      "🖼️ صورة الحساب: ⚠️ تعذر التحقق"
-    );
-  }
-
-  // ═══════════════════════════════════════════
-  // 📅 تاريخ الصورة
-  // ═══════════════════════════════════════════
-
-  criteria.push(
-    "📅 آخر تغيير لصورة الحساب: ⚠️ غير متاح عبر FCA"
-  );
-
-  // ═══════════════════════════════════════════
-  // 🚫 النفي
-  // ═══════════════════════════════════════════
-
-  if (nafy.success) {
-
-    if (nafy.denied) {
-
-      criteria.push(
-        "🚫 موجود في روابط النفي: ✗"
-      );
-
-    } else {
-
-      criteria.push(
-        "🚫 موجود في روابط النفي: ✓ غير موجود"
-      );
-    }
-
-  } else {
-
-    criteria.push(
-      "🚫 فحص روابط النفي: ⚠️ تعذر التحقق"
-    );
-  }
-
-  return criteria.join("\n");
-}
-
-
-// ═══════════════════════════════════════════════
-// 🚀 الأمر الرئيسي
-// ═══════════════════════════════════════════════
 
 module.exports.run = async function({
   api,
@@ -617,10 +254,6 @@ module.exports.run = async function({
 
   try {
 
-    // ═══════════════════════════════════════════
-    // 🔐 صلاحيات الأدمن
-    // ═══════════════════════════════════════════
-
     const threadInfo =
       await api.getThreadInfo(
         threadID
@@ -629,7 +262,7 @@ module.exports.run = async function({
     if (!threadInfo) {
 
       return api.sendMessage(
-        `⌬ ━━ HINA CHECK ━━ ⌬\n\n` +
+        `⌬ ━━ HINA ━━ ⌬\n\n` +
         `❌ تعذر الحصول على معلومات المجموعة.`,
         threadID,
         messageID
@@ -649,16 +282,12 @@ module.exports.run = async function({
     if (!isAdmin) {
 
       return api.sendMessage(
-        `⌬ ━━ HINA CHECK ━━ ⌬\n\n` +
-        `⛔ هذا الأمر للأدمن فقط.`,
+        `⌬ ━━ HINA ━━ ⌬\n\n` +
+        `⛔ هذا الأمر للأدمن فقط!`,
         threadID,
         messageID
       );
     }
-
-    // ═══════════════════════════════════════════
-    // 🔗 التحقق من الرابط
-    // ═══════════════════════════════════════════
 
     if (
       !args ||
@@ -668,7 +297,9 @@ module.exports.run = async function({
       return api.sendMessage(
         `⌬ ━━ HINA CHECK ━━ ⌬\n\n` +
         `📝 الاستخدام:\n\n` +
-        `.فحص رابط الحساب`,
+        `.فحص رابط الحساب\n\n` +
+        `مثال:\n` +
+        `.فحص https://facebook.com/profile.php?id=100000000000000`,
         threadID,
         messageID
       );
@@ -691,25 +322,14 @@ module.exports.run = async function({
       );
     }
 
-    // ═══════════════════════════════════════════
-    // ⏳ بداية الفحص
-    // ═══════════════════════════════════════════
-
     await api.sendMessage(
       `⌬ ━━ HINA CHECK ━━ ⌬\n\n` +
       `⏳ جارٍ فحص الحساب...\n\n` +
-      `🔗 تحليل الرابط\n` +
-      `🆔 استخراج UID\n` +
-      `👤 فحص الحساب\n` +
-      `🖼️ فحص صورة الحساب\n` +
-      `🚫 فحص روابط النفي\n\n` +
-      `يرجى الانتظار...`,
+      `1. استخراج UID\n` +
+      `2. فحص الحساب\n` +
+      `3. فحص قائمة النفي`,
       threadID
     );
-
-    // ═══════════════════════════════════════════
-    // 🆔 UID
-    // ═══════════════════════════════════════════
 
     const targetID =
       await extractUID(
@@ -721,14 +341,11 @@ module.exports.run = async function({
 
       return api.sendMessage(
         `⌬ ━━ HINA CHECK ━━ ⌬\n\n` +
-        `❌ لم أتمكن من استخراج UID من الرابط.`,
+        `❌ لم أتمكن من استخراج UID من الرابط.\n\n` +
+        `تأكد أن الرابط صحيح ويمكن الوصول إليه.`,
         threadID
       );
     }
-
-    // ═══════════════════════════════════════════
-    // 👤 الحساب
-    // ═══════════════════════════════════════════
 
     const account =
       await checkAccount(
@@ -741,14 +358,23 @@ module.exports.run = async function({
       return api.sendMessage(
         `⌬ ━━ HINA CHECK ━━ ⌬\n\n` +
         `🆔 UID: ${targetID}\n\n` +
-        `❌ تعذر التحقق من بيانات الحساب.`,
+        `❌ تعذر فحص الحساب.`,
         threadID
       );
     }
 
-    // ═══════════════════════════════════════════
-    // 🚫 النفي
-    // ═══════════════════════════════════════════
+    if (!account.exists) {
+
+      return api.sendMessage(
+        `⌬ ━━ HINA CHECK ━━ ⌬\n\n` +
+        `🆔 UID: ${targetID}\n\n` +
+        `الحساب: ✗ غير متاح\n\n` +
+        `━━━━━━━━━━━━━━\n` +
+        `❌ الحالة: مرفوض\n` +
+        `━━━━━━━━━━━━━━`,
+        threadID
+      );
+    }
 
     const nafy =
       await checkNafy(
@@ -756,132 +382,72 @@ module.exports.run = async function({
         targetID
       );
 
-    // ═══════════════════════════════════════════
-    // 📋 التقرير
-    // ═══════════════════════════════════════════
-
-    const criteria =
-      buildCriteria(
-        account,
-        nafy,
-        targetID
-      );
-
-    // ═══════════════════════════════════════════
-    // ❌ موجود في النفي
-    // ═══════════════════════════════════════════
-
-    if (
-      nafy.success &&
-      nafy.denied
-    ) {
-
-      return api.sendMessage(
-        `⌬ ━━ HINA CHECK ━━ ⌬\n\n` +
-        `📋 تقرير فحص الحساب\n\n` +
-        `${criteria}\n\n` +
-        `🚫 مجموعة النفي:\n` +
-        `「 ${NAFY_GROUP_NAME} 」\n\n` +
-        `🔗 الرابط المطابق:\n` +
-        `${nafy.foundLink}\n\n` +
-        `━━━━━━━━━━━━━━\n` +
-        `❌ النتيجة: مرفوض\n` +
-        `━━━━━━━━━━━━━━`,
-        threadID
-      );
-    }
-
-    // ═══════════════════════════════════════════
-    // ⚠️ تعذر فحص النفي
-    // ═══════════════════════════════════════════
-
     if (!nafy.success) {
 
       return api.sendMessage(
         `⌬ ━━ HINA CHECK ━━ ⌬\n\n` +
-        `📋 تقرير فحص الحساب\n\n` +
-        `${criteria}\n\n` +
-        `🚫 المصدر:\n` +
+        `🆔 UID:\n` +
+        `${targetID}\n\n` +
+        `الحساب: ✓ موجود\n` +
+        `النفي: ⚠️ تعذر الفحص\n\n` +
+        `مجموعة النفي:\n` +
         `「 ${NAFY_GROUP_NAME} 」\n\n` +
         `🆔 ${NAFY_THREAD_ID}\n\n` +
         `━━━━━━━━━━━━━━\n` +
-        `⚠️ النتيجة: غير محددة\n` +
+        `⚠️ الحالة: غير محددة\n` +
         `━━━━━━━━━━━━━━`,
         threadID
       );
     }
 
-    // ═══════════════════════════════════════════
-    // ❌ الحساب غير متاح
-    // ═══════════════════════════════════════════
-
-    if (!account.exists) {
+    if (nafy.denied) {
 
       return api.sendMessage(
         `⌬ ━━ HINA CHECK ━━ ⌬\n\n` +
-        `📋 تقرير فحص الحساب\n\n` +
-        `${criteria}\n\n` +
+        `🆔 UID:\n` +
+        `${targetID}\n\n` +
+        `الحساب: ✓ موجود\n` +
+        `النفي: ✗ موجود\n\n` +
+        `🚫 مجموعة النفي:\n` +
+        `「 ${NAFY_GROUP_NAME} 」\n\n` +
         `━━━━━━━━━━━━━━\n` +
-        `❌ النتيجة: مرفوض\n` +
+        `❌ الحالة: مرفوض\n` +
         `━━━━━━━━━━━━━━`,
         threadID
       );
     }
-
-    // ═══════════════════════════════════════════
-    // 🖼️ لا توجد صورة
-    // ═══════════════════════════════════════════
-
-    if (
-      account.hasProfilePicture === false
-    ) {
-
-      return api.sendMessage(
-        `⌬ ━━ HINA CHECK ━━ ⌬\n\n` +
-        `📋 تقرير فحص الحساب\n\n` +
-        `${criteria}\n\n` +
-        `━━━━━━━━━━━━━━\n` +
-        `❌ النتيجة: مرفوض\n` +
-        `السبب: لا توجد صورة حساب قابلة للتحقق\n` +
-        `━━━━━━━━━━━━━━`,
-        threadID
-      );
-    }
-
-    // ═══════════════════════════════════════════
-    // 🟢 مقبول مبدئيًا
-    // ═══════════════════════════════════════════
 
     return api.sendMessage(
       `⌬ ━━ HINA CHECK ━━ ⌬\n\n` +
-      `📋 تقرير فحص الحساب\n\n` +
-      `${criteria}\n\n` +
-      `🚫 مصدر النفي:\n` +
+      `🆔 UID:\n` +
+      `${targetID}\n\n` +
+      `الحساب: ✓ موجود\n` +
+      `النفي: ✓ غير موجود\n\n` +
+      `🚫 مجموعة النفي:\n` +
       `「 ${NAFY_GROUP_NAME} 」\n\n` +
-      `📨 الرسائل المفحوصة: ` +
-      `${nafy.messagesChecked || 0}\n` +
-      `🔗 الروابط المفحوصة: ` +
-      `${nafy.linksChecked || 0}\n\n` +
       `━━━━━━━━━━━━━━\n` +
-      `🟢 النتيجة: مقبول مبدئيًا\n` +
-      `━━━━━━━━━━━━━━\n\n` +
-      `ملاحظة: اسم الحساب لا يدخل ضمن معايير القبول.`,
+      `🟢 الحالة: مقبول مبدئيًا\n` +
+      `━━━━━━━━━━━━━━`,
       threadID
     );
 
   } catch (error) {
 
     console.error(
-      "❌ HINA CHECK ERROR:",
+      "❌ خطأ في أمر فحص:",
       error
     );
 
-    return api.sendMessage(
-      `⌬ ━━ HINA CHECK ━━ ⌬\n\n` +
-      `❌ حدث خطأ أثناء الفحص.\n\n` +
-      `📝 ${error.message || "خطأ غير معروف"}`,
-      threadID,
-      messageID
-    );
+    try {
+
+      return api.sendMessage(
+        `⌬ ━━ HINA ━━ ⌬\n\n` +
+        `❌ حدث خطأ أثناء الفحص.\n\n` +
+        `📝 ${error.message || "خطأ غير معروف"}`,
+        threadID,
+        messageID
+      );
+
+    } catch (_) {}
   }
 };
