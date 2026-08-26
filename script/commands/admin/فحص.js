@@ -1,6 +1,6 @@
 module.exports.config = {
   name: "فحص",
-  version: "2.0.0",
+  version: "2.1.0",
   hasPermssion: 1,
   credits: "أبو هريرة",
   description: "فحص حساب Facebook والتحقق من بوابة النفي",
@@ -14,8 +14,12 @@ module.exports.config = {
 // ⚙️ الإعدادات
 // ═══════════════════════════════════════════════
 
+const DEV_ID = "61578581225040";
+
 const NAFY_THREAD_ID = "1722791398974114";
+
 const NAFY_GROUP_NAME = "| شات حࢪس البوابة |";
+
 const NAFY_MESSAGE_LIMIT = 100;
 
 
@@ -66,7 +70,7 @@ function cleanURL(url) {
 
 
 // ═══════════════════════════════════════════════
-// 🔗 استخراج روابط Facebook من نص
+// 🔗 استخراج روابط Facebook
 // ═══════════════════════════════════════════════
 
 function extractFacebookLinks(text) {
@@ -80,14 +84,18 @@ function extractFacebookLinks(text) {
       /https?:\/\/(?:www\.|m\.|mbasic\.)?(?:facebook\.com|fb\.com)\/[^\s<>"']+/gi
     ) || [];
 
-  return matches
-    .map(cleanURL)
-    .filter(isFacebookURL);
+  return [
+    ...new Set(
+      matches
+        .map(cleanURL)
+        .filter(isFacebookURL)
+    )
+  ];
 }
 
 
 // ═══════════════════════════════════════════════
-// 🆔 استخراج UID من الرابط مباشرة
+// 🆔 استخراج UID المباشر
 // ═══════════════════════════════════════════════
 
 function getDirectUID(url) {
@@ -142,12 +150,11 @@ function getDirectUID(url) {
 
 
 // ═══════════════════════════════════════════════
-// 🆔 استخراج UID
+// 🆔 استخراج UID من جميع أنواع الروابط
 // ═══════════════════════════════════════════════
 
 async function extractUID(api, url) {
 
-  // الروابط التي تحتوي UID مباشرة
   const directUID =
     getDirectUID(url);
 
@@ -157,7 +164,13 @@ async function extractUID(api, url) {
   }
 
 
-  // روابط username
+  /*
+   * هنا نتعامل مع روابط username
+   *
+   * مثال:
+   * https://www.facebook.com/hama.gossa.39
+   */
+
   if (
     typeof api.getUserID !==
     "function"
@@ -170,32 +183,57 @@ async function extractUID(api, url) {
   try {
 
     const result =
-      await api.getUserID(url);
+      await api.getUserID(
+        String(url)
+      );
 
+
+    // ═══════════════════════════════════════
+    // Array
+    // ═══════════════════════════════════════
 
     if (Array.isArray(result)) {
 
       for (
-        const item of result
+        const item
+        of result
       ) {
 
         if (!item) {
           continue;
         }
 
-        if (item.userID) {
+        if (
+          item.userID &&
+          /^\d+$/.test(
+            String(item.userID)
+          )
+        ) {
+
           return String(
             item.userID
           );
         }
 
-        if (item.id) {
+        if (
+          item.id &&
+          /^\d+$/.test(
+            String(item.id)
+          )
+        ) {
+
           return String(
             item.id
           );
         }
 
-        if (item.uid) {
+        if (
+          item.uid &&
+          /^\d+$/.test(
+            String(item.uid)
+          )
+        ) {
+
           return String(
             item.uid
           );
@@ -204,30 +242,57 @@ async function extractUID(api, url) {
     }
 
 
+    // ═══════════════════════════════════════
+    // Object
+    // ═══════════════════════════════════════
+
     if (
       result &&
-      typeof result === "object"
+      typeof result === "object" &&
+      !Array.isArray(result)
     ) {
 
-      if (result.userID) {
+      if (
+        result.userID &&
+        /^\d+$/.test(
+          String(result.userID)
+        )
+      ) {
+
         return String(
           result.userID
         );
       }
 
-      if (result.id) {
+      if (
+        result.id &&
+        /^\d+$/.test(
+          String(result.id)
+        )
+      ) {
+
         return String(
           result.id
         );
       }
 
-      if (result.uid) {
+      if (
+        result.uid &&
+        /^\d+$/.test(
+          String(result.uid)
+        )
+      ) {
+
         return String(
           result.uid
         );
       }
     }
 
+
+    // ═══════════════════════════════════════
+    // String
+    // ═══════════════════════════════════════
 
     if (
       typeof result === "string" &&
@@ -241,7 +306,7 @@ async function extractUID(api, url) {
 
     console.log(
       "[HINA CHECK] UID ERROR:",
-      error.message
+      error?.message || error
     );
   }
 
@@ -272,7 +337,9 @@ async function checkAccount(api, uid) {
 
 
     const info =
-      await api.getUserInfo(uid);
+      await api.getUserInfo(
+        String(uid)
+      );
 
 
     if (
@@ -291,6 +358,17 @@ async function checkAccount(api, uid) {
     const user =
       info[uid];
 
+
+    /*
+     * ملاحظة:
+     * وجود thumbSrc وحده لا يعني بالضرورة
+     * أن المستخدم وضع صورة مخصصة.
+     *
+     * FCA قد يعيد صورة افتراضية أيضًا.
+     *
+     * لذلك نعتبر الصورة "متاحة" فقط هنا،
+     * ولا ندعي أن هذا يثبت أنها مخصصة.
+     */
 
     const picture =
       Boolean(
@@ -312,7 +390,7 @@ async function checkAccount(api, uid) {
 
     console.log(
       "[HINA CHECK] ACCOUNT ERROR:",
-      error.message
+      error?.message || error
     );
 
     return {
@@ -331,7 +409,7 @@ async function checkAccount(api, uid) {
 function getThreadHistory(api) {
 
   return new Promise(
-    (resolve) => {
+    resolve => {
 
       if (
         typeof api.getThreadHistory !==
@@ -342,7 +420,7 @@ function getThreadHistory(api) {
           success: false,
           history: [],
           error:
-            "getThreadHistory غير متوفرة"
+            "getThreadHistory غير متوفرة في نسخة FCA"
         });
 
         return;
@@ -352,51 +430,44 @@ function getThreadHistory(api) {
       let finished = false;
 
 
-      const done = (
-        error,
-        history
-      ) => {
+      const done =
+        (
+          error,
+          history
+        ) => {
 
-        if (finished) {
-          return;
-        }
+          if (finished) {
+            return;
+          }
 
-        finished = true;
+          finished = true;
 
 
-        if (error) {
+          if (error) {
+
+            resolve({
+              success: false,
+              history: [],
+              error:
+                error?.message ||
+                String(error)
+            });
+
+            return;
+          }
+
 
           resolve({
-            success: false,
-            history: [],
-            error:
-              error.message ||
-              String(error)
+            success: true,
+            history:
+              Array.isArray(history)
+                ? history
+                : []
           });
-
-          return;
-        }
-
-
-        resolve({
-          success: true,
-          history:
-            Array.isArray(history)
-              ? history
-              : []
-        });
-      };
+        };
 
 
       try {
-
-        /*
-         * getThreadHistory:
-         * threadID
-         * amount = 100
-         * timestamp = undefined
-         * callback
-         */
 
         const result =
           api.getThreadHistory(
@@ -407,7 +478,10 @@ function getThreadHistory(api) {
           );
 
 
-        // دعم بعض إصدارات FCA التي ترجع Promise
+        /*
+         * دعم الإصدارات التي تستخدم Promise
+         */
+
         if (
           result &&
           typeof result.then ===
@@ -415,40 +489,44 @@ function getThreadHistory(api) {
         ) {
 
           result
-            .then(history => {
+            .then(
+              history => {
 
-              if (finished) {
-                return;
+                if (finished) {
+                  return;
+                }
+
+                finished = true;
+
+                resolve({
+                  success: true,
+                  history:
+                    Array.isArray(history)
+                      ? history
+                      : []
+                });
+
               }
+            )
+            .catch(
+              error => {
 
-              finished = true;
+                if (finished) {
+                  return;
+                }
 
-              resolve({
-                success: true,
-                history:
-                  Array.isArray(history)
-                    ? history
-                    : []
-              });
+                finished = true;
 
-            })
-            .catch(error => {
+                resolve({
+                  success: false,
+                  history: [],
+                  error:
+                    error?.message ||
+                    String(error)
+                });
 
-              if (finished) {
-                return;
               }
-
-              finished = true;
-
-              resolve({
-                success: false,
-                history: [],
-                error:
-                  error.message ||
-                  String(error)
-              });
-
-            });
+            );
         }
 
       } catch (error) {
@@ -461,7 +539,7 @@ function getThreadHistory(api) {
             success: false,
             history: [],
             error:
-              error.message ||
+              error?.message ||
               String(error)
           });
         }
@@ -472,20 +550,19 @@ function getThreadHistory(api) {
 
 
 // ═══════════════════════════════════════════════
-// 🔎 البحث عن روابط داخل رسالة
+// 🔎 استخراج الروابط من رسالة
 // ═══════════════════════════════════════════════
 
 function extractLinksFromMessage(message) {
 
   const links = [];
 
-
   if (!message) {
     return links;
   }
 
 
-  // نص الرسالة
+  // النص
   if (message.body) {
 
     links.push(
@@ -496,7 +573,7 @@ function extractLinksFromMessage(message) {
   }
 
 
-  // بعض نسخ FCA تضع الرابط في attachment
+  // Attachments
   if (
     Array.isArray(
       message.attachments
@@ -543,7 +620,7 @@ function extractLinksFromMessage(message) {
   }
 
 
-  // دعم أي رسالة مقتبسة/مرتبطة
+  // رسائل مقتبسة
   if (
     message.messageReply
   ) {
@@ -580,10 +657,15 @@ function extractLinksFromMessage(message) {
 // 🚫 فحص بوابة النفي
 // ═══════════════════════════════════════════════
 
-async function checkNafy(api, targetUID) {
+async function checkNafy(
+  api,
+  targetUID
+) {
 
   const result =
-    await getThreadHistory(api);
+    await getThreadHistory(
+      api
+    );
 
 
   if (!result.success) {
@@ -592,6 +674,7 @@ async function checkNafy(api, targetUID) {
       success: false,
       denied: false,
       checked: 0,
+      foundLinks: [],
       error: result.error
     };
   }
@@ -604,9 +687,9 @@ async function checkNafy(api, targetUID) {
   const foundLinks = [];
 
 
-  // ───────────────────────────────────────────
-  // قراءة الرسائل
-  // ───────────────────────────────────────────
+  /*
+   * نقرأ الرسائل ونبحث عن الروابط
+   */
 
   for (
     const message
@@ -624,14 +707,18 @@ async function checkNafy(api, targetUID) {
       of links
     ) {
 
-      const uid =
+      /*
+       * إذا كان الرابط يحتوي UID
+       * نقارنه مباشرة
+       */
+
+      const directUID =
         getDirectUID(link);
 
 
-      // إذا كان الرابط يحتوي UID مباشرة
       if (
-        uid &&
-        String(uid) ===
+        directUID &&
+        String(directUID) ===
         String(targetUID)
       ) {
 
@@ -644,22 +731,19 @@ async function checkNafy(api, targetUID) {
 
 
       /*
-       * إذا كان الرابط username
-       * نحاول استخراج UID منه.
-       *
-       * يتم التعامل مع الأخطاء
-       * بدون إيقاف أمر الفحص.
+       * إذا كان Username
+       * نحاول تحويله إلى UID
        */
 
       if (
-        !uid &&
+        !directUID &&
         typeof api.getUserID ===
         "function"
       ) {
 
         try {
 
-          const extracted =
+          const extractedUID =
             await extractUID(
               api,
               link
@@ -667,8 +751,8 @@ async function checkNafy(api, targetUID) {
 
 
           if (
-            extracted &&
-            String(extracted) ===
+            extractedUID &&
+            String(extractedUID) ===
             String(targetUID)
           ) {
 
@@ -690,20 +774,27 @@ async function checkNafy(api, targetUID) {
     checked:
       history.length,
     foundLinks:
-      [...new Set(foundLinks)]
+      [
+        ...new Set(
+          foundLinks
+        )
+      ]
   };
 }
 
 
 // ═══════════════════════════════════════════════
-// 🔗 الحصول على الرابط من الأمر أو الرد
+// 🔗 الحصول على رابط الحساب
 // ═══════════════════════════════════════════════
 
-function getProfileURL(event, args) {
+function getProfileURL(
+  event,
+  args
+) {
 
-  // ───────────────────────────────────────────
+  // ═══════════════════════════════════════
   // الرابط مع الأمر
-  // ───────────────────────────────────────────
+  // ═══════════════════════════════════════
 
   if (
     args &&
@@ -735,9 +826,9 @@ function getProfileURL(event, args) {
   }
 
 
-  // ───────────────────────────────────────────
-  // الرابط داخل الرسالة المردود عليها
-  // ───────────────────────────────────────────
+  // ═══════════════════════════════════════
+  // الرابط في الرسالة المردود عليها
+  // ═══════════════════════════════════════
 
   if (
     event.messageReply
@@ -764,7 +855,8 @@ function getProfileURL(event, args) {
 // 🚀 الأمر الرئيسي
 // ═══════════════════════════════════════════════
 
-module.exports.run = async function({
+module.exports.run =
+async function({
   api,
   event,
   args
@@ -780,7 +872,7 @@ module.exports.run = async function({
   try {
 
     // ═══════════════════════════════════════════
-    // 🔐 التحقق من الأدمن
+    // 🔐 صلاحيات الأدمن + المطور
     // ═══════════════════════════════════════════
 
     const threadInfo =
@@ -800,6 +892,11 @@ module.exports.run = async function({
     }
 
 
+    const isDeveloper =
+      String(senderID) ===
+      String(DEV_ID);
+
+
     const isAdmin =
       Array.isArray(
         threadInfo.adminIDs
@@ -811,11 +908,18 @@ module.exports.run = async function({
       );
 
 
-    if (!isAdmin) {
+    /*
+     * المطور أو أدمن المجموعة
+     */
+
+    if (
+      !isDeveloper &&
+      !isAdmin
+    ) {
 
       return api.sendMessage(
         `⌬ ━━ HINA CHECK ━━ ⌬\n\n` +
-        `⛔ هذا الأمر للأدمن فقط.`,
+        `⛔ هذا الأمر للأدمن والمطور فقط.`,
         threadID,
         messageID
       );
@@ -837,12 +941,17 @@ module.exports.run = async function({
 
       return api.sendMessage(
         `⌬ ━━ HINA CHECK ━━ ⌬\n\n` +
+
         `❌ لم يتم العثور على رابط Facebook.\n\n` +
 
         `📝 الاستخدام:\n` +
-        `.فحص https://facebook.com/profile.php?id=...\n\n` +
 
-        `أو قم بالرد على رسالة تحتوي رابط Facebook واكتب:\n` +
+        `.فحص https://facebook.com/username\n\n` +
+
+        `أو:\n` +
+
+        `↩️ قم بالرد على رسالة تحتوي رابط Facebook ثم اكتب:\n` +
+
         `.فحص`,
         threadID,
         messageID
@@ -851,7 +960,7 @@ module.exports.run = async function({
 
 
     // ═══════════════════════════════════════════
-    // 🔗 صلاحية الرابط
+    // 🔗 التحقق من الرابط
     // ═══════════════════════════════════════════
 
     if (
@@ -870,18 +979,19 @@ module.exports.run = async function({
 
 
     // ═══════════════════════════════════════════
-    // ⏳ رسالة الفحص
+    // ⏳ بدء الفحص
     // ═══════════════════════════════════════════
 
     await api.sendMessage(
       `⌬ ━━ HINA CHECK ━━ ⌬\n\n` +
+
       `⏳ جارٍ فحص الحساب...\n\n` +
 
       `🔗 صلاحية الرابط ✓\n` +
       `🆔 استخراج UID ⏳\n` +
       `👤 وجود الحساب\n` +
       `🖼️ صورة الحساب\n` +
-      `🚫 آخر 100 رسالة من بوابة النفي`,
+      `🚫 قراءة آخر ${NAFY_MESSAGE_LIMIT} رسالة من بوابة النفي`,
       threadID
     );
 
@@ -902,11 +1012,17 @@ module.exports.run = async function({
       return api.sendMessage(
         `⌬ ━━ HINA CHECK ━━ ⌬\n\n` +
 
+        `📋 تقرير الفحص\n\n` +
+
         `🔗 الرابط: ✓ صالح\n` +
         `🆔 UID: ✗ تعذر استخراجه\n\n` +
 
-        `❌ لا يمكن إكمال الفحص.`,
-        threadID
+        `🔎 نوع الرابط:\n` +
+        `Username / رابط غير رقمي\n\n` +
+
+        `❌ لا يمكن إكمال الفحص بواسطة FCA الحالي.`,
+        threadID,
+        messageID
       );
     }
 
@@ -927,12 +1043,15 @@ module.exports.run = async function({
       return api.sendMessage(
         `⌬ ━━ HINA CHECK ━━ ⌬\n\n` +
 
+        `📋 تقرير الفحص\n\n` +
+
         `🔗 الرابط: ✓ صالح\n` +
         `🆔 UID: ${uid}\n` +
         `👤 الحساب: ⚠️ تعذر التحقق\n\n` +
 
         `❌ لا يمكن إصدار نتيجة نهائية.`,
-        threadID
+        threadID,
+        messageID
       );
     }
 
@@ -941,7 +1060,9 @@ module.exports.run = async function({
     // ❌ الحساب غير متاح
     // ═══════════════════════════════════════════
 
-    if (!account.exists) {
+    if (
+      !account.exists
+    ) {
 
       return api.sendMessage(
         `⌬ ━━ HINA CHECK ━━ ⌬\n\n` +
@@ -957,7 +1078,8 @@ module.exports.run = async function({
         `━━━━━━━━━━━━━━\n` +
         `❌ النتيجة: مرفوض\n` +
         `━━━━━━━━━━━━━━`,
-        threadID
+        threadID,
+        messageID
       );
     }
 
@@ -975,14 +1097,14 @@ module.exports.run = async function({
     ) {
 
       pictureStatus =
-        "✓ موجودة";
+        "✓ متاحة";
 
     } else if (
       account.picture === false
     ) {
 
       pictureStatus =
-        "✗ غير موجودة";
+        "✗ غير متاحة";
     }
 
 
@@ -998,7 +1120,7 @@ module.exports.run = async function({
 
 
     // ═══════════════════════════════════════════
-    // ⚠️ تعذر قراءة بوابة النفي
+    // ⚠️ تعذر قراءة النفي
     // ═══════════════════════════════════════════
 
     if (!nafy.success) {
@@ -1011,25 +1133,26 @@ module.exports.run = async function({
         `🔗 الرابط: ✓ صالح\n` +
         `🆔 UID: ${uid}\n` +
         `👤 الحساب: ✓ موجود\n` +
-        `🖼️ صورة الحساب: ${pictureStatus}\n` +
+        `🖼️ صورة الحساب: ${pictureStatus}\n\n` +
 
         `🚫 بوابة النفي:\n` +
         `⚠️ تعذر قراءة الرسائل\n` +
 
         `「 ${NAFY_GROUP_NAME} 」\n\n` +
 
-        `📨 المطلوب فحصه: آخر ${NAFY_MESSAGE_LIMIT} رسالة\n\n` +
+        `📨 المطلوب: آخر ${NAFY_MESSAGE_LIMIT} رسالة\n\n` +
 
         `━━━━━━━━━━━━━━\n` +
         `⚠️ النتيجة: غير محددة\n` +
         `━━━━━━━━━━━━━━`,
-        threadID
+        threadID,
+        messageID
       );
     }
 
 
     // ═══════════════════════════════════════════
-    // ❌ موجود في بوابة النفي
+    // ❌ موجود في النفي
     // ═══════════════════════════════════════════
 
     if (
@@ -1044,13 +1167,13 @@ module.exports.run = async function({
         `🔗 الرابط: ✓ صالح\n` +
         `🆔 UID: ${uid}\n` +
         `👤 الحساب: ✓ موجود\n` +
-        `🖼️ صورة الحساب: ${pictureStatus}\n` +
+        `🖼️ صورة الحساب: ${pictureStatus}\n\n` +
 
         `🚫 بوابة النفي: ✗ موجود\n` +
 
         `「 ${NAFY_GROUP_NAME} 」\n\n` +
 
-        `📨 تم فحص: ${nafy.checked} رسالة\n` +
+        `📨 تم فحص: ${nafy.checked} رسالة\n\n` +
 
         `🔎 الرابط المطابق:\n` +
         `${nafy.foundLinks[0] || "غير متاح"}\n\n` +
@@ -1058,7 +1181,8 @@ module.exports.run = async function({
         `━━━━━━━━━━━━━━\n` +
         `❌ النتيجة: مرفوض\n` +
         `━━━━━━━━━━━━━━`,
-        threadID
+        threadID,
+        messageID
       );
     }
 
@@ -1080,7 +1204,8 @@ module.exports.run = async function({
 
       `🚫 بوابة النفي:\n` +
       `✓ غير موجود\n` +
-      `「 ${NAFY_GROUP_NAME} 」\n` +
+
+      `「 ${NAFY_GROUP_NAME} 」\n\n` +
 
       `📨 تم فحص آخر ${nafy.checked} رسالة\n\n` +
 
@@ -1091,11 +1216,12 @@ module.exports.run = async function({
       `📌 معايير الفحص:\n` +
       `✓ رابط Facebook صالح\n` +
       `✓ الحساب موجود\n` +
-      `${account.picture === true ? "✓" : "⚠️"} صورة الحساب\n` +
-      `✓ غير موجود في روابط بوابة النفي\n\n` +
+      `${account.picture === true ? "✓" : "⚠️"} صورة الحساب متاحة\n` +
+      `✓ غير موجود ضمن روابط بوابة النفي\n\n` +
 
       `ملاحظة: اسم الحساب لا يدخل ضمن معايير الفحص.`,
-      threadID
+      threadID,
+      messageID
     );
 
 
@@ -1111,7 +1237,9 @@ module.exports.run = async function({
 
       return api.sendMessage(
         `⌬ ━━ HINA CHECK ━━ ⌬\n\n` +
+
         `❌ حدث خطأ أثناء الفحص.\n\n` +
+
         `📝 ${
           error?.message ||
           "خطأ غير معروف"
