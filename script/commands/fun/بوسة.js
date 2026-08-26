@@ -5,11 +5,11 @@ const jimp = require("jimp");
 
 module.exports.config = {
   name: "بوسة",
-  version: "3.0.0",
+  version: "4.0.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
-  description: "تركيب صورتي شخصين على قالب",
-  commandCategory: "Utility",
+  description: "تركيب صور بروفايل شخصين على القالب",
+  commandCategory: "Fun",
   usages: "بوسة بالرد على رسالة",
   cooldowns: 5,
 
@@ -23,198 +23,96 @@ module.exports.config = {
 
 
 // ==================================================
-// 🖼️ إعدادات القالب
+// 🖼️ القالب
 // ==================================================
 
 const BACKGROUND_URL =
   "https://files.catbox.moe/cbb7zy.jpg";
 
 
-// أبعاد القالب
+// ==================================================
+// 📐 أبعاد القالب
+// ==================================================
+
 const CANVAS_WIDTH = 473;
 const CANVAS_HEIGHT = 500;
 
 
-// حجم صور البروفايل
+// ==================================================
+// 👤 حجم صور البروفايل
+// ==================================================
+
 const AVATAR_SIZE = 132;
 
 
 // ==================================================
-// 📍 إحداثيات البروفايل
+// 📍 إحداثيات الصور
 // ==================================================
 
-// الشخص الأول
 const AVATAR_1_X = 89;
 const AVATAR_1_Y = 22;
 
-
-// الشخص الثاني
 const AVATAR_2_X = 258;
 const AVATAR_2_Y = 22;
 
 
 // ==================================================
-// 🔵 تحويل الصورة إلى دائرة
-// ==================================================
-
-async function makeCircle(filePath) {
-
-  const image =
-    await jimp.read(filePath);
-
-  image
-    .cover(
-      AVATAR_SIZE,
-      AVATAR_SIZE,
-      jimp.HORIZONTAL_ALIGN_CENTER,
-      jimp.VERTICAL_ALIGN_MIDDLE
-    )
-    .circle();
-
-  return image;
-}
-
-
-// ==================================================
-// 👤 استخراج رابط صورة البروفايل
+// 📥 الحصول على رابط صورة المستخدم
 // ==================================================
 
 async function getAvatarURL(api, uid) {
 
-  const id =
-    String(uid);
+  const id = String(uid);
 
-
-  // الطريقة الأولى
   try {
 
-    if (
-      api &&
-      typeof api.getUserInfo === "function"
-    ) {
+    const info =
+      await api.getUserInfo(id);
 
-      const info =
-        await api.getUserInfo(id);
+    const user =
+      info && info[id];
 
+    if (user) {
 
-      const user =
-        info &&
-        info[id];
+      const possibleURLs = [
+        user.thumbSrc,
+        user.imageSrc,
+        user.profilePic,
+        user.profilePicture,
+        user.avatar,
+        user.avatarUrl,
+        user.picture
+      ];
 
+      for (const url of possibleURLs) {
 
-      if (user) {
-
-        const possibleURLs = [
-
-          user.thumbSrc,
-          user.imageSrc,
-          user.profilePic,
-          user.profilePicture,
-          user.avatar,
-          user.avatarUrl,
-          user.picture
-
-        ];
-
-
-        for (
-          const url of possibleURLs
+        if (
+          typeof url === "string" &&
+          /^https?:\/\//i.test(url)
         ) {
-
-          if (
-            typeof url === "string" &&
-            url.startsWith("http")
-          ) {
-
-            return url;
-
-          }
-
+          return url;
         }
 
       }
-
     }
 
   } catch (error) {
 
     console.log(
-      "[BOSA] getUserInfo:",
+      "[BOSA] getUserInfo error:",
       error.message
     );
 
   }
-
-
-  // الطريقة الثانية
-  try {
-
-    if (
-      api &&
-      typeof api.getUserInfo === "function"
-    ) {
-
-      const info =
-        await api.getUserInfo([id]);
-
-
-      const user =
-        info &&
-        info[id];
-
-
-      if (user) {
-
-        const possibleURLs = [
-
-          user.thumbSrc,
-          user.imageSrc,
-          user.profilePic,
-          user.profilePicture,
-          user.avatar,
-          user.avatarUrl,
-          user.picture
-
-        ];
-
-
-        for (
-          const url of possibleURLs
-        ) {
-
-          if (
-            typeof url === "string" &&
-            url.startsWith("http")
-          ) {
-
-            return url;
-
-          }
-
-        }
-
-      }
-
-    }
-
-  } catch (error) {
-
-    console.log(
-      "[BOSA] getUserInfo array:",
-      error.message
-    );
-
-  }
-
 
   throw new Error(
-    `تعذر الحصول على رابط صورة البروفايل للعضو ${id}`
+    "تعذر الحصول على صورة البروفايل."
   );
 }
 
 
 // ==================================================
-// 📥 تحميل صورة البروفايل بجودة عالية
+// 📥 تحميل صورة البروفايل
 // ==================================================
 
 async function downloadAvatar(
@@ -228,7 +126,6 @@ async function downloadAvatar(
       api,
       uid
     );
-
 
   const response =
     await axios.get(
@@ -247,13 +144,11 @@ async function downloadAvatar(
           30 * 1024 * 1024,
 
         headers: {
-
           "User-Agent":
             "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/131.0.0.0 Mobile Safari/537.36",
 
           "Accept":
             "image/avif,image/webp,image/apng,image/*,*/*;q=0.8"
-
         }
       }
     );
@@ -265,7 +160,7 @@ async function downloadAvatar(
   ) {
 
     throw new Error(
-      "تم الحصول على صورة فارغة"
+      "صورة البروفايل فارغة."
     );
 
   }
@@ -275,7 +170,6 @@ async function downloadAvatar(
     filePath,
     Buffer.from(response.data)
   );
-
 
   return filePath;
 }
@@ -306,13 +200,11 @@ async function downloadBackground(
           30 * 1024 * 1024,
 
         headers: {
-
           "User-Agent":
             "Mozilla/5.0",
 
           "Accept":
             "image/jpeg,image/png,image/*"
-
         }
       }
     );
@@ -324,7 +216,7 @@ async function downloadBackground(
   ) {
 
     throw new Error(
-      "تعذر تحميل القالب"
+      "تعذر تحميل القالب."
     );
 
   }
@@ -335,8 +227,44 @@ async function downloadBackground(
     Buffer.from(response.data)
   );
 
-
   return filePath;
+}
+
+
+// ==================================================
+// 🔵 تجهيز صورة البروفايل
+// ==================================================
+
+async function prepareAvatar(
+  filePath
+) {
+
+  const image =
+    await jimp.read(
+      filePath
+    );
+
+
+  // --------------------------------------------------
+  // توحيد الحجم قبل القص
+  // --------------------------------------------------
+
+  image.cover(
+    AVATAR_SIZE,
+    AVATAR_SIZE,
+    jimp.HORIZONTAL_ALIGN_CENTER,
+    jimp.VERTICAL_ALIGN_MIDDLE
+  );
+
+
+  // --------------------------------------------------
+  // تحويل إلى دائرة
+  // --------------------------------------------------
+
+  image.circle();
+
+
+  return image;
 }
 
 
@@ -344,11 +272,9 @@ async function downloadBackground(
 // 🧹 حذف الملفات
 // ==================================================
 
-async function removeFiles(files) {
+async function cleanFiles(files) {
 
-  for (
-    const file of files
-  ) {
+  for (const file of files) {
 
     try {
 
@@ -387,7 +313,7 @@ async function({
 
 
   // ==================================================
-  // 📌 التأكد من وجود رد
+  // 📌 يجب الرد على شخص
   // ==================================================
 
   if (!messageReply) {
@@ -398,9 +324,7 @@ async function({
 
 ❌ يجب الرد على رسالة الشخص أولًا.
 
-مثال:
-
-↪️ رد على رسالة شخص
+↪️ قم بالرد على رسالة الشخص
 ثم اكتب:
 
 بوسة`,
@@ -438,8 +362,8 @@ async function({
   // ==================================================
 
   if (
-    String(targetID) ===
-    String(senderID)
+    String(senderID) ===
+    String(targetID)
   ) {
 
     return api.sendMessage(
@@ -457,7 +381,7 @@ async function({
 
 
   // ==================================================
-  // 📁 مجلد FUN
+  // 📁 مجلد الكاش
   // ==================================================
 
   const cacheDir =
@@ -481,14 +405,14 @@ async function({
     Date.now();
 
 
-  const avatarOnePath =
+  const senderAvatarPath =
     path.join(
       cacheDir,
       `bosa_sender_${senderID}_${time}.jpg`
     );
 
 
-  const avatarTwoPath =
+  const targetAvatarPath =
     path.join(
       cacheDir,
       `bosa_target_${targetID}_${time}.jpg`
@@ -498,31 +422,29 @@ async function({
   const backgroundPath =
     path.join(
       cacheDir,
-      `bosa_bg_${time}.jpg`
+      `bosa_background_${time}.jpg`
     );
 
 
   const outputPath =
     path.join(
       cacheDir,
-      `bosa_final_${time}.png`
+      `bosa_result_${time}.png`
     );
 
 
-  const temporaryFiles = [
-
-    avatarOnePath,
-    avatarTwoPath,
+  const filesToClean = [
+    senderAvatarPath,
+    targetAvatarPath,
     backgroundPath,
     outputPath
-
   ];
 
 
   try {
 
     // ==================================================
-    // 📥 تحميل الصور بالتوازي
+    // 📥 تحميل كل شيء
     // ==================================================
 
     await Promise.all([
@@ -530,13 +452,13 @@ async function({
       downloadAvatar(
         api,
         senderID,
-        avatarOnePath
+        senderAvatarPath
       ),
 
       downloadAvatar(
         api,
         targetID,
-        avatarTwoPath
+        targetAvatarPath
       ),
 
       downloadBackground(
@@ -556,7 +478,10 @@ async function({
       );
 
 
-    // التأكد من أبعاد القالب
+    // ==================================================
+    // 📐 ضبط القالب
+    // ==================================================
+
     background.resize(
       CANVAS_WIDTH,
       CANVAS_HEIGHT,
@@ -565,27 +490,27 @@ async function({
 
 
     // ==================================================
-    // 👤 تجهيز البروفايل الأول
+    // 👤 تجهيز الصورة الأولى
     // ==================================================
 
     const avatarOne =
-      await makeCircle(
-        avatarOnePath
+      await prepareAvatar(
+        senderAvatarPath
       );
 
 
     // ==================================================
-    // 👤 تجهيز البروفايل الثاني
+    // 👤 تجهيز الصورة الثانية
     // ==================================================
 
     const avatarTwo =
-      await makeCircle(
-        avatarTwoPath
+      await prepareAvatar(
+        targetAvatarPath
       );
 
 
     // ==================================================
-    // 🎨 تركيب الصور
+    // 🎨 تركيب البروفايل الأول
     // ==================================================
 
     background.composite(
@@ -605,6 +530,10 @@ async function({
     );
 
 
+    // ==================================================
+    // 🎨 تركيب البروفايل الثاني
+    // ==================================================
+
     background.composite(
       avatarTwo,
       AVATAR_2_X,
@@ -623,7 +552,7 @@ async function({
 
 
     // ==================================================
-    // 💾 حفظ PNG بدون ضغط JPG
+    // 💾 حفظ PNG
     // ==================================================
 
     await background.writeAsync(
@@ -650,7 +579,6 @@ async function({
               fs.createReadStream(
                 outputPath
               )
-
           },
 
           threadID,
@@ -705,14 +633,14 @@ async function({
   } finally {
 
     // ==================================================
-    // 🧹 تنظيف بعد الإرسال
+    // 🧹 تنظيف الملفات
     // ==================================================
 
     setTimeout(
       () => {
 
-        removeFiles(
-          temporaryFiles
+        cleanFiles(
+          filesToClean
         );
 
       },
@@ -722,3 +650,15 @@ async function({
   }
 
 };
+
+أهم ما تغير
+
+- "commandCategory" أصبحت "Fun".
+- القالب أصبح "cbb7zy.jpg".
+- أبعاد القالب ثابتة على "473×500".
+- الصورتان دائمًا بنفس الحجم "132×132".
+- يتم استخدام "cover()" لتعبئة المربع بدون تشويه الوجه.
+- يتم تحويل الصورتين إلى دوائر بعد توحيد الحجم.
+- الناتج النهائي PNG لتجنب ضغط JPG الإضافي.
+- كل عملية لها ملفات مؤقتة منفصلة، حتى لا تتداخل طلبات المستخدمين.
+- لا يوجد Access Token مكتوب داخل الكود؛ يعتمد على رابط الصورة الذي يعيده "api.getUserInfo()".
