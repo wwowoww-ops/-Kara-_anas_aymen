@@ -1,6 +1,6 @@
 module.exports.config = {
   name: "فحص",
-  version: "2.1.0",
+  version: "2.2.0",
   hasPermssion: 1,
   credits: "أبو هريرة",
   description: "فحص حساب Facebook والتحقق من بوابة النفي",
@@ -150,13 +150,211 @@ function getDirectUID(url) {
 
 
 // ═══════════════════════════════════════════════
+// 👤 استخراج Username من الرابط
+// ═══════════════════════════════════════════════
+
+function getUsernameFromURL(url) {
+
+  try {
+
+    const parsed =
+      new URL(url);
+
+    const host =
+      parsed.hostname
+        .toLowerCase()
+        .replace(/^www\./, "");
+
+    if (
+      host !== "facebook.com" &&
+      host !== "m.facebook.com" &&
+      host !== "mbasic.facebook.com" &&
+      host !== "fb.com"
+    ) {
+
+      return null;
+    }
+
+    const parts =
+      parsed.pathname
+        .split("/")
+        .filter(Boolean);
+
+    if (!parts.length) {
+      return null;
+    }
+
+    const first =
+      parts[0];
+
+    const reserved = [
+      "profile.php",
+      "people",
+      "pages",
+      "groups",
+      "share",
+      "sharer",
+      "watch",
+      "photo",
+      "photos",
+      "reel",
+      "reels",
+      "story",
+      "stories",
+      "marketplace",
+      "events",
+      "gaming",
+      "login",
+      "home"
+    ];
+
+    if (
+      reserved.includes(
+        first.toLowerCase()
+      )
+    ) {
+
+      return null;
+    }
+
+    return first;
+
+  } catch (_) {
+
+    return null;
+  }
+}
+
+
+// ═══════════════════════════════════════════════
+// 🔢 البحث عن UID داخل نتيجة FCA
+// ═══════════════════════════════════════════════
+
+function findUIDInResult(result) {
+
+  if (!result) {
+    return null;
+  }
+
+
+  // String
+  if (
+    typeof result === "string"
+  ) {
+
+    const value =
+      result.trim();
+
+    if (
+      /^\d{5,}$/.test(value)
+    ) {
+
+      return value;
+    }
+
+    return null;
+  }
+
+
+  // Array
+  if (
+    Array.isArray(result)
+  ) {
+
+    for (
+      const item
+      of result
+    ) {
+
+      const found =
+        findUIDInResult(item);
+
+      if (found) {
+        return found;
+      }
+    }
+
+    return null;
+  }
+
+
+  // Object
+  if (
+    typeof result === "object"
+  ) {
+
+    const keys = [
+      "userID",
+      "userId",
+      "uid",
+      "id",
+      "profileID",
+      "profileId",
+      "entityID",
+      "entityId"
+    ];
+
+
+    for (
+      const key
+      of keys
+    ) {
+
+      const value =
+        result[key];
+
+      if (
+        value !== undefined &&
+        value !== null &&
+        /^\d{5,}$/.test(
+          String(value)
+        )
+      ) {
+
+        return String(value);
+      }
+    }
+
+
+    // بعض إصدارات FCA ترجع كائنًا
+    // مفاتيحه نفسها هي الـUID
+    for (
+      const key
+      of Object.keys(result)
+    ) {
+
+      if (
+        /^\d{5,}$/.test(key)
+      ) {
+
+        return key;
+      }
+    }
+  }
+
+
+  return null;
+}
+
+
+// ═══════════════════════════════════════════════
 // 🆔 استخراج UID من جميع أنواع الروابط
 // ═══════════════════════════════════════════════
 
 async function extractUID(api, url) {
 
+  const originalURL =
+    cleanURL(url);
+
+
+  // ═══════════════════════════════════════════
+  // 1️⃣ UID موجود داخل الرابط
+  // ═══════════════════════════════════════════
+
   const directUID =
-    getDirectUID(url);
+    getDirectUID(
+      originalURL
+    );
 
   if (directUID) {
 
@@ -164,150 +362,149 @@ async function extractUID(api, url) {
   }
 
 
-  /*
-   * هنا نتعامل مع روابط username
-   *
-   * مثال:
-   * https://www.facebook.com/hama.gossa.39
-   */
-
   if (
     typeof api.getUserID !==
     "function"
   ) {
 
+    console.log(
+      "[HINA CHECK] api.getUserID غير متوفرة"
+    );
+
     return null;
   }
 
 
+  // ═══════════════════════════════════════════
+  // 2️⃣ تجهيز روابط متعددة للتجربة
+  // ═══════════════════════════════════════════
+
+  const attempts = [];
+
+  const addAttempt = value => {
+
+    if (
+      !value ||
+      typeof value !== "string"
+    ) {
+
+      return;
+    }
+
+    const cleaned =
+      cleanURL(value);
+
+    if (
+      !attempts.includes(cleaned)
+    ) {
+
+      attempts.push(cleaned);
+    }
+  };
+
+
+  // الرابط الأصلي
+  addAttempt(
+    originalURL
+  );
+
+
+  // الرابط بدون www
   try {
 
-    const result =
-      await api.getUserID(
-        String(url)
+    const parsed =
+      new URL(
+        originalURL
+      );
+
+    const hostname =
+      parsed.hostname
+        .replace(/^www\./, "");
+
+    addAttempt(
+      `https://${hostname}${parsed.pathname}${parsed.search}${parsed.hash}`
+    );
+
+  } catch (_) {}
+
+
+  // ═══════════════════════════════════════════
+  // 3️⃣ تجربة username
+  // ═══════════════════════════════════════════
+
+  const username =
+    getUsernameFromURL(
+      originalURL
+    );
+
+
+  if (username) {
+
+    addAttempt(
+      username
+    );
+
+    addAttempt(
+      `https://www.facebook.com/${username}`
+    );
+
+    addAttempt(
+      `https://facebook.com/${username}`
+    );
+
+    addAttempt(
+      `https://www.facebook.com/profile.php?username=${encodeURIComponent(username)}`
+    );
+  }
+
+
+  // ═══════════════════════════════════════════
+  // 4️⃣ تجربة كل صيغة مع FCA
+  // ═══════════════════════════════════════════
+
+  for (
+    const attempt
+    of attempts
+  ) {
+
+    try {
+
+      console.log(
+        "[HINA CHECK] UID ATTEMPT:",
+        attempt
       );
 
 
-    // ═══════════════════════════════════════
-    // Array
-    // ═══════════════════════════════════════
-
-    if (Array.isArray(result)) {
-
-      for (
-        const item
-        of result
-      ) {
-
-        if (!item) {
-          continue;
-        }
-
-        if (
-          item.userID &&
-          /^\d+$/.test(
-            String(item.userID)
-          )
-        ) {
-
-          return String(
-            item.userID
-          );
-        }
-
-        if (
-          item.id &&
-          /^\d+$/.test(
-            String(item.id)
-          )
-        ) {
-
-          return String(
-            item.id
-          );
-        }
-
-        if (
-          item.uid &&
-          /^\d+$/.test(
-            String(item.uid)
-          )
-        ) {
-
-          return String(
-            item.uid
-          );
-        }
-      }
-    }
-
-
-    // ═══════════════════════════════════════
-    // Object
-    // ═══════════════════════════════════════
-
-    if (
-      result &&
-      typeof result === "object" &&
-      !Array.isArray(result)
-    ) {
-
-      if (
-        result.userID &&
-        /^\d+$/.test(
-          String(result.userID)
-        )
-      ) {
-
-        return String(
-          result.userID
+      const result =
+        await api.getUserID(
+          attempt
         );
-      }
 
-      if (
-        result.id &&
-        /^\d+$/.test(
-          String(result.id)
-        )
-      ) {
 
-        return String(
-          result.id
+      const found =
+        findUIDInResult(
+          result
         );
-      }
 
-      if (
-        result.uid &&
-        /^\d+$/.test(
-          String(result.uid)
-        )
-      ) {
 
-        return String(
-          result.uid
+      if (found) {
+
+        console.log(
+          "[HINA CHECK] UID FOUND:",
+          found
         );
+
+        return found;
       }
+
+    } catch (error) {
+
+      console.log(
+        "[HINA CHECK] UID ATTEMPT ERROR:",
+        attempt,
+        error?.message || error
+      );
     }
-
-
-    // ═══════════════════════════════════════
-    // String
-    // ═══════════════════════════════════════
-
-    if (
-      typeof result === "string" &&
-      /^\d+$/.test(result)
-    ) {
-
-      return result;
-    }
-
-  } catch (error) {
-
-    console.log(
-      "[HINA CHECK] UID ERROR:",
-      error?.message || error
-    );
   }
 
 
@@ -361,13 +558,8 @@ async function checkAccount(api, uid) {
 
     /*
      * ملاحظة:
-     * وجود thumbSrc وحده لا يعني بالضرورة
-     * أن المستخدم وضع صورة مخصصة.
-     *
-     * FCA قد يعيد صورة افتراضية أيضًا.
-     *
-     * لذلك نعتبر الصورة "متاحة" فقط هنا،
-     * ولا ندعي أن هذا يثبت أنها مخصصة.
+     * هذه القيمة تثبت توفر صورة من FCA
+     * لكنها لا تثبت وحدها أن الصورة مخصصة.
      */
 
     const picture =
@@ -403,7 +595,7 @@ async function checkAccount(api, uid) {
 
 
 // ═══════════════════════════════════════════════
-// 📜 قراءة آخر 100 رسالة من بوابة النفي
+// 📜 قراءة آخر 100 رسالة
 // ═══════════════════════════════════════════════
 
 function getThreadHistory(api) {
@@ -478,10 +670,6 @@ function getThreadHistory(api) {
           );
 
 
-        /*
-         * دعم الإصدارات التي تستخدم Promise
-         */
-
         if (
           result &&
           typeof result.then ===
@@ -550,7 +738,7 @@ function getThreadHistory(api) {
 
 
 // ═══════════════════════════════════════════════
-// 🔎 استخراج الروابط من رسالة
+// 🔎 استخراج الروابط من الرسالة
 // ═══════════════════════════════════════════════
 
 function extractLinksFromMessage(message) {
@@ -562,7 +750,6 @@ function extractLinksFromMessage(message) {
   }
 
 
-  // النص
   if (message.body) {
 
     links.push(
@@ -573,7 +760,6 @@ function extractLinksFromMessage(message) {
   }
 
 
-  // Attachments
   if (
     Array.isArray(
       message.attachments
@@ -590,7 +776,7 @@ function extractLinksFromMessage(message) {
       }
 
 
-      const possibleValues = [
+      const values = [
         attachment.url,
         attachment.href,
         attachment.target,
@@ -601,7 +787,7 @@ function extractLinksFromMessage(message) {
 
       for (
         const value
-        of possibleValues
+        of values
       ) {
 
         if (
@@ -620,7 +806,6 @@ function extractLinksFromMessage(message) {
   }
 
 
-  // رسائل مقتبسة
   if (
     message.messageReply
   ) {
@@ -683,13 +868,8 @@ async function checkNafy(
   const history =
     result.history;
 
-
   const foundLinks = [];
 
-
-  /*
-   * نقرأ الرسائل ونبحث عن الروابط
-   */
 
   for (
     const message
@@ -707,13 +887,10 @@ async function checkNafy(
       of links
     ) {
 
-      /*
-       * إذا كان الرابط يحتوي UID
-       * نقارنه مباشرة
-       */
-
       const directUID =
-        getDirectUID(link);
+        getDirectUID(
+          link
+        );
 
 
       if (
@@ -729,11 +906,6 @@ async function checkNafy(
         continue;
       }
 
-
-      /*
-       * إذا كان Username
-       * نحاول تحويله إلى UID
-       */
 
       if (
         !directUID &&
@@ -792,10 +964,6 @@ function getProfileURL(
   args
 ) {
 
-  // ═══════════════════════════════════════
-  // الرابط مع الأمر
-  // ═══════════════════════════════════════
-
   if (
     args &&
     args.length
@@ -825,10 +993,6 @@ function getProfileURL(
     }
   }
 
-
-  // ═══════════════════════════════════════
-  // الرابط في الرسالة المردود عليها
-  // ═══════════════════════════════════════
 
   if (
     event.messageReply
@@ -872,7 +1036,7 @@ async function({
   try {
 
     // ═══════════════════════════════════════════
-    // 🔐 صلاحيات الأدمن + المطور
+    // 🔐 الصلاحيات
     // ═══════════════════════════════════════════
 
     const threadInfo =
@@ -908,10 +1072,6 @@ async function({
       );
 
 
-    /*
-     * المطور أو أدمن المجموعة
-     */
-
     if (
       !isDeveloper &&
       !isAdmin
@@ -941,27 +1101,18 @@ async function({
 
       return api.sendMessage(
         `⌬ ━━ HINA CHECK ━━ ⌬\n\n` +
-
         `❌ لم يتم العثور على رابط Facebook.\n\n` +
 
         `📝 الاستخدام:\n` +
-
         `.فحص https://facebook.com/username\n\n` +
 
-        `أو:\n` +
-
-        `↩️ قم بالرد على رسالة تحتوي رابط Facebook ثم اكتب:\n` +
-
+        `أو قم بالرد على رسالة تحتوي رابط Facebook واكتب:\n` +
         `.فحص`,
         threadID,
         messageID
       );
     }
 
-
-    // ═══════════════════════════════════════════
-    // 🔗 التحقق من الرابط
-    // ═══════════════════════════════════════════
 
     if (
       !isFacebookURL(
@@ -1018,9 +1169,14 @@ async function({
         `🆔 UID: ✗ تعذر استخراجه\n\n` +
 
         `🔎 نوع الرابط:\n` +
-        `Username / رابط غير رقمي\n\n` +
+        `${
+          getUsernameFromURL(profileURL)
+            ? "Username"
+            : "رابط غير رقمي"
+        }\n\n` +
 
-        `❌ لا يمكن إكمال الفحص بواسطة FCA الحالي.`,
+        `⚠️ FCA لم يُرجع UID لهذا الرابط.\n` +
+        `❌ لا يمكن إكمال الفحص بدون UID.`,
         threadID,
         messageID
       );
