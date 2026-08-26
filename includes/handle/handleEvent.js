@@ -24,93 +24,59 @@ module.exports = function ({
     const MAX_ACTIVITY_MEMBERS = 5000;
 
     try {
-
-        if (
-            !fs.existsSync(
-                ACTIVITY_DIR
-            )
-        ) {
-
-            fs.mkdirSync(
-                ACTIVITY_DIR,
-                {
-                    recursive: true
-                }
-            );
+        if (!fs.existsSync(ACTIVITY_DIR)) {
+            fs.mkdirSync(ACTIVITY_DIR, {
+                recursive: true
+            });
         }
-
     } catch (error) {
-
         console.error(
             "[ACTIVITY] فشل إنشاء مجلد النشاط:",
             error.message
         );
     }
 
-
     // ==================================================
-    // 📁 ملف نشاط المجموعة
+    // 📁 الحصول على ملف نشاط المجموعة
     // ==================================================
 
-    function getActivityFile(
-        threadID
-    ) {
-
+    function getActivityFile(threadID) {
         return path.join(
             ACTIVITY_DIR,
             `${String(threadID)}.json`
         );
     }
 
-
     // ==================================================
     // 📖 قراءة نشاط المجموعة
     // ==================================================
 
-    function loadActivity(
-        threadID
-    ) {
+    function loadActivity(threadID) {
 
-        const file =
-            getActivityFile(
-                threadID
-            );
+        const file = getActivityFile(threadID);
 
         try {
 
-            if (
-                !fs.existsSync(
-                    file
-                )
-            ) {
-
+            if (!fs.existsSync(file)) {
                 return {};
             }
 
-            const content =
-                fs.readFileSync(
-                    file,
-                    "utf8"
-                );
+            const content = fs.readFileSync(
+                file,
+                "utf8"
+            );
 
-            if (
-                !content.trim()
-            ) {
-
+            if (!content.trim()) {
                 return {};
             }
 
-            const data =
-                JSON.parse(
-                    content
-                );
+            const data = JSON.parse(content);
 
             if (
                 !data ||
                 typeof data !== "object" ||
                 Array.isArray(data)
             ) {
-
                 return {};
             }
 
@@ -127,22 +93,15 @@ module.exports = function ({
         }
     }
 
-
     // ==================================================
     // 💾 حفظ نشاط المجموعة
     // ==================================================
 
-    function saveActivity(
-        threadID,
-        activity
-    ) {
+    function saveActivity(threadID, activity) {
 
         try {
 
-            const file =
-                getActivityFile(
-                    threadID
-                );
+            const file = getActivityFile(threadID);
 
             fs.writeFileSync(
                 file,
@@ -163,46 +122,33 @@ module.exports = function ({
         }
     }
 
-
     // ==================================================
-    // 📈 تسجيل رسالة العضو
+    // 📈 تسجيل نشاط العضو
     // ==================================================
 
-    function registerActivity(
-        threadID,
-        senderID
-    ) {
+    function registerActivity(threadID, senderID) {
 
-        if (
-            !threadID ||
-            !senderID
-        ) {
-
+        if (!threadID || !senderID) {
             return;
         }
 
-        // الخاص لا يدخل في إحصائيات المجموعات
+        // عدم تسجيل الخاص
         if (
             String(threadID) ===
             String(senderID)
         ) {
-
             return;
         }
 
         try {
 
             const activity =
-                loadActivity(
-                    threadID
-                );
+                loadActivity(threadID);
 
             const uid =
                 String(senderID);
 
-            if (
-                !activity[uid]
-            ) {
+            if (!activity[uid]) {
 
                 activity[uid] = {
                     messages: 0,
@@ -218,37 +164,32 @@ module.exports = function ({
             activity[uid].lastMessage =
                 Date.now();
 
-
             // ==================================================
-            // حماية من تضخم الملف
+            // 🛡️ حماية من تضخم الملف
             // ==================================================
 
             const users =
-                Object.keys(
-                    activity
-                );
+                Object.keys(activity);
 
             if (
                 users.length >
                 MAX_ACTIVITY_MEMBERS
             ) {
 
-                users.sort(
-                    (a, b) => {
+                users.sort((a, b) => {
 
-                        const countA =
-                            Number(
-                                activity[a]?.messages || 0
-                            );
+                    const countA =
+                        Number(
+                            activity[a]?.messages || 0
+                        );
 
-                        const countB =
-                            Number(
-                                activity[b]?.messages || 0
-                            );
+                    const countB =
+                        Number(
+                            activity[b]?.messages || 0
+                        );
 
-                        return countB - countA;
-                    }
-                );
+                    return countB - countA;
+                });
 
                 const keep =
                     users.slice(
@@ -258,11 +199,7 @@ module.exports = function ({
 
                 const cleaned = {};
 
-                for (
-                    const uid
-                    of keep
-                ) {
-
+                for (const uid of keep) {
                     cleaned[uid] =
                         activity[uid];
                 }
@@ -289,14 +226,11 @@ module.exports = function ({
         }
     }
 
-
     // ==================================================
     // 🚀 Handle Event
     // ==================================================
 
-    return async function ({
-        event
-    }) {
+    return async function ({ event }) {
 
         try {
 
@@ -304,56 +238,36 @@ module.exports = function ({
             // التأكد من وجود Event
             // ==================================================
 
-            if (
-                !event
-            ) {
-
+            if (!event) {
                 return;
             }
 
-
             // ==================================================
-            // تسجيل النشاط
+            // 📊 تسجيل نشاط الرسائل
             // ==================================================
 
-            try {
+            if (
+                event.type === "message" &&
+                event.threadID &&
+                event.senderID
+            ) {
 
-                if (
-                    event.type === "message" &&
-                    event.threadID &&
-                    event.senderID
-                ) {
-
-                    registerActivity(
-                        String(
-                            event.threadID
-                        ),
-                        String(
-                            event.senderID
-                        )
-                    );
-                }
-
-            } catch (error) {
-
-                console.error(
-                    "[ACTIVITY EVENT ERROR]",
-                    error.message
+                registerActivity(
+                    String(event.threadID),
+                    String(event.senderID)
                 );
             }
 
-
             // ==================================================
-            // الإعدادات
+            // ⚙️ الإعدادات
             // ==================================================
 
             const {
                 allowInbox
             } = global.config;
 
-
             // ==================================================
-            // البيانات العامة
+            // 🚫 المحظورون
             // ==================================================
 
             const {
@@ -361,18 +275,16 @@ module.exports = function ({
                 threadBanned
             } = global.data;
 
-
             // ==================================================
-            // أوامر البوت
+            // 📦 أوامر البوت
             // ==================================================
 
             const {
                 commands
             } = global.client;
 
-
             // ==================================================
-            // IDs
+            // 🆔 IDs
             // ==================================================
 
             const senderID =
@@ -385,38 +297,29 @@ module.exports = function ({
                     event.threadID || ""
                 );
 
-
             // ==================================================
-            // 🚫 المستخدم المحظور
+            // 🚫 منع المستخدم المحظور
             // ==================================================
 
             if (
                 userBanned &&
                 typeof userBanned.has === "function" &&
-                userBanned.has(
-                    senderID
-                )
+                userBanned.has(senderID)
             ) {
-
                 return;
             }
 
-
             // ==================================================
-            // 🚫 المجموعة المحظورة
+            // 🚫 منع المجموعة المحظورة
             // ==================================================
 
             if (
                 threadBanned &&
                 typeof threadBanned.has === "function" &&
-                threadBanned.has(
-                    threadID
-                )
+                threadBanned.has(threadID)
             ) {
-
                 return;
             }
-
 
             // ==================================================
             // 🚫 منع الخاص
@@ -426,22 +329,16 @@ module.exports = function ({
                 allowInbox === false &&
                 senderID === threadID
             ) {
-
                 return;
             }
 
-
             // ==================================================
-            // الحصول على Events
+            // 📋 الحصول على Events
             // ==================================================
 
             let registeredEvents = [];
 
-
-            // ==================================================
             // الطريقة الأساسية
-            // ==================================================
-
             if (
                 global.client.events &&
                 global.client.events instanceof Map
@@ -452,7 +349,6 @@ module.exports = function ({
                         global.client.events.entries()
                     );
             }
-
 
             // ==================================================
             // دعم eventRegistered
@@ -479,16 +375,12 @@ module.exports = function ({
                                 eventName
                             );
 
-                        if (
-                            eventModule
-                        ) {
+                        if (eventModule) {
 
-                            oldEvents.push(
-                                [
-                                    eventName,
-                                    eventModule
-                                ]
-                            );
+                            oldEvents.push([
+                                eventName,
+                                eventModule
+                            ]);
                         }
 
                     } catch (error) {
@@ -500,16 +392,12 @@ module.exports = function ({
                     }
                 }
 
-
-                if (
-                    oldEvents.length > 0
-                ) {
+                if (oldEvents.length > 0) {
 
                     registeredEvents =
                         oldEvents;
                 }
             }
-
 
             // ==================================================
             // لا توجد Events
@@ -531,9 +419,8 @@ module.exports = function ({
                 return;
             }
 
-
             // ==================================================
-            // تشغيل Events
+            // تشغيل جميع Events
             // ==================================================
 
             for (
@@ -544,13 +431,9 @@ module.exports = function ({
                 of registeredEvents
             ) {
 
-                if (
-                    !eventModule
-                ) {
-
+                if (!eventModule) {
                     continue;
                 }
-
 
                 // ==================================================
                 // التأكد من handleEvent
@@ -560,10 +443,8 @@ module.exports = function ({
                     typeof eventModule.handleEvent !==
                     "function"
                 ) {
-
                     continue;
                 }
-
 
                 // ==================================================
                 // getText
@@ -571,10 +452,8 @@ module.exports = function ({
 
                 let getText =
                     function () {
-
                         return "";
                     };
-
 
                 if (
                     eventModule.languages &&
@@ -591,26 +470,19 @@ module.exports = function ({
                                     global.config.language ||
                                     "ar";
 
-
                                 const languageData =
                                     eventModule.languages[
                                         language
                                     ];
 
-
-                                if (
-                                    !languageData
-                                ) {
-
+                                if (!languageData) {
                                     return "";
                                 }
-
 
                                 let text =
                                     languageData[
                                         values[0]
                                     ] || "";
-
 
                                 for (
                                     let i = 1;
@@ -620,18 +492,18 @@ module.exports = function ({
 
                                     const regex =
                                         new RegExp(
-                                            "%" +
-                                            i,
+                                            "%" + i,
                                             "g"
                                         );
 
                                     text =
                                         text.replace(
                                             regex,
-                                            values[i]
+                                            String(
+                                                values[i]
+                                            )
                                         );
                                 }
-
 
                                 return text;
 
@@ -642,9 +514,8 @@ module.exports = function ({
                         };
                 }
 
-
                 // ==================================================
-                // Object الخاص بالـEvent
+                // Object الخاص بالـ Event
                 // ==================================================
 
                 const Obj = {
@@ -665,7 +536,6 @@ module.exports = function ({
 
                 };
 
-
                 // ==================================================
                 // تشغيل Event
                 // ==================================================
@@ -682,10 +552,7 @@ module.exports = function ({
                         `❌ EVENT ERROR: ${eventName}`
                     );
 
-                    console.error(
-                        error
-                    );
-
+                    console.error(error);
 
                     try {
 
@@ -701,14 +568,13 @@ module.exports = function ({
         } catch (error) {
 
             // ==================================================
-            // خطأ عام
+            // ❌ خطأ عام
             // ==================================================
 
             console.error(
                 "❌ HANDLE EVENT ERROR:",
                 error
             );
-
 
             try {
 
@@ -721,24 +587,3 @@ module.exports = function ({
         }
     };
 };
-
-ماذا أصبح عندك؟
-
-عند وصول رسالة في مجموعة، سيُحفظ مثلًا:
-
-data/
-└── groupActivity/
-    └── 123456789.json
-
-ومحتوى الملف يكون بهذا الشكل:
-
-{
-  "10001": {
-    "messages": 245,
-    "lastMessage": 1787731200000
-  },
-  "10002": {
-    "messages": 181,
-    "lastMessage": 1787731250000
-  }
-}
