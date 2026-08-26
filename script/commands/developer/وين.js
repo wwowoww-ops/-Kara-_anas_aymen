@@ -3,10 +3,10 @@ const path = require("path");
 
 module.exports.config = {
   name: "وين",
-  version: "2.0.0",
+  version: "3.0.0",
   hasPermssion: 2,
   credits: "أبو هريرة",
-  description: "البحث عن مكان أمر داخل البوت",
+  description: "البحث عن مكان أمر داخل ملفات البوت",
   commandCategory: "Developer",
   usages: "وين [اسم الأمر]",
   cooldowns: 3,
@@ -36,7 +36,9 @@ const IGNORED_DIRS = new Set([
   "tmp",
   "temp",
   "uploads",
-  "downloads"
+  "downloads",
+  ".npm",
+  ".cache"
 ]);
 
 
@@ -46,36 +48,20 @@ const IGNORED_DIRS = new Set([
 
 function getBotRoot() {
 
-  /*
-   * process.cwd()
-   * هو المكان الذي تم منه تشغيل البوت
-   */
+  return path.resolve(
+    process.cwd()
+  );
 
-  try {
-
-    return path.resolve(
-      process.cwd()
-    );
-
-  } catch (_) {
-
-    return path.resolve(
-      __dirname,
-      ".."
-    );
-
-  }
 }
 
 
 // ═══════════════════════════════════════════════
-// 📂 البحث عن ملفات JavaScript
+// 📂 البحث عن ملفات JS بدون تشغيلها
 // ═══════════════════════════════════════════════
 
 function getJSFiles(rootDir) {
 
   const files = [];
-
 
   function scan(currentDir) {
 
@@ -108,9 +94,15 @@ function getJSFiles(rootDir) {
       const name =
         entry.name;
 
+      const fullPath =
+        path.join(
+          currentDir,
+          name
+        );
+
 
       // ═══════════════════════════════════════
-      // تجاهل المجلدات
+      // 📁 مجلد
       // ═══════════════════════════════════════
 
       if (
@@ -127,11 +119,6 @@ function getJSFiles(rootDir) {
         }
 
 
-        /*
-         * تجاهل المجلدات المخفية
-         * باستثناء المجلدات المهمة
-         */
-
         if (
           name.startsWith(".")
         ) {
@@ -141,10 +128,7 @@ function getJSFiles(rootDir) {
 
 
         scan(
-          path.join(
-            currentDir,
-            name
-          )
+          fullPath
         );
 
         continue;
@@ -152,7 +136,7 @@ function getJSFiles(rootDir) {
 
 
       // ═══════════════════════════════════════
-      // ملفات JavaScript
+      // 📄 ملف JavaScript
       // ═══════════════════════════════════════
 
       if (
@@ -164,10 +148,7 @@ function getJSFiles(rootDir) {
       ) {
 
         files.push(
-          path.join(
-            currentDir,
-            name
-          )
+          fullPath
         );
 
       }
@@ -187,97 +168,69 @@ function getJSFiles(rootDir) {
 
 
 // ═══════════════════════════════════════════════
-// 🔎 قراءة config.name
+// 🔎 استخراج config.name من النص
 // ═══════════════════════════════════════════════
 
-function getCommandConfig(filePath) {
+function extractConfigName(content) {
 
-  try {
+  if (
+    !content ||
+    typeof content !== "string"
+  ) {
 
-    /*
-     * إزالة النسخة القديمة من الكاش
-     */
-    try {
-
-      delete require.cache[
-        require.resolve(
-          filePath
-        )
-      ];
-
-    } catch (_) {}
+    return null;
+  }
 
 
-    const command =
-      require(
-        filePath
+  /*
+   * يدعم:
+   *
+   * name: "بنترست"
+   * name: 'بنترست'
+   * name : "بنترست"
+   *
+   * داخل:
+   * module.exports.config
+   */
+
+  const patterns = [
+
+    /module\s*\.\s*exports\s*\.\s*config\s*=\s*\{[\s\S]{0,5000}?\bname\s*:\s*["'`]([^"'`]+)["'`]/i,
+
+    /exports\s*\.\s*config\s*=\s*\{[\s\S]{0,5000}?\bname\s*:\s*["'`]([^"'`]+)["'`]/i
+
+  ];
+
+
+  for (
+    const regex
+    of patterns
+  ) {
+
+    const match =
+      content.match(
+        regex
       );
 
 
     if (
-      !command ||
-      !command.config
+      match &&
+      match[1]
     ) {
 
-      return null;
+      return match[1].trim();
+
     }
 
-
-    const config =
-      command.config;
-
-
-    if (
-      typeof config.name !==
-      "string"
-    ) {
-
-      return null;
-    }
-
-
-    const name =
-      config.name.trim();
-
-
-    if (!name) {
-
-      return null;
-    }
-
-
-    return {
-
-      name,
-
-      version:
-        config.version || "غير محدد",
-
-      category:
-        config.commandCategory ||
-        "غير محدد",
-
-      file:
-        filePath
-
-    };
-
-  } catch (error) {
-
-    /*
-     * بعض ملفات البوت قد تحتوي على
-     * أكواد لا يمكن require لها مباشرة
-     *
-     * نتجاهلها بدل إيقاف البحث
-     */
-
-    return null;
   }
+
+
+  return null;
 }
 
 
 // ═══════════════════════════════════════════════
-// 🔍 البحث عن الأمر
+// 🔎 البحث عن الأمر
 // ═══════════════════════════════════════════════
 
 function findCommand(
@@ -299,30 +252,54 @@ function findCommand(
     of files
   ) {
 
-    const config =
-      getCommandConfig(
-        file
+    let content;
+
+    try {
+
+      /*
+       * قراءة الملف فقط
+       * بدون require
+       * بدون تشغيل الكود
+       */
+
+      content =
+        fs.readFileSync(
+          file,
+          "utf8"
+        );
+
+    } catch (_) {
+
+      continue;
+    }
+
+
+    const commandName =
+      extractConfigName(
+        content
       );
 
 
-    if (!config) {
+    if (!commandName) {
 
       continue;
     }
 
 
     if (
-      String(config.name)
-        .trim()
-        .toLowerCase() ===
-      String(targetName)
-        .trim()
-        .toLowerCase()
+      commandName.toLowerCase() ===
+      targetName.toLowerCase()
     ) {
 
-      results.push(
-        config
-      );
+      results.push({
+
+        name:
+          commandName,
+
+        file:
+          file
+
+      });
 
     }
 
@@ -330,6 +307,7 @@ function findCommand(
 
 
   return {
+
     scanned:
       files.length,
 
@@ -340,7 +318,7 @@ function findCommand(
 
 
 // ═══════════════════════════════════════════════
-// 📍 الحصول على المسار النسبي
+// 📍 المسار النسبي
 // ═══════════════════════════════════════════════
 
 function getRelativePath(
@@ -348,22 +326,16 @@ function getRelativePath(
   filePath
 ) {
 
-  const relative =
-    path.relative(
-      rootDir,
-      filePath
-    );
+  return path.relative(
+    rootDir,
+    filePath
+  );
 
-
-  return relative ||
-    path.basename(
-      filePath
-    );
 }
 
 
 // ═══════════════════════════════════════════════
-// 🚀 الأمر الرئيسي
+// 🚀 الأمر
 // ═══════════════════════════════════════════════
 
 module.exports.run =
@@ -415,14 +387,14 @@ async function ({
       return api.sendMessage(
         `⌬ ━━ 𝗛𝗜𝗡𝗔 FIND ━━ ⌬\n\n` +
 
-        `❌ اكتب اسم الأمر.\n\n` +
+        `❌ اكتب اسم الأمر الذي تريد البحث عنه.\n\n` +
 
         `📝 الاستخدام:\n` +
         `.وين [اسم الأمر]\n\n` +
 
         `مثال:\n` +
         `.وين بنترست`,
-        
+
         threadID,
         messageID
       );
@@ -450,7 +422,7 @@ async function ({
 
 
     // ═══════════════════════════════════════════
-    // ❌ لم يجد
+    // ❌ لا توجد نتيجة
     // ═══════════════════════════════════════════
 
     if (
@@ -465,11 +437,12 @@ async function ({
 
         `❌ لم يتم العثور على الأمر.\n\n` +
 
-        `📂 تم البحث في كامل مجلد البوت.\n` +
+        `📂 مكان البحث:\n` +
+        `${rootDir}\n\n` +
 
-        `📄 ملفات JavaScript المفحوصة:\n` +
-        `${search.scanned}`,
-        
+        `📄 تم فحص:\n` +
+        `${search.scanned} ملف JavaScript`,
+
         threadID,
         messageID
       );
@@ -487,8 +460,7 @@ async function ({
       `🔎 الأمر:\n` +
       `${targetName}\n\n` +
 
-      `✓ تم العثور على:\n` +
-      `${search.results.length} نتيجة\n\n`;
+      `✓ تم العثور على ${search.results.length} نتيجة\n`;
 
 
     search.results.forEach(
@@ -508,36 +480,29 @@ async function ({
 
 
         output +=
-          `━━━━━━━━━━━━━━\n` +
+          `\n━━━━━━━━━━━━━━\n` +
 
           `📌 النتيجة ${index + 1}\n\n` +
 
           `⚙️ config.name:\n` +
           `${result.name}\n\n` +
 
-          `📦 الإصدار:\n` +
-          `${result.version}\n\n` +
-
-          `🗂️ التصنيف:\n` +
-          `${result.category}\n\n` +
-
-          `📄 اسم الملف:\n` +
+          `📄 الملف:\n` +
           `${path.basename(result.file)}\n\n` +
 
           `📂 المسار النسبي:\n` +
           `${relativePath}\n\n` +
 
           `📍 المسار الكامل:\n` +
-          `${absolutePath}\n\n`;
+          `${absolutePath}\n`;
 
       }
     );
 
 
     output +=
-      `━━━━━━━━━━━━━━\n` +
-
-      `📊 تم فحص ${search.scanned} ملف JavaScript`;
+      `\n━━━━━━━━━━━━━━\n` +
+      `📊 تم فحص ${search.scanned} ملف`;
 
 
     // ═══════════════════════════════════════════
@@ -568,7 +533,7 @@ async function ({
         error?.message ||
         "خطأ غير معروف"
       }`,
-      
+
       threadID,
       messageID
     );
