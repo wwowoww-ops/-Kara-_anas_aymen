@@ -9,7 +9,7 @@ module.exports.config = {
   hasPermssion: 0,
   credits: "أبو هريرة",
   description: "تعديل الصور وتحسينها",
-  commandCategory: "Utility",
+  commandCategory:" utility",
   usages: "تعديل [التأثير] بالرد على صورة",
   cooldowns: 5
 };
