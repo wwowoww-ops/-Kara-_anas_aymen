@@ -6,7 +6,8 @@ const moment = require("moment-timezone");
 // المسارات
 // ============================================================
 
-const DATA_DIR = path.join(process.cwd(), "data");
+const DATA_DIR =
+  path.join(process.cwd(), "data");
 
 const BANNED_GROUPS_FILE =
   path.join(DATA_DIR, "banned.json");
@@ -16,16 +17,18 @@ const BANNED_USERS_FILE =
 
 
 // ============================================================
-// إنشاء مجلد data بدون حذف أي شيء داخله
+// إنشاء مجلد البيانات
 // ============================================================
 
 if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.mkdirSync(DATA_DIR, {
+    recursive: true
+  });
 }
 
 
 // ============================================================
-// منع تكرار تنفيذ الأمر
+// منع التكرار
 // ============================================================
 
 const commandExecuted = new Set();
@@ -36,7 +39,6 @@ const commandExecuted = new Set();
 // ============================================================
 
 function readJSON(file) {
-
   try {
 
     if (!fs.existsSync(file)) {
@@ -53,7 +55,10 @@ function readJSON(file) {
     const data =
       JSON.parse(content);
 
-    return data && typeof data === "object"
+    return (
+      data &&
+      typeof data === "object"
+    )
       ? data
       : {};
 
@@ -71,19 +76,21 @@ function readJSON(file) {
 
 
 // ============================================================
-// مزامنة الحظر من الملفات إلى global.data
+// مزامنة الحظر
 // ============================================================
 
 function syncBanData() {
 
   // -------------------------------
-  // حظر المجموعات
+  // المجموعات
   // -------------------------------
 
   try {
 
     const bannedGroups =
-      readJSON(BANNED_GROUPS_FILE);
+      readJSON(
+        BANNED_GROUPS_FILE
+      );
 
     if (
       global.data &&
@@ -94,13 +101,12 @@ function syncBanData() {
         typeof global.data.threadBanned.clear ===
         "function"
       ) {
-
         global.data.threadBanned.clear();
-
       }
 
       for (
-        const id of Object.keys(bannedGroups)
+        const id of
+        Object.keys(bannedGroups)
       ) {
 
         const item =
@@ -131,13 +137,15 @@ function syncBanData() {
 
 
   // -------------------------------
-  // حظر المستخدمين
+  // المستخدمون
   // -------------------------------
 
   try {
 
     const bannedUsers =
-      readJSON(BANNED_USERS_FILE);
+      readJSON(
+        BANNED_USERS_FILE
+      );
 
     if (
       global.data &&
@@ -148,13 +156,12 @@ function syncBanData() {
         typeof global.data.userBanned.clear ===
         "function"
       ) {
-
         global.data.userBanned.clear();
-
       }
 
       for (
-        const id of Object.keys(bannedUsers)
+        const id of
+        Object.keys(bannedUsers)
       ) {
 
         const item =
@@ -216,9 +223,13 @@ function levenshtein(a, b) {
 
   const matrix =
     Array.from(
-      { length: b.length + 1 },
+      {
+        length: b.length + 1
+      },
       () =>
-        Array(a.length + 1).fill(0)
+        Array(
+          a.length + 1
+        ).fill(0)
     );
 
   for (
@@ -226,9 +237,7 @@ function levenshtein(a, b) {
     i <= b.length;
     i++
   ) {
-
     matrix[i][0] = i;
-
   }
 
   for (
@@ -236,9 +245,7 @@ function levenshtein(a, b) {
     j <= a.length;
     j++
   ) {
-
     matrix[0][j] = j;
-
   }
 
   for (
@@ -279,7 +286,7 @@ function levenshtein(a, b) {
 
 
 // ============================================================
-// التشابه
+// حساب التشابه
 // ============================================================
 
 function similarityScore(input, command) {
@@ -345,7 +352,7 @@ function similarityScore(input, command) {
 
 
 // ============================================================
-// أقرب أمر
+// إيجاد أقرب أمر
 // ============================================================
 
 function findClosestCommand(
@@ -482,7 +489,7 @@ function getFirstMention(event) {
 
 
 // ============================================================
-// معرفة المطور
+// أيديات المطورين
 // ============================================================
 
 function getDeveloperIDs() {
@@ -546,7 +553,7 @@ function isDeveloper(senderID) {
 
 
 // ============================================================
-// التحقق من حظر المجموعة من الملف
+// حظر المجموعة
 // ============================================================
 
 function isGroupBanned(threadID) {
@@ -567,7 +574,7 @@ function isGroupBanned(threadID) {
 
 
 // ============================================================
-// التحقق من حظر المستخدم
+// حظر المستخدم
 // ============================================================
 
 function isUserBanned(senderID) {
@@ -588,7 +595,38 @@ function isUserBanned(senderID) {
 
 
 // ============================================================
-// معالجة الأمر
+// Typing Indicator
+// ============================================================
+
+function setTyping(api, threadID, status) {
+
+  try {
+
+    if (
+      typeof api.sendTypingIndicator ===
+      "function"
+    ) {
+
+      api.sendTypingIndicator(
+        String(threadID),
+        status
+      );
+
+    }
+
+  } catch (error) {
+
+    console.error(
+      "TYPING INDICATOR ERROR:",
+      error.message
+    );
+
+  }
+}
+
+
+// ============================================================
+// Handler
 // ============================================================
 
 module.exports = function ({
@@ -599,9 +637,7 @@ module.exports = function ({
   Currencies
 }) {
 
-  // مزامنة ملفات الحظر عند تحميل المعالج
   syncBanData();
-
 
   return async function ({
     event
@@ -615,15 +651,10 @@ module.exports = function ({
 
       normalizeMentions(event);
 
-
       const {
-        allowInbox,
         PREFIX,
-        ADMINBOT,
-        DeveloperMode,
-        YASSIN
+        DeveloperMode
       } = global.config;
-
 
       const {
         threadInfo,
@@ -631,11 +662,9 @@ module.exports = function ({
         commandBanned
       } = global.data;
 
-
       const {
         commands
       } = global.client;
-
 
       let {
         body,
@@ -644,11 +673,9 @@ module.exports = function ({
         messageID
       } = event;
 
-
       if (!body) {
         return;
       }
-
 
       senderID =
         String(senderID);
@@ -656,23 +683,12 @@ module.exports = function ({
       threadID =
         String(threadID);
 
-
-      // ======================================================
-      // مزامنة الحظر قبل معالجة الرسالة
-      // ======================================================
-
       syncBanData();
-
-
-      // ======================================================
-      // البادئة
-      // ======================================================
 
       const currentThreadData =
         threadData.get(
           threadID
         ) || {};
-
 
       const prefix =
         Object.prototype.hasOwnProperty.call(
@@ -682,12 +698,10 @@ module.exports = function ({
           ? currentThreadData.PREFIX
           : PREFIX;
 
-
       const botID =
         String(
           api.getCurrentUserID()
         );
-
 
       const escapeRegex =
         str =>
@@ -696,23 +710,19 @@ module.exports = function ({
             "\\$&"
           );
 
-
       const prefixRegex =
         new RegExp(
           `^(<@!?${botID}>|${escapeRegex(prefix)})\\s*`
         );
-
 
       const matchedPrefix =
         body.match(
           prefixRegex
         )?.[0];
 
-
       if (!matchedPrefix) {
         return;
       }
-
 
       const content =
         body
@@ -721,15 +731,9 @@ module.exports = function ({
           )
           .trim();
 
-
       if (!content) {
         return;
       }
-
-
-      // ======================================================
-      // استخراج الأمر
-      // ======================================================
 
       const args =
         content.split(/\s+/);
@@ -741,11 +745,6 @@ module.exports = function ({
         normalizeCommand(
           commandNameRaw
         );
-
-
-      // ======================================================
-      // البحث عن الأمر
-      // ======================================================
 
       let command = null;
 
@@ -765,43 +764,30 @@ module.exports = function ({
         }
       }
 
-
-      // ======================================================
-      // الحظر قبل تشغيل الأمر
-      //
-      // مهم:
-      // المطور يستطيع استعمال "حظر ازالة"
-      // حتى لو كانت المجموعة محظورة.
-      // ======================================================
-
       const developer =
-        isDeveloper(senderID);
-
+        isDeveloper(
+          senderID
+        );
 
       if (!developer) {
 
         if (
-          isGroupBanned(threadID)
+          isGroupBanned(
+            threadID
+          )
         ) {
-
           return;
-
         }
 
         if (
-          isUserBanned(senderID)
+          isUserBanned(
+            senderID
+          )
         ) {
-
           return;
-
         }
 
       }
-
-
-      // ======================================================
-      // إذا لم يوجد الأمر
-      // ======================================================
 
       if (!command) {
 
@@ -813,9 +799,7 @@ module.exports = function ({
         if (
           allCommandNames.length === 0
         ) {
-
           return;
-
         }
 
         const result =
@@ -849,7 +833,7 @@ module.exports = function ({
 
           `⌬ ━━ 𝗛𝗜𝗡𝗔 UTILITY ━━ ⌬
 
-❌ الأمر "${commandNameRaw}" غير موجود.
+❌ الأمر "${commandNameRaw}" غير موجود
 
 💡 استخدم ${prefix}مساعدة لرؤية الأوامر.`,
 
@@ -860,16 +844,10 @@ module.exports = function ({
 
       }
 
-
-      // ======================================================
-      // المنشن
-      // ======================================================
-
       normalizeMentions(event);
 
       const firstMention =
         getFirstMention(event);
-
 
       if (
         DeveloperMode &&
@@ -880,19 +858,16 @@ module.exports = function ({
           "[HINA MENTION]",
           {
             senderID,
-            mentionID: firstMention,
+            mentionID:
+              firstMention,
             allMentions:
               event.mentionIDs,
-            command: commandName
+            command:
+              commandName
           }
         );
 
       }
-
-
-      // ======================================================
-      // حظر الأوامر
-      // ======================================================
 
       if (
         commandBanned &&
@@ -908,7 +883,6 @@ module.exports = function ({
           commandBanned.get(
             senderID
           ) || [];
-
 
         if (
           Array.isArray(
@@ -935,7 +909,6 @@ ${command.config.name}`,
 
         }
 
-
         if (
           Array.isArray(
             userBannedCommands
@@ -959,11 +932,6 @@ ${command.config.name}`,
         }
 
       }
-
-
-      // ======================================================
-      // NSFW
-      // ======================================================
 
       if (
         command.config.commandCategory &&
@@ -989,19 +957,12 @@ ${command.config.name}`,
 
       }
 
-
-      // ======================================================
-      // الصلاحيات
-      // ======================================================
-
       let permssion = 0;
-
 
       let info =
         threadInfo.get(
           threadID
         );
-
 
       if (!info) {
 
@@ -1032,10 +993,8 @@ ${command.config.name}`,
 
       }
 
-
       const admins =
         info?.adminIDs || [];
-
 
       const isGroupAdmin =
         admins.some(
@@ -1043,7 +1002,6 @@ ${command.config.name}`,
             String(admin.id) ===
             String(senderID)
         );
-
 
       if (developer) {
 
@@ -1056,7 +1014,6 @@ ${command.config.name}`,
         permssion = 1;
 
       }
-
 
       if (
         Number(
@@ -1078,11 +1035,6 @@ ${command.config.name}`,
 
       }
 
-
-      // ======================================================
-      // Cooldown
-      // ======================================================
-
       if (
         !global.client.cooldowns.has(
           command.config.name
@@ -1096,12 +1048,10 @@ ${command.config.name}`,
 
       }
 
-
       const timestamps =
         global.client.cooldowns.get(
           command.config.name
         );
-
 
       const expirationTime =
         (
@@ -1110,11 +1060,14 @@ ${command.config.name}`,
           ) || 1
         ) * 1000;
 
-
       if (
-        timestamps.has(senderID) &&
+        timestamps.has(
+          senderID
+        ) &&
         Date.now() <
-          timestamps.get(senderID) +
+          timestamps.get(
+            senderID
+          ) +
           expirationTime
       ) {
 
@@ -1127,30 +1080,20 @@ ${command.config.name}`,
 
       }
 
-
-      // ======================================================
-      // منع التكرار
-      // ======================================================
-
       const commandKey =
         `${threadID}_${senderID}_${commandName}`;
-
 
       if (
         commandExecuted.has(
           commandKey
         )
       ) {
-
         return;
-
       }
-
 
       commandExecuted.add(
         commandKey
       );
-
 
       setTimeout(
         () => {
@@ -1162,11 +1105,6 @@ ${command.config.name}`,
         },
         1000
       );
-
-
-      // ======================================================
-      // بيانات الأمر
-      // ======================================================
 
       const Obj = {
 
@@ -1192,25 +1130,37 @@ ${command.config.name}`,
         mentionIDs:
           event.mentionIDs || [],
 
-        getText: () => {}
+        getText:
+          () => {}
 
       };
 
-
-      // ======================================================
-      // تشغيل الأمر
-      // ======================================================
-
-      await command.run(
-        Obj
+      setTyping(
+        api,
+        threadID,
+        true
       );
 
+      try {
+
+        await command.run(
+          Obj
+        );
+
+      } finally {
+
+        setTyping(
+          api,
+          threadID,
+          false
+        );
+
+      }
 
       timestamps.set(
         senderID,
         Date.now()
       );
-
 
     } catch (error) {
 
@@ -1218,7 +1168,6 @@ ${command.config.name}`,
         `[${moment().format("HH:mm:ss")}] COMMAND ERROR:`,
         error
       );
-
 
       try {
 
