@@ -1,63 +1,216 @@
-const axios = require("axios");
-const fs = require("fs-extra");
-const path = require("path");
-
 module.exports.config = {
     name: "joinNoti",
     eventType: ["log:subscribe"],
-    version: "5.3.0",
-    credits: "KIRA System",
-    description: "ترحيب مزخرف ومختصر جداً",
+    version: "6.0.0",
+    credits: "أبو هريرة",
+    description: "نظام ترحيب عند دخول الأعضاء",
     category: "events"
 };
 
-module.exports.run = async function({ api, event, Users }) {
-    const { threadID, logMessageData, author } = event;
-
-    if (logMessageData.addedParticipants.some(i => i.userFbId == api.getCurrentUserID())) {
-        return api.sendMessage(`⌬ ━━ 𝗞𝗜𝗥𝗔  ━━ ⌬\n✅ تم الاتصال بنجاح!`, threadID);
-    }
+module.exports.handleEvent = async function ({
+    api,
+    event,
+    Users
+}) {
 
     try {
-        const newMembers = logMessageData.addedParticipants;
-        const adderData = await Users.getData(author);
-        const adderName = adderData?.name || "رابط دعوة";
 
-        const gifs = [
-            "https://media.giphy.com/media/10N247rib4BlVC/giphy.gif",
-            "https://media.giphy.com/media/MdLFOyVZtoUPm/giphy.gif",
-            "https://media.giphy.com/media/bqSkJ4IwNcoZG/giphy.gif"
-        ];
-        const randomGif = gifs[Math.floor(Math.random() * gifs.length)];
+        if (!event) {
+            return;
+        }
 
-        let mentions = [];
-        let names = "";
-        newMembers.forEach(m => {
-            mentions.push({ tag: m.fullName, id: m.userFbId });
-            names += `${m.fullName}، `;
-        });
+        const threadID =
+            String(event.threadID || "");
 
-        // الرسالة المزخرفة والمختصرة
-        const msg = `⌬ ━━ 𝗞𝗜𝗥𝗔  ━━ ⌬\n` +
-                    `👋 أهلاً: {names}\n` +
-                    `💫 بواسطة: ${adderName}\n` +
-                    `⌬ ━━━━━━━━━ ⌬`.replace(/{names}/g, names.slice(0, -2));
+        const logMessageData =
+            event.logMessageData || {};
 
-        const cachePath = path.join(__dirname, "cache", `j_${Date.now()}.gif`);
-        if (!fs.existsSync(path.dirname(cachePath))) fs.mkdirSync(path.dirname(cachePath), { recursive: true });
+        const author =
+            String(event.author || "");
 
-        const res = await axios.get(randomGif, { responseType: "arraybuffer" });
-        fs.writeFileSync(cachePath, Buffer.from(res.data));
+        if (!threadID) {
+            return;
+        }
 
-        return api.sendMessage({
-            body: msg,
-            attachment: fs.createReadStream(cachePath),
-            mentions
-        }, threadID, () => {
-            if (fs.existsSync(cachePath)) fs.unlinkSync(cachePath);
-        });
+        // ==================================================
+        // الأعضاء الجدد
+        // ==================================================
 
-    } catch (e) {
-        console.error(e);
+        const addedParticipants =
+            Array.isArray(
+                logMessageData.addedParticipants
+            )
+                ? logMessageData.addedParticipants
+                : [];
+
+        if (
+            addedParticipants.length === 0
+        ) {
+            return;
+        }
+
+        // ==================================================
+        // ID البوت
+        // ==================================================
+
+        const botID =
+            String(
+                api.getCurrentUserID()
+            );
+
+        // ==================================================
+        // إذا كان البوت هو المضاف
+        // ==================================================
+
+        const botAdded =
+            addedParticipants.some(
+                participant =>
+                    String(
+                        participant.userFbId || ""
+                    ) === botID
+            );
+
+        if (botAdded) {
+            return;
+        }
+
+        // ==================================================
+        // اسم الشخص الذي أضاف العضو
+        // ==================================================
+
+        let adderName =
+            "رابط دعوة";
+
+        if (
+            author &&
+            Users &&
+            typeof Users.getData === "function"
+        ) {
+
+            try {
+
+                const adderData =
+                    await Users.getData(
+                        author
+                    );
+
+                if (
+                    adderData &&
+                    adderData.name
+                ) {
+
+                    adderName =
+                        adderData.name;
+                }
+
+            } catch (error) {
+
+                console.error(
+                    "[joinNoti] GET ADDER ERROR:",
+                    error.message
+                );
+
+            }
+        }
+
+        // ==================================================
+        // تجهيز المنشنات
+        // ==================================================
+
+        const mentions = [];
+        const memberNames = [];
+
+        for (
+            const participant
+            of addedParticipants
+        ) {
+
+            const userID =
+                String(
+                    participant.userFbId || ""
+                );
+
+            if (!userID) {
+                continue;
+            }
+
+            const fullName =
+                participant.fullName ||
+                "عضو جديد";
+
+            memberNames.push(
+                fullName
+            );
+
+            mentions.push({
+                tag: fullName,
+                id: userID
+            });
+        }
+
+        if (
+            mentions.length === 0
+        ) {
+            return;
+        }
+
+        // ==================================================
+        // منشن المضيف
+        // ==================================================
+
+        if (author) {
+
+            mentions.push({
+                tag: adderName,
+                id: author
+            });
+
+        }
+
+        // ==================================================
+        // أسماء الأعضاء
+        // ==================================================
+
+        const memberText =
+            memberNames
+                .map(
+                    name => `@${name}`
+                )
+                .join("، ");
+
+        // ==================================================
+        // رسالة الترحيب
+        // ==================================================
+
+        const message =
+`⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬
+
+👋 أهلاً بـ ${memberText}
+
+💫 نورت المجموعة بانضمامك
+نتمنى لك وقتًا ممتعًا معنا
+
+👤 المضيف
+@${adderName}`;
+
+        // ==================================================
+        // إرسال الرسالة
+        // ==================================================
+
+        await api.sendMessage(
+            {
+                body: message,
+                mentions
+            },
+            threadID
+        );
+
+    } catch (error) {
+
+        console.error(
+            "❌ JOIN NOTIFICATION ERROR:",
+            error
+        );
+
     }
 };
