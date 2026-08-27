@@ -1,173 +1,267 @@
-const axios = require("axios");
-const fs = require("fs-extra");
-const path = require("path");
-
 module.exports.config = {
     name: "leaveNoti",
     eventType: ["log:unsubscribe"],
-    version: "5.0.0",
-    credits: "KIRA System - Enhanced by Ayman",
-    description: "نظام وداع متقدم",
+    version: "6.0.0",
+    credits: "HINA System - Abu Huraira",
+    description: "نظام وداع أعضاء المجموعة",
     category: "events"
 };
 
-module.exports.run = async function({ api, event, Users, Threads }) {
-    const { threadID, logMessageData, author } = event;
-    const leftID = logMessageData.leftParticipantFbId;
-
-    // ═══════════════════════════════════════════════════════════
-    // تجاهل خروج البوت
-    // ═══════════════════════════════════════════════════════════
-    
-    if (leftID == api.getCurrentUserID()) {
-        return; // البوت غادر، لا نفعل شيء
-    }
+module.exports.handleEvent = async function ({
+    api,
+    event,
+    Users,
+    Threads
+}) {
 
     try {
-        const { threadName } = await api.getThreadInfo(threadID);
-        const threadData = global.data.threadData.get(parseInt(threadID)) || {};
-        
-        // معلومات العضو الذي غادر
-        const userData = await Users.getData(leftID);
-        const userName = userData?.name || "عضو سابق";
-        
-        // ═══════════════════════════════════════════════════════════
-        // تحديد نوع المغادرة
-        // ═══════════════════════════════════════════════════════════
-        
-        const isKicked = (author !== leftID); // طُرد من قبل شخص آخر
-        const leftVoluntarily = (author === leftID); // غادر بنفسه
-        
-        // معلومات من طرد (إذا كان مطروداً)
-        let kickerName = "";
-        if (isKicked) {
-            const kickerData = await Users.getData(author);
-            kickerName = kickerData?.name || "مشرف";
+
+        // ==================================================
+        // التأكد من وجود Event
+        // ==================================================
+
+        if (!event) {
+            return;
         }
 
-        // ═══════════════════════════════════════════════════════════
-        // رسالة الوداع
-        // ═══════════════════════════════════════════════════════════
-        
-        let leaveMessage = threadData.customLeave;
-        
-        if (!leaveMessage) {
-            // رسالة افتراضية حسب نوع المغادرة
-            if (leftVoluntarily) {
-                // غادر بنفسه
-                leaveMessage = 
-                    `◈ ───『 👋 وداعـــاً 👋 』─── ◈\n` +
-                    `◈ ────────────── ◈\n\n` +
-                    `💔 غـادر: {userName}\n` +
-                    `📍 مـن: {threadName}\n\n` +
-                    `😢 سـنـفـتـقـدك\n` +
-                    `🚪 الـبـاب مـفـتـوح دائـمـاً لـلـعـودة\n\n` +
-                    `◈ ────────────── ◈`;
-            } else {
-                // تم طرده
-                leaveMessage = 
-                    `◈ ───『 ⚔️ طـرد عـضـو ⚔️ 』─── ◈\n` +
-                    `◈ ────────────── ◈\n\n` +
-                    `👤 تـم طـرد: {userName}\n` +
-                    `⚔️ بـواسـطـة: {kickerName}\n` +
-                    `📍 مـن: {threadName}\n\n` +
-                    `⚠️ الـتـزم بـالـقـوانـيـن\n\n` +
-                    `◈ ────────────── ◈`;
+        // ==================================================
+        // التأكد أن الحدث مغادرة
+        // ==================================================
+
+        if (
+            event.logMessageType !==
+            "log:unsubscribe"
+        ) {
+            return;
+        }
+
+        // ==================================================
+        // IDs
+        // ==================================================
+
+        const threadID =
+            String(event.threadID || "");
+
+        if (!threadID) {
+            return;
+        }
+
+        const logData =
+            event.logMessageData || {};
+
+        const leftID =
+            String(
+                logData.leftParticipantFbId || ""
+            );
+
+        if (!leftID) {
+            return;
+        }
+
+        const botID =
+            String(
+                api.getCurrentUserID()
+            );
+
+        // ==================================================
+        // تجاهل مغادرة البوت
+        // ==================================================
+
+        if (leftID === botID) {
+            return;
+        }
+
+        // ==================================================
+        // اسم العضو
+        // ==================================================
+
+        let userName = "عضو سابق";
+
+        try {
+
+            const userData =
+                await Users.getData(leftID);
+
+            if (userData?.name) {
+
+                userName =
+                    userData.name;
+
             }
+
+        } catch (error) {
+
+            console.error(
+                "[LEAVE] USER DATA ERROR:",
+                error.message
+            );
+
         }
 
-        // استبدال المتغيرات
-        leaveMessage = leaveMessage
-            .replace(/{userName}/g, userName)
-            .replace(/{name}/g, userName)
-            .replace(/{threadName}/g, threadName)
-            .replace(/{kickerName}/g, kickerName)
-            .replace(/{author}/g, kickerName);
+        // ==================================================
+        // اسم المجموعة
+        // ==================================================
 
-        // ═══════════════════════════════════════════════════════════
-        // إرسال الرسالة
-        // ═══════════════════════════════════════════════════════════
-        
-        const messageData = {
-            body: leaveMessage
-        };
+        let threadName = "المجموعة";
 
-        // محاولة إضافة صورة وداع
-        if (threadData.leaveImage || global.config.leaveImage) {
-            try {
-                const imageUrl = threadData.leaveImage || global.config.leaveImage;
-                const cachePath = path.join(__dirname, "cache");
-                
-                if (!fs.existsSync(cachePath)) {
-                    fs.mkdirSync(cachePath, { recursive: true });
+        try {
+
+            if (
+                Threads &&
+                typeof Threads.getInfo ===
+                "function"
+            ) {
+
+                const info =
+                    await Threads.getInfo(
+                        threadID
+                    );
+
+                if (info?.threadName) {
+
+                    threadName =
+                        info.threadName;
+
                 }
-                
-                const imagePath = path.join(cachePath, `leave_${Date.now()}.jpg`);
-                
-                const response = await axios.get(imageUrl, {
-                    responseType: 'arraybuffer',
-                    timeout: 10000
-                });
-                
-                fs.writeFileSync(imagePath, Buffer.from(response.data));
-                messageData.attachment = fs.createReadStream(imagePath);
-                
-                return api.sendMessage(messageData, threadID, () => {
-                    if (fs.existsSync(imagePath)) {
-                        fs.unlinkSync(imagePath);
-                    }
-                });
-                
-            } catch (imageError) {
-                console.log("⚠️ تعذر تحميل صورة الوداع، إرسال رسالة نصية فقط");
-                return api.sendMessage(messageData, threadID);
+
             }
-        } else {
-            return api.sendMessage(messageData, threadID);
+
+        } catch (error) {
+
+            try {
+
+                if (
+                    typeof api.getThreadInfo ===
+                    "function"
+                ) {
+
+                    const info =
+                        await api.getThreadInfo(
+                            threadID
+                        );
+
+                    if (info?.threadName) {
+
+                        threadName =
+                            info.threadName;
+
+                    }
+
+                }
+
+            } catch (e) {}
+
         }
+
+        // ==================================================
+        // معرفة نوع المغادرة
+        // ==================================================
+
+        const author =
+            String(
+                event.author || ""
+            );
+
+        const leftVoluntarily =
+            author === leftID;
+
+        // ==================================================
+        // اسم من قام بالطرد
+        // ==================================================
+
+        let kickerName = "مشرف";
+
+        if (
+            !leftVoluntarily &&
+            author
+        ) {
+
+            try {
+
+                const kickerData =
+                    await Users.getData(
+                        author
+                    );
+
+                if (kickerData?.name) {
+
+                    kickerName =
+                        kickerData.name;
+
+                }
+
+            } catch (error) {}
+
+        }
+
+        // ==================================================
+        // رسالة الوداع
+        // ==================================================
+
+        let message;
+
+        if (leftVoluntarily) {
+
+            message =
+`⌬ ━━ 𝗛𝗜𝗡𝗔  ━━ ⌬
+
+👋 وداعًا @${userName}
+
+قرر ${userName} أخيرًا أن يتركنا
+بعد أن أتعب المجموعة بحضوره
+
+نتمنى له رحلة موفقة
+ولا تنسَ أن الباب مفتوح... من الخارج فقط
+
+⌬ ━━━━━━━━━ ⌬`;
+
+        } else {
+
+            message =
+`⌬ ━━ 𝗛𝗜𝗡𝗔  ━━ ⌬
+
+👋 وداعًا @${userName}
+
+تم طرده بواسطة ${kickerName}
+
+يبدو أن المجموعة قررت أخذ استراحة منه
+
+نتمنى له حظًا سعيدًا في مكان آخر
+
+⌬ ━━━━━━━━━ ⌬`;
+
+        }
+
+        // ==================================================
+        // المنشن
+        // ==================================================
+
+        const mentions = [
+            {
+                tag: userName,
+                id: leftID
+            }
+        ];
+
+        // ==================================================
+        // إرسال الرسالة
+        // ==================================================
+
+        return api.sendMessage(
+            {
+                body: message,
+                mentions
+            },
+            threadID
+        );
 
     } catch (error) {
-        console.error("❌ خطأ في نظام الوداع:", error);
-        console.error("التفاصيل:", error.stack);
-        
-        // رسالة احتياطية
-        try {
-            return api.sendMessage("👋 وداعاً...", threadID);
-        } catch (fallbackError) {
-            console.error("❌ فشل إرسال رسالة الوداع");
-        }
+
+        console.error(
+            "❌ LEAVE EVENT ERROR:",
+            error
+        );
+
     }
+
 };
-
-// ═══════════════════════════════════════════════════════════
-// دليل الاستخدام
-// ═══════════════════════════════════════════════════════════
-
-/*
-الميزات المتوفرة:
-
-1️⃣ رسالة وداع مخصصة:
-   - استخدم الأمر: .setleave <الرسالة>
-   
-2️⃣ المتغيرات المتاحة:
-   {userName}   - اسم من غادر
-   {name}       - اسم من غادر (بديل)
-   {threadName} - اسم المجموعة
-   {kickerName} - من طرد العضو (إن وُجد)
-   {author}     - من طرد العضو (بديل)
-
-3️⃣ صورة وداع:
-   - ضع رابط الصورة في threadData.leaveImage
-   - أو في config.leaveImage
-
-4️⃣ التمييز بين الأنواع:
-   - يميز بين من غادر بنفسه ومن تم طرده
-   - يعرض اسم من قام بالطرد
-
-مثال رسالة مخصصة:
-━━━━━━━━━━━━━━━━━━━━
-وداعاً {userName}
-نتمنى لك التوفيق 💔
-الباب مفتوح للعودة دائماً
-━━━━━━━━━━━━━━━━━━━━
-*/
