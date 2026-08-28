@@ -3,1072 +3,1208 @@ const path = require("path");
 const moment = require("moment-timezone");
 
 // ============================================================
-// المسارات
+// DATA PATHS
 // ============================================================
 
-const DATA_DIR =
-  path.join(process.cwd(), "data");
+const DATA_DIR = path.join(process.cwd(), "data");
 
-const BANNED_GROUPS_FILE =
-  path.join(DATA_DIR, "banned.json");
+const BANNED_GROUPS_FILE = path.join(
+DATA_DIR,
+"banned.json"
+);
 
-const BANNED_USERS_FILE =
-  path.join(DATA_DIR, "banned_users.json");
-
-
-// ============================================================
-// إنشاء مجلد البيانات
-// ============================================================
+const BANNED_USERS_FILE = path.join(
+DATA_DIR,
+"banned_users.json"
+);
 
 if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, {
-    recursive: true
-  });
+fs.mkdirSync(DATA_DIR, {
+recursive: true
+});
 }
 
-
 // ============================================================
-// منع التكرار
+// EXECUTION PROTECTION
 // ============================================================
 
 const commandExecuted = new Set();
 
-
 // ============================================================
-// JSON آمن
+// SAFE JSON
 // ============================================================
 
 function readJSON(file) {
-  try {
-
-    if (!fs.existsSync(file)) {
-      return {};
-    }
-
-    const content =
-      fs.readFileSync(file, "utf8").trim();
-
-    if (!content) {
-      return {};
-    }
-
-    const data =
-      JSON.parse(content);
-
-    return (
-      data &&
-      typeof data === "object"
-    )
-      ? data
-      : {};
-
-  } catch (error) {
-
-    console.error(
-      "JSON READ ERROR:",
-      file,
-      error.message
-    );
-
-    return {};
-  }
+try {
+if (!fs.existsSync(file)) {
+return {};
 }
 
+const content = fs
+  .readFileSync(file, "utf8")
+  .trim();
+
+if (!content) {
+  return {};
+}
+
+const data = JSON.parse(content);
+
+if (
+  data &&
+  typeof data === "object" &&
+  !Array.isArray(data)
+) {
+  return data;
+}
+
+return {};
+
+} catch (error) {
+console.error(
+"[JSON ERROR]",
+file,
+error.message
+);
+
+return {};
+
+}
+}
 
 // ============================================================
-// مزامنة الحظر
+// BAN DATA SYNC
 // ============================================================
 
 function syncBanData() {
+try {
+if (
+global.data &&
+global.data.threadBanned &&
+typeof global.data.threadBanned.clear === "function"
+) {
+const groups = readJSON(
+BANNED_GROUPS_FILE
+);
 
-  // -------------------------------
-  // المجموعات
-  // -------------------------------
+  global.data.threadBanned.clear();
 
-  try {
-
-    const bannedGroups =
-      readJSON(
-        BANNED_GROUPS_FILE
-      );
-
-    if (
-      global.data &&
-      global.data.threadBanned
-    ) {
-
-      if (
-        typeof global.data.threadBanned.clear ===
-        "function"
-      ) {
-        global.data.threadBanned.clear();
-      }
-
-      for (
-        const id of
-        Object.keys(bannedGroups)
-      ) {
-
-        const item =
-          bannedGroups[id];
-
-        if (
-          item === true ||
-          item?.banned === true
-        ) {
-
-          global.data.threadBanned.set(
-            String(id),
-            true
-          );
-
-        }
-      }
-    }
-
-  } catch (error) {
-
-    console.error(
-      "SYNC GROUP BAN ERROR:",
-      error.message
-    );
-
-  }
-
-
-  // -------------------------------
-  // المستخدمون
-  // -------------------------------
-
-  try {
-
-    const bannedUsers =
-      readJSON(
-        BANNED_USERS_FILE
-      );
+  for (const id of Object.keys(groups)) {
+    const item = groups[id];
 
     if (
-      global.data &&
-      global.data.userBanned
+      item === true ||
+      (
+        item &&
+        typeof item === "object" &&
+        item.banned === true
+      )
     ) {
-
-      if (
-        typeof global.data.userBanned.clear ===
-        "function"
-      ) {
-        global.data.userBanned.clear();
-      }
-
-      for (
-        const id of
-        Object.keys(bannedUsers)
-      ) {
-
-        const item =
-          bannedUsers[id];
-
-        if (
-          item === true ||
-          item?.banned === true
-        ) {
-
-          global.data.userBanned.set(
-            String(id),
-            true
-          );
-
-        }
-      }
+      global.data.threadBanned.set(
+        String(id),
+        true
+      );
     }
-
-  } catch (error) {
-
-    console.error(
-      "SYNC USER BAN ERROR:",
-      error.message
-    );
-
   }
 }
 
+} catch (error) {
+console.error(
+"[GROUP BAN SYNC]",
+error.message
+);
+}
+
+try {
+if (
+global.data &&
+global.data.userBanned &&
+typeof global.data.userBanned.clear === "function"
+) {
+const users = readJSON(
+BANNED_USERS_FILE
+);
+
+  global.data.userBanned.clear();
+
+  for (const id of Object.keys(users)) {
+    const item = users[id];
+
+    if (
+      item === true ||
+      (
+        item &&
+        typeof item === "object" &&
+        item.banned === true
+      )
+    ) {
+      global.data.userBanned.set(
+        String(id),
+        true
+      );
+    }
+  }
+}
+
+} catch (error) {
+console.error(
+"[USER BAN SYNC]",
+error.message
+);
+}
+}
 
 // ============================================================
-// تنظيف اسم الأمر
+// COMMAND NORMALIZER
 // ============================================================
 
 function normalizeCommand(text) {
-
-  return String(text || "")
-    .toLowerCase()
-    .trim()
-    .replace(/[إأآٱ]/g, "ا")
-    .replace(/ة/g, "ه")
-    .replace(/ى/g, "ي")
-    .replace(/ؤ/g, "و")
-    .replace(/ئ/g, "ي")
-    .replace(/ـ/g, "")
-    .replace(/[\u064B-\u065F\u0670]/g, "")
-    .replace(/\s+/g, "");
+return String(text || "")
+.toLowerCase()
+.trim()
+.replace(/[إأآٱ]/g, "ا")
+.replace(/ة/g, "ه")
+.replace(/ى/g, "ي")
+.replace(/ؤ/g, "و")
+.replace(/ئ/g, "ي")
+.replace(/ـ/g, "")
+.replace(/[\u064B-\u065F\u0670]/g, "")
+.replace(/\s+/g, "");
 }
 
-
 // ============================================================
-// Levenshtein
+// LEVENSHTEIN
 // ============================================================
 
 function levenshtein(a, b) {
+a = String(a);
+b = String(b);
 
-  a = String(a);
-  b = String(b);
+const matrix = Array.from(
+{
+length: b.length + 1
+},
+() => Array(a.length + 1).fill(0)
+);
 
-  const matrix =
-    Array.from(
-      {
-        length: b.length + 1
-      },
-      () =>
-        Array(
-          a.length + 1
-        ).fill(0)
-    );
-
-  for (
-    let i = 0;
-    i <= b.length;
-    i++
-  ) {
-    matrix[i][0] = i;
-  }
-
-  for (
-    let j = 0;
-    j <= a.length;
-    j++
-  ) {
-    matrix[0][j] = j;
-  }
-
-  for (
-    let i = 1;
-    i <= b.length;
-    i++
-  ) {
-
-    for (
-      let j = 1;
-      j <= a.length;
-      j++
-    ) {
-
-      if (
-        b[i - 1] ===
-        a[j - 1]
-      ) {
-
-        matrix[i][j] =
-          matrix[i - 1][j - 1];
-
-      } else {
-
-        matrix[i][j] =
-          Math.min(
-            matrix[i - 1][j] + 1,
-            matrix[i][j - 1] + 1,
-            matrix[i - 1][j - 1] + 1
-          );
-
-      }
-    }
-  }
-
-  return matrix[b.length][a.length];
+for (let i = 0; i <= b.length; i++) {
+matrix[i][0] = i;
 }
 
+for (let j = 0; j <= a.length; j++) {
+matrix[0][j] = j;
+}
+
+for (let i = 1; i <= b.length; i++) {
+for (let j = 1; j <= a.length; j++) {
+if (b[i - 1] === a[j - 1]) {
+matrix[i][j] =
+matrix[i - 1][j - 1];
+} else {
+matrix[i][j] =
+Math.min(
+matrix[i - 1][j] + 1,
+matrix[i][j - 1] + 1,
+matrix[i - 1][j - 1] + 1
+);
+}
+}
+}
+
+return matrix[b.length][a.length];
+}
 
 // ============================================================
-// حساب التشابه
+// SIMILARITY
 // ============================================================
 
 function similarityScore(input, command) {
+input = normalizeCommand(input);
+command = normalizeCommand(command);
 
-  input =
-    normalizeCommand(input);
-
-  command =
-    normalizeCommand(command);
-
-  if (!input || !command) {
-    return 0;
-  }
-
-  if (input === command) {
-    return 1;
-  }
-
-  if (
-    command.startsWith(input) ||
-    input.startsWith(command)
-  ) {
-
-    const shorter =
-      Math.min(
-        input.length,
-        command.length
-      );
-
-    const longer =
-      Math.max(
-        input.length,
-        command.length
-      );
-
-    return (
-      0.75 +
-      (shorter / longer) * 0.25
-    );
-  }
-
-  const distance =
-    levenshtein(
-      input,
-      command
-    );
-
-  const maxLength =
-    Math.max(
-      input.length,
-      command.length
-    );
-
-  if (!maxLength) {
-    return 0;
-  }
-
-  return (
-    1 -
-    distance / maxLength
-  );
+if (!input || !command) {
+return 0;
 }
 
+if (input === command) {
+return 1;
+}
 
-// ============================================================
-// إيجاد أقرب أمر
-// ============================================================
-
-function findClosestCommand(
-  input,
-  commands
+if (
+command.startsWith(input) ||
+input.startsWith(command)
 ) {
+const shorter = Math.min(
+input.length,
+command.length
+);
 
-  let bestCommand = null;
-  let bestScore = 0;
+const longer = Math.max(
+  input.length,
+  command.length
+);
 
-  for (
-    const command of commands
-  ) {
+return (
+  0.75 +
+  (shorter / longer) * 0.25
+);
 
-    const score =
-      similarityScore(
-        input,
-        command
-      );
-
-    if (
-      score > bestScore
-    ) {
-
-      bestScore = score;
-      bestCommand = command;
-
-    }
-  }
-
-  return {
-    command: bestCommand,
-    score: bestScore
-  };
 }
 
+const distance = levenshtein(
+input,
+command
+);
+
+const maxLength = Math.max(
+input.length,
+command.length
+);
+
+return maxLength
+? 1 - distance / maxLength
+: 0;
+}
 
 // ============================================================
-// توحيد المنشنات
+// CLOSEST COMMAND
+// ============================================================
+
+function findClosestCommand(input, commands) {
+let bestCommand = null;
+let bestScore = 0;
+
+for (const command of commands) {
+const score = similarityScore(
+input,
+command
+);
+
+if (score > bestScore) {
+  bestScore = score;
+  bestCommand = command;
+}
+
+}
+
+return {
+command: bestCommand,
+score: bestScore
+};
+}
+
+// ============================================================
+// NORMALIZE MENTIONS
 // ============================================================
 
 function normalizeMentions(event) {
-
-  if (!event) {
-    return;
-  }
-
-  if (
-    !event.mentions ||
-    typeof event.mentions !== "object"
-  ) {
-
-    event.mentions = {};
-
-  }
-
-  if (
-    event.mentions instanceof Map
-  ) {
-
-    const converted = {};
-
-    for (
-      const [id, name] of
-      event.mentions.entries()
-    ) {
-
-      converted[String(id)] =
-        name;
-
-    }
-
-    event.mentions =
-      converted;
-  }
-
-  const normalized = {};
-
-  for (
-    const id of
-    Object.keys(event.mentions)
-  ) {
-
-    if (!id) {
-      continue;
-    }
-
-    normalized[String(id)] =
-      event.mentions[id];
-
-  }
-
-  event.mentions =
-    normalized;
-
-  if (
-    event.messageReply &&
-    event.messageReply.senderID
-  ) {
-
-    event.messageReply.senderID =
-      String(
-        event.messageReply.senderID
-      );
-
-  }
-
-  event.mentionIDs =
-    Object.keys(
-      event.mentions
-    ).map(
-      id => String(id)
-    );
+if (!event) {
+return;
 }
 
+if (
+!event.mentions ||
+typeof event.mentions !== "object"
+) {
+event.mentions = {};
+}
+
+if (event.mentions instanceof Map) {
+const converted = {};
+
+for (const [id, name] of event.mentions) {
+  converted[String(id)] = name;
+}
+
+event.mentions = converted;
+
+}
+
+const normalized = {};
+
+for (const id of Object.keys(event.mentions)) {
+if (!id) {
+continue;
+}
+
+normalized[String(id)] =
+  event.mentions[id];
+
+}
+
+event.mentions = normalized;
+
+if (
+event.messageReply &&
+event.messageReply.senderID
+) {
+event.messageReply.senderID =
+String(
+event.messageReply.senderID
+);
+}
+
+event.mentionIDs =
+Object.keys(event.mentions);
+}
 
 // ============================================================
-// أول منشن
+// FIRST MENTION
 // ============================================================
 
 function getFirstMention(event) {
+normalizeMentions(event);
 
-  normalizeMentions(event);
+const ids = Object.keys(
+event?.mentions || {}
+);
 
-  const ids =
-    Object.keys(
-      event?.mentions || {}
-    );
-
-  return ids.length
-    ? String(ids[0])
-    : null;
+return ids.length
+? String(ids[0])
+: null;
 }
 
-
 // ============================================================
-// أيديات المطورين
+// DEVELOPERS
 // ============================================================
 
 function getDeveloperIDs() {
+const ids = [];
 
-  const ids = [];
+try {
+if (
+Array.isArray(
+global.config?.ADMINBOT
+)
+) {
+for (
+const id of global.config.ADMINBOT
+) {
+if (id) {
+ids.push(String(id));
+}
+}
+}
+} catch (e) {}
 
-  try {
+try {
+const dev =
+global.config?.KIRA_CONF?.dev;
 
-    if (
-      Array.isArray(
-        global.config?.ADMINBOT
-      )
-    ) {
-
-      for (
-        const id of
-        global.config.ADMINBOT
-      ) {
-
-        if (id) {
-          ids.push(
-            String(id)
-          );
-        }
-
-      }
-    }
-
-  } catch (e) {}
-
-
-  try {
-
-    const dev =
-      global.config?.KIRA_CONF?.dev;
-
-    if (dev) {
-
-      ids.push(
-        String(dev)
-      );
-
-    }
-
-  } catch (e) {}
-
-  return [
-    ...new Set(ids)
-  ];
+if (dev) {
+  ids.push(String(dev));
 }
 
+} catch (e) {}
+
+return [
+...new Set(ids)
+];
+}
 
 function isDeveloper(senderID) {
-
-  return getDeveloperIDs()
-    .includes(
-      String(senderID)
-    );
-
+return getDeveloperIDs().includes(
+String(senderID)
+);
 }
 
-
 // ============================================================
-// حظر المجموعة
+// BAN CHECK
 // ============================================================
 
 function isGroupBanned(threadID) {
+const data = readJSON(
+BANNED_GROUPS_FILE
+);
 
-  const data =
-    readJSON(
-      BANNED_GROUPS_FILE
-    );
+const item =
+data[String(threadID)];
 
-  const item =
-    data[String(threadID)];
-
-  return (
-    item === true ||
-    item?.banned === true
-  );
+return (
+item === true ||
+(
+item &&
+typeof item === "object" &&
+item.banned === true
+)
+);
 }
-
-
-// ============================================================
-// حظر المستخدم
-// ============================================================
 
 function isUserBanned(senderID) {
+const data = readJSON(
+BANNED_USERS_FILE
+);
 
-  const data =
-    readJSON(
-      BANNED_USERS_FILE
-    );
+const item =
+data[String(senderID)];
 
-  const item =
-    data[String(senderID)];
-
-  return (
-    item === true ||
-    item?.banned === true
-  );
+return (
+item === true ||
+(
+item &&
+typeof item === "object" &&
+item.banned === true
+)
+);
 }
 
-
 // ============================================================
-// Typing Indicator
+// TYPING INDICATOR
 // ============================================================
 
-function setTyping(api, threadID, status) {
+async function setTyping(
+api,
+threadID,
+status
+) {
+try {
+if (!api) {
+return false;
+}
 
+const id = String(threadID);
+
+// الطريقة الأولى
+if (
+  typeof api.sendTypingIndicator ===
+  "function"
+) {
   try {
-
-    if (
-      typeof api.sendTypingIndicator ===
-      "function"
-    ) {
-
+    const result =
       api.sendTypingIndicator(
-        String(threadID),
+        id,
         status
       );
 
+    if (
+      result &&
+      typeof result.then === "function"
+    ) {
+      await result;
     }
 
+    return true;
   } catch (error) {
-
-    console.error(
-      "TYPING INDICATOR ERROR:",
+    console.log(
+      "[TYPING] sendTypingIndicator failed:",
       error.message
     );
-
   }
 }
 
+// الطريقة الثانية لبعض إصدارات FCA
+if (
+  typeof api.sendTyping ===
+  "function"
+) {
+  try {
+    const result =
+      api.sendTyping(
+        id,
+        status
+      );
+
+    if (
+      result &&
+      typeof result.then === "function"
+    ) {
+      await result;
+    }
+
+    return true;
+  } catch (error) {
+    console.log(
+      "[TYPING] sendTyping failed:",
+      error.message
+    );
+  }
+}
+
+// الطريقة الثالثة
+if (
+  typeof api.setTypingIndicator ===
+  "function"
+) {
+  try {
+    const result =
+      api.setTypingIndicator(
+        id,
+        status
+      );
+
+    if (
+      result &&
+      typeof result.then === "function"
+    ) {
+      await result;
+    }
+
+    return true;
+  } catch (error) {
+    console.log(
+      "[TYPING] setTypingIndicator failed:",
+      error.message
+    );
+  }
+}
+
+return false;
+
+} catch (error) {
+console.error(
+"[TYPING ERROR]",
+error.message
+);
+
+return false;
+
+}
+}
 
 // ============================================================
-// Handler
+// SEND MESSAGE SAFE
+// ============================================================
+
+async function sendMessage(
+api,
+message,
+threadID,
+messageID
+) {
+try {
+if (
+!api ||
+typeof api.sendMessage !==
+"function"
+) {
+return;
+}
+
+return await new Promise(
+  (resolve) => {
+    let finished = false;
+
+    const done = (
+      error,
+      info
+    ) => {
+      if (finished) {
+        return;
+      }
+
+      finished = true;
+
+      if (error) {
+        console.error(
+          "[SEND MESSAGE ERROR]",
+          error
+        );
+      }
+
+      resolve(info);
+    };
+
+    try {
+      api.sendMessage(
+        message,
+        threadID,
+        done,
+        messageID
+      );
+    } catch (error) {
+      done(error);
+    }
+  }
+);
+
+} catch (error) {
+console.error(
+"[SEND ERROR]",
+error.message
+);
+}
+}
+
+// ============================================================
+// MAIN HANDLER
 // ============================================================
 
 module.exports = function ({
-  api,
-  models,
-  Users,
-  Threads,
-  Currencies
+api,
+models,
+Users,
+Threads,
+Currencies
 }) {
+
+syncBanData();
+
+return async function ({
+event
+}) {
+
+if (!event) {
+  return;
+}
+
+try {
+
+  normalizeMentions(event);
+
+  const config =
+    global.config || {};
+
+  const data =
+    global.data || {};
+
+  const client =
+    global.client || {};
+
+  const commands =
+    client.commands || new Map();
+
+  const threadInfo =
+    data.threadInfo || new Map();
+
+  const threadData =
+    data.threadData || new Map();
+
+  const commandBanned =
+    data.commandBanned || new Map();
+
+  const PREFIX =
+    config.PREFIX || "";
+
+  const DeveloperMode =
+    config.DeveloperMode;
+
+  let body =
+    event.body;
+
+  let senderID =
+    String(
+      event.senderID || ""
+    );
+
+  let threadID =
+    String(
+      event.threadID || ""
+    );
+
+  const messageID =
+    event.messageID;
+
+  if (!body || !senderID || !threadID) {
+    return;
+  }
+
+  // ======================================================
+  // BAN SYNC
+  // ======================================================
 
   syncBanData();
 
-  return async function ({
-    event
-  }) {
+  // ======================================================
+  // PREFIX
+  // ======================================================
 
-    try {
+  const currentThreadData =
+    threadData.get(threadID) || {};
 
-      if (!event) {
-        return;
-      }
+  const prefix =
+    Object.prototype.hasOwnProperty.call(
+      currentThreadData,
+      "PREFIX"
+    )
+      ? currentThreadData.PREFIX
+      : PREFIX;
 
-      normalizeMentions(event);
+  if (!prefix) {
+    return;
+  }
 
-      const {
-        PREFIX,
-        DeveloperMode
-      } = global.config;
+  // ======================================================
+  // BOT ID
+  // ======================================================
 
-      const {
-        threadInfo,
-        threadData,
-        commandBanned
-      } = global.data;
+  let botID = "";
 
-      const {
-        commands
-      } = global.client;
-
-      let {
-        body,
-        senderID,
-        threadID,
-        messageID
-      } = event;
-
-      if (!body) {
-        return;
-      }
-
-      senderID =
-        String(senderID);
-
-      threadID =
-        String(threadID);
-
-      syncBanData();
-
-      const currentThreadData =
-        threadData.get(
-          threadID
-        ) || {};
-
-      const prefix =
-        Object.prototype.hasOwnProperty.call(
-          currentThreadData,
-          "PREFIX"
-        )
-          ? currentThreadData.PREFIX
-          : PREFIX;
-
-      const botID =
+  try {
+    if (
+      typeof api.getCurrentUserID ===
+      "function"
+    ) {
+      botID =
         String(
           api.getCurrentUserID()
         );
+    }
+  } catch (e) {}
 
-      const escapeRegex =
-        str =>
-          String(str).replace(
-            /[.*+?^${}()|[\]\\]/g,
-            "\\$&"
-          );
+  // ======================================================
+  // PREFIX REGEX
+  // ======================================================
 
-      const prefixRegex =
-        new RegExp(
-          `^(<@!?${botID}>|${escapeRegex(prefix)})\\s*`
-        );
+  const escapeRegex =
+    (str) =>
+      String(str).replace(
+        /[.*+?^${}()|[\]\\]/g,
+        "\\$&"
+      );
 
-      const matchedPrefix =
-        body.match(
-          prefixRegex
-        )?.[0];
+  const prefixPart =
+    escapeRegex(prefix);
 
-      if (!matchedPrefix) {
-        return;
-      }
+  let prefixRegex;
 
-      const content =
-        body
-          .slice(
-            matchedPrefix.length
-          )
-          .trim();
+  if (botID) {
+    prefixRegex =
+      new RegExp(
+        `^(<@!?${escapeRegex(
+          botID
+        )}>|${prefixPart})\\s*`,
+        "i"
+      );
+  } else {
+    prefixRegex =
+      new RegExp(
+        `^${prefixPart}\\s*`,
+        "i"
+      );
+  }
 
-      if (!content) {
-        return;
-      }
+  const prefixMatch =
+    body.match(prefixRegex);
 
-      const args =
-        content.split(/\s+/);
+  if (!prefixMatch) {
+    return;
+  }
 
-      const commandNameRaw =
-        args.shift();
+  const content =
+    body
+      .slice(
+        prefixMatch[0].length
+      )
+      .trim();
 
-      const commandName =
-        normalizeCommand(
-          commandNameRaw
-        );
+  if (!content) {
+    return;
+  }
 
-      let command = null;
+  // ======================================================
+  // COMMAND
+  // ======================================================
 
-      for (
-        const [name, cmd] of
-        commands.entries()
-      ) {
+  const parts =
+    content.split(/\s+/);
 
-        if (
-          normalizeCommand(name) ===
-          commandName
-        ) {
+  const commandNameRaw =
+    parts.shift();
 
-          command = cmd;
-          break;
+  const commandName =
+    normalizeCommand(
+      commandNameRaw
+    );
 
-        }
-      }
+  if (!commandName) {
+    return;
+  }
 
-      const developer =
-        isDeveloper(
-          senderID
-        );
+  let command = null;
 
-      if (!developer) {
+  for (
+    const [
+      name,
+      cmd
+    ] of commands.entries()
+  ) {
 
-        if (
-          isGroupBanned(
-            threadID
-          )
-        ) {
-          return;
-        }
+    if (
+      normalizeCommand(name) ===
+      commandName
+    ) {
+      command = cmd;
+      break;
+    }
+  }
 
-        if (
-          isUserBanned(
-            senderID
-          )
-        ) {
-          return;
-        }
+  // ======================================================
+  // DEVELOPER
+  // ======================================================
 
-      }
+  const developer =
+    isDeveloper(
+      senderID
+    );
 
-      if (!command) {
+  // ======================================================
+  // BAN CHECK
+  // ======================================================
 
-        const allCommandNames =
-          Array.from(
-            commands.keys()
-          );
+  if (!developer) {
 
-        if (
-          allCommandNames.length === 0
-        ) {
-          return;
-        }
+    if (
+      isGroupBanned(
+        threadID
+      )
+    ) {
+      return;
+    }
 
-        const result =
-          findClosestCommand(
-            commandName,
-            allCommandNames
-          );
+    if (
+      isUserBanned(
+        senderID
+      )
+    ) {
+      return;
+    }
 
-        if (
-          result.command &&
-          result.score >= 0.45
-        ) {
+  }
 
-          return api.sendMessage(
+  // ======================================================
+  // COMMAND NOT FOUND
+  // ======================================================
 
-            `⌬ ━━ 𝗛𝗜𝗡𝗔 UTILITY ━━ ⌬
+  if (!command) {
+
+    const names =
+      Array.from(
+        commands.keys()
+      );
+
+    if (!names.length) {
+      return;
+    }
+
+    const result =
+      findClosestCommand(
+        commandName,
+        names
+      );
+
+    if (
+      result.command &&
+      result.score >= 0.55
+    ) {
+
+      return sendMessage(
+        api,
+
+`⌬ ━━ 𝗛𝗜𝗡𝗔 UTILITY ━━ ⌬
 
 ❌ الأمر "${commandNameRaw}" غير موجود
 
 💡 ربما تقصد:
 "${result.command}"؟`,
 
-            threadID,
-            messageID
+        threadID,
+        messageID
+      );
+    }
 
-          );
+    return sendMessage(
+      api,
 
-        }
-
-        return api.sendMessage(
-
-          `⌬ ━━ 𝗛𝗜𝗡𝗔 UTILITY ━━ ⌬
+`⌬ ━━ 𝗛𝗜𝗡𝗔 UTILITY ━━ ⌬
 
 ❌ الأمر "${commandNameRaw}" غير موجود
 
 💡 استخدم ${prefix}مساعدة لرؤية الأوامر.`,
 
-          threadID,
-          messageID
+      threadID,
+      messageID
+    );
+  }
 
-        );
+  // ======================================================
+  // COMMAND CONFIG
+  // ======================================================
 
+  const commandConfig =
+    command.config || {};
+
+  // ======================================================
+  // MENTIONS
+  // ======================================================
+
+  normalizeMentions(event);
+
+  const firstMention =
+    getFirstMention(event);
+
+  if (
+    DeveloperMode &&
+    firstMention
+  ) {
+
+    console.log(
+      "[HINA MENTION]",
+      {
+        senderID,
+        mentionID:
+          firstMention,
+        allMentions:
+          event.mentionIDs || [],
+        command:
+          commandName
       }
+    );
 
-      normalizeMentions(event);
+  }
 
-      const firstMention =
-        getFirstMention(event);
+  // ======================================================
+  // COMMAND BAN
+  // ======================================================
 
-      if (
-        DeveloperMode &&
-        firstMention
-      ) {
+  if (
+    commandBanned &&
+    !developer
+  ) {
 
-        console.log(
-          "[HINA MENTION]",
-          {
-            senderID,
-            mentionID:
-              firstMention,
-            allMentions:
-              event.mentionIDs,
-            command:
-              commandName
-          }
-        );
+    const threadBannedCommands =
+      commandBanned.get(
+        threadID
+      ) || [];
 
-      }
+    const userBannedCommands =
+      commandBanned.get(
+        senderID
+      ) || [];
 
-      if (
-        commandBanned &&
-        !developer
-      ) {
+    if (
+      Array.isArray(
+        threadBannedCommands
+      ) &&
+      threadBannedCommands.includes(
+        commandConfig.name
+      )
+    ) {
 
-        const threadBannedCommands =
-          commandBanned.get(
-            threadID
-          ) || [];
+      return sendMessage(
+        api,
 
-        const userBannedCommands =
-          commandBanned.get(
-            senderID
-          ) || [];
-
-        if (
-          Array.isArray(
-            threadBannedCommands
-          ) &&
-          threadBannedCommands.includes(
-            command.config.name
-          )
-        ) {
-
-          return api.sendMessage(
-
-            `⌬ ━━ 𝗛𝗜𝗡𝗔 ADMIN ━━ ⌬
+`⌬ ━━ 𝗛𝗜𝗡𝗔 ADMIN ━━ ⌬
 
 🚫 الأمر محظور في هذه المجموعة
 
 الأمر:
-${command.config.name}`,
+${commandConfig.name}`,
 
-            threadID,
-            messageID
+        threadID,
+        messageID
+      );
+    }
 
-          );
+    if (
+      Array.isArray(
+        userBannedCommands
+      ) &&
+      userBannedCommands.includes(
+        commandConfig.name
+      )
+    ) {
 
-        }
+      return sendMessage(
+        api,
 
-        if (
-          Array.isArray(
-            userBannedCommands
-          ) &&
-          userBannedCommands.includes(
-            command.config.name
-          )
-        ) {
-
-          return api.sendMessage(
-
-            `⌬ ━━ 𝗛𝗜𝗡𝗔 ADMIN ━━ ⌬
+`⌬ ━━ 𝗛𝗜𝗡𝗔 ADMIN ━━ ⌬
 
 ⛔ أنت محظور من استخدام هذا الأمر`,
 
-            threadID,
-            messageID
+        threadID,
+        messageID
+      );
+    }
+  }
 
-          );
+  // ======================================================
+  // NSFW
+  // ======================================================
 
-        }
+  const category =
+    String(
+      commandConfig.commandCategory ||
+      ""
+    ).toLowerCase();
 
-      }
+  if (
+    category === "nsfw" &&
+    !(
+      data.threadAllowNSFW instanceof Array
+        ? data.threadAllowNSFW.includes(threadID)
+        : false
+    ) &&
+    !developer
+  ) {
 
-      if (
-        command.config.commandCategory &&
-        command.config.commandCategory
-          .toLowerCase() ===
-          "nsfw" &&
-        !global.data.threadAllowNSFW.includes(
-          threadID
-        ) &&
-        !developer
-      ) {
+    return sendMessage(
+      api,
 
-        return api.sendMessage(
-
-          `⌬ ━━ 𝗛𝗜𝗡𝗔 UTILITY ━━ ⌬
+`⌬ ━━ 𝗛𝗜𝗡𝗔 UTILITY ━━ ⌬
 
 🔞 محتوى محظور في هذه المجموعة`,
 
-          threadID,
-          messageID
+      threadID,
+      messageID
+    );
+  }
 
-        );
+  // ======================================================
+  // PERMISSION
+  // ======================================================
 
-      }
+  let permission = 0;
 
-      let permssion = 0;
+  let info =
+    threadInfo.get(threadID);
 
-      let info =
-        threadInfo.get(
+  if (
+    !info &&
+    Threads &&
+    typeof Threads.getInfo ===
+    "function"
+  ) {
+
+    try {
+
+      info =
+        await Threads.getInfo(
           threadID
         );
 
-      if (!info) {
+      if (info) {
+        threadInfo.set(
+          threadID,
+          info
+        );
+      }
 
-        try {
+    } catch (error) {
 
-          info =
-            await Threads.getInfo(
-              threadID
-            );
+      console.error(
+        "[THREAD INFO ERROR]",
+        error.message
+      );
 
-          if (info) {
+    }
+  }
 
-            threadInfo.set(
-              threadID,
-              info
-            );
+  const admins =
+    Array.isArray(
+      info?.adminIDs
+    )
+      ? info.adminIDs
+      : [];
 
-          }
+  const isGroupAdmin =
+    admins.some(
+      (admin) => {
 
-        } catch (error) {
-
-          console.error(
-            "GET THREAD INFO ERROR:",
-            error.message
+        if (
+          typeof admin ===
+          "string" ||
+          typeof admin ===
+          "number"
+        ) {
+          return (
+            String(admin) ===
+            senderID
           );
-
         }
 
-      }
-
-      const admins =
-        info?.adminIDs || [];
-
-      const isGroupAdmin =
-        admins.some(
-          admin =>
-            String(admin.id) ===
-            String(senderID)
+        return (
+          String(
+            admin?.id || ""
+          ) === senderID
         );
-
-      if (developer) {
-
-        permssion = 2;
-
-      } else if (
-        isGroupAdmin
-      ) {
-
-        permssion = 1;
-
       }
+    );
 
-      if (
-        Number(
-          command.config.hasPermssion || 0
-        ) >
-        permssion
-      ) {
+  if (developer) {
+    permission = 2;
+  } else if (
+    isGroupAdmin
+  ) {
+    permission = 1;
+  }
 
-        return api.sendMessage(
+  const requiredPermission =
+    Number(
+      commandConfig.hasPermssion ??
+      commandConfig.hasPermission ??
+      0
+    );
 
-          `⌬ ━━ 𝗛𝗜𝗡𝗔 ADMIN ━━ ⌬
+  if (
+    requiredPermission >
+    permission
+  ) {
+
+    return sendMessage(
+      api,
+
+`⌬ ━━ 𝗛𝗜𝗡𝗔 ADMIN ━━ ⌬
 
 ⚠️ ليس لديك صلاحية لتنفيذ هذا الأمر`,
 
-          threadID,
-          messageID
+      threadID,
+      messageID
+    );
+  }
 
-        );
+  // ======================================================
+  // COOLDOWN
+  // ======================================================
 
-      }
+  if (
+    !client.cooldowns
+  ) {
+    client.cooldowns =
+      new Map();
+  }
+
+  if (
+    !client.cooldowns.has(
+      commandConfig.name
+    )
+  ) {
+
+    client.cooldowns.set(
+      commandConfig.name,
+      new Map()
+    );
+  }
+
+  const timestamps =
+    client.cooldowns.get(
+      commandConfig.name
+    );
+
+  const cooldownSeconds =
+    Number(
+      commandConfig.cooldowns
+    ) || 1;
+
+  const expirationTime =
+    cooldownSeconds * 1000;
+
+  const previous =
+    timestamps.get(
+      senderID
+    );
+
+  if (
+    previous &&
+    Date.now() <
+      previous +
+      expirationTime
+  ) {
+
+    try {
 
       if (
-        !global.client.cooldowns.has(
-          command.config.name
-        )
-      ) {
-
-        global.client.cooldowns.set(
-          command.config.name,
-          new Map()
-        );
-
-      }
-
-      const timestamps =
-        global.client.cooldowns.get(
-          command.config.name
-        );
-
-      const expirationTime =
-        (
-          Number(
-            command.config.cooldowns
-          ) || 1
-        ) * 1000;
-
-      if (
-        timestamps.has(
-          senderID
-        ) &&
-        Date.now() <
-          timestamps.get(
-            senderID
-          ) +
-          expirationTime
+        typeof api.setMessageReaction ===
+        "function"
       ) {
 
         return api.setMessageReaction(
@@ -1080,113 +1216,215 @@ ${command.config.name}`,
 
       }
 
-      const commandKey =
-        `${threadID}_${senderID}_${commandName}`;
+    } catch (e) {}
 
-      if (
-        commandExecuted.has(
-          commandKey
-        )
-      ) {
-        return;
-      }
+    return;
+  }
 
-      commandExecuted.add(
+  // ======================================================
+  // DUPLICATE PROTECTION
+  // ======================================================
+
+  const commandKey =
+    [
+      threadID,
+      senderID,
+      commandName
+    ].join("_");
+
+  if (
+    commandExecuted.has(
+      commandKey
+    )
+  ) {
+    return;
+  }
+
+  commandExecuted.add(
+    commandKey
+  );
+
+  setTimeout(
+    () => {
+      commandExecuted.delete(
         commandKey
       );
+    },
+    1500
+  );
 
-      setTimeout(
-        () => {
+  // ======================================================
+  // COMMAND OBJECT
+  // ======================================================
 
-          commandExecuted.delete(
-            commandKey
-          );
+  const Obj = {
 
-        },
-        1000
-      );
+    api,
 
-      const Obj = {
+    event,
 
-        api,
+    args: parts,
 
-        event,
+    models,
 
-        args,
+    Users,
 
-        models,
+    Threads,
 
-        Users,
+    Currencies,
 
-        Threads,
+    permssion:
+      permission,
 
-        Currencies,
+    permission,
 
-        permssion,
+    mentionID:
+      firstMention,
 
-        mentionID:
-          getFirstMention(event),
+    mentionIDs:
+      event.mentionIDs || [],
 
-        mentionIDs:
-          event.mentionIDs || [],
-
-        getText:
-          () => {}
-
-      };
-
-      setTyping(
-        api,
-        threadID,
-        true
-      );
-
-      try {
-
-        await command.run(
-          Obj
-        );
-
-      } finally {
-
-        setTyping(
-          api,
-          threadID,
-          false
-        );
-
+    getText:
+      global.getText ||
+      function () {
+        return "";
       }
 
-      timestamps.set(
-        senderID,
-        Date.now()
+  };
+
+  // ======================================================
+  // TYPING ON
+  // ======================================================
+
+  await setTyping(
+    api,
+    threadID,
+    true
+  );
+
+  try {
+
+    // ====================================================
+    // RUN COMMAND
+    // ====================================================
+
+    if (
+      typeof command.run ===
+      "function"
+    ) {
+
+      await command.run(
+        Obj
       );
 
-    } catch (error) {
+    }
 
-      console.error(
-        `[${moment().format("HH:mm:ss")}] COMMAND ERROR:`,
-        error
-      );
+  } catch (error) {
 
-      try {
+    console.error(
+      `[${moment().format(
+        "HH:mm:ss"
+      )}] COMMAND ERROR:`,
+      error
+    );
 
-        return api.sendMessage(
+    if (DeveloperMode) {
 
-          `⌬ ━━ 𝗛𝗜𝗡𝗔 DEVELOPER ━━ ⌬
+      await sendMessage(
+        api,
+
+`⌬ ━━ 𝗛𝗜𝗡𝗔 DEVELOPER ━━ ⌬
 
 ❌ حدث خطأ أثناء تنفيذ الأمر
 
 ${error.message}`,
 
-          event.threadID,
-          event.messageID
+        threadID,
+        messageID
+      );
 
-        );
+    } else {
 
-      } catch (e) {}
+      await sendMessage(
+        api,
+
+`⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬
+
+❌ حدث خطأ أثناء تنفيذ الأمر`,
+
+        threadID,
+        messageID
+      );
 
     }
 
-  };
+  } finally {
+
+    // ====================================================
+    // TYPING OFF
+    // ====================================================
+
+    await setTyping(
+      api,
+      threadID,
+      false
+    );
+
+  }
+
+  // ======================================================
+  // SAVE COOLDOWN
+  // ======================================================
+
+  timestamps.set(
+    senderID,
+    Date.now()
+  );
+
+} catch (error) {
+
+  console.error(
+    `[${moment().format(
+      "HH:mm:ss"
+    )}] HANDLER ERROR:`,
+    error
+  );
+
+  try {
+
+    if (
+      event?.threadID &&
+      event?.messageID
+    ) {
+
+      await sendMessage(
+        api,
+
+`⌬ ━━ 𝗛𝗜𝗡𝗔 DEVELOPER ━━ ⌬
+
+❌ حدث خطأ في معالجة الأمر
+
+${error.message}`,
+
+        String(
+          event.threadID
+        ),
+
+        event.messageID
+      );
+
+    }
+
+  } catch (e) {
+
+    console.error(
+      "[FINAL ERROR]",
+      e.message
+    );
+
+  }
+
+}
+
+};
 };
