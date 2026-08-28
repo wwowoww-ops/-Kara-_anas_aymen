@@ -1,7 +1,7 @@
 module.exports.config = {
     name: "joinNoti",
     eventType: ["log:subscribe"],
-    version: "6.0.0",
+    version: "6.1.0",
     credits: "أبو هريرة",
     description: "نظام ترحيب عند دخول الأعضاء",
     category: "events"
@@ -75,46 +75,7 @@ module.exports.handleEvent = async function ({
         }
 
         // ==================================================
-        // اسم الشخص الذي أضاف العضو
-        // ==================================================
-
-        let adderName =
-            "رابط دعوة";
-
-        if (
-            author &&
-            Users &&
-            typeof Users.getData === "function"
-        ) {
-
-            try {
-
-                const adderData =
-                    await Users.getData(
-                        author
-                    );
-
-                if (
-                    adderData &&
-                    adderData.name
-                ) {
-
-                    adderName =
-                        adderData.name;
-                }
-
-            } catch (error) {
-
-                console.error(
-                    "[joinNoti] GET ADDER ERROR:",
-                    error.message
-                );
-
-            }
-        }
-
-        // ==================================================
-        // تجهيز المنشنات
+        // تجهيز المنشنات وأسماء الأعضاء
         // ==================================================
 
         const mentions = [];
@@ -134,9 +95,45 @@ module.exports.handleEvent = async function ({
                 continue;
             }
 
-            const fullName =
+            // الاسم الموجود في الحدث كاحتياط
+            let fullName =
                 participant.fullName ||
                 "عضو جديد";
+
+            // محاولة جلب الاسم الحالي من قاعدة Users
+            if (
+                Users &&
+                typeof Users.getData === "function"
+            ) {
+
+                try {
+
+                    const userData =
+                        await Users.getData(
+                            userID
+                        );
+
+                    if (
+                        userData &&
+                        userData.name
+                    ) {
+
+                        fullName =
+                            String(
+                                userData.name
+                            );
+
+                    }
+
+                } catch (error) {
+
+                    console.error(
+                        "[joinNoti] GET MEMBER ERROR:",
+                        error.message
+                    );
+
+                }
+            }
 
             memberNames.push(
                 fullName
@@ -155,15 +152,66 @@ module.exports.handleEvent = async function ({
         }
 
         // ==================================================
+        // اسم الشخص الذي أضاف العضو
+        // ==================================================
+
+        let adderName = null;
+
+        if (
+            author &&
+            author !== botID &&
+            Users &&
+            typeof Users.getData === "function"
+        ) {
+
+            try {
+
+                const adderData =
+                    await Users.getData(
+                        author
+                    );
+
+                if (
+                    adderData &&
+                    adderData.name
+                ) {
+
+                    adderName =
+                        String(
+                            adderData.name
+                        );
+
+                }
+
+            } catch (error) {
+
+                console.error(
+                    "[joinNoti] GET ADDER ERROR:",
+                    error.message
+                );
+
+            }
+        }
+
+        // ==================================================
         // منشن المضيف
         // ==================================================
 
-        if (author) {
+        let adderText =
+            "";
+
+        if (
+            author &&
+            adderName
+        ) {
 
             mentions.push({
                 tag: adderName,
                 id: author
             });
+
+            adderText =
+                `\n\n👤 المضيف\n@${adderName}`;
 
         }
 
@@ -188,10 +236,7 @@ module.exports.handleEvent = async function ({
 👋 أهلاً بـ ${memberText}
 
 💫 نورت المجموعة بانضمامك
-نتمنى لك وقتًا ممتعًا معنا
-
-👤 المضيف
-@${adderName}`;
+نتمنى لك وقتًا ممتعًا معنا${adderText}`;
 
         // ==================================================
         // إرسال الرسالة
