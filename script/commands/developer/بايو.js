@@ -2,7 +2,7 @@ module.exports.config = {
   name: "بايو",
   version: "1.2.0",
   hasPermssion: 2,
-  credits: "Ayman",
+  credits: "أبو هريرة",
   description: "تغيير السيرة الذاتية (Bio) لحساب البوت",
   commandCategory: "developer",
   usages: "[النص الجديد]",
@@ -16,7 +16,7 @@ module.exports.run = async function({ api, event, args }) {
   // التحقق من صلاحية المطور عبر الـ Config
   const adminConfig = global.config.ADMINBOT || [];
   if (!adminConfig.includes(senderID)) {
-    return api.sendMessage(`${header}\n\n⚠️ عـذراً، هـذا الأمـر سـيادي لـلـمـطور فـقـط.`, threadID, messageID);
+    return api.sendMessage(`${header}\n\n⚠️ عـذراً، هـذا الأمـر سـيادي لـلـمطور فـقـط.`, threadID, messageID);
   }
 
   const content = args.join(" ");
