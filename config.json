@@ -3,26 +3,35 @@
     "DeveloperMode": false,
     "autoCreateDB": true,
     "MODEL_API_KEY": "ضع_مفتاح_API_الجديد_هنا",
+
     "iconUnsend": {
         "status": true,
         "icon": "😡"
     },
+
     "notiGroup": true,
     "NOTIFICATION": true,
     "allowInbox": true,
+
     "commandDisabled": [],
     "eventDisabled": [],
+
     "BOTNAME": "زنجوبة",
     "PREFIX": ".",
+
     "ADMINBOT": [
-        "61578581225040"
+        "61578581225040",
+        "61590924093066"
     ],
+
     "DATABASE": {
         "sqlite": {
             "storage": "data.sqlite"
         }
     },
+
     "APPSTATEPATH": "appstate.json",
+
     "FCAOption": {
         "forceLogin": true,
         "listenEvents": true,
@@ -31,7 +40,9 @@
         "selfListen": true,
         "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"
     },
+
     "version": "1.0.0",
+
     "menu": {
         "autoUnsend": {
             "status": true,
@@ -43,6 +54,7 @@
             "url": "https://i.imgur.com/LKkw8SL.jpg"
         }
     },
+
     "autoAction": {
         "status": true,
         "keywords": {
@@ -51,11 +63,9 @@
             "مطلوب": "مطلوب"
         }
     },
+
     "KIRA_CONF": {
-        "dev": [
-            "61578581225040",
-            "61590924093066"
-        ],
+        "dev": "61578581225040",
         "personality": "بوتة متواضعة",
         "ayman_msg": "حبيبي أبو هريرة! 💖 تحت أمرك يا تاج رأسي",
         "other_msg": "سؤالك يثبت أن العقل زينة لم تُرزق بها 😏"
