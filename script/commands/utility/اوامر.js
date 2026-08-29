@@ -2,28 +2,28 @@ const axios = require("axios");
 const fs = require("fs-extra");
 
 module.exports.config = {
-  name: "اوامر",
-  version: "12.0.0",
-  hasPermssion: 0,
-  credits: "أبو هريرة",
-  description: "قائمة أوامر HINA بنظام تفاعلي",
-  commandCategory: "utility",
-  usages: "اوامر",
-  cooldowns: 5
+name: "اوامر",
+version: "13.0.0",
+hasPermssion: 0,
+credits: "أبو هريرة",
+description: "قائمة أوامر HINA بنظام تفاعلي",
+commandCategory: "utility",
+usages: "اوامر",
+cooldowns: 5
 };
 
 const IMAGE_URL =
-  "https://files.catbox.moe/01t0g7.jpg";
+"https://files.catbox.moe/01t0g7.jpg";
 
 // ============================================================
 // الزخرفة
 // ============================================================
 
 const TOP =
-  "╭──────────────╮";
+"╭━━━━━━━━━━━━━━━━╮";
 
 const BOTTOM =
-  "╰──────────────╯";
+"╰━━━━━━━━━━━━━━━━╯";
 
 // ============================================================
 // الفئات
@@ -31,42 +31,188 @@ const BOTTOM =
 
 const categories = {
 
-  "1": {
-    id: "fun",
-    name: "الـتـرفـيـه"
-  },
+"1": {
+id: "fun",
+name: "الـتـرفـيـه",
+aliases: [
+"الترفيه",
+"ترفيه",
+"الـتـرفـيـه"
+]
+},
 
-  "2": {
-    id: "admin",
-    name: "الإدارة"
-  },
+"2": {
+id: "admin",
+name: "الإدارة",
+aliases: [
+"الإدارة",
+"الادارة",
+"ادارة"
+]
+},
 
-  "3": {
-    id: "developer",
-    name: "الـمـطـور"
-  },
+"3": {
+id: "developer",
+name: "الـمـطـور",
+aliases: [
+"المطور",
+"الـمـطـور",
+"مطوّر",
+"مطور"
+]
+},
 
-  "4": {
-    id: "games",
-    name: "الألـعـاب"
-  },
+"4": {
+id: "games",
+name: "الألـعـاب",
+aliases: [
+"الألعاب",
+"الالعاب",
+"العاب",
+"الألـعـاب"
+]
+},
 
-  "5": {
-    id: "media",
-    name: "الـوسـائـط"
-  },
+"5": {
+id: "media",
+name: "الـوسـائـط",
+aliases: [
+"الوسائط",
+"الـوسـائـط",
+"وسائط"
+]
+},
 
-  "6": {
-    id: "pic",
-    name: "الـصـور"
-  },
+"6": {
+id: "pic",
+name: "الـصـور",
+aliases: [
+"الصور",
+"الـصـور",
+"صور"
+]
+},
 
-  "7": {
-    id: "utility",
-    name: "الـخـدمـات"
-  }
+"7": {
+id: "utility",
+name: "الـخـدمات",
+aliases: [
+"الخدمات",
+"الـخـدمات",
+"خدمات"
+]
+}
 
 };
+
+// ============================================================
+// تنظيف النص
+// ============================================================
+
+function normalizeText(text) {
+
+return String(text || "")
+.trim()
+.toLowerCase()
+
+// إزالة التشكيل
+.replace(
+  /[\u064B-\u065F\u0670]/g,
+  ""
+)
+
+// توحيد الهمزات
+.replace(/[أإآ]/g, "ا")
+
+// إزالة التطويل
+.replace(/ـ/g, "")
+
+// توحيد بعض الحروف
+.replace(/ى/g, "ي")
+
+// إزالة المسافات الزائدة
+.replace(/\s+/g, " ")
+
+.trim();
+
+}
+
+// ============================================================
+// تحويل الأرقام العربية
+// ============================================================
+
+function normalizeNumber(text) {
+
+return String(text || "")
+.replace(
+/[٠-٩]/g,
+digit =>
+String(
+"٠١٢٣٤٥٦٧٨٩".indexOf(
+digit
+)
+)
+);
+}
+
+// ============================================================
+// البحث عن الفئة
+// ============================================================
+
+function findCategory(input) {
+
+const normalized =
+normalizeText(
+normalizeNumber(input)
+);
+
+// --------------------------------------------
+// البحث بالرقم
+// --------------------------------------------
+
+if (
+categories[normalized]
+) {
+
+return categories[normalized];
+
+}
+
+// --------------------------------------------
+// البحث بالاسم
+// --------------------------------------------
+
+for (
+const key of Object.keys(categories)
+) {
+
+const category =
+  categories[key];
+
+const names = [
+  category.name,
+  ...(category.aliases || [])
+];
+
+for (
+  const name of names
+) {
+
+  if (
+    normalizeText(name) ===
+    normalized
+  ) {
+
+    return category;
+
+  }
+
+}
+
+}
+
+return null;
+}
 
 // ============================================================
 // القائمة الرئيسية
@@ -74,20 +220,20 @@ const categories = {
 
 function createMainMenu() {
 
-  return `${TOP}
-│ 𝗛𝗜𝗡𝗔 〢 الأوامر │
+return `${TOP}
+𝗛𝗜𝗡𝗔          〢       الأوامر
 ${BOTTOM}
 
-╞❯ ❶ الترفيه
-╞❯ ❷ الإدارة
-╞❯ ❸ المطور
-╞❯ ❹ الألعاب
-╞❯ ❺ الوسائط
-╞❯ ❻ الصور
-╘❯ ❼ الخدمات
+❶ الـتـرفـيـه
+❷ الإدارة
+❸ الـمـطـور
+❹ الألـعـاب
+❺ الـوسـائـط
+❻ الـصـور
+❼ الـخـدمات
 
 ${TOP}
-│ ↳ رد برقم الفئة للعرض │
+رد برقم الفئة أو اسمها
 ${BOTTOM}`;
 
 }
@@ -97,34 +243,35 @@ ${BOTTOM}`;
 // ============================================================
 
 function createCategoryMenu(
-  category,
-  commands
+category,
+commands
 ) {
 
-  let commandList = "";
+let commandList = "";
 
-  commands.forEach(
-    (command, index) => {
+commands.forEach(
+(command, index) => {
 
-      const symbol =
-        index === commands.length - 1
-          ? "╘❯"
-          : "╞❯";
+  const symbol =
+    index === commands.length - 1
+      ? "╘❯"
+      : "╞❯";
 
-      commandList +=
-        `${symbol} ${command}\n`;
+  commandList +=
+    `${symbol} ${command}\n`;
 
-    }
-  );
+}
 
-  return `${TOP}
-│ 𝗛𝗜𝗡𝗔 〢 ${category.name} │
+);
+
+return `${TOP}
+𝗛𝗜𝗡𝗔          〢       ${category.name}
 ${BOTTOM}
 
 ${commandList}
 ${TOP}
-│ ↳ عدد الأوامر: ${commands.length} │
-│ ↳ أرسل رجوع للقائمة الرئيسية │
+عدد الأوامر: ${commands.length}
+رد بـ رجوع للقائمة
 ${BOTTOM}`;
 
 }
@@ -134,145 +281,155 @@ ${BOTTOM}`;
 // ============================================================
 
 function getCategoryCommands(
-  categoryID
+categoryID
 ) {
 
+if (
+!global.client ||
+!global.client.commands
+) {
+
+return [];
+
+}
+
+return Array.from(
+global.client.commands.values()
+)
+
+.filter(command => {
+
   if (
-    !global.client ||
-    !global.client.commands
+    !command ||
+    !command.config
   ) {
-    return [];
+
+    return false;
+
   }
 
-  return Array.from(
-    global.client.commands.values()
-  )
-
-    .filter(command => {
-
-      if (
-        !command ||
-        !command.config
-      ) {
-        return false;
-      }
-
-      const commandCategory =
-        String(
-          command.config.commandCategory || ""
-        )
-          .trim()
-          .toLowerCase();
-
-      return (
-        commandCategory ===
-        String(categoryID)
-          .trim()
-          .toLowerCase()
-      );
-
-    })
-
-    .map(
-      command =>
-        String(
-          command.config.name || ""
-        ).trim()
+  const commandCategory =
+    String(
+      command.config.commandCategory || ""
     )
+      .trim()
+      .toLowerCase();
 
-    .filter(Boolean)
+  return (
+    commandCategory ===
+    String(categoryID)
+      .trim()
+      .toLowerCase()
+  );
 
-    .sort(
-      (a, b) =>
-        a.localeCompare(
-          b,
-          "ar"
-        )
-    );
+})
+
+.map(
+  command =>
+    String(
+      command.config.name || ""
+    ).trim()
+)
+
+.filter(Boolean)
+
+.sort(
+  (a, b) =>
+    a.localeCompare(
+      b,
+      "ar"
+    )
+);
 
 }
 
 // ============================================================
-// حذف جلسات المستخدم القديمة فقط
+// حذف جلسات المستخدم القديمة
 // ============================================================
 
 function removeUserReplies(
-  senderID
+senderID
 ) {
 
-  if (
-    !global.client
-  ) {
-    return;
-  }
+if (
+!global.client
+) {
 
-  if (
-    !Array.isArray(
-      global.client.handleReply
-    )
-  ) {
-    global.client.handleReply = [];
-    return;
-  }
+return;
 
-  global.client.handleReply =
-    global.client.handleReply.filter(
-      item => {
+}
 
-        if (
-          item.name !==
-          module.exports.config.name
-        ) {
-          return true;
-        }
+if (
+!Array.isArray(
+global.client.handleReply
+)
+) {
 
-        return (
-          String(item.author) !==
-          String(senderID)
-        );
+global.client.handleReply = [];
 
-      }
+return;
+
+}
+
+global.client.handleReply =
+global.client.handleReply.filter(
+item => {
+
+    if (
+      item.name !==
+      module.exports.config.name
+    ) {
+
+      return true;
+
+    }
+
+    return (
+      String(item.author) !==
+      String(senderID)
     );
+
+  }
+);
 
 }
 
 // ============================================================
-// تسجيل جلسة المستخدم
+// حفظ جلسة المستخدم
 // ============================================================
 
 function saveReply(
-  messageID,
-  author,
-  type
+messageID,
+author,
+type
 ) {
 
-  if (
-    !global.client.handleReply
-  ) {
-    global.client.handleReply = [];
-  }
+if (
+!global.client.handleReply
+) {
 
-  // حذف جلسة هذا المستخدم فقط
-  removeUserReplies(
-    author
-  );
+global.client.handleReply = [];
 
-  global.client.handleReply.push({
+}
 
-    name:
-      module.exports.config.name,
+removeUserReplies(
+author
+);
 
-    messageID:
+global.client.handleReply.push({
 
-      String(messageID),
+name:
+  module.exports.config.name,
 
-    author:
+messageID:
+  String(messageID),
 
-      String(author),
+author:
+  String(author),
 
-    type
+type
 
-  });
+});
 
 }
 
@@ -281,42 +438,75 @@ function saveReply(
 // ============================================================
 
 function isOwner(
-  senderID,
-  handleReply
+senderID,
+handleReply
 ) {
 
-  return (
-    String(senderID) ===
-    String(handleReply.author)
-  );
+return (
+String(senderID) ===
+String(handleReply.author)
+);
 
 }
 
 // ============================================================
-// رسالة القائمة ليست لك
+// تنبيه شخص ليس صاحب القائمة
 // ============================================================
 
 function notYourMenu(
-  api,
-  event
+api,
+event
 ) {
 
-  return api.sendMessage(
+return api.sendMessage(
 
 `${TOP}
-│ 𝗛𝗜𝗡𝗔 〢 تنبيه │
+𝗛𝗜𝗡𝗔          〢       تنبيه
 ${BOTTOM}
 
 ⚠️ هذه ليست قائمتك
 
 ↳ اكتب اوامر لإظهار قائمة خاصة بك
 
+${TOP}
+HINA
 ${BOTTOM}`,
 
-    event.threadID,
-    event.messageID
+event.threadID,
+event.messageID
 
-  );
+);
+
+}
+
+// ============================================================
+// اختيار غير صحيح
+// ============================================================
+
+function invalidChoice(
+api,
+event
+) {
+
+return api.sendMessage(
+
+`${TOP}
+𝗛𝗜𝗡𝗔          〢       تنبيه
+${BOTTOM}
+
+⚠️ الاختيار غير صحيح
+
+↳ رد برقم الفئة من ❶ إلى ❼
+أو اكتب اسم الفئة
+
+${TOP}
+حاول مرة أخرى
+${BOTTOM}`,
+
+event.threadID,
+event.messageID
+
+);
 
 }
 
@@ -326,410 +516,422 @@ ${BOTTOM}`,
 
 module.exports.run =
 async function ({
-  api,
-  event
+api,
+event
 }) {
 
-  try {
+try {
+
+if (!event) {
+
+  return;
+
+}
+
+const {
+  threadID,
+  messageID,
+  senderID
+} = event;
+
+const menu =
+  createMainMenu();
+
+let imagePath =
+  null;
+
+// ========================================================
+// تحميل الصورة
+// ========================================================
+
+try {
+
+  const response =
+    await axios.get(
+      IMAGE_URL,
+      {
+        responseType:
+          "arraybuffer",
+
+        timeout:
+          15000
+      }
+    );
+
+  imagePath =
+    `${process.cwd()}/hina_commands_${Date.now()}_${Math.random()
+      .toString(36)
+      .slice(2)}.jpg`;
+
+  await fs.writeFile(
+    imagePath,
+    Buffer.from(
+      response.data
+    )
+  );
+
+} catch (error) {
+
+  console.error(
+    "[HINA MENU] IMAGE ERROR:",
+    error.message
+  );
+
+}
+
+// ========================================================
+// إرسال القائمة
+// ========================================================
+
+return api.sendMessage(
+
+  imagePath
+
+    ? {
+        body:
+          menu,
+
+        attachment:
+          fs.createReadStream(
+            imagePath
+          )
+      }
+
+    : menu,
+
+  threadID,
+
+  (err, info) => {
+
+    // ----------------------------------------------------
+    // تنظيف الصورة
+    // ----------------------------------------------------
 
     if (
-      !event
-    ) {
-      return;
-    }
-
-    const {
-      threadID,
-      messageID,
-      senderID
-    } = event;
-
-    const menu =
-      createMainMenu();
-
-    let imagePath =
-      null;
-
-    // ========================================================
-    // تحميل صورة القائمة
-    // ========================================================
-
-    try {
-
-      const response =
-        await axios.get(
-          IMAGE_URL,
-          {
-            responseType:
-              "arraybuffer",
-
-            timeout:
-              15000
-          }
-        );
-
-      imagePath =
-        `${process.cwd()}/hina_commands_${Date.now()}_${Math.random()
-          .toString(36)
-          .slice(2)}.jpg`;
-
-      await fs.writeFile(
-        imagePath,
-        Buffer.from(
-          response.data
-        )
-      );
-
-    } catch (error) {
-
-      console.error(
-        "[HINA MENU] IMAGE ERROR:",
-        error.message
-      );
-
-    }
-
-    // ========================================================
-    // إرسال القائمة
-    // ========================================================
-
-    return api.sendMessage(
-
       imagePath
+    ) {
 
-        ? {
-            body:
-              menu,
+      setTimeout(
+        async () => {
 
-            attachment:
-              fs.createReadStream(
+          try {
+
+            if (
+              await fs.pathExists(
                 imagePath
               )
-          }
+            ) {
 
-        : menu,
+              await fs.remove(
+                imagePath
+              );
 
-      threadID,
+            }
 
-      (err, info) => {
+          } catch (e) {}
 
-        // ----------------------------------------------------
-        // حذف الصورة المؤقتة
-        // ----------------------------------------------------
+        },
+        10000
+      );
 
-        if (
-          imagePath
-        ) {
+    }
 
-          setTimeout(
-            async () => {
+    if (
+      err ||
+      !info
+    ) {
 
-              try {
+      console.error(
+        "[HINA MENU] SEND ERROR:",
+        err
+      );
 
-                if (
-                  await fs.pathExists(
-                    imagePath
-                  )
-                ) {
+      return;
 
-                  await fs.remove(
-                    imagePath
-                  );
+    }
 
-                }
+    // ----------------------------------------------------
+    // حفظ الجلسة
+    // ----------------------------------------------------
 
-              } catch (e) {}
-
-            },
-
-            10000
-          );
-
-        }
-
-        if (
-          err ||
-          !info
-        ) {
-
-          console.error(
-            "[HINA MENU] SEND ERROR:",
-            err
-          );
-
-          return;
-        }
-
-        // ----------------------------------------------------
-        // إنشاء جلسة خاصة بالمستخدم
-        // ----------------------------------------------------
-
-        saveReply(
-          info.messageID,
-          senderID,
-          "main"
-        );
-
-      },
-
-      messageID
+    saveReply(
+      info.messageID,
+      senderID,
+      "main"
     );
 
-  } catch (error) {
+  },
 
-    console.error(
-      "❌ HINA COMMAND MENU ERROR:",
-      error
-    );
+  messageID
+);
 
-    return api.sendMessage(
-      "❌ حدث خطأ أثناء فتح قائمة الأوامر",
-      event.threadID,
-      event.messageID
-    );
+} catch (error) {
 
-  }
+console.error(
+  "❌ HINA COMMAND MENU ERROR:",
+  error
+);
+
+return api.sendMessage(
+  "❌ حدث خطأ أثناء فتح قائمة الأوامر",
+  event.threadID,
+  event.messageID
+);
+
+}
 
 };
 
 // ============================================================
-// التعامل مع الردود
+// HANDLE REPLY
 // ============================================================
 
 module.exports.handleReply =
 async function ({
-  api,
-  event,
-  handleReply
+api,
+event,
+handleReply
 }) {
+
+try {
+
+if (
+  !event ||
+  !handleReply
+) {
+
+  return;
+
+}
+
+const {
+  threadID,
+  messageID,
+  senderID,
+  body
+} = event;
+
+// ========================================================
+// التحقق من صاحب القائمة
+// ========================================================
+
+if (
+  !isOwner(
+    senderID,
+    handleReply
+  )
+) {
+
+  return notYourMenu(
+    api,
+    event
+  );
+
+}
+
+// ========================================================
+// تنظيف الإدخال
+// ========================================================
+
+const input =
+  String(
+    body || ""
+  )
+    .trim();
+
+if (
+  !input
+) {
+
+  return;
+
+}
+
+const normalizedInput =
+  normalizeText(
+    normalizeNumber(input)
+  );
+
+// ========================================================
+// رجوع
+// ========================================================
+
+if (
+  normalizedInput === "رجوع" ||
+  normalizedInput === "عودة" ||
+  normalizedInput === "back"
+) {
 
   try {
 
-    if (
-      !event ||
-      !handleReply
-    ) {
-      return;
-    }
+    await api.unsendMessage(
+      handleReply.messageID
+    );
 
-    const {
-      threadID,
-      messageID,
-      senderID,
-      body
-    } = event;
+  } catch (e) {}
 
-    // ========================================================
-    // الشخص ليس صاحب القائمة
-    // ========================================================
+  return module.exports.run({
+    api,
+    event
+  });
 
-    if (
-      !isOwner(
-        senderID,
-        handleReply
-      )
-    ) {
+}
 
-      return notYourMenu(
-        api,
-        event
-      );
+// ========================================================
+// القائمة ليست الرئيسية
+// ========================================================
 
-    }
+if (
+  handleReply.type !==
+  "main"
+) {
 
-    // ========================================================
-    // تنظيف الإدخال
-    // ========================================================
+  return;
 
-    const input =
-      String(
-        body || ""
-      )
-        .trim()
-        .replace(
-          /[٠-٩]/g,
-          digit =>
-            String(
-              "٠١٢٣٤٥٦٧٨٩"
-                .indexOf(
-                  digit
-                )
-            )
-        );
+}
 
-    if (
-      !input
-    ) {
-      return;
-    }
+// ========================================================
+// البحث عن الفئة
+// ========================================================
 
-    // ========================================================
-    // رجوع
-    // ========================================================
+const category =
+  findCategory(
+    input
+  );
 
-    if (
-      input === "رجوع" ||
-      input === "رجـوع" ||
-      input === "عودة" ||
-      input.toLowerCase() === "back"
-    ) {
+// ========================================================
+// اختيار غير صحيح
+// ========================================================
 
-      try {
+if (
+  !category
+) {
 
-        await api.unsendMessage(
-          handleReply.messageID
-        );
+  return invalidChoice(
+    api,
+    event
+  );
 
-      } catch (e) {}
+}
 
-      return module.exports.run({
-        api,
-        event
-      });
+// ========================================================
+// جلب الأوامر
+// ========================================================
 
-    }
+const commandList =
+  getCategoryCommands(
+    category.id
+  );
 
-    // ========================================================
-    // إذا كانت القائمة فئة
-    // ========================================================
+// ========================================================
+// حذف القائمة الرئيسية
+// ========================================================
 
-    if (
-      handleReply.type !==
-      "main"
-    ) {
+try {
 
-      return;
+  await api.unsendMessage(
+    handleReply.messageID
+  );
 
-    }
+} catch (e) {}
 
-    // ========================================================
-    // اختيار الفئة
-    // ========================================================
+// ========================================================
+// لا توجد أوامر
+// ========================================================
 
-    const category =
-      categories[input];
+if (
+  commandList.length === 0
+) {
 
-    if (
-      !category
-    ) {
+  const emptyMessage =
 
-      return;
-
-    }
-
-    // ========================================================
-    // جلب أوامر الفئة
-    // ========================================================
-
-    const commandList =
-      getCategoryCommands(
-        category.id
-      );
-
-    // ========================================================
-    // حذف القائمة الرئيسية
-    // ========================================================
-
-    try {
-
-      await api.unsendMessage(
-        handleReply.messageID
-      );
-
-    } catch (e) {}
-
-    // ========================================================
-    // لا توجد أوامر
-    // ========================================================
-
-    if (
-      commandList.length === 0
-    ) {
-
-      const emptyMessage =
 `${TOP}
-│ 𝗛𝗜𝗡𝗔 〢 ${category.name} │
+𝗛𝗜𝗡𝗔          〢       ${category.name}
 ${BOTTOM}
 
 ⚠️ لا توجد أوامر في هذه الفئة حاليًا
 
 ${TOP}
-│ ↳ أرسل رجوع للقائمة الرئيسية │
+رد بـ رجوع للقائمة
 ${BOTTOM}`;
 
-      return api.sendMessage(
-        emptyMessage,
-        threadID,
+  return api.sendMessage(
+    emptyMessage,
+    threadID,
 
-        (err, info) => {
+    (err, info) => {
 
-          if (
-            err ||
-            !info
-          ) {
-            return;
-          }
+      if (
+        err ||
+        !info
+      ) {
 
-          saveReply(
-            info.messageID,
-            senderID,
-            "category"
-          );
+        return;
 
-        },
+      }
 
-        messageID
+      saveReply(
+        info.messageID,
+        senderID,
+        "category"
       );
+
+    },
+
+    messageID
+  );
+
+}
+
+// ========================================================
+// إنشاء قائمة الفئة
+// ========================================================
+
+const categoryMessage =
+  createCategoryMenu(
+    category,
+    commandList
+  );
+
+// ========================================================
+// إرسال قائمة الفئة
+// ========================================================
+
+return api.sendMessage(
+
+  categoryMessage,
+
+  threadID,
+
+  (err, info) => {
+
+    if (
+      err ||
+      !info
+    ) {
+
+      return;
 
     }
 
-    // ========================================================
-    // إنشاء قائمة الفئة
-    // ========================================================
-
-    const categoryMessage =
-      createCategoryMenu(
-        category,
-        commandList
-      );
-
-    // ========================================================
-    // إرسال قائمة الفئة
-    // ========================================================
-
-    return api.sendMessage(
-
-      categoryMessage,
-
-      threadID,
-
-      (err, info) => {
-
-        if (
-          err ||
-          !info
-        ) {
-          return;
-        }
-
-        saveReply(
-          info.messageID,
-          senderID,
-          "category"
-        );
-
-      },
-
-      messageID
+    saveReply(
+      info.messageID,
+      senderID,
+      "category"
     );
 
-  } catch (error) {
+  },
 
-    console.error(
-      "❌ HINA MENU REPLY ERROR:",
-      error
-    );
+  messageID
+);
 
-  }
+} catch (error) {
+
+console.error(
+  "❌ HINA MENU REPLY ERROR:",
+  error
+);
+
+}
 
 };
