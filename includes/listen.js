@@ -104,10 +104,6 @@ module.exports = function ({ api, models }) {
                 "[ DATABASE ]"
             );
 
-            // ----------------------------------------------------
-            // Threads
-            // ----------------------------------------------------
-
             const threads = await Threads.getAll([
                 "threadID",
                 "data",
@@ -122,9 +118,7 @@ module.exports = function ({ api, models }) {
                 if (
                     !global.data.allThreadID.includes(tid)
                 ) {
-
                     global.data.allThreadID.push(tid);
-
                 }
 
                 global.data.threadData.set(
@@ -137,7 +131,6 @@ module.exports = function ({ api, models }) {
                     thread.threadInfo || {}
                 );
 
-                // حظر المجموعة
                 if (
                     thread.data &&
                     thread.data.banned == 1
@@ -156,7 +149,6 @@ module.exports = function ({ api, models }) {
                     );
                 }
 
-                // حظر أوامر
                 if (
                     thread.data &&
                     Array.isArray(
@@ -171,7 +163,6 @@ module.exports = function ({ api, models }) {
                     );
                 }
 
-                // NSFW
                 if (
                     thread.data &&
                     thread.data.NSFW
@@ -182,14 +173,9 @@ module.exports = function ({ api, models }) {
                     ) {
 
                         global.data.threadAllowNSFW.push(tid);
-
                     }
                 }
             }
-
-            // ----------------------------------------------------
-            // Users
-            // ----------------------------------------------------
 
             const users = await Users.getAll([
                 "userID",
@@ -207,7 +193,6 @@ module.exports = function ({ api, models }) {
                 ) {
 
                     global.data.allUserID.push(uid);
-
                 }
 
                 if (user.name) {
@@ -218,7 +203,6 @@ module.exports = function ({ api, models }) {
                     );
                 }
 
-                // حظر المستخدم
                 if (
                     user.data &&
                     user.data.banned == 1
@@ -237,7 +221,6 @@ module.exports = function ({ api, models }) {
                     );
                 }
 
-                // حظر الأوامر
                 if (
                     user.data &&
                     Array.isArray(
@@ -252,10 +235,6 @@ module.exports = function ({ api, models }) {
                     );
                 }
             }
-
-            // ----------------------------------------------------
-            // Currencies
-            // ----------------------------------------------------
 
             const currencies =
                 await Currencies.getAll([
@@ -272,7 +251,6 @@ module.exports = function ({ api, models }) {
                 ) {
 
                     global.data.allCurrenciesID.push(uid);
-
                 }
             }
 
@@ -344,12 +322,13 @@ module.exports = function ({ api, models }) {
 
             try {
 
-                if (typeof handleNotification === "function") {
+                if (
+                    typeof handleNotification === "function"
+                ) {
 
                     handleNotification({
                         api
                     });
-
                 }
 
             } catch (error) {}
@@ -366,10 +345,6 @@ module.exports = function ({ api, models }) {
         if (!event) {
             return;
         }
-
-        // ========================================================
-        // IDs
-        // ========================================================
 
         const threadID =
             String(event.threadID || "");
@@ -396,7 +371,6 @@ module.exports = function ({ api, models }) {
                 global.data.userBanned.has(senderID)
             ) {
 
-                // يسمح للمطور بالمرور
                 const admins =
                     global.config.ADMINBOT || [];
 
@@ -424,10 +398,6 @@ module.exports = function ({ api, models }) {
                 }
             }
 
-            // ====================================================
-            // منع الخاص
-            // ====================================================
-
             if (
                 global.config.allowInbox === false &&
                 senderID === threadID
@@ -444,9 +414,9 @@ module.exports = function ({ api, models }) {
             );
         }
 
-        // ============================================================
+        // ========================================================
         // DEBUG
-        // ============================================================
+        // ========================================================
 
         if (
             global.config.DeveloperMode
@@ -467,93 +437,54 @@ module.exports = function ({ api, models }) {
         ) {
 
             try {
-
-                // إنشاء/تحديث قاعدة البيانات
                 await handleCreateDatabase({
                     event
                 });
-
             } catch (error) {
-
                 console.error(
                     "❌ handleCreateDatabase:",
                     error
                 );
             }
 
-            // ----------------------------------------------------
-            // الأوامر
-            // ----------------------------------------------------
-
             try {
-
                 await handleCommand({
                     event
                 });
-
             } catch (error) {
-
                 console.error(
                     "❌ handleCommand:",
                     error
                 );
             }
 
-            // ----------------------------------------------------
-            // Replies
-            // ----------------------------------------------------
-
             try {
-
                 await handleReply({
                     event
                 });
-
             } catch (error) {
-
                 console.error(
                     "❌ handleReply:",
                     error
                 );
             }
 
-            // ----------------------------------------------------
-            // Command Events
-            // ----------------------------------------------------
-
             try {
-
                 await handleCommandEvent({
                     event
                 });
-
             } catch (error) {
-
                 console.error(
                     "❌ handleCommandEvent:",
                     error
                 );
             }
 
-            // ----------------------------------------------------
-            // IMPORTANT
-            // Events على الرسائل
-            //
-            // هنا يتم تشغيل:
-            // منع الكلام
-            // مراقبة الرسائل
-            // anti-spam
-            // وغيرها
-            // ----------------------------------------------------
-
             try {
-
                 await handleEvent({
                     event
                 });
-
             } catch (error) {
-
                 console.error(
                     "❌ handleEvent MESSAGE:",
                     error
@@ -585,7 +516,6 @@ module.exports = function ({ api, models }) {
                 );
             }
 
-            // السماح أيضًا للإيفنتات التي تعتمد على reaction
             try {
 
                 await handleEvent({
@@ -626,7 +556,6 @@ module.exports = function ({ api, models }) {
                 );
             }
 
-            // تشغيل Events
             try {
 
                 await handleEvent({
@@ -641,7 +570,6 @@ module.exports = function ({ api, models }) {
                 );
             }
 
-            // تحديث البيانات
             try {
 
                 await handleRefresh({
@@ -656,9 +584,9 @@ module.exports = function ({ api, models }) {
                 );
             }
 
-            // ----------------------------------------------------
+            // ====================================================
             // رسالة دخول البوت
-            // ----------------------------------------------------
+            // ====================================================
 
             try {
 
@@ -683,32 +611,51 @@ module.exports = function ({ api, models }) {
                         added.some(
                             participant =>
                                 String(
-                                    participant.userFbId
+                                    participant.userFbId || ""
                                 ) === botID
                         );
 
                     if (botAdded) {
 
-                        await api.changeNickname(
-                            `『 ${global.config.PREFIX} 』• ${global.config.BOTNAME}`,
-                            threadID,
-                            botID
-                        );
+                        // تغيير لقب البوت
+                        try {
+
+                            await api.changeNickname(
+                                `『 ${global.config.PREFIX} 』• ${global.config.BOTNAME}`,
+                                threadID,
+                                botID
+                            );
+
+                        } catch (error) {}
+
+                        const prefix =
+                            global.config.PREFIX || ".";
+
+                        const botName =
+                            global.config.BOTNAME || "HINA";
+
+                        const message =
+`╭──────────────╮
+│ 𝗛𝗜𝗡𝗔 〢 𝗢𝗡𝗟𝗜𝗡𝗘 │
+╰──────────────╯
+
+✦ تم إدخال ${botName} إلى المجموعة بنجاح
+
+╭──────────────╮
+│ 𝗦𝗧𝗔𝗧𝗨𝗦 : 𝗥𝗘𝗔𝗗𝗬 │
+╰──────────────╯
+
+البوت جاهز للعمل الآن
+
+❯ البادئة : ${prefix}
+
+لعرض الأوامر اكتب
+${prefix}اوامر
+
+╰──────────────╯`;
 
                         await api.sendMessage(
-`
-◈ ───『 ✨ ${global.config.BOTNAME} ✨ 』─── ◈
-
-✅ تم الاتصال بنجاح!
-
-📋 البادئة:
-${global.config.PREFIX}
-
-💡 اكتب:
-${global.config.PREFIX}أوامر
-
-◈ ────────────── ◈
-`,
+                            message,
                             threadID
                         );
                     }
@@ -794,13 +741,7 @@ ${global.config.PREFIX}أوامر
                     event
                 });
 
-            } catch (error) {
-
-                console.error(
-                    "❌ handleRefresh ADMINS:",
-                    error
-                );
-            }
+            } catch (error) {}
 
             return;
         }
@@ -820,13 +761,7 @@ ${global.config.PREFIX}أوامر
                     event
                 });
 
-            } catch (error) {
-
-                console.error(
-                    "❌ handleRefresh NAME:",
-                    error
-                );
-            }
+            } catch (error) {}
 
             try {
 
@@ -834,13 +769,7 @@ ${global.config.PREFIX}أوامر
                     event
                 });
 
-            } catch (error) {
-
-                console.error(
-                    "❌ handleEvent NAME:",
-                    error
-                );
-            }
+            } catch (error) {}
 
             return;
         }
@@ -851,7 +780,7 @@ ${global.config.PREFIX}أوامر
 
         if (
             logMessageType ===
-            "log:thread-icon" ||
+                "log:thread-icon" ||
             type === "change_thread_image"
         ) {
 
@@ -861,13 +790,7 @@ ${global.config.PREFIX}أوامر
                     event
                 });
 
-            } catch (error) {
-
-                console.error(
-                    "❌ handleEvent IMAGE:",
-                    error
-                );
-            }
+            } catch (error) {}
 
             try {
 
@@ -875,13 +798,7 @@ ${global.config.PREFIX}أوامر
                     event
                 });
 
-            } catch (error) {
-
-                console.error(
-                    "❌ handleRefresh IMAGE:",
-                    error
-                );
-            }
+            } catch (error) {}
 
             return;
         }
@@ -900,13 +817,7 @@ ${global.config.PREFIX}أوامر
                     event
                 });
 
-            } catch (error) {
-
-                console.error(
-                    "❌ Database EVENT:",
-                    error
-                );
-            }
+            } catch (error) {}
 
             try {
 
@@ -914,13 +825,7 @@ ${global.config.PREFIX}أوامر
                     event
                 });
 
-            } catch (error) {
-
-                console.error(
-                    "❌ handleEvent EVENT:",
-                    error
-                );
-            }
+            } catch (error) {}
 
             try {
 
@@ -928,19 +833,13 @@ ${global.config.PREFIX}أوامر
                     event
                 });
 
-            } catch (error) {
-
-                console.error(
-                    "❌ handleRefresh EVENT:",
-                    error
-                );
-            }
+            } catch (error) {}
 
             return;
         }
 
         // ============================================================
-        // أي Event غير معروف
+        // UNKNOWN EVENT
         // ============================================================
 
         try {
