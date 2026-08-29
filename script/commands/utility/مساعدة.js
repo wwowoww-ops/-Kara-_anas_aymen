@@ -1,14 +1,14 @@
 const axios = require("axios");
 
 module.exports.config = {
-name: "مساعدة",
-version: "3.0.0",
-hasPermssion: 0,
-credits: "أبو هريرة",
-description: "عرض جميع أوامر HINA وتفاصيلها",
-commandCategory: "utility",
-usages: "مساعدة [اسم الأمر أو الفئة]",
-cooldowns: 5
+    name: "مساعدة",
+    version: "3.0.1",
+    hasPermssion: 0,
+    credits: "أبو هريرة",
+    description: "عرض جميع أوامر HINA وتفاصيلها",
+    commandCategory: "utility",
+    usages: "مساعدة [اسم الأمر أو الفئة]",
+    cooldowns: 5
 };
 
 // ============================================================
@@ -16,17 +16,17 @@ cooldowns: 5
 // ============================================================
 
 const HINA_IMAGE =
-"https://files.catbox.moe/mezb8y.jpg";
+    "https://files.catbox.moe/mezb8y.jpg";
 
 // ============================================================
 // الزخرفة
 // ============================================================
 
 const TOP =
-"╭━━━━━━━━━━━━━━━━╮";
+    "╭━━━━━━━━━━━━━━━━╮";
 
 const BOTTOM =
-"╰━━━━━━━━━━━━━━━━╯";
+    "╰━━━━━━━━━━━━━━━━╯";
 
 // ============================================================
 // أسماء الفئات
@@ -34,26 +34,32 @@ const BOTTOM =
 
 const CATEGORY_NAMES = {
 
-fun:
-"الـتـرفـيـه",
+    fun:
+        "الـتـرفـيـه",
 
-admin:
-"الإدارة",
+    admin:
+        "الإدارة",
 
-developer:
-"الـمـطـور",
+    developer:
+        "الـمـطـور",
 
-games:
-"الألـعـاب",
+    games:
+        "الألـعـاب",
 
-media:
-"الـوسـائـط",
+    media:
+        "الـوسـائـط",
 
-pic:
-"الـصـور",
+    pic:
+        "الـصـور",
 
-utility:
-"الـخـدمات"
+    utility:
+        "الـخـدمات",
+
+    photos:
+        "الـصـور",
+
+    cache:
+        "الـكـاش"
 
 };
 
@@ -62,13 +68,15 @@ utility:
 // ============================================================
 
 const CATEGORY_ORDER = [
-"fun",
-"admin",
-"developer",
-"games",
-"media",
-"pic",
-"utility"
+    "fun",
+    "admin",
+    "developer",
+    "games",
+    "media",
+    "photos",
+    "pic",
+    "cache",
+    "utility"
 ];
 
 // ============================================================
@@ -77,10 +85,10 @@ const CATEGORY_ORDER = [
 
 function normalize(text) {
 
-return String(text || "")
-.trim()
-.toLowerCase()
-.replace(/\s+/g, " ");
+    return String(text || "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, " ");
 
 }
 
@@ -90,14 +98,14 @@ return String(text || "")
 
 function normalizeDigits(text) {
 
-return String(text || "")
-.replace(
-/[٠-٩]/g,
-digit =>
-String(
-"٠١٢٣٤٥٦٧٨٩".indexOf(digit)
-)
-);
+    return String(text || "")
+        .replace(
+            /[٠-٩]/g,
+            digit =>
+                String(
+                    "٠١٢٣٤٥٦٧٨٩".indexOf(digit)
+                )
+        );
 
 }
 
@@ -107,34 +115,36 @@ String(
 
 function getCommands() {
 
-if (
-!global.client ||
-!global.client.commands
-) {
+    if (
+        !global.client ||
+        !global.client.commands
+    ) {
 
-return [];
+        return [];
 
-}
+    }
 
-return Array.from(
-global.client.commands.entries()
-)
+    return Array.from(
+        global.client.commands.entries()
+    )
 
-.map(
-  ([name, command]) => ({
-    name:
-      String(name || "").trim(),
+    .map(
+        ([name, command]) => ({
 
-    command
-  })
-)
+            name:
+                String(name || "").trim(),
 
-.filter(
-  item =>
-    item.name &&
-    item.command &&
-    item.command.config
-);
+            command
+
+        })
+    )
+
+    .filter(
+        item =>
+            item.name &&
+            item.command &&
+            item.command.config
+    );
 
 }
 
@@ -142,18 +152,15 @@ global.client.commands.entries()
 // اسم الفئة
 // ============================================================
 
-function getCategoryName(
-category
-) {
+function getCategoryName(category) {
 
-const key =
-normalize(category);
+    const key =
+        normalize(category);
 
-return (
-CATEGORY_NAMES[key] ||
-category ||
-"غير محددة"
-);
+    return (
+        CATEGORY_NAMES[key] ||
+        String(category || "غير محددة")
+    );
 
 }
 
@@ -161,52 +168,59 @@ category ||
 // تحديد الفئة
 // ============================================================
 
-function resolveCategory(
-input
-) {
+function resolveCategory(input) {
 
-const value =
-normalize(input);
+    const value =
+        normalize(input);
 
-const aliases = {
+    const aliases = {
 
-"الترفيه": "fun",
-"الـتـرفـيـه": "fun",
-"ترفيه": "fun",
+        "fun": "fun",
+        "الترفيه": "fun",
+        "الـتـرفـيـه": "fun",
+        "ترفيه": "fun",
 
-"الإدارة": "admin",
-"الادارة": "admin",
-"إدارة": "admin",
-"ادارة": "admin",
+        "admin": "admin",
+        "الإدارة": "admin",
+        "الادارة": "admin",
+        "إدارة": "admin",
+        "ادارة": "admin",
 
-"المطور": "developer",
-"الـمـطـور": "developer",
-"مطور": "developer",
+        "developer": "developer",
+        "المطور": "developer",
+        "الـمـطـور": "developer",
+        "مطور": "developer",
 
-"الألعاب": "games",
-"الالعاب": "games",
-"الألـعـاب": "games",
-"العاب": "games",
-"ألعاب": "games",
+        "games": "games",
+        "الألعاب": "games",
+        "الالعاب": "games",
+        "الألـعـاب": "games",
+        "العاب": "games",
+        "ألعاب": "games",
 
-"الوسائط": "media",
-"الـوسـائـط": "media",
-"وسائط": "media",
+        "media": "media",
+        "الوسائط": "media",
+        "الـوسـائـط": "media",
+        "وسائط": "media",
 
-"الصور": "pic",
-"الـصـور": "pic",
-"صور": "pic",
+        "photos": "photos",
+        "الصور": "photos",
+        "الـصـور": "photos",
 
-"الخدمات": "utility",
-"الـخـدمات": "utility",
-"خدمات": "utility"
+        "pic": "pic",
+        "صور": "pic",
 
-};
+        "cache": "cache",
+        "الكاش": "cache",
 
-return (
-aliases[value] ||
-null
-);
+        "utility": "utility",
+        "الخدمات": "utility",
+        "الـخـدمات": "utility",
+        "خدمات": "utility"
+
+    };
+
+    return aliases[value] || null;
 
 }
 
@@ -216,32 +230,29 @@ null
 
 async function getImage() {
 
-try {
+    try {
 
-const response =
-  await axios.get(
-    HINA_IMAGE,
-    {
-      responseType:
-        "stream",
+        const response =
+            await axios.get(
+                HINA_IMAGE,
+                {
+                    responseType: "stream",
+                    timeout: 15000
+                }
+            );
 
-      timeout:
-        15000
+        return response.data;
+
+    } catch (error) {
+
+        console.error(
+            "[HINA HELP] IMAGE ERROR:",
+            error.message
+        );
+
+        return null;
+
     }
-  );
-
-return response.data;
-
-} catch (error) {
-
-console.error(
-  "[HINA HELP] IMAGE ERROR:",
-  error.message
-);
-
-return null;
-
-}
 
 }
 
@@ -250,35 +261,32 @@ return null;
 // ============================================================
 
 function send(
-api,
-event,
-body,
-image
+    api,
+    event,
+    body,
+    image
 ) {
 
-if (image) {
+    if (image) {
 
-return api.sendMessage(
-  {
-    body,
-    attachment: image
-  },
+        return api.sendMessage(
+            {
+                body: body,
+                attachment: image
+            },
 
-  event.threadID,
+            event.threadID,
 
-  event.messageID
-);
+            event.messageID
+        );
 
-}
+    }
 
-return api.sendMessage(
-body,
-
-event.threadID,
-
-event.messageID
-
-);
+    return api.sendMessage(
+        body,
+        event.threadID,
+        event.messageID
+    );
 
 }
 
@@ -287,151 +295,154 @@ event.messageID
 // ============================================================
 
 function createAllCommandsMenu(
-commands,
-prefix
+    commands,
+    prefix
 ) {
 
-const grouped = {};
+    const grouped = {};
 
-// ----------------------------------------------------------
-// تجميع الأوامر حسب الفئة
-// ----------------------------------------------------------
+    // ----------------------------------------------------------
+    // تجميع الأوامر حسب الفئة
+    // ----------------------------------------------------------
 
-commands.forEach(
-item => {
+    commands.forEach(
+        item => {
 
-  const category =
-    normalize(
-      item.command.config.commandCategory ||
-      "utility"
+            const category =
+                normalize(
+                    item.command.config.commandCategory ||
+                    "utility"
+                );
+
+            if (
+                !grouped[category]
+            ) {
+
+                grouped[category] = [];
+
+            }
+
+            grouped[category].push(
+                item.name
+            );
+
+        }
     );
 
-  if (
-    !grouped[category]
-  ) {
-
-    grouped[category] = [];
-
-  }
-
-  grouped[category].push(
-    item.name
-  );
-
-}
-
-);
-
-let message =
+    let message =
 `${TOP}
 𝗛𝗜𝗡𝗔          〢       مـسـاعـدة
 ${BOTTOM}
 
 `;
 
-let totalShown = 0;
+    let totalShown = 0;
 
-// ----------------------------------------------------------
-// عرض الفئات بالترتيب
-// ----------------------------------------------------------
+    // ----------------------------------------------------------
+    // عرض الفئات بالترتيب
+    // ----------------------------------------------------------
 
-CATEGORY_ORDER.forEach(
-category => {
+    CATEGORY_ORDER.forEach(
+        category => {
 
-  if (
-    !grouped[category] ||
-    !grouped[category].length
-  ) {
+            if (
+                !grouped[category] ||
+                !grouped[category].length
+            ) {
 
-    return;
+                return;
 
-  }
+            }
 
-  const list =
-    grouped[category]
-      .sort(
-        (a, b) =>
-          a.localeCompare(
-            b,
-            "ar"
-          )
-      );
+            const list =
+                grouped[category]
+                    .sort(
+                        (a, b) =>
+                            a.localeCompare(
+                                b,
+                                "ar"
+                            )
+                    );
 
-  message +=
+            // تم إصلاح الخطأ هنا
+            message +=
+`\n✦ ${getCategoryName(category)}
+`;
 
-"\n✦ ${getCategoryName(category)}\n";
+            list.forEach(
+                (command, index) => {
 
-  list.forEach(
-    (command, index) => {
+                    const symbol =
+                        index === list.length - 1
+                            ? "╘❯"
+                            : "╞❯";
 
-      const symbol =
-        index === list.length - 1
-          ? "╘❯"
-          : "╞❯";
+                    message +=
+                        `${symbol} ${prefix}${command}\n`;
 
-      message +=
-        `${symbol} ${prefix}${command}\n`;
+                    totalShown++;
 
-      totalShown++;
+                }
+            );
 
-    }
-  );
-
-}
-
-);
-
-// ----------------------------------------------------------
-// أي فئة غير موجودة في الترتيب
-// ----------------------------------------------------------
-
-Object.keys(grouped)
-.filter(
-category =>
-!CATEGORY_ORDER.includes(
-category
-)
-)
-.forEach(
-category => {
-
-    const list =
-      grouped[category]
-        .sort(
-          (a, b) =>
-            a.localeCompare(
-              b,
-              "ar"
-            )
-        );
-
-    message +=
-
-"\n✦ ${getCategoryName(category)}\n";
-
-    list.forEach(
-      (command, index) => {
-
-        const symbol =
-          index === list.length - 1
-            ? "╘❯"
-            : "╞❯";
-
-        message +=
-          `${symbol} ${prefix}${command}\n`;
-
-        totalShown++;
-
-      }
+        }
     );
 
-  }
-);
+    // ----------------------------------------------------------
+    // أي فئة غير موجودة في الترتيب
+    // ----------------------------------------------------------
 
-message +=
-" ${TOP} عدد الأوامر: ${totalShown} ${BOTTOM}";
+    Object.keys(grouped)
+        .filter(
+            category =>
+                !CATEGORY_ORDER.includes(
+                    category
+                )
+        )
+        .forEach(
+            category => {
 
-return message;
+                const list =
+                    grouped[category]
+                        .sort(
+                            (a, b) =>
+                                a.localeCompare(
+                                    b,
+                                    "ar"
+                                )
+                        );
+
+                // تم إصلاح الخطأ هنا أيضًا
+                message +=
+`\n✦ ${getCategoryName(category)}
+`;
+
+                list.forEach(
+                    (command, index) => {
+
+                        const symbol =
+                            index === list.length - 1
+                                ? "╘❯"
+                                : "╞❯";
+
+                        message +=
+                            `${symbol} ${prefix}${command}\n`;
+
+                        totalShown++;
+
+                    }
+                );
+
+            }
+        );
+
+    // تم إصلاح الخطأ هنا أيضًا
+    message +=
+`\n${TOP}
+عدد الأوامر: ${totalShown}
+${BOTTOM}`;
+
+    return message;
 
 }
 
@@ -440,55 +451,56 @@ return message;
 // ============================================================
 
 function createCategoryMenu(
-commands,
-category,
-prefix
+    commands,
+    category,
+    prefix
 ) {
 
-const list =
-commands
-.filter(
-item =>
-normalize(
-item.command.config.commandCategory ||
-"utility"
-) ===
-normalize(category)
-)
-.sort(
-(a, b) =>
-a.name.localeCompare(
-b.name,
-"ar"
-)
-);
+    const list =
+        commands
+            .filter(
+                item =>
+                    normalize(
+                        item.command.config.commandCategory ||
+                        "utility"
+                    ) ===
+                    normalize(category)
+            )
+            .sort(
+                (a, b) =>
+                    a.name.localeCompare(
+                        b.name,
+                        "ar"
+                    )
+            );
 
-let message =
+    let message =
 `${TOP}
 𝗛𝗜𝗡𝗔          〢       ${getCategoryName(category)}
 ${BOTTOM}
 
 `;
 
-list.forEach(
-(item, index) => {
+    list.forEach(
+        (item, index) => {
 
-  const symbol =
-    index === list.length - 1
-      ? "╘❯"
-      : "╞❯";
+            const symbol =
+                index === list.length - 1
+                    ? "╘❯"
+                    : "╞❯";
 
-  message +=
-    `${symbol} ${prefix}${item.name}\n`;
+            message +=
+                `${symbol} ${prefix}${item.name}\n`;
 
-}
+        }
+    );
 
-);
+    message +=
+`\n${TOP}
+عدد الأوامر: ${list.length}
+${BOTTOM}`;
 
-message +=
-" ${TOP} عدد الأوامر: ${list.length} ${BOTTOM}";
-
-return message;
+    return message;
 
 }
 
@@ -497,37 +509,37 @@ return message;
 // ============================================================
 
 function createCommandDetails(
-item,
-prefix
+    item,
+    prefix
 ) {
 
-const config =
-item.command.config;
+    const config =
+        item.command.config;
 
-let permission;
+    let permission;
 
-if (
-config.hasPermssion === 0
-) {
+    if (
+        config.hasPermssion === 0
+    ) {
 
-permission =
-  "الجميع";
+        permission =
+            "الجميع";
 
-} else if (
-config.hasPermssion === 1
-) {
+    } else if (
+        config.hasPermssion === 1
+    ) {
 
-permission =
-  "المشرفين";
+        permission =
+            "المشرفين";
 
-} else {
+    } else {
 
-permission =
-  "المطور";
+        permission =
+            "المطور";
 
-}
+    }
 
-return `${TOP}
+    return `${TOP}
 𝗛𝗜𝗡𝗔          〢       مـسـاعـدة
 ${BOTTOM}
 
@@ -539,8 +551,8 @@ ${config.description || "لا يوجد وصف"}
 
 ✦ الفئة
 ${getCategoryName(
-config.commandCategory ||
-"utility"
+    config.commandCategory ||
+    "utility"
 )}
 
 ✦ الاستخدام
@@ -567,27 +579,29 @@ ${BOTTOM}`;
 
 module.exports.run =
 async function ({
-api,
-event,
-args
+    api,
+    event,
+    args
 }) {
 
-try {
+    try {
 
-if (!event) {
-  return;
-}
+        if (!event) {
+            return;
+        }
 
-const prefix =
-  global.config.PREFIX || ".";
+        const prefix =
+            global.config &&
+            global.config.PREFIX
+                ? global.config.PREFIX
+                : ".";
 
-const commands =
-  getCommands();
+        const commands =
+            getCommands();
 
-if (!commands.length) {
+        if (!commands.length) {
 
-  return api.sendMessage(
-
+            return api.sendMessage(
 `${TOP}
 𝗛𝗜𝗡𝗔          〢       مـسـاعـدة
 ${BOTTOM}
@@ -595,159 +609,155 @@ ${BOTTOM}
 ⚠️ لم يتم العثور على أي أوامر
 
 ${BOTTOM}`,
+                event.threadID,
+                event.messageID
+            );
 
-    event.threadID,
+        }
 
-    event.messageID
-  );
+        // ========================================================
+        // تحميل الصورة
+        // ========================================================
 
-}
+        const image =
+            await getImage();
 
-// ========================================================
-// تحميل الصورة
-// ========================================================
+        // ========================================================
+        // .مساعدة
+        // عرض جميع الأوامر
+        // ========================================================
 
-const image =
-  await getImage();
+        if (
+            !args ||
+            !args.length
+        ) {
 
-// ========================================================
-// .مساعدة
-// عرض جميع الأوامر
-// ========================================================
+            const message =
+                createAllCommandsMenu(
+                    commands,
+                    prefix
+                );
 
-if (
-  !args ||
-  !args.length
-) {
+            return send(
+                api,
+                event,
+                message,
+                image
+            );
 
-  const message =
-    createAllCommandsMenu(
-      commands,
-      prefix
-    );
+        }
 
-  return send(
-    api,
-    event,
-    message,
-    image
-  );
+        // ========================================================
+        // البحث
+        // ========================================================
 
-}
+        const input =
+            normalize(
+                normalizeDigits(
+                    args.join(" ")
+                )
+            );
 
-// ========================================================
-// البحث
-// ========================================================
+        // ========================================================
+        // البحث عن أمر
+        // ========================================================
 
-const input =
-  normalize(
-    normalizeDigits(
-      args.join(" ")
-    )
-  );
+        const command =
+            commands.find(
+                item =>
+                    normalize(
+                        item.name
+                    ) === input
+            );
 
-// ========================================================
-// البحث عن أمر
-// ========================================================
+        if (command) {
 
-const command =
-  commands.find(
-    item =>
-      normalize(
-        item.name
-      ) === input
-  );
+            const message =
+                createCommandDetails(
+                    command,
+                    prefix
+                );
 
-if (command) {
+            return send(
+                api,
+                event,
+                message,
+                image
+            );
 
-  const message =
-    createCommandDetails(
-      command,
-      prefix
-    );
+        }
 
-  return send(
-    api,
-    event,
-    message,
-    image
-  );
+        // ========================================================
+        // البحث عن فئة
+        // ========================================================
 
-}
+        let category =
+            resolveCategory(input);
 
-// ========================================================
-// البحث عن فئة
-// ========================================================
+        // البحث أيضًا بالاسم الموجود في config
+        if (!category) {
 
-let category =
-  resolveCategory(
-    input
-  );
+            const found =
+                commands.find(
+                    item =>
+                        normalize(
+                            item.command.config.commandCategory ||
+                            ""
+                        ) === input
+                );
 
-// البحث أيضًا بالاسم الموجود في config
-if (!category) {
+            if (found) {
 
-  const found =
-    commands.find(
-      item =>
-        normalize(
-          item.command.config.commandCategory ||
-          ""
-        ) === input
-    );
+                category =
+                    normalize(
+                        found.command.config.commandCategory
+                    );
 
-  if (found) {
+            }
 
-    category =
-      normalize(
-        found.command.config.commandCategory
-      );
+        }
 
-  }
+        if (category) {
 
-}
+            const categoryCommands =
+                commands.filter(
+                    item =>
+                        normalize(
+                            item.command.config.commandCategory ||
+                            "utility"
+                        ) ===
+                        normalize(category)
+                );
 
-if (category) {
+            if (
+                categoryCommands.length
+            ) {
 
-  const categoryCommands =
-    commands.filter(
-      item =>
-        normalize(
-          item.command.config.commandCategory ||
-          "utility"
-        ) ===
-        normalize(category)
-    );
+                const message =
+                    createCategoryMenu(
+                        commands,
+                        category,
+                        prefix
+                    );
 
-  if (
-    categoryCommands.length
-  ) {
+                return send(
+                    api,
+                    event,
+                    message,
+                    image
+                );
 
-    const message =
-      createCategoryMenu(
-        commands,
-        category,
-        prefix
-      );
+            }
 
-    return send(
-      api,
-      event,
-      message,
-      image
-    );
+        }
 
-  }
+        // ========================================================
+        // غير موجود
+        // ========================================================
 
-}
-
-// ========================================================
-// غير موجود
-// ========================================================
-
-return send(
-  api,
-  event,
+        return send(
+            api,
+            event,
 
 `${TOP}
 𝗛𝗜𝗡𝗔          〢       تنبيه
@@ -771,22 +781,22 @@ ${TOP}
 حاول مرة أخرى
 ${BOTTOM}`,
 
-  image
-);
+            image
+        );
 
-} catch (error) {
+    } catch (error) {
 
-console.error(
-  "❌ HINA HELP ERROR:",
-  error
-);
+        console.error(
+            "❌ HINA HELP ERROR:",
+            error
+        );
 
-return api.sendMessage(
-  "❌ حدث خطأ أثناء تشغيل نظام المساعدة",
-  event.threadID,
-  event.messageID
-);
+        return api.sendMessage(
+            "❌ حدث خطأ أثناء تشغيل نظام المساعدة",
+            event.threadID,
+            event.messageID
+        );
 
-}
+    }
 
 };
