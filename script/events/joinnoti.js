@@ -1,9 +1,9 @@
 module.exports.config = {
     name: "joinNoti",
     eventType: ["log:subscribe"],
-    version: "6.1.0",
+    version: "7.1.0",
     credits: "أبو هريرة",
-    description: "نظام ترحيب عند دخول الأعضاء",
+    description: "نظام ترحيب سريع عند دخول الأعضاء",
     category: "events"
 };
 
@@ -15,22 +15,18 @@ module.exports.handleEvent = async function ({
 
     try {
 
-        if (!event) {
-            return;
-        }
+        if (!event) return;
 
         const threadID =
             String(event.threadID || "");
+
+        if (!threadID) return;
 
         const logMessageData =
             event.logMessageData || {};
 
         const author =
             String(event.author || "");
-
-        if (!threadID) {
-            return;
-        }
 
         // ==================================================
         // الأعضاء الجدد
@@ -43,9 +39,7 @@ module.exports.handleEvent = async function ({
                 ? logMessageData.addedParticipants
                 : [];
 
-        if (
-            addedParticipants.length === 0
-        ) {
+        if (!addedParticipants.length) {
             return;
         }
 
@@ -59,7 +53,7 @@ module.exports.handleEvent = async function ({
             );
 
         // ==================================================
-        // إذا كان البوت هو المضاف
+        // إذا تمت إضافة البوت نفسه
         // ==================================================
 
         const botAdded =
@@ -75,7 +69,7 @@ module.exports.handleEvent = async function ({
         }
 
         // ==================================================
-        // تجهيز المنشنات وأسماء الأعضاء
+        // تجهيز المنشنات والأسماء
         // ==================================================
 
         const mentions = [];
@@ -91,128 +85,25 @@ module.exports.handleEvent = async function ({
                     participant.userFbId || ""
                 );
 
-            if (!userID) {
-                continue;
-            }
+            if (!userID) continue;
 
-            // الاسم الموجود في الحدث كاحتياط
-            let fullName =
-                participant.fullName ||
-                "عضو جديد";
+            const name =
+                String(
+                    participant.fullName ||
+                    participant.name ||
+                    "عضو جديد"
+                );
 
-            // محاولة جلب الاسم الحالي من قاعدة Users
-            if (
-                Users &&
-                typeof Users.getData === "function"
-            ) {
-
-                try {
-
-                    const userData =
-                        await Users.getData(
-                            userID
-                        );
-
-                    if (
-                        userData &&
-                        userData.name
-                    ) {
-
-                        fullName =
-                            String(
-                                userData.name
-                            );
-
-                    }
-
-                } catch (error) {
-
-                    console.error(
-                        "[joinNoti] GET MEMBER ERROR:",
-                        error.message
-                    );
-
-                }
-            }
-
-            memberNames.push(
-                fullName
-            );
+            memberNames.push(name);
 
             mentions.push({
-                tag: fullName,
+                tag: name,
                 id: userID
             });
         }
 
-        if (
-            mentions.length === 0
-        ) {
+        if (!mentions.length) {
             return;
-        }
-
-        // ==================================================
-        // اسم الشخص الذي أضاف العضو
-        // ==================================================
-
-        let adderName = null;
-
-        if (
-            author &&
-            author !== botID &&
-            Users &&
-            typeof Users.getData === "function"
-        ) {
-
-            try {
-
-                const adderData =
-                    await Users.getData(
-                        author
-                    );
-
-                if (
-                    adderData &&
-                    adderData.name
-                ) {
-
-                    adderName =
-                        String(
-                            adderData.name
-                        );
-
-                }
-
-            } catch (error) {
-
-                console.error(
-                    "[joinNoti] GET ADDER ERROR:",
-                    error.message
-                );
-
-            }
-        }
-
-        // ==================================================
-        // منشن المضيف
-        // ==================================================
-
-        let adderText =
-            "";
-
-        if (
-            author &&
-            adderName
-        ) {
-
-            mentions.push({
-                tag: adderName,
-                id: author
-            });
-
-            adderText =
-                `\n\n👤 المضيف\n@${adderName}`;
-
         }
 
         // ==================================================
@@ -224,31 +115,127 @@ module.exports.handleEvent = async function ({
                 .map(
                     name => `@${name}`
                 )
-                .join("، ");
+                .join(" و ");
 
         // ==================================================
-        // رسالة الترحيب
+        // الترحيب
         // ==================================================
 
         const message =
-`⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬
+`╭━━━━━━━━━━━━━━━━╮
+     𝗛𝗜𝗡𝗔       〢       تـرحـيـب
+╰━━━━━━━━━━━━━━━━╯
 
-👋 أهلاً بـ ${memberText}
+👋 أهلاً بـ  
+    ${memberText}
 
-💫 نورت المجموعة بانضمامك
-نتمنى لك وقتًا ممتعًا معنا${adderText}`;
+✦ نورت المجموعة بانضمامك
+✦ نتمنى لك وقتًا ممتعًا معنا
+
+╭━━━━━━━━━━━━━━━━╮
+              أهـلاً وسـهـلاً بـك
+╰━━━━━━━━━━━━━━━━╯`;
 
         // ==================================================
-        // إرسال الرسالة
+        // إرسال الترحيب فورًا
         // ==================================================
 
-        await api.sendMessage(
+        api.sendMessage(
             {
                 body: message,
                 mentions
             },
-            threadID
+            threadID,
+            error => {
+
+                if (error) {
+
+                    console.error(
+                        "❌ WELCOME SEND ERROR:",
+                        error
+                    );
+
+                }
+
+            }
         );
+
+        // ==================================================
+        // تحديث قاعدة البيانات في الخلفية
+        // ==================================================
+
+        setImmediate(async () => {
+
+            try {
+
+                if (
+                    !Users ||
+                    typeof Users.getData !== "function"
+                ) {
+                    return;
+                }
+
+                // تحديث الأعضاء الجدد
+                for (
+                    const participant
+                    of addedParticipants
+                ) {
+
+                    const userID =
+                        String(
+                            participant.userFbId || ""
+                        );
+
+                    if (!userID) continue;
+
+                    try {
+
+                        await Users.getData(
+                            userID
+                        );
+
+                    } catch (error) {
+
+                        console.error(
+                            "[joinNoti] USER UPDATE ERROR:",
+                            error.message
+                        );
+
+                    }
+                }
+
+                // تحديث الشخص الذي أضافهم
+                if (
+                    author &&
+                    author !== botID
+                ) {
+
+                    try {
+
+                        await Users.getData(
+                            author
+                        );
+
+                    } catch (error) {
+
+                        console.error(
+                            "[joinNoti] ADDER UPDATE ERROR:",
+                            error.message
+                        );
+
+                    }
+                }
+
+            } catch (error) {
+
+                console.error(
+                    "❌ BACKGROUND USER UPDATE ERROR:",
+                    error
+                );
+
+            }
+
+        });
 
     } catch (error) {
 
@@ -258,4 +245,5 @@ module.exports.handleEvent = async function ({
         );
 
     }
+
 };
