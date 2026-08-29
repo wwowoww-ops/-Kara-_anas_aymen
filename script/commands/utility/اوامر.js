@@ -8,15 +8,19 @@ hasPermssion: 0,
 credits: "أبو هريرة",
 description: "قائمة أوامر HINA بنظام تفاعلي",
 commandCategory: "utility",
-usages: "اوامر",
+usages: ".اوامر",
 cooldowns: 5
 };
+
+// ============================================================
+// صورة القائمة
+// ============================================================
 
 const IMAGE_URL =
 "https://files.catbox.moe/01t0g7.jpg";
 
 // ============================================================
-// الزخرفة
+// الزخرفة المعتمدة
 // ============================================================
 
 const TOP =
@@ -36,8 +40,8 @@ id: "fun",
 name: "الـتـرفـيـه",
 aliases: [
 "الترفيه",
-"ترفيه",
-"الـتـرفـيـه"
+"الـتـرفـيـه",
+"ترفيه"
 ]
 },
 
@@ -47,6 +51,7 @@ name: "الإدارة",
 aliases: [
 "الإدارة",
 "الادارة",
+"إدارة",
 "ادارة"
 ]
 },
@@ -68,8 +73,9 @@ name: "الألـعـاب",
 aliases: [
 "الألعاب",
 "الالعاب",
+"الألـعـاب",
 "العاب",
-"الألـعـاب"
+"ألعاب"
 ]
 },
 
@@ -106,53 +112,33 @@ aliases: [
 };
 
 // ============================================================
-// تنظيف النص
-// ============================================================
-
-function normalizeText(text) {
-
-return String(text || "")
-.trim()
-.toLowerCase()
-
-// إزالة التشكيل
-.replace(
-  /[\u064B-\u065F\u0670]/g,
-  ""
-)
-
-// توحيد الهمزات
-.replace(/[أإآ]/g, "ا")
-
-// إزالة التطويل
-.replace(/ـ/g, "")
-
-// توحيد بعض الحروف
-.replace(/ى/g, "ي")
-
-// إزالة المسافات الزائدة
-.replace(/\s+/g, " ")
-
-.trim();
-
-}
-
-// ============================================================
 // تحويل الأرقام العربية
 // ============================================================
 
-function normalizeNumber(text) {
+function normalizeDigits(text) {
 
 return String(text || "")
 .replace(
 /[٠-٩]/g,
 digit =>
 String(
-"٠١٢٣٤٥٦٧٨٩".indexOf(
-digit
-)
+"٠١٢٣٤٥٦٧٨٩".indexOf(digit)
 )
 );
+
+}
+
+// ============================================================
+// تنظيف النص
+// ============================================================
+
+function normalizeText(text) {
+
+return normalizeDigits(text)
+.trim()
+.replace(/\s+/g, " ")
+.toLowerCase();
+
 }
 
 // ============================================================
@@ -161,27 +147,17 @@ digit
 
 function findCategory(input) {
 
-const normalized =
-normalizeText(
-normalizeNumber(input)
-);
+const value =
+normalizeText(input);
 
-// --------------------------------------------
-// البحث بالرقم
-// --------------------------------------------
-
+// الرقم
 if (
-categories[normalized]
+categories[value]
 ) {
-
-return categories[normalized];
-
+return categories[value];
 }
 
-// --------------------------------------------
-// البحث بالاسم
-// --------------------------------------------
-
+// الاسم
 for (
 const key of Object.keys(categories)
 ) {
@@ -189,29 +165,21 @@ const key of Object.keys(categories)
 const category =
   categories[key];
 
-const names = [
-  category.name,
-  ...(category.aliases || [])
-];
-
-for (
-  const name of names
+if (
+  category.aliases.some(
+    alias =>
+      normalizeText(alias) === value
+  )
 ) {
 
-  if (
-    normalizeText(name) ===
-    normalized
-  ) {
-
-    return category;
-
-  }
+  return category;
 
 }
 
 }
 
 return null;
+
 }
 
 // ============================================================
@@ -288,9 +256,7 @@ if (
 !global.client ||
 !global.client.commands
 ) {
-
 return [];
-
 }
 
 return Array.from(
@@ -303,9 +269,7 @@ global.client.commands.values()
     !command ||
     !command.config
   ) {
-
     return false;
-
   }
 
   const commandCategory =
@@ -344,7 +308,7 @@ global.client.commands.values()
 }
 
 // ============================================================
-// حذف جلسات المستخدم القديمة
+// حذف جلسات المستخدم
 // ============================================================
 
 function removeUserReplies(
@@ -354,9 +318,7 @@ senderID
 if (
 !global.client
 ) {
-
 return;
-
 }
 
 if (
@@ -376,6 +338,7 @@ global.client.handleReply.filter(
 item => {
 
     if (
+      !item ||
       item.name !==
       module.exports.config.name
     ) {
@@ -395,7 +358,7 @@ item => {
 }
 
 // ============================================================
-// حفظ جلسة المستخدم
+// حفظ جلسة
 // ============================================================
 
 function saveReply(
@@ -434,56 +397,10 @@ type
 }
 
 // ============================================================
-// التحقق من صاحب القائمة
+// إرسال رسالة تنبيه
 // ============================================================
 
-function isOwner(
-senderID,
-handleReply
-) {
-
-return (
-String(senderID) ===
-String(handleReply.author)
-);
-
-}
-
-// ============================================================
-// تنبيه شخص ليس صاحب القائمة
-// ============================================================
-
-function notYourMenu(
-api,
-event
-) {
-
-return api.sendMessage(
-
-`${TOP}
-𝗛𝗜𝗡𝗔          〢       تنبيه
-${BOTTOM}
-
-⚠️ هذه ليست قائمتك
-
-↳ اكتب اوامر لإظهار قائمة خاصة بك
-
-${TOP}
-HINA
-${BOTTOM}`,
-
-event.threadID,
-event.messageID
-
-);
-
-}
-
-// ============================================================
-// اختيار غير صحيح
-// ============================================================
-
-function invalidChoice(
+function sendInvalidChoice(
 api,
 event
 ) {
@@ -497,10 +414,38 @@ ${BOTTOM}
 ⚠️ الاختيار غير صحيح
 
 ↳ رد برقم الفئة من ❶ إلى ❼
-أو اكتب اسم الفئة
+↳ أو اكتب اسم الفئة
 
 ${TOP}
 حاول مرة أخرى
+${BOTTOM}`,
+
+event.threadID,
+event.messageID
+
+);
+
+}
+
+// ============================================================
+// رسالة ليست قائمتك
+// ============================================================
+
+function sendNotYourMenu(
+api,
+event
+) {
+
+return api.sendMessage(
+
+`${TOP}
+𝗛𝗜𝗡𝗔          〢       تنبيه
+${BOTTOM}
+
+⚠️ هذه ليست قائمتك
+
+↳ اكتب .اوامر لفتح قائمة خاصة بك
+
 ${BOTTOM}`,
 
 event.threadID,
@@ -523,9 +468,7 @@ event
 try {
 
 if (!event) {
-
   return;
-
 }
 
 const {
@@ -537,8 +480,7 @@ const {
 const menu =
   createMainMenu();
 
-let imagePath =
-  null;
+let imagePath = null;
 
 // ========================================================
 // تحميل الصورة
@@ -588,9 +530,7 @@ return api.sendMessage(
   imagePath
 
     ? {
-        body:
-          menu,
-
+        body: menu,
         attachment:
           fs.createReadStream(
             imagePath
@@ -603,13 +543,11 @@ return api.sendMessage(
 
   (err, info) => {
 
-    // ----------------------------------------------------
-    // تنظيف الصورة
-    // ----------------------------------------------------
+    // ====================================================
+    // حذف الصورة
+    // ====================================================
 
-    if (
-      imagePath
-    ) {
+    if (imagePath) {
 
       setTimeout(
         async () => {
@@ -638,7 +576,8 @@ return api.sendMessage(
 
     if (
       err ||
-      !info
+      !info ||
+      !info.messageID
     ) {
 
       console.error(
@@ -650,9 +589,9 @@ return api.sendMessage(
 
     }
 
-    // ----------------------------------------------------
-    // حفظ الجلسة
-    // ----------------------------------------------------
+    // ====================================================
+    // حفظ جلسة المستخدم
+    // ====================================================
 
     saveReply(
       info.messageID,
@@ -668,7 +607,7 @@ return api.sendMessage(
 } catch (error) {
 
 console.error(
-  "❌ HINA COMMAND MENU ERROR:",
+  "❌ HINA MENU ERROR:",
   error
 );
 
@@ -712,17 +651,15 @@ const {
 } = event;
 
 // ========================================================
-// التحقق من صاحب القائمة
+// التأكد من صاحب القائمة
 // ========================================================
 
 if (
-  !isOwner(
-    senderID,
-    handleReply
-  )
+  String(senderID) !==
+  String(handleReply.author)
 ) {
 
-  return notYourMenu(
+  return sendNotYourMenu(
     api,
     event
   );
@@ -734,32 +671,20 @@ if (
 // ========================================================
 
 const input =
-  String(
-    body || ""
-  )
-    .trim();
+  normalizeText(body);
 
-if (
-  !input
-) {
-
+if (!input) {
   return;
-
 }
-
-const normalizedInput =
-  normalizeText(
-    normalizeNumber(input)
-  );
 
 // ========================================================
 // رجوع
 // ========================================================
 
 if (
-  normalizedInput === "رجوع" ||
-  normalizedInput === "عودة" ||
-  normalizedInput === "back"
+  input === "رجوع" ||
+  input === "عودة" ||
+  input === "back"
 ) {
 
   try {
@@ -768,7 +693,7 @@ if (
       handleReply.messageID
     );
 
-  } catch (e) {}
+  } catch (error) {}
 
   return module.exports.run({
     api,
@@ -778,13 +703,17 @@ if (
 }
 
 // ========================================================
-// القائمة ليست الرئيسية
+// يجب أن تكون الجلسة الرئيسية
 // ========================================================
 
 if (
   handleReply.type !==
   "main"
 ) {
+
+  // إذا كان داخل الفئة
+  // لا نقوم بأي شيء عند كتابة
+  // نص غير متعلق بالقائمة
 
   return;
 
@@ -795,19 +724,15 @@ if (
 // ========================================================
 
 const category =
-  findCategory(
-    input
-  );
+  findCategory(input);
 
 // ========================================================
 // اختيار غير صحيح
 // ========================================================
 
-if (
-  !category
-) {
+if (!category) {
 
-  return invalidChoice(
+  return sendInvalidChoice(
     api,
     event
   );
@@ -815,7 +740,7 @@ if (
 }
 
 // ========================================================
-// جلب الأوامر
+// جلب أوامر الفئة
 // ========================================================
 
 const commandList =
@@ -833,7 +758,7 @@ try {
     handleReply.messageID
   );
 
-} catch (e) {}
+} catch (error) {}
 
 // ========================================================
 // لا توجد أوامر
@@ -863,11 +788,10 @@ ${BOTTOM}`;
 
       if (
         err ||
-        !info
+        !info ||
+        !info.messageID
       ) {
-
         return;
-
       }
 
       saveReply(
@@ -884,7 +808,7 @@ ${BOTTOM}`;
 }
 
 // ========================================================
-// إنشاء قائمة الفئة
+// إنشاء القائمة
 // ========================================================
 
 const categoryMessage =
@@ -894,7 +818,7 @@ const categoryMessage =
   );
 
 // ========================================================
-// إرسال قائمة الفئة
+// إرسال القائمة
 // ========================================================
 
 return api.sendMessage(
@@ -907,7 +831,8 @@ return api.sendMessage(
 
     if (
       err ||
-      !info
+      !info ||
+      !info.messageID
     ) {
 
       return;
