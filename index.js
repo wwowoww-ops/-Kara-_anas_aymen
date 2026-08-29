@@ -1,8 +1,8 @@
 const express = require('express');
 const app = express();
 const chalk = require('chalk');
-const cron = require("node-cron");
-const moment = require("moment-timezone");
+const cron = require('node-cron');
+const moment = require('moment-timezone');
 
 const port = process.env.PORT || 8000;
 
@@ -27,8 +27,8 @@ chalk.cyan(
 // ═══════════════════════════════════════════════
 
 console.log(
-chalk.bold.hex("#00FA9A")(
-"[ DATA ] » تم الحفاظ على بيانات البوت وعدم حذفها عند التشغيل"
+chalk.bold.hex('#00FA9A')(
+'[ DATA ] » تم الحفاظ على بيانات البوت وعدم حذفها عند التشغيل'
 )
 );
 
@@ -42,23 +42,23 @@ readFileSync,
 writeFileSync,
 existsSync,
 unlinkSync
-} = require("fs-extra");
+} = require('fs-extra');
 
 const {
 join,
 resolve
-} = require("path");
+} = require('path');
 
-const logger = require("./utils/log.js");
-const login = require("hut-chat-api");
-const axios = require("axios");
+const logger = require('./utils/log.js');
+const login = require('hut-chat-api');
+const axios = require('axios');
 
 console.log(
-chalk.bold.hex("#03f0fc").bold(
-"[ KIRA ] » "
+chalk.bold.hex('#03f0fc')(
+'[ KIRA ] » '
 ) +
-chalk.bold.hex("#fcba03").bold(
-"Initializing variables..."
+chalk.bold.hex('#fcba03')(
+'Initializing variables...'
 )
 );
 
@@ -99,9 +99,9 @@ allThreadID: new Array()
 // GLOBAL UTILS
 // ═══════════════════════════════════════════════
 
-global.utils = require("./utils/index.js");
-global.utils.config = require("./utils/config.js");
-global.utils.decorations = require("./utils/decorations.js");
+global.utils = require('./utils/index.js');
+global.utils.config = require('./utils/config.js');
+global.utils.decorations = require('./utils/decorations.js');
 
 global.nodemodule = new Object();
 global.config = new Object();
@@ -116,22 +116,27 @@ global.language = new Object();
 var configValue;
 
 try {
+
 global.client.configPath = join(
-global.client.mainPath,
-"config.json"
+    global.client.mainPath,
+    'config.json'
 );
 
-configValue = require(global.client.configPath);
+configValue = require(
+    global.client.configPath
+);
 
 logger.loader(
-    "Found file config: config.json"
+    'Found file config: config.json'
 );
 
 } catch {
+
 return logger.loader(
-"config.json not found!",
-"error"
+    'config.json not found!',
+    'error'
 );
+
 }
 
 try {
@@ -141,14 +146,16 @@ for (const key in configValue) {
 }
 
 logger.loader(
-    "Config Loaded!"
+    'Config Loaded!'
 );
 
 } catch {
+
 return logger.loader(
-"Can't load file config!",
-"error"
+    "Can't load file config!",
+    'error'
 );
+
 }
 
 // ═══════════════════════════════════════════════
@@ -159,11 +166,11 @@ const {
 Sequelize,
 sequelize
 } = require(
-"./includes/database/index.js"
+'./includes/database/index.js'
 );
 
 writeFileSync(
-global.client.configPath + ".temp",
+global.client.configPath + '.temp',
 JSON.stringify(
 global.config,
 null,
@@ -178,19 +185,17 @@ null,
 
 try {
 
-const langFile = (
-    readFileSync(
-        `${__dirname}/languages/${global.config.language || "en"}.lang`,
-        {
-            encoding: 'utf-8'
-        }
-    )
+const langFile = readFileSync(
+    `${__dirname}/languages/${global.config.language || 'en'}.lang`,
+    {
+        encoding: 'utf-8'
+    }
 ).split(/\r?\n|\r/);
 
 const langData = langFile.filter(
     item =>
-        item.indexOf('#') != 0 &&
-        item != ''
+        item.indexOf('#') !== 0 &&
+        item !== ''
 );
 
 for (const item of langData) {
@@ -229,11 +234,13 @@ for (const item of langData) {
         );
 
     if (
-        typeof global.language[head] ==
-        "undefined"
+        typeof global.language[head] ===
+        'undefined'
     ) {
+
         global.language[head] =
             new Object();
+
     }
 
     global.language[head][key] =
@@ -243,7 +250,7 @@ for (const item of langData) {
 } catch (e) {
 
 console.log(
-    "Language Load Error: " +
+    'Language Load Error: ' +
     e.message
 );
 
@@ -305,7 +312,7 @@ resolve(
 join(
 global.client.mainPath,
 global.config.APPSTATEPATH ||
-"appstate.json"
+'appstate.json'
 )
 );
 
@@ -321,14 +328,14 @@ try {
         );
 
     logger.loader(
-        "💌 ───『 تم العثور على APPSTATE في إعدادات السيرفر 』─── 💌"
+        '💌 ───『 تم العثور على APPSTATE في إعدادات السيرفر 』─── 💌'
     );
 
 } catch (e) {
 
     return logger.loader(
-        "خطأ في تنسيق JSON الخاص بـ APPSTATE!",
-        "error"
+        'خطأ في تنسيق JSON الخاص بـ APPSTATE!',
+        'error'
     );
 
 }
@@ -341,14 +348,14 @@ try {
         require(appStateFile);
 
     logger.loader(
-        "💌 ───『 تم العثور على ملف appstate.json محلياً 』─── 💌"
+        '💌 ───『 تم العثور على ملف appstate.json محلياً 』─── 💌'
     );
 
 } catch {
 
     return logger.loader(
-        "لم يتم العثور على ملف تسجيل الدخول أو متغير البيئة APPSTATE!",
-        "error"
+        'لم يتم العثور على ملف تسجيل الدخول أو متغير البيئة APPSTATE!',
+        'error'
     );
 
 }
@@ -359,42 +366,55 @@ try {
 // AUTO RECONNECT
 // ═══════════════════════════════════════════════
 
-// عدد محاولات تسجيل الدخول
 let reconnectAttempts = 0;
-
-// مؤقت إعادة الاتصال
 let reconnectTimer = null;
-
-// هل توجد محاولة إعادة اتصال مجدولة؟
-let reconnectScheduled = false;
-
-// هل البوت يعمل حاليًا؟
-let botConnected = false;
-
-// هل يتم حاليًا إنشاء جلسة؟
-let loginInProgress = false;
-
-// مرجع آخر API لمنع الاتصالات المتداخلة
-let activeApi = null;
+let isConnecting = false;
+let currentApi = null;
 
 const MAX_RECONNECT_ATTEMPTS = 10;
 
-// ------------------------------------------------
-// تنظيف اتصال MQTT القديم
-// ------------------------------------------------
+// ═══════════════════════════════════════════════
+// حساب وقت إعادة الاتصال
+// ═══════════════════════════════════════════════
 
-function closeOldConnection() {
+function getReconnectDelay() {
+
+const delays = [
+    5000,
+    10000,
+    15000,
+    20000,
+    30000,
+    45000,
+    60000
+];
+
+const index =
+    Math.min(
+        reconnectAttempts - 1,
+        delays.length - 1
+    );
+
+return delays[
+    Math.max(index, 0)
+];
+
+}
+
+// ═══════════════════════════════════════════════
+// إغلاق الاتصال القديم
+// ═══════════════════════════════════════════════
+
+function closeCurrentConnection() {
 
 try {
 
     if (
-        activeApi &&
-        typeof activeApi.end === "function"
+        currentApi &&
+        typeof currentApi.end === 'function'
     ) {
 
-        activeApi.end(
-            true
-        );
+        currentApi.end(true);
 
     }
 
@@ -402,54 +422,24 @@ try {
 
     console.log(
         chalk.gray(
-            "[ MQTT ] تعذر إغلاق الاتصال القديم"
+            '[ MQTT ] تعذر إغلاق الاتصال القديم'
         )
     );
 
 }
 
-activeApi = null;
-botConnected = false;
+currentApi = null;
 
 }
 
-// ------------------------------------------------
-// حساب مدة الانتظار
-// ------------------------------------------------
-
-function getReconnectDelay() {
-
-const attempt =
-    Math.max(
-        reconnectAttempts,
-        1
-    );
-
-// 5s → 10s → 20s → 30s → 45s → 60s
-return Math.min(
-    5000 * Math.pow(2, attempt - 1),
-    60000
-);
-
-}
-
-// ------------------------------------------------
+// ═══════════════════════════════════════════════
 // جدولة إعادة الاتصال
-// ------------------------------------------------
+// ═══════════════════════════════════════════════
 
-function scheduleReconnect(
-botModel,
-reason = ""
-) {
+function reconnect(botModel, reason) {
 
-// منع إنشاء أكثر من مؤقت
-if (
-    reconnectScheduled ||
-    reconnectTimer
-) {
-
+if (reconnectTimer) {
     return;
-
 }
 
 if (
@@ -459,7 +449,7 @@ if (
 
     console.log(
         chalk.red(
-            `❌ توقف نظام إعادة الاتصال بعد ${MAX_RECONNECT_ATTEMPTS} محاولات.`
+            `❌ فشل الاتصال بعد ${MAX_RECONNECT_ATTEMPTS} محاولات`
         )
     );
 
@@ -468,14 +458,13 @@ if (
 }
 
 reconnectAttempts++;
-reconnectScheduled = true;
 
 const delay =
     getReconnectDelay();
 
 console.log(
     chalk.yellow(
-        `🔄 إعادة الاتصال رقم ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}`
+        `🔄 إعادة الاتصال ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}`
     )
 );
 
@@ -483,7 +472,7 @@ if (reason) {
 
     console.log(
         chalk.gray(
-            `↳ السبب: ${reason}`
+            `↳ ${reason}`
         )
     );
 
@@ -491,7 +480,7 @@ if (reason) {
 
 console.log(
     chalk.yellow(
-        `⏳ المحاولة القادمة بعد ${Math.round(delay / 1000)} ثانية...`
+        `⏳ المحاولة القادمة بعد ${delay / 1000} ثانية`
     )
 );
 
@@ -500,11 +489,10 @@ reconnectTimer =
         () => {
 
             reconnectTimer = null;
-            reconnectScheduled = false;
 
             onBot({
                 models: botModel,
-                isReconnect: true
+                reconnecting: true
             });
 
         },
@@ -514,20 +502,19 @@ reconnectTimer =
 }
 
 // ═══════════════════════════════════════════════
-// تشغيل البوت
+// ON BOT
 // ═══════════════════════════════════════════════
 
 function onBot({
 models: botModel,
-isReconnect = false
+reconnecting = false
 }) {
 
-// منع تشغيل login جديد إذا كان هناك واحد قيد التنفيذ
-if (loginInProgress) {
+if (isConnecting) {
 
     console.log(
         chalk.gray(
-            "[ RECONNECT ] توجد محاولة اتصال قيد التنفيذ، تم تجاهل الطلب الجديد."
+            '[ RECONNECT ] توجد محاولة اتصال قيد التنفيذ'
         )
     );
 
@@ -535,12 +522,13 @@ if (loginInProgress) {
 
 }
 
-// عند إعادة الاتصال نغلق الجلسة السابقة أولًا
-if (isReconnect) {
-    closeOldConnection();
+if (reconnecting) {
+
+    closeCurrentConnection();
+
 }
 
-loginInProgress = true;
+isConnecting = true;
 
 const loginData = {
     appState
@@ -553,15 +541,13 @@ login(
         loginApiData
     ) => {
 
-        loginInProgress = false;
+        isConnecting = false;
 
         // ═══════════════════════════════════
         // LOGIN ERROR
         // ═══════════════════════════════════
 
         if (loginError) {
-
-            botConnected = false;
 
             console.error(
                 chalk.red(
@@ -572,13 +558,14 @@ login(
                 )
             );
 
-            scheduleReconnect(
+            reconnect(
                 botModel,
                 loginError.message ||
                 String(loginError)
             );
 
             return;
+
         }
 
         // ═══════════════════════════════════
@@ -586,14 +573,11 @@ login(
         // ═══════════════════════════════════
 
         reconnectAttempts = 0;
-        botConnected = true;
-
-        activeApi =
-            loginApiData;
+        currentApi = loginApiData;
 
         console.log(
             chalk.green(
-                `✅ تم تسجيل الدخول بنجاح!`
+                '✅ تم تسجيل الدخول بنجاح!'
             )
         );
 
@@ -753,9 +737,9 @@ login(
                 } catch (err) {
 
                     logger.loader(
-                        "Fail load event: " +
+                        'Fail load event: ' +
                         ev,
-                        "error"
+                        'error'
                     );
 
                 }
@@ -802,19 +786,17 @@ login(
                 listenerData
             );
 
+        // ═══════════════════════════════════
+        // MQTT LISTENER
+        // ═══════════════════════════════════
+
         loginApiData.listenMqtt(
             (
                 error,
                 message
             ) => {
 
-                // ═════════════════════════════
-                // MQTT ERROR
-                // ═════════════════════════════
-
                 if (error) {
-
-                    botConnected = false;
 
                     console.log(
                         chalk.red(
@@ -825,9 +807,9 @@ login(
                         )
                     );
 
-                    // تجاهل الأخطاء الناتجة عن جلسة قديمة
+                    // إذا كان هذا اتصالًا قديمًا
                     if (
-                        activeApi !==
+                        currentApi !==
                         loginApiData
                     ) {
 
@@ -835,26 +817,22 @@ login(
 
                     }
 
-                    // إزالة المرجع قبل إعادة الاتصال
-                    activeApi = null;
+                    currentApi = null;
 
-                    // إغلاق الاتصال القديم إن أمكن
                     try {
 
                         if (
                             typeof loginApiData.end ===
-                            "function"
+                            'function'
                         ) {
 
-                            loginApiData.end(
-                                true
-                            );
+                            loginApiData.end(true);
 
                         }
 
                     } catch (e) {}
 
-                    scheduleReconnect(
+                    reconnect(
                         botModel,
                         error.message ||
                         String(error)
@@ -864,21 +842,24 @@ login(
 
                 }
 
-                // ═════════════════════════════
-                // MQTT MESSAGE
-                // ═════════════════════════════
-
-                if (
-                    !message
-                ) {
-
+                if (!message) {
                     return;
-
                 }
 
-                return listener(
-                    message
-                );
+                try {
+
+                    return listener(
+                        message
+                    );
+
+                } catch (error) {
+
+                    console.error(
+                        '❌ LISTENER ERROR:',
+                        error
+                    );
+
+                }
 
             }
         );
@@ -887,7 +868,7 @@ login(
             loginApiData;
 
         logger(
-            `KIRA ✨`,
+            'KIRA ✨',
             '[ by ayman ]'
         );
 
@@ -897,8 +878,8 @@ login(
 
         const timeNow =
             moment()
-                .tz("Africa/Casablanca")
-                .format("HH:mm:ss");
+                .tz('Africa/Casablanca')
+                .format('HH:mm:ss');
 
         if (
             global.config.ADMINBOT &&
@@ -917,29 +898,40 @@ login(
         // ═══════════════════════════════════
 
         cron.schedule(
-            `0 0 */1 * * *`,
+            '0 0 */1 * * *',
             () => {
 
                 const dateStr =
                     moment()
-                        .tz("Asia/Manila")
-                        .format("MM/DD/YYYY");
+                        .tz('Asia/Manila')
+                        .format('MM/DD/YYYY');
 
-                loginApiData.changeBio(
-                    `Prefix: ${
-                        global.config.PREFIX
-                    }\n\nBot Name: ${
-                        global.config.BOTNAME
-                    }\nDate: ${
-                        dateStr
-                    }`
-                );
+                try {
+
+                    loginApiData.changeBio(
+                        `Prefix: ${
+                            global.config.PREFIX
+                        }\n\nBot Name: ${
+                            global.config.BOTNAME
+                        }\nDate: ${
+                            dateStr
+                        }`
+                    );
+
+                } catch (error) {
+
+                    console.log(
+                        '[ BIO ] ERROR:',
+                        error.message
+                    );
+
+                }
 
             },
             {
                 scheduled: true,
                 timezone:
-                    "Africa/Casablanca"
+                    'Africa/Casablanca'
             }
         );
 
@@ -975,15 +967,15 @@ try {
     console.log(error);
 
     logger(
-        "DB Error",
-        "error"
+        'DB Error',
+        'error'
     );
 
 }
 
 console.log(
-    chalk.bold.hex("#eff1f0").bold(
-        "════════════════ SUCCESFULLY ═════════════════"
+    chalk.bold.hex('#eff1f0')(
+        '════════════════ SUCCESFULLY ═════════════════'
     )
 );
 
@@ -996,6 +988,11 @@ console.log(
 process.on(
 'unhandledRejection',
 (err) => {
-console.log(err);
+
+    console.log(
+        err
+    );
+
 }
+
 );
