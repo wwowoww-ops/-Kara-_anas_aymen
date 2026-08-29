@@ -16,16 +16,25 @@ module.exports.run = async function ({ api, event }) {
   const developerLink =
     "https://www.facebook.com/profile.php?id=61578581225040";
 
+  const instagramLink =
+    "https://www.instagram.com/aloui._.med";
+
   const message =
 `⌬ ━━ 𝗛𝗜𝗡𝗔 𝗗𝗘𝗩𝗘𝗟𝗢𝗣𝗘𝗥 ━━ ⌬
 
 👤 المطور: أبو هريرة
+🇹🇳 البلد: تونس
+🎂 سنة الميلاد: 2009
+
 🤖 البوت: زنجوبة
 ⚙️ النظام: Facebook Messenger Bot
 💻 التطوير: Node.js
 
 🔗 حساب المطور:
 ${developerLink}
+
+📸 حساب الإنستغرام:
+${instagramLink}
 
 ━━━━━━━━━━━━━━━━━━
 ✦ جميع الحقوق محفوظة للمطور
