@@ -7,7 +7,7 @@ module.exports.config = {
   hasPermssion: 2,
   credits: "أبو هريرة",
   description: "تشغيل أو إيقاف استجابة البوت للعامة",
-  commandCategory: "Developer",
+  commandCategory: "developer",
   usages: "اون / اوف",
   cooldowns: 2
 };
