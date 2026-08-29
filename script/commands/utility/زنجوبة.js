@@ -18,10 +18,10 @@ if (!global.conversationHistory)
 
 module.exports.config = {
   name: "زنجوبة",
-  version: "14.0.0",
+  version: "15.0.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
-  description: "زنجوبة — ذكاء اصطناعي جزائري ساخر وذكي",
+  description: "زنجوبة — ذكاء اصطناعي جزائري بجلسة جماعية",
   commandCategory: "utility",
   usages: ".زنجوبة [النص]",
   cooldowns: 3
@@ -51,18 +51,21 @@ function getGroqKey() {
   try {
 
     if (!fs.existsSync(CONFIG_PATH)) {
+
       console.error(
         "❌ config.json غير موجود"
       );
+
       return null;
     }
 
-    const config = JSON.parse(
-      fs.readFileSync(
-        CONFIG_PATH,
-        "utf8"
-      )
-    );
+    const config =
+      JSON.parse(
+        fs.readFileSync(
+          CONFIG_PATH,
+          "utf8"
+        )
+      );
 
     const key =
       String(
@@ -73,6 +76,7 @@ function getGroqKey() {
       !key ||
       key === "YOUR_API_KEY_HERE"
     ) {
+
       console.error(
         "❌ MODEL_API_KEY غير موجود"
       );
@@ -106,6 +110,7 @@ async function askGroq(
     getGroqKey();
 
   if (!apiKey) {
+
     throw new Error(
       "MODEL_API_KEY_MISSING"
     );
@@ -130,6 +135,7 @@ async function askGroq(
       },
       {
         headers: {
+
           Authorization:
             `Bearer ${apiKey}`,
 
@@ -150,6 +156,7 @@ async function askGroq(
       ?.trim();
 
   if (!answer) {
+
     throw new Error(
       "EMPTY_GROQ_RESPONSE"
     );
@@ -159,7 +166,7 @@ async function askGroq(
 }
 
 // ==================================================
-// تفاعل السنجاب
+// تفاعل زنجوبة
 // ==================================================
 
 function reactSquirrel(
@@ -167,31 +174,36 @@ function reactSquirrel(
   messageID
 ) {
 
-  return new Promise(
-    resolve => {
+  try {
 
-      try {
+    if (
+      !api ||
+      typeof api.setMessageReaction !==
+        "function"
+    ) {
 
-        if (
-          !api ||
-          typeof api.setMessageReaction !==
-            "function"
-        ) {
-          return resolve(false);
-        }
+      console.error(
+        "❌ setMessageReaction غير متوفرة في API"
+      );
 
-        api.setMessageReaction(
-          "🐿️",
-          messageID,
-          () => resolve(true)
-        );
-
-      } catch (error) {
-
-        resolve(false);
-      }
+      return;
     }
-  );
+
+    // نفس الطريقة التي تعمل في أمر سبوتي
+    api.setMessageReaction(
+      "🐿️",
+      messageID,
+      () => {},
+      true
+    );
+
+  } catch (error) {
+
+    console.error(
+      "❌ Reaction Error:",
+      error
+    );
+  }
 }
 
 // ==================================================
@@ -204,6 +216,7 @@ function detectDialect(text) {
     /شلونك|شكو|ماكو|يابة|زين/i
       .test(text)
   ) {
+
     return "عراقية";
   }
 
@@ -211,6 +224,7 @@ function detectDialect(text) {
     /كيفك|هلق|يلا|شو|لسا/i
       .test(text)
   ) {
+
     return "شامية";
   }
 
@@ -218,6 +232,7 @@ function detectDialect(text) {
     /ازيك|عامل ايه|يسطا|بتاع/i
       .test(text)
   ) {
+
     return "مصرية";
   }
 
@@ -225,6 +240,7 @@ function detectDialect(text) {
     /وش|ايش|الله يسعدك/i
       .test(text)
   ) {
+
     return "خليجية";
   }
 
@@ -232,6 +248,7 @@ function detectDialect(text) {
     /واش|علاه|بصح|برك|بزاف|ماكانش|راني|راكي|راك|دروك|هكا|صح|نورمال|نتي|نتا|خويا|يخي/i
       .test(text)
   ) {
+
     return "جزائرية";
   }
 
@@ -239,6 +256,7 @@ function detectDialect(text) {
     /[a-zA-Z]{3,}/
       .test(text)
   ) {
+
     return "إنجليزية";
   }
 
@@ -259,6 +277,7 @@ function getResponseLength(text) {
   if (words.length <= 3) {
 
     return {
+
       maxTokens: 100,
 
       instruction:
@@ -272,6 +291,7 @@ function getResponseLength(text) {
   ) {
 
     return {
+
       maxTokens: 250,
 
       instruction:
@@ -285,6 +305,7 @@ function getResponseLength(text) {
   ) {
 
     return {
+
       maxTokens: 450,
 
       instruction:
@@ -344,6 +365,24 @@ function buildSystemRole(
 - السؤال المعقد = شرح واضح.
 
 ━━━━━━━━━━━━━━━━━━
+الجلسة الجماعية
+━━━━━━━━━━━━━━━━━━
+
+هذه المحادثة داخل مجموعة.
+
+أي شخص يرد على رسالة زنجوبة يمكنه متابعة الحوار.
+
+لا تفترضي أن الشخص الذي بدأ المحادثة هو الشخص الوحيد المسموح له بالرد.
+
+حاولي فهم سياق الكلام من المحادثة السابقة.
+
+إذا انتقل شخص آخر إلى الحوار، تابعي الحديث بشكل طبيعي.
+
+لا تقولي للمستخدم:
+"هذه ليست محادثتك"
+ولا تطلبي منه بدء جلسة جديدة فقط لأنه شخص مختلف.
+
+━━━━━━━━━━━━━━━━━━
 أبو هريرة
 ━━━━━━━━━━━━━━━━━━
 
@@ -392,7 +431,7 @@ Webhooks
 "أنا مسلمة ومؤمنة بالله 🐿️"
 
 ━━━━━━━━━━━━━━━━━━
-المستخدم
+المستخدم الحالي
 ━━━━━━━━━━━━━━━━━━
 
 ${
@@ -453,7 +492,7 @@ async function generateReply(
 
   const userName =
     global.usersNames.get(
-      senderID
+      String(senderID)
     ) || null;
 
   const systemRole =
@@ -504,6 +543,7 @@ async function generateReply(
 
   );
 
+  // الاحتفاظ بآخر 20 رسالة فقط
   if (history.length > 20) {
 
     history.splice(
@@ -516,7 +556,7 @@ async function generateReply(
 }
 
 // ==================================================
-// إرسال رسالة الخطأ
+// إرسال خطأ Groq
 // ==================================================
 
 function sendGroqError(
@@ -552,23 +592,21 @@ function sendGroqError(
 
     message =
       "⌬ ━━ HINA UTILITY ━━ ⌬\n\n" +
-      "🐿️ مفتاح Groq غير صالح أو منتهي.\n" +
-      "تأكد من MODEL_API_KEY في config.json •-•";
+      "🐿️ مفتاح Groq غير صالح أو منتهي.";
   }
 
   else if (status === 429) {
 
     message =
       "⌬ ━━ HINA UTILITY ━━ ⌬\n\n" +
-      "🐿️ وصلنا للحد المؤقت للطلبات، جرب بعد شوية •-• 🌰";
+      "🐿️ وصلنا للحد المؤقت للطلبات، جرب بعد شوية •-•";
   }
 
   else if (status === 400) {
 
     message =
       "⌬ ━━ HINA UTILITY ━━ ⌬\n\n" +
-      "🐿️ Groq رفض الطلب.\n" +
-      "تأكد من إعدادات النموذج •-•";
+      "🐿️ Groq رفض الطلب، تأكد من إعدادات النموذج •-•";
   }
 
   else if (
@@ -584,6 +622,87 @@ function sendGroqError(
   return api.sendMessage(
     message,
     event.threadID,
+    event.messageID
+  );
+}
+
+// ==================================================
+// حفظ رد زنجوبة في جلسة المجموعة
+// ==================================================
+
+function registerReply(
+  info,
+  event
+) {
+
+  if (
+    !info ||
+    !info.messageID
+  ) {
+    return;
+  }
+
+  if (
+    !global.client.handleReply
+  ) {
+
+    global.client.handleReply =
+      [];
+  }
+
+  // الجلسة مرتبطة بالمجموعة وليس بالشخص
+  const conversationKey =
+    `group_${String(event.threadID)}`;
+
+  global.client.handleReply.push({
+
+    name:
+      module.exports.config.name,
+
+    messageID:
+      info.messageID,
+
+    threadID:
+      String(event.threadID),
+
+    conversationKey
+
+  });
+}
+
+// ==================================================
+// إرسال رد زنجوبة
+// ==================================================
+
+function sendZanjoobaReply(
+  api,
+  event,
+  answer
+) {
+
+  return api.sendMessage(
+    `🐿️ ${answer} 🌰`,
+    event.threadID,
+
+    (err, info) => {
+
+      if (err) {
+
+        console.error(
+          "❌ ZANJOUBA SEND ERROR:",
+          err
+        );
+
+        return;
+      }
+
+      registerReply(
+        info,
+        event
+      );
+
+    },
+
     event.messageID
   );
 }
@@ -618,7 +737,11 @@ async function ({
     );
   }
 
-  await reactSquirrel(
+  // ==================================================
+  // التفاعل على رسالة المستخدم
+  // ==================================================
+
+  reactSquirrel(
     api,
     messageID
   );
@@ -664,7 +787,7 @@ async function ({
         );
 
         return api.sendMessage(
-          "🐿️ تم الطرد يا حبيبي أبو هريرة 👑 •-• 🌰",
+          "🐿️ تم التنفيذ يا أبو هريرة 👑",
           threadID,
           messageID
         );
@@ -672,7 +795,7 @@ async function ({
       } catch (error) {
 
         return api.sendMessage(
-          "🐿️ ما عنديش الصلاحية… آسفة يا أبو هريرة •-• 🥜",
+          "🐿️ ما عنديش الصلاحية يا أبو هريرة •-•",
           threadID,
           messageID
         );
@@ -681,11 +804,11 @@ async function ({
   }
 
   // ==================================================
-  // مفتاح المحادثة
+  // جلسة المجموعة
   // ==================================================
 
   const conversationKey =
-    `${threadID}_${senderID}`;
+    `group_${String(threadID)}`;
 
   try {
 
@@ -696,47 +819,10 @@ async function ({
         String(senderID)
       );
 
-    return api.sendMessage(
-      `🐿️ ${answer} 🌰`,
-      threadID,
-
-      (err, info) => {
-
-        if (
-          err ||
-          !info ||
-          !info.messageID
-        ) {
-          return;
-        }
-
-        if (
-          !global.client.handleReply
-        ) {
-          global.client.handleReply =
-            [];
-        }
-
-        global.client.handleReply.push({
-
-          name:
-            module.exports.config.name,
-
-          messageID:
-            info.messageID,
-
-          author:
-            String(senderID),
-
-          threadID,
-
-          conversationKey
-
-        });
-
-      },
-
-      messageID
+    return sendZanjoobaReply(
+      api,
+      event,
+      answer
     );
 
   } catch (error) {
@@ -768,16 +854,17 @@ async function ({
   } = event;
 
   // ==================================================
-  // التأكد من صاحب المحادثة
+  // التحقق من المجموعة
   // ==================================================
 
   if (
-    String(handleReply.author) !==
-    String(senderID)
+    handleReply.threadID &&
+    String(handleReply.threadID) !==
+      String(threadID)
   ) {
 
     return api.sendMessage(
-      "🐿️ هذي ماشي محادثتك، ابدا محادثة جديدة •-• 🌰",
+      "🐿️ هذي الجلسة تاع مجموعة أخرى •-• 🌰",
       threadID,
       messageID
     );
@@ -790,13 +877,39 @@ async function ({
     return;
   }
 
-  await reactSquirrel(
+  // ==================================================
+  // التفاعل على رسالة المستخدم
+  // ==================================================
+
+  reactSquirrel(
     api,
     messageID
   );
 
+  // ==================================================
+  // اسم المستخدم
+  // ==================================================
+
+  const nameMatch =
+    body.trim().match(
+      /(?:اسمي|انا|أنا|ادعى|أدعى|اسمى)\s+(.+)/i
+    );
+
+  if (nameMatch) {
+
+    global.usersNames.set(
+      String(senderID),
+      nameMatch[1].trim()
+    );
+  }
+
+  // ==================================================
+  // جلسة المجموعة
+  // ==================================================
+
   const conversationKey =
-    handleReply.conversationKey;
+    handleReply.conversationKey ||
+    `group_${String(threadID)}`;
 
   try {
 
@@ -807,47 +920,10 @@ async function ({
         String(senderID)
       );
 
-    return api.sendMessage(
-      `🐿️ ${answer} 🌰`,
-      threadID,
-
-      (err, info) => {
-
-        if (
-          err ||
-          !info ||
-          !info.messageID
-        ) {
-          return;
-        }
-
-        if (
-          !global.client.handleReply
-        ) {
-          global.client.handleReply =
-            [];
-        }
-
-        global.client.handleReply.push({
-
-          name:
-            module.exports.config.name,
-
-          messageID:
-            info.messageID,
-
-          author:
-            String(senderID),
-
-          threadID,
-
-          conversationKey
-
-        });
-
-      },
-
-      messageID
+    return sendZanjoobaReply(
+      api,
+      event,
+      answer
     );
 
   } catch (error) {
