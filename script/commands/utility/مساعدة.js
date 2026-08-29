@@ -1,259 +1,792 @@
 const axios = require("axios");
 
 module.exports.config = {
-  name: "مساعدة",
-  version: "2.0.0",
-  hasPermssion: 0,
-  credits: "أبو هريرة",
-  description: "عرض قائمة الأوامر مع صورة HINA",
-  commandCategory: "utility",
-  usages: "[اسم الأمر] أو [الفئة]",
-  cooldowns: 5
+name: "مساعدة",
+version: "3.0.0",
+hasPermssion: 0,
+credits: "أبو هريرة",
+description: "عرض جميع أوامر HINA وتفاصيلها",
+commandCategory: "utility",
+usages: "مساعدة [اسم الأمر أو الفئة]",
+cooldowns: 5
 };
 
-const HINA_IMAGE = "https://files.catbox.moe/mezb8y.jpg";
+// ============================================================
+// صورة HINA
+// ============================================================
 
-module.exports.run = async function({ api, event, args }) {
-  const { threadID, messageID } = event;
-  const { commands } = global.client;
-  const prefix = global.config.PREFIX || "/";
+const HINA_IMAGE =
+"https://files.catbox.moe/mezb8y.jpg";
 
-  if (!commands) {
-    return api.sendMessage(
-      "⌬ ━━ HINA UTILITY ━━ ⌬\n\n❌ فشل تحميل قائمة الأوامر",
-      threadID,
-      messageID
+// ============================================================
+// الزخرفة
+// ============================================================
+
+const TOP =
+"╭━━━━━━━━━━━━━━━━╮";
+
+const BOTTOM =
+"╰━━━━━━━━━━━━━━━━╯";
+
+// ============================================================
+// أسماء الفئات
+// ============================================================
+
+const CATEGORY_NAMES = {
+
+fun:
+"الـتـرفـيـه",
+
+admin:
+"الإدارة",
+
+developer:
+"الـمـطـور",
+
+games:
+"الألـعـاب",
+
+media:
+"الـوسـائـط",
+
+pic:
+"الـصـور",
+
+utility:
+"الـخـدمات"
+
+};
+
+// ============================================================
+// ترتيب الفئات
+// ============================================================
+
+const CATEGORY_ORDER = [
+"fun",
+"admin",
+"developer",
+"games",
+"media",
+"pic",
+"utility"
+];
+
+// ============================================================
+// تنظيف النص
+// ============================================================
+
+function normalize(text) {
+
+return String(text || "")
+.trim()
+.toLowerCase()
+.replace(/\s+/g, " ");
+
+}
+
+// ============================================================
+// تحويل الأرقام العربية
+// ============================================================
+
+function normalizeDigits(text) {
+
+return String(text || "")
+.replace(
+/[٠-٩]/g,
+digit =>
+String(
+"٠١٢٣٤٥٦٧٨٩".indexOf(digit)
+)
+);
+
+}
+
+// ============================================================
+// الحصول على جميع الأوامر
+// ============================================================
+
+function getCommands() {
+
+if (
+!global.client ||
+!global.client.commands
+) {
+
+return [];
+
+}
+
+return Array.from(
+global.client.commands.entries()
+)
+
+.map(
+  ([name, command]) => ({
+    name:
+      String(name || "").trim(),
+
+    command
+  })
+)
+
+.filter(
+  item =>
+    item.name &&
+    item.command &&
+    item.command.config
+);
+
+}
+
+// ============================================================
+// اسم الفئة
+// ============================================================
+
+function getCategoryName(
+category
+) {
+
+const key =
+normalize(category);
+
+return (
+CATEGORY_NAMES[key] ||
+category ||
+"غير محددة"
+);
+
+}
+
+// ============================================================
+// تحديد الفئة
+// ============================================================
+
+function resolveCategory(
+input
+) {
+
+const value =
+normalize(input);
+
+const aliases = {
+
+"الترفيه": "fun",
+"الـتـرفـيـه": "fun",
+"ترفيه": "fun",
+
+"الإدارة": "admin",
+"الادارة": "admin",
+"إدارة": "admin",
+"ادارة": "admin",
+
+"المطور": "developer",
+"الـمـطـور": "developer",
+"مطور": "developer",
+
+"الألعاب": "games",
+"الالعاب": "games",
+"الألـعـاب": "games",
+"العاب": "games",
+"ألعاب": "games",
+
+"الوسائط": "media",
+"الـوسـائـط": "media",
+"وسائط": "media",
+
+"الصور": "pic",
+"الـصـور": "pic",
+"صور": "pic",
+
+"الخدمات": "utility",
+"الـخـدمات": "utility",
+"خدمات": "utility"
+
+};
+
+return (
+aliases[value] ||
+null
+);
+
+}
+
+// ============================================================
+// تحميل الصورة
+// ============================================================
+
+async function getImage() {
+
+try {
+
+const response =
+  await axios.get(
+    HINA_IMAGE,
+    {
+      responseType:
+        "stream",
+
+      timeout:
+        15000
+    }
+  );
+
+return response.data;
+
+} catch (error) {
+
+console.error(
+  "[HINA HELP] IMAGE ERROR:",
+  error.message
+);
+
+return null;
+
+}
+
+}
+
+// ============================================================
+// إرسال رسالة
+// ============================================================
+
+function send(
+api,
+event,
+body,
+image
+) {
+
+if (image) {
+
+return api.sendMessage(
+  {
+    body,
+    attachment: image
+  },
+
+  event.threadID,
+
+  event.messageID
+);
+
+}
+
+return api.sendMessage(
+body,
+
+event.threadID,
+
+event.messageID
+
+);
+
+}
+
+// ============================================================
+// إنشاء قائمة جميع الأوامر
+// ============================================================
+
+function createAllCommandsMenu(
+commands,
+prefix
+) {
+
+const grouped = {};
+
+// ----------------------------------------------------------
+// تجميع الأوامر حسب الفئة
+// ----------------------------------------------------------
+
+commands.forEach(
+item => {
+
+  const category =
+    normalize(
+      item.command.config.commandCategory ||
+      "utility"
     );
+
+  if (
+    !grouped[category]
+  ) {
+
+    grouped[category] = [];
+
   }
 
-  try {
-    // تحميل صورة HINA
-    const image = await axios.get(HINA_IMAGE, {
-      responseType: "stream"
-    });
+  grouped[category].push(
+    item.name
+  );
 
-    const commandsMap = new Map();
+}
 
-    commands.forEach((cmd, name) => {
-      if (cmd && cmd.config) {
-        commandsMap.set(name, cmd);
-      }
-    });
+);
 
-    // ==================================================
-    // عرض كل الأوامر
-    // ==================================================
-
-    if (args.length === 0) {
-
-      const categories = {};
-
-      commandsMap.forEach((cmd, name) => {
-
-        const category =
-          cmd.config.commandCategory || "utility";
-
-        if (!categories[category]) {
-          categories[category] = [];
-        }
-
-        categories[category].push(name);
-      });
-
-      let message =
-`⌬ ━━ HINA UTILITY ━━ ⌬
-
-🤖 البوت: زنجوبة
-🔑 البادئة: ${prefix}
-📊 عدد الأوامر: ${commandsMap.size}
-
-━━━━━━━━━━━━━━━━━━
-📂 قـائـمـة الأوامـر
-━━━━━━━━━━━━━━━━━━
+let message =
+`${TOP}
+𝗛𝗜𝗡𝗔          〢       مـسـاعـدة
+${BOTTOM}
 
 `;
 
-      for (const [category, cmds] of Object.entries(categories)) {
+let totalShown = 0;
 
-        message +=
-`「 ${category.toUpperCase()} 」
+// ----------------------------------------------------------
+// عرض الفئات بالترتيب
+// ----------------------------------------------------------
 
-`;
+CATEGORY_ORDER.forEach(
+category => {
 
-        message += cmds
-          .sort()
-          .map(cmd => `${prefix}${cmd}`)
-          .join(" • ");
+  if (
+    !grouped[category] ||
+    !grouped[category].length
+  ) {
 
-        message += "\n\n";
-      }
+    return;
+
+  }
+
+  const list =
+    grouped[category]
+      .sort(
+        (a, b) =>
+          a.localeCompare(
+            b,
+            "ar"
+          )
+      );
+
+  message +=
+
+"\n✦ ${getCategoryName(category)}\n";
+
+  list.forEach(
+    (command, index) => {
+
+      const symbol =
+        index === list.length - 1
+          ? "╘❯"
+          : "╞❯";
 
       message +=
-`━━━━━━━━━━━━━━━━━━
+        `${symbol} ${prefix}${command}\n`;
 
-💡 لمعرفة تفاصيل أي أمر:
+      totalShown++;
 
-${prefix}مساعدة [اسم الأمر]
-
-مثال:
-${prefix}مساعدة حذف
-
-⌬ ━━ HINA UTILITY ━━ ⌬`;
-
-      return api.sendMessage(
-        {
-          body: message,
-          attachment: image.data
-        },
-        threadID,
-        messageID
-      );
     }
+  );
 
-    // ==================================================
-    // البحث عن أمر
-    // ==================================================
+}
 
-    const cmdName = args[0].toLowerCase();
+);
 
-    const command = commandsMap.get(cmdName);
+// ----------------------------------------------------------
+// أي فئة غير موجودة في الترتيب
+// ----------------------------------------------------------
 
-    if (!command) {
+Object.keys(grouped)
+.filter(
+category =>
+!CATEGORY_ORDER.includes(
+category
+)
+)
+.forEach(
+category => {
 
-      const category = cmdName;
-      const cmdsInCategory = [];
+    const list =
+      grouped[category]
+        .sort(
+          (a, b) =>
+            a.localeCompare(
+              b,
+              "ar"
+            )
+        );
 
-      commandsMap.forEach((cmd, name) => {
+    message +=
 
-        if (
-          String(cmd.config.commandCategory || "")
-            .toLowerCase() === category
-        ) {
-          cmdsInCategory.push(name);
-        }
+"\n✦ ${getCategoryName(category)}\n";
 
-      });
+    list.forEach(
+      (command, index) => {
 
-      if (cmdsInCategory.length > 0) {
+        const symbol =
+          index === list.length - 1
+            ? "╘❯"
+            : "╞❯";
 
-        let message =
-`⌬ ━━ HINA UTILITY ━━ ⌬
+        message +=
+          `${symbol} ${prefix}${command}\n`;
 
-📂 الفئة:
-${category.toUpperCase()}
+        totalShown++;
 
-📊 عدد الأوامر:
-${cmdsInCategory.length}
+      }
+    );
 
-━━━━━━━━━━━━━━━━━━
+  }
+);
+
+message +=
+" ${TOP} عدد الأوامر: ${totalShown} ${BOTTOM}";
+
+return message;
+
+}
+
+// ============================================================
+// قائمة فئة واحدة
+// ============================================================
+
+function createCategoryMenu(
+commands,
+category,
+prefix
+) {
+
+const list =
+commands
+.filter(
+item =>
+normalize(
+item.command.config.commandCategory ||
+"utility"
+) ===
+normalize(category)
+)
+.sort(
+(a, b) =>
+a.name.localeCompare(
+b.name,
+"ar"
+)
+);
+
+let message =
+`${TOP}
+𝗛𝗜𝗡𝗔          〢       ${getCategoryName(category)}
+${BOTTOM}
 
 `;
 
-        message += cmdsInCategory
-          .sort()
-          .map(cmd => `${prefix}${cmd}`)
-          .join(" • ");
+list.forEach(
+(item, index) => {
 
-        return api.sendMessage(
-          {
-            body: message,
-            attachment: image.data
-          },
-          threadID,
-          messageID
-        );
-      }
+  const symbol =
+    index === list.length - 1
+      ? "╘❯"
+      : "╞❯";
 
-      return api.sendMessage(
-        {
-          body:
-`⌬ ━━ HINA UTILITY ━━ ⌬
+  message +=
+    `${symbol} ${prefix}${item.name}\n`;
 
-❌ الأمر "${cmdName}" غير موجود.
+}
 
-💡 استخدم:
-${prefix}مساعدة
+);
 
-لعرض جميع الأوامر.`,
-          attachment: image.data
-        },
-        threadID,
-        messageID
-      );
-    }
+message +=
+" ${TOP} عدد الأوامر: ${list.length} ${BOTTOM}";
 
-    // ==================================================
-    // تفاصيل الأمر
-    // ==================================================
+return message;
 
-    const config = command.config;
+}
 
-    const permission =
-      config.hasPermssion === 0
-        ? "الجميع"
-        : config.hasPermssion === 1
-        ? "المشرفين"
-        : "المطور";
+// ============================================================
+// تفاصيل الأمر
+// ============================================================
 
-    let message =
-`⌬ ━━ HINA ${(
-  config.commandCategory || "UTILITY"
-).toUpperCase()} ━━ ⌬
+function createCommandDetails(
+item,
+prefix
+) {
 
-📝 الاسم:
-${config.name}
+const config =
+item.command.config;
 
-📄 الوصف:
+let permission;
+
+if (
+config.hasPermssion === 0
+) {
+
+permission =
+  "الجميع";
+
+} else if (
+config.hasPermssion === 1
+) {
+
+permission =
+  "المشرفين";
+
+} else {
+
+permission =
+  "المطور";
+
+}
+
+return `${TOP}
+𝗛𝗜𝗡𝗔          〢       مـسـاعـدة
+${BOTTOM}
+
+✦ الاسم
+${config.name || item.name}
+
+✦ الوصف
 ${config.description || "لا يوجد وصف"}
 
-🔰 الفئة:
-${config.commandCategory || "utility"}
+✦ الفئة
+${getCategoryName(
+config.commandCategory ||
+"utility"
+)}
 
-⚙️ الاستخدام:
-${prefix}${config.usages || config.name}
+✦ الاستخدام
+${prefix}${config.usages || config.name || item.name}
 
-⏱️ الانتظار:
+✦ الانتظار
 ${config.cooldowns || 0} ثانية
 
-👤 الصلاحية:
+✦ الصلاحية
 ${permission}
 
-✍️ المطور:
+✦ المطور
 ${config.credits || "غير معروف"}
 
-⌬ ━━━━━━━━━━━━ ⌬`;
+${TOP}
+HINA SYSTEM
+${BOTTOM}`;
 
-    return api.sendMessage(
-      {
-        body: message,
-        attachment: image.data
-      },
-      threadID,
-      messageID
+}
+
+// ============================================================
+// RUN
+// ============================================================
+
+module.exports.run =
+async function ({
+api,
+event,
+args
+}) {
+
+try {
+
+if (!event) {
+  return;
+}
+
+const prefix =
+  global.config.PREFIX || ".";
+
+const commands =
+  getCommands();
+
+if (!commands.length) {
+
+  return api.sendMessage(
+
+`${TOP}
+𝗛𝗜𝗡𝗔          〢       مـسـاعـدة
+${BOTTOM}
+
+⚠️ لم يتم العثور على أي أوامر
+
+${BOTTOM}`,
+
+    event.threadID,
+
+    event.messageID
+  );
+
+}
+
+// ========================================================
+// تحميل الصورة
+// ========================================================
+
+const image =
+  await getImage();
+
+// ========================================================
+// .مساعدة
+// عرض جميع الأوامر
+// ========================================================
+
+if (
+  !args ||
+  !args.length
+) {
+
+  const message =
+    createAllCommandsMenu(
+      commands,
+      prefix
     );
 
-  } catch (error) {
+  return send(
+    api,
+    event,
+    message,
+    image
+  );
 
-    console.error(
-      "❌ مساعدة - خطأ:",
-      error
+}
+
+// ========================================================
+// البحث
+// ========================================================
+
+const input =
+  normalize(
+    normalizeDigits(
+      args.join(" ")
+    )
+  );
+
+// ========================================================
+// البحث عن أمر
+// ========================================================
+
+const command =
+  commands.find(
+    item =>
+      normalize(
+        item.name
+      ) === input
+  );
+
+if (command) {
+
+  const message =
+    createCommandDetails(
+      command,
+      prefix
     );
 
-    // إذا فشل تحميل الصورة، لا يتعطل الأمر
-    return api.sendMessage(
-      `⌬ ━━ HINA UTILITY ━━ ⌬
+  return send(
+    api,
+    event,
+    message,
+    image
+  );
 
-❌ تعذر تحميل صورة HINA.
+}
 
-📊 عدد الأوامر:
-${global.client.commands
-  ? global.client.commands.size
-  : 0}
+// ========================================================
+// البحث عن فئة
+// ========================================================
 
-💡 استخدم:
-${prefix}مساعدة [اسم الأمر]`,
-      threadID,
-      messageID
+let category =
+  resolveCategory(
+    input
+  );
+
+// البحث أيضًا بالاسم الموجود في config
+if (!category) {
+
+  const found =
+    commands.find(
+      item =>
+        normalize(
+          item.command.config.commandCategory ||
+          ""
+        ) === input
     );
+
+  if (found) {
+
+    category =
+      normalize(
+        found.command.config.commandCategory
+      );
+
   }
+
+}
+
+if (category) {
+
+  const categoryCommands =
+    commands.filter(
+      item =>
+        normalize(
+          item.command.config.commandCategory ||
+          "utility"
+        ) ===
+        normalize(category)
+    );
+
+  if (
+    categoryCommands.length
+  ) {
+
+    const message =
+      createCategoryMenu(
+        commands,
+        category,
+        prefix
+      );
+
+    return send(
+      api,
+      event,
+      message,
+      image
+    );
+
+  }
+
+}
+
+// ========================================================
+// غير موجود
+// ========================================================
+
+return send(
+  api,
+  event,
+
+`${TOP}
+𝗛𝗜𝗡𝗔          〢       تنبيه
+${BOTTOM}
+
+⚠️ لم أجد الأمر أو الفئة:
+
+「 ${input} 」
+
+✦ استخدم:
+${prefix}مساعدة
+
+لعرض جميع الأوامر
+
+✦ أو:
+${prefix}مساعدة اسم_الأمر
+
+لعرض تفاصيل أمر محدد
+
+${TOP}
+حاول مرة أخرى
+${BOTTOM}`,
+
+  image
+);
+
+} catch (error) {
+
+console.error(
+  "❌ HINA HELP ERROR:",
+  error
+);
+
+return api.sendMessage(
+  "❌ حدث خطأ أثناء تشغيل نظام المساعدة",
+  event.threadID,
+  event.messageID
+);
+
+}
+
 };
