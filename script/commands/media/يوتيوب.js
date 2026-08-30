@@ -16,7 +16,7 @@ module.exports.config = {
   hasPermssion: 0,
   credits: "أبو هريرة",
   description: "البحث وتحميل فيديوهات YouTube",
-  commandCategory: "الوسائط",
+  commandCategory: "media",
   usages: "[اسم الفيديو أو رابط YouTube]",
   cooldowns: 10
 };
