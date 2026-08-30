@@ -1,67 +1,79 @@
-const axios = require("axios");
-const { Readable } = require("stream");
-
 module.exports.config = {
   name: "بروفايل",
-  version: "2.2.0",
+  version: "2.0.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
-  description: "تغيير صورة بروفايل البوت بالرد على صورة",
+  description: "تغيير صورة بروفايل البوت بواسطة الرد على صورة",
   commandCategory: "إدارة",
-  usages: "بروفايل [بالرد على صورة]",
+  usages: "بروفايل [رد على صورة]",
   cooldowns: 5
 };
-
-const HINA = "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬";
 
 module.exports.run = async function ({ api, event }) {
   const { threadID, messageID, messageReply, senderID } = event;
 
-  const admins = Array.isArray(global.config.ADMINBOT)
-    ? global.config.ADMINBOT.map(String)
-    : [];
+  const ADMINBOT = global.config.ADMINBOT || [];
 
-  if (!admins.includes(String(senderID))) {
+  // ==============================
+  // التحقق من المطور
+  // ==============================
+
+  const isAdmin = ADMINBOT
+    .map(id => String(id))
+    .includes(String(senderID));
+
+  if (!isAdmin) {
     return api.sendMessage(
-      `${HINA}\n\n❌ هذا الأمر للمطور فقط`,
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬\n\n🐿️ هذا الأمر للمطور فقط •-•",
       threadID,
       messageID
     );
   }
+
+  // ==============================
+  // التحقق من الرد
+  // ==============================
 
   if (
     !messageReply ||
-    !Array.isArray(messageReply.attachments) ||
-    messageReply.attachments.length === 0
+    !messageReply.attachments ||
+    !messageReply.attachments.length
   ) {
     return api.sendMessage(
-      `${HINA}\n\n⚠️ قم بالرد على صورة لاستخدام الأمر`,
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬\n\n🐿️ قم بالرد على صورة ثم استخدم الأمر",
       threadID,
       messageID
     );
   }
 
-  const attachment = messageReply.attachments.find(
-    item =>
-      item &&
-      item.type === "photo" &&
-      (item.url || item.previewUrl)
-  );
+  const attachment = messageReply.attachments[0];
 
-  if (!attachment) {
+  if (attachment.type !== "photo") {
     return api.sendMessage(
-      `${HINA}\n\n❌ لم أجد صورة صالحة في الرسالة التي رددت عليها`,
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬\n\n❌ المرفق يجب أن يكون صورة",
       threadID,
       messageID
     );
   }
 
-  const imageUrl = attachment.url || attachment.previewUrl;
+  if (!attachment.url) {
+    return api.sendMessage(
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬\n\n❌ لم أستطع الحصول على رابط الصورة",
+      threadID,
+      messageID
+    );
+  }
 
   try {
-    const response = await axios.get(imageUrl, {
+    const axios = require("axios");
+    const { Readable } = require("stream");
+
+    // ==============================
+    // تحميل الصورة
+    // ==============================
+
+    const response = await axios.get(attachment.url, {
       responseType: "arraybuffer",
-      timeout: 30000,
       headers: {
         "User-Agent": "Mozilla/5.0"
       }
@@ -70,55 +82,63 @@ module.exports.run = async function ({ api, event }) {
     const imageBuffer = Buffer.from(response.data);
 
     if (!imageBuffer.length) {
-      throw new Error("تعذر تحميل الصورة");
+      throw new Error("الصورة فارغة");
     }
 
-    const imageStream = new Readable({
-      read() {
-        this.push(imageBuffer);
-        this.push(null);
-      }
-    });
+    // ==============================
+    // تحويل Buffer إلى Readable Stream
+    // ==============================
 
-    if (typeof api.changeAvatar !== "function") {
-      throw new Error(
-        "دالة changeAvatar غير موجودة في hut-chat-api"
-      );
-    }
+    const imageStream = Readable.from(imageBuffer);
 
-    api.changeAvatar(imageStream, (err) => {
-      if (err) {
-        console.error(
-          "[PROFILE] changeAvatar ERROR:",
-          err
-        );
+    // ==============================
+    // تغيير صورة البروفايل
+    // ==============================
+
+    await api.changeAvatar(
+      imageStream,
+      "",
+      null,
+      function (err) {
+        if (err) {
+          console.error(
+            "❌ changeAvatar error:",
+            err
+          );
+
+          return api.sendMessage(
+            "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬\n\n❌ فشل تغيير صورة البروفايل\n\nالخطأ: " +
+              (
+                typeof err === "string"
+                  ? err
+                  : err?.message || JSON.stringify(err)
+              ),
+            threadID,
+            messageID
+          );
+        }
 
         return api.sendMessage(
-          `${HINA}\n\n❌ فشل تغيير صورة البروفايل\n\nالخطأ: ${
-            err.message || String(err)
-          }`,
+          "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬\n\n" +
+          "🐿️ تم تغيير صورة بروفايل البوت بنجاح\n\n" +
+          "✦ بواسطة: المطور",
           threadID,
           messageID
         );
       }
-
-      return api.sendMessage(
-        `${HINA}\n\n✅ تم تغيير صورة بروفايل البوت بنجاح`,
-        threadID,
-        messageID
-      );
-    });
+    );
 
   } catch (error) {
     console.error(
-      "[PROFILE] ERROR:",
+      "❌ Profile command error:",
       error
     );
 
     return api.sendMessage(
-      `${HINA}\n\n❌ حدث خطأ أثناء تغيير صورة البروفايل\n\n${
-        error.message || String(error)
-      }`,
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬\n\n" +
+      "❌ حدث خطأ أثناء تغيير صورة البروفايل\n\n" +
+      "الخطأ: " +
+      (error?.message || String(error)),
       threadID,
       messageID
     );
