@@ -1,55 +1,142 @@
 module.exports.config = {
   name: "بروفايل",
-  version: "1.0.0",
-  hasPermssion: 1,
+  version: "2.0.0",
+  hasPermssion: 0,
   credits: "أبو هريرة",
-  description: "تغيير صورة بروفايل البوت (للمطور فقط) 🐿️",
+  description: "تغيير صورة بروفايل البوت بالرد على صورة",
   commandCategory: "إدارة",
-  usages: "بروفايل [رد على صورة]",
+  usages: "بروفايل [بالرد على صورة]",
   cooldowns: 5
 };
 
-module.exports.run = async ({ api, event }) => {
+module.exports.run = async function ({ api, event }) {
   const { threadID, messageID, messageReply, senderID } = event;
 
-  // ===== التحقق من المطور =====
-  const ADMIN_ID = "61578581225040";
+  // ═══════════════════════════════════════
+  // التحقق من ADMINBOT
+  // ═══════════════════════════════════════
 
-  if (senderID !== ADMIN_ID) {
-    return api.sendMessage("🐿️ هذا الأمر للمطور فقط •-•", threadID, messageID);
+  const admins = Array.isArray(global.config.ADMINBOT)
+    ? global.config.ADMINBOT.map(String)
+    : [];
+
+  if (!admins.includes(String(senderID))) {
+    return api.sendMessage(
+      "🐿️ هذا الأمر للمطور فقط •-•",
+      threadID,
+      messageID
+    );
   }
 
-  // التحقق من وجود رد على صورة
-  if (!messageReply || !messageReply.attachments || messageReply.attachments.length === 0) {
-    return api.sendMessage("🐿️ يرجى الرد على صورة لتغيير بروفايل البوت •-•", threadID, messageID);
+  // ═══════════════════════════════════════
+  // التحقق من الرد على صورة
+  // ═══════════════════════════════════════
+
+  if (
+    !messageReply ||
+    !Array.isArray(messageReply.attachments) ||
+    messageReply.attachments.length === 0
+  ) {
+    return api.sendMessage(
+      "🐿️ قم بالرد على صورة لاستخدام الأمر •-•",
+      threadID,
+      messageID
+    );
   }
 
-  const attachment = messageReply.attachments[0];
-  if (attachment.type !== "photo") {
-    return api.sendMessage("🐿️ يرجى الرد على صورة فقط •-•", threadID, messageID);
+  const attachment = messageReply.attachments.find(
+    item => item.type === "photo" && item.url
+  );
+
+  if (!attachment) {
+    return api.sendMessage(
+      "🐿️ الرسالة التي رددت عليها لا تحتوي على صورة صالحة •-•",
+      threadID,
+      messageID
+    );
   }
 
   try {
     const axios = require("axios");
-    const imageUrl = attachment.url;
-    const response = await axios.get(imageUrl, { responseType: "arraybuffer" });
-    const imageBuffer = Buffer.from(response.data, "binary");
+    const FormData = require("form-data");
 
-    // ✅ استخدم api.changeAvatarImage بدلاً من changeAvatar
-    const form = {
-      avatar: imageBuffer
-    };
+    // ═══════════════════════════════════════
+    // تحميل الصورة
+    // ═══════════════════════════════════════
 
-    api.changeAvatar(form, (err) => {
-      if (err) {
-        console.error("❌ خطأ تغيير الصورة:", err);
-        return api.sendMessage("🐿️ فشل تغيير الصورة •-•", threadID, messageID);
+    const response = await axios.get(attachment.url, {
+      responseType: "arraybuffer",
+      timeout: 30000,
+      headers: {
+        "User-Agent": "Mozilla/5.0"
       }
-      return api.sendMessage("🐿️ تم تغيير صورة البروفايل بنجاح ✅", threadID, messageID);
+    });
+
+    const imageBuffer = Buffer.from(response.data);
+
+    if (!imageBuffer.length) {
+      throw new Error("الصورة فارغة");
+    }
+
+    // ═══════════════════════════════════════
+    // تجهيز الطلب
+    // ═══════════════════════════════════════
+
+    const form = new FormData();
+
+    form.append(
+      "avatar",
+      imageBuffer,
+      {
+        filename: "profile.jpg",
+        contentType:
+          response.headers["content-type"] || "image/jpeg"
+      }
+    );
+
+    // ═══════════════════════════════════════
+    // تغيير صورة البروفايل
+    // ═══════════════════════════════════════
+
+    if (typeof api.changeAvatar !== "function") {
+      throw new Error(
+        "دالة changeAvatar غير موجودة في hut-chat-api"
+      );
+    }
+
+    api.changeAvatar(form, function (err) {
+      if (err) {
+        console.error(
+          "[PROFILE] changeAvatar ERROR:",
+          err
+        );
+
+        return api.sendMessage(
+          "🐿️ فشل تغيير صورة البروفايل\n\nالخطأ: " +
+            (err.message || String(err)),
+          threadID,
+          messageID
+        );
+      }
+
+      return api.sendMessage(
+        "🐿️ تم تغيير صورة بروفايل البوت بنجاح ✅",
+        threadID,
+        messageID
+      );
     });
 
   } catch (error) {
-    console.error("❌ خطأ:", error);
-    return api.sendMessage("🐿️ حدث خطأ أثناء التغيير •-•", threadID, messageID);
+    console.error(
+      "[PROFILE] ERROR:",
+      error
+    );
+
+    return api.sendMessage(
+      "🐿️ حدث خطأ أثناء تغيير صورة البروفايل\n\n" +
+        (error.message || String(error)),
+      threadID,
+      messageID
+    );
   }
 };
