@@ -1,6 +1,9 @@
+const axios = require("axios");
+const { Readable } = require("stream");
+
 module.exports.config = {
   name: "بروفايل",
-  version: "2.0.0",
+  version: "2.2.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
   description: "تغيير صورة بروفايل البوت بالرد على صورة",
@@ -9,12 +12,10 @@ module.exports.config = {
   cooldowns: 5
 };
 
+const HINA = "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬";
+
 module.exports.run = async function ({ api, event }) {
   const { threadID, messageID, messageReply, senderID } = event;
-
-  // ═══════════════════════════════════════
-  // التحقق من ADMINBOT
-  // ═══════════════════════════════════════
 
   const admins = Array.isArray(global.config.ADMINBOT)
     ? global.config.ADMINBOT.map(String)
@@ -22,15 +23,11 @@ module.exports.run = async function ({ api, event }) {
 
   if (!admins.includes(String(senderID))) {
     return api.sendMessage(
-      "🐿️ هذا الأمر للمطور فقط •-•",
+      `${HINA}\n\n❌ هذا الأمر للمطور فقط`,
       threadID,
       messageID
     );
   }
-
-  // ═══════════════════════════════════════
-  // التحقق من الرد على صورة
-  // ═══════════════════════════════════════
 
   if (
     !messageReply ||
@@ -38,33 +35,31 @@ module.exports.run = async function ({ api, event }) {
     messageReply.attachments.length === 0
   ) {
     return api.sendMessage(
-      "🐿️ قم بالرد على صورة لاستخدام الأمر •-•",
+      `${HINA}\n\n⚠️ قم بالرد على صورة لاستخدام الأمر`,
       threadID,
       messageID
     );
   }
 
   const attachment = messageReply.attachments.find(
-    item => item.type === "photo" && item.url
+    item =>
+      item &&
+      item.type === "photo" &&
+      (item.url || item.previewUrl)
   );
 
   if (!attachment) {
     return api.sendMessage(
-      "🐿️ الرسالة التي رددت عليها لا تحتوي على صورة صالحة •-•",
+      `${HINA}\n\n❌ لم أجد صورة صالحة في الرسالة التي رددت عليها`,
       threadID,
       messageID
     );
   }
 
+  const imageUrl = attachment.url || attachment.previewUrl;
+
   try {
-    const axios = require("axios");
-    const FormData = require("form-data");
-
-    // ═══════════════════════════════════════
-    // تحميل الصورة
-    // ═══════════════════════════════════════
-
-    const response = await axios.get(attachment.url, {
+    const response = await axios.get(imageUrl, {
       responseType: "arraybuffer",
       timeout: 30000,
       headers: {
@@ -75,28 +70,15 @@ module.exports.run = async function ({ api, event }) {
     const imageBuffer = Buffer.from(response.data);
 
     if (!imageBuffer.length) {
-      throw new Error("الصورة فارغة");
+      throw new Error("تعذر تحميل الصورة");
     }
 
-    // ═══════════════════════════════════════
-    // تجهيز الطلب
-    // ═══════════════════════════════════════
-
-    const form = new FormData();
-
-    form.append(
-      "avatar",
-      imageBuffer,
-      {
-        filename: "profile.jpg",
-        contentType:
-          response.headers["content-type"] || "image/jpeg"
+    const imageStream = new Readable({
+      read() {
+        this.push(imageBuffer);
+        this.push(null);
       }
-    );
-
-    // ═══════════════════════════════════════
-    // تغيير صورة البروفايل
-    // ═══════════════════════════════════════
+    });
 
     if (typeof api.changeAvatar !== "function") {
       throw new Error(
@@ -104,7 +86,7 @@ module.exports.run = async function ({ api, event }) {
       );
     }
 
-    api.changeAvatar(form, function (err) {
+    api.changeAvatar(imageStream, (err) => {
       if (err) {
         console.error(
           "[PROFILE] changeAvatar ERROR:",
@@ -112,15 +94,16 @@ module.exports.run = async function ({ api, event }) {
         );
 
         return api.sendMessage(
-          "🐿️ فشل تغيير صورة البروفايل\n\nالخطأ: " +
-            (err.message || String(err)),
+          `${HINA}\n\n❌ فشل تغيير صورة البروفايل\n\nالخطأ: ${
+            err.message || String(err)
+          }`,
           threadID,
           messageID
         );
       }
 
       return api.sendMessage(
-        "🐿️ تم تغيير صورة بروفايل البوت بنجاح ✅",
+        `${HINA}\n\n✅ تم تغيير صورة بروفايل البوت بنجاح`,
         threadID,
         messageID
       );
@@ -133,8 +116,9 @@ module.exports.run = async function ({ api, event }) {
     );
 
     return api.sendMessage(
-      "🐿️ حدث خطأ أثناء تغيير صورة البروفايل\n\n" +
-        (error.message || String(error)),
+      `${HINA}\n\n❌ حدث خطأ أثناء تغيير صورة البروفايل\n\n${
+        error.message || String(error)
+      }`,
       threadID,
       messageID
     );
