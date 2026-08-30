@@ -3,114 +3,52 @@ const path = require("path");
 
 module.exports.config = {
   name: "افحص_افاتر",
-  version: "2.0.0",
+  version: "3.0.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
-  description: "البحث عن changeAvatar داخل hut-chat-api",
+  description: "عرض كود changeAvatar",
   commandCategory: "Developer",
   usages: "",
   cooldowns: 5
 };
 
-function searchFiles(dir, results = []) {
-  if (!fs.existsSync(dir)) return results;
-
-  let files;
-
-  try {
-    files = fs.readdirSync(dir);
-  } catch {
-    return results;
-  }
-
-  for (const file of files) {
-    const fullPath = path.join(dir, file);
-
-    let stat;
-
-    try {
-      stat = fs.statSync(fullPath);
-    } catch {
-      continue;
-    }
-
-    if (stat.isDirectory()) {
-      searchFiles(fullPath, results);
-      continue;
-    }
-
-    if (!file.endsWith(".js")) continue;
-
-    try {
-      const content = fs.readFileSync(fullPath, "utf8");
-
-      if (
-        content.includes("changeAvatar") ||
-        content.includes("changeProfilePicture") ||
-        content.includes("change_profile")
-      ) {
-        const lines = content.split(/\r?\n/);
-
-        const matches = [];
-
-        lines.forEach((line, index) => {
-          if (
-            line.includes("changeAvatar") ||
-            line.includes("changeProfilePicture") ||
-            line.includes("change_profile")
-          ) {
-            matches.push(
-              `السطر ${index + 1}: ${line.trim().slice(0, 500)}`
-            );
-          }
-        });
-
-        results.push({
-          file: fullPath,
-          matches
-        });
-      }
-
-    } catch {}
-  }
-
-  return results;
-}
-
 module.exports.run = async function ({ api, event }) {
   const HINA = "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬";
 
   try {
-    const libraryPath = path.dirname(
-      require.resolve("hut-chat-api")
+    const file = path.join(
+      process.cwd(),
+      "node_modules",
+      "hut-chat-api",
+      "src",
+      "changeAvatar.js"
     );
 
-    const results = searchFiles(libraryPath);
-
-    if (!results.length) {
+    if (!fs.existsSync(file)) {
       return api.sendMessage(
-        `${HINA}\n\n❌ لم يتم العثور على changeAvatar داخل ملفات hut-chat-api`,
+        `${HINA}\n\n❌ الملف غير موجود:\n${file}`,
         event.threadID,
         event.messageID
       );
     }
 
-    let message =
+    const lines = fs.readFileSync(file, "utf8")
+      .split(/\r?\n/);
+
+    const start = Math.max(0, 40);
+    const end = Math.min(lines.length, 140);
+
+    let output =
       `${HINA}\n\n` +
-      `🔎 تم العثور على changeAvatar داخل:\n\n`;
+      `📄 changeAvatar.js\n` +
+      `📌 الأسطر ${start + 1} إلى ${end}\n\n`;
 
-    for (const result of results) {
-      message += `📄 ${result.file}\n`;
-
-      for (const match of result.matches) {
-        message += `   ${match}\n`;
-      }
-
-      message += "\n";
+    for (let i = start; i < end; i++) {
+      output += `${i + 1}: ${lines[i]}\n`;
     }
 
     return api.sendMessage(
-      message.slice(0, 19000),
+      output.slice(0, 19000),
       event.threadID,
       event.messageID
     );
@@ -119,7 +57,7 @@ module.exports.run = async function ({ api, event }) {
     console.error(error);
 
     return api.sendMessage(
-      `${HINA}\n\n❌ حدث خطأ أثناء الفحص\n\n${error.message}`,
+      `${HINA}\n\n❌ فشل قراءة الملف\n\n${error.message}`,
       event.threadID,
       event.messageID
     );
