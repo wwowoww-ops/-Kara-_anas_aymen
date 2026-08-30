@@ -59,7 +59,6 @@ function readJSON(file) {
     }
 
     return {};
-
   } catch (error) {
     console.error(
       "[JSON ERROR]",
@@ -106,7 +105,6 @@ function syncBanData() {
         }
       }
     }
-
   } catch (error) {
     console.error(
       "[GROUP BAN SYNC]",
@@ -144,7 +142,6 @@ function syncBanData() {
         }
       }
     }
-
   } catch (error) {
     console.error(
       "[USER BAN SYNC]",
@@ -389,7 +386,6 @@ function getDeveloperIDs() {
     if (dev) {
       ids.push(String(dev));
     }
-
   } catch (e) {}
 
   return [
@@ -444,7 +440,7 @@ function isUserBanned(senderID) {
 }
 
 // ============================================================
-// TYPING INDICATOR
+// TYPING INDICATOR - SAFE
 // ============================================================
 
 async function setTyping(
@@ -453,101 +449,57 @@ async function setTyping(
   status
 ) {
   try {
-    if (!api) {
+    if (
+      !api ||
+      !threadID ||
+      typeof api.sendTypingIndicator !== "function"
+    ) {
       return false;
     }
 
     const id = String(threadID);
 
-    if (
-      typeof api.sendTypingIndicator ===
-      "function"
-    ) {
-      try {
-        const result =
-          api.sendTypingIndicator(
-            id,
-            status
-          );
+    /*
+     * hut-chat-api قد يظهر:
+     *
+     * ERR! sendTypingIndicator
+     *
+     * عند فشل طلب مؤشر الكتابة.
+     *
+     * لذلك نستخدم Promise.race مع مهلة قصيرة
+     * ونتجاهل فشل المؤشر بالكامل.
+     */
 
-        if (
-          result &&
-          typeof result.then === "function"
-        ) {
-          await result;
-        }
-
-        return true;
-      } catch (error) {
-        console.log(
-          "[TYPING] sendTypingIndicator failed:",
-          error.message
+    try {
+      const result =
+        api.sendTypingIndicator(
+          id,
+          Boolean(status)
         );
+
+      if (
+        result &&
+        typeof result.then === "function"
+      ) {
+        await Promise.race([
+          result.catch(() => false),
+
+          new Promise(resolve =>
+            setTimeout(
+              () => resolve(false),
+              3000
+            )
+          )
+        ]);
       }
+
+      return true;
+
+    } catch (error) {
+      return false;
     }
-
-    if (
-      typeof api.sendTyping ===
-      "function"
-    ) {
-      try {
-        const result =
-          api.sendTyping(
-            id,
-            status
-          );
-
-        if (
-          result &&
-          typeof result.then === "function"
-        ) {
-          await result;
-        }
-
-        return true;
-      } catch (error) {
-        console.log(
-          "[TYPING] sendTyping failed:",
-          error.message
-        );
-      }
-    }
-
-    if (
-      typeof api.setTypingIndicator ===
-      "function"
-    ) {
-      try {
-        const result =
-          api.setTypingIndicator(
-            id,
-            status
-          );
-
-        if (
-          result &&
-          typeof result.then === "function"
-        ) {
-          await result;
-        }
-
-        return true;
-      } catch (error) {
-        console.log(
-          "[TYPING] setTypingIndicator failed:",
-          error.message
-        );
-      }
-    }
-
-    return false;
 
   } catch (error) {
-    console.error(
-      "[TYPING ERROR]",
-      error.message
-    );
-
     return false;
   }
 }
@@ -669,15 +621,15 @@ module.exports = function ({
       const DeveloperMode =
         config.DeveloperMode === true;
 
-      let body =
+      const body =
         event.body;
 
-      let senderID =
+      const senderID =
         String(
           event.senderID || ""
         );
 
-      let threadID =
+      const threadID =
         String(
           event.threadID || ""
         );
@@ -685,7 +637,11 @@ module.exports = function ({
       const messageID =
         event.messageID;
 
-      if (!body || !senderID || !threadID) {
+      if (
+        !body ||
+        !senderID ||
+        !threadID
+      ) {
         return;
       }
 
@@ -831,10 +787,6 @@ module.exports = function ({
       // ======================================================
       // DEVELOPER MODE
       // ======================================================
-      // عند تفعيل DeveloperMode
-      // الأعضاء العاديون لا يستطيعون تشغيل أي أمر
-      // المطورون فقط يستطيعون استخدام البوت
-      // ======================================================
 
       if (
         DeveloperMode &&
@@ -864,7 +816,6 @@ module.exports = function ({
         ) {
           return;
         }
-
       }
 
       // ======================================================
@@ -1090,7 +1041,6 @@ ${commandConfig.name}`,
             "[THREAD INFO ERROR]",
             error.message
           );
-
         }
       }
 
@@ -1293,7 +1243,6 @@ ${commandConfig.name}`,
           function () {
             return "";
           }
-
       };
 
       // ======================================================
