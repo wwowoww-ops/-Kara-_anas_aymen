@@ -1,6 +1,6 @@
 module.exports.config = {
   name: "حيوان",
-  version: "1.0.0",
+  version: "1.1.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
   description: "نظام الحيوانات",
@@ -11,97 +11,118 @@ module.exports.config = {
 
 
 // ==================================================
-// الحيوانات المتاحة
+// الحيوانات
 // ==================================================
 
 const PETS = [
   {
     id: 1,
     type: "أرنب",
-    name: "أرنب",
-    price: 0
+    name: "أرنب"
   },
 
   {
     id: 2,
     type: "قطة",
-    name: "قطة",
-    price: 0
+    name: "قطة"
   },
 
   {
     id: 3,
     type: "كلب",
-    name: "كلب",
-    price: 0
+    name: "كلب"
   },
 
   {
     id: 4,
     type: "ببغاء",
-    name: "ببغاء",
-    price: 0
+    name: "ببغاء"
   },
 
   {
     id: 5,
     type: "هامستر",
-    name: "هامستر",
-    price: 0
+    name: "هامستر"
   },
 
   {
     id: 6,
     type: "ثعلب",
-    name: "ثعلب",
-    price: 0
+    name: "ثعلب"
   },
 
   {
     id: 7,
     type: "ذئب",
-    name: "ذئب",
-    price: 0
+    name: "ذئب"
   },
 
   {
     id: 8,
     type: "نمر",
-    name: "نمر",
-    price: 0
+    name: "نمر"
   },
 
   {
     id: 9,
     type: "أسد",
-    name: "أسد",
-    price: 0
+    name: "أسد"
   },
 
   {
     id: 10,
     type: "تنين",
-    name: "تنين",
-    price: 0
+    name: "تنين"
   }
 ];
 
 
 // ==================================================
-// البحث عن الحيوان
+// الحصول على مودل Pets
 // ==================================================
 
-function getPet(type) {
+function getPetsModel(models) {
 
-  return PETS.find(
-    pet => pet.type === type
-  );
+  let Pets = null;
+
+  try {
+
+    if (
+      models &&
+      typeof models.use === "function"
+    ) {
+
+      Pets = models.use("Pets");
+
+    }
+
+  } catch (error) {
+
+    console.error(
+      "[PETS MODEL USE ERROR]",
+      error.message
+    );
+
+  }
+
+
+  if (!Pets) {
+
+    Pets =
+      models?.Pets ||
+      global.models?.Pets ||
+      global.data?.Pets ||
+      null;
+
+  }
+
+  return Pets;
 
 }
 
 
 // ==================================================
-// عرض معلومات الحيوان
+// تنسيق معلومات الحيوان
 // ==================================================
 
 function formatPet(pet) {
@@ -109,28 +130,124 @@ function formatPet(pet) {
   return (
 `⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬
 
-🐾 حيوانك: ${pet.type}
+حيوانك: ${pet.type}
 
-❤️ الصحة: ${pet.health}/100
-🍖 الجوع: ${pet.hunger}/100
+الاسم: ${pet.name}
 
-⭐ المستوى: ${pet.level}
-✨ الخبرة: ${pet.exp}
+المستوى: ${pet.level}
+الخبرة: ${pet.exp}
 
-😊 الحالة: ${pet.status}`
+الصحة: ${pet.health}/100
+الجوع: ${pet.hunger}/100
+
+الحالة: ${pet.status}`
   );
 
 }
 
 
 // ==================================================
-// الأمر
+// إرسال القائمة
+// ==================================================
+
+function sendPetList({
+  api,
+  threadID,
+  messageID,
+  senderID
+}) {
+
+  let message =
+`⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬
+
+لم تقم بإنشاء حيوان بعد.
+
+اختر حيوانك:
+
+`;
+
+
+  for (const pet of PETS) {
+
+    message +=
+      `${pet.id} ─ ${pet.name}\n`;
+
+  }
+
+
+  message +=
+`
+رد على هذه الرسالة برقم الحيوان لإنشائه.`;
+
+
+  return new Promise(resolve => {
+
+    api.sendMessage(
+      message,
+      threadID,
+      (error, info) => {
+
+        if (
+          error ||
+          !info?.messageID
+        ) {
+
+          console.error(
+            "[PET LIST SEND ERROR]",
+            error
+          );
+
+          resolve(null);
+          return;
+        }
+
+
+        if (
+          !global.client.handleReply
+        ) {
+
+          global.client.handleReply =
+            [];
+
+        }
+
+
+        global.client.handleReply.push({
+
+          name:
+            module.exports.config.name,
+
+          messageID:
+            info.messageID,
+
+          author:
+            String(senderID),
+
+          type:
+            "createPet"
+
+        });
+
+
+        resolve(info);
+
+      },
+
+      messageID
+    );
+
+  });
+
+}
+
+
+// ==================================================
+// الأمر الأساسي
 // ==================================================
 
 module.exports.run = async function ({
   api,
   event,
-  Currencies,
   models
 }) {
 
@@ -142,15 +259,18 @@ module.exports.run = async function ({
 
 
   // ==================================================
-  // الحصول على مودل الحيوانات
+  // الحصول على Pets
   // ==================================================
 
   const Pets =
-    models?.Pets ||
-    global.models?.Pets;
+    getPetsModel(models);
 
 
   if (!Pets) {
+
+    console.error(
+      "[PETS] Model not loaded"
+    );
 
     return api.sendMessage(
 `⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬
@@ -172,7 +292,7 @@ module.exports.run = async function ({
     const existingPet =
       await Pets.findOne({
         where: {
-          userID: senderID
+          userID: String(senderID)
         }
       });
 
@@ -184,9 +304,7 @@ module.exports.run = async function ({
     if (existingPet) {
 
       return api.sendMessage(
-        formatPet(
-          existingPet
-        ),
+        formatPet(existingPet),
         threadID,
         messageID
       );
@@ -198,109 +316,24 @@ module.exports.run = async function ({
     // لا يملك حيوان
     // ==================================================
 
-    let message =
-`⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬
-
-🐾 لم تقم بإنشاء حيوان بعد.
-
-اختر حيوانك:
-
-`;
-
-
-    for (
-      const pet of PETS
-    ) {
-
-      message +=
-`\n${pet.id} ─ ${pet.name}`;
-
-    }
-
-
-    message +=
-`
-
-↪️ رد على هذه الرسالة برقم الحيوان لإنشائه.`;
-
-
-    // ==================================================
-    // إرسال القائمة
-    // ==================================================
-
-    return new Promise(
-      resolve => {
-
-        api.sendMessage(
-          message,
-          threadID,
-          (
-            error,
-            info
-          ) => {
-
-            if (
-              error ||
-              !info?.messageID
-            ) {
-
-              resolve();
-              return;
-            }
-
-
-            // ==================================================
-            // حفظ جلسة الاختيار
-            // ==================================================
-
-            if (
-              !global.client.handleReply
-            ) {
-
-              global.client.handleReply =
-                [];
-
-            }
-
-
-            global.client.handleReply.push({
-
-              name:
-                module.exports.config.name,
-
-              messageID:
-                info.messageID,
-
-              author:
-                String(senderID),
-
-              type:
-                "createPet"
-
-            });
-
-
-            resolve();
-
-          },
-
-          messageID
-        );
-
-      }
-    );
+    return sendPetList({
+      api,
+      threadID,
+      messageID,
+      senderID
+    });
 
   } catch (error) {
 
     console.error(
-      "[PET ERROR]",
+      "[PET COMMAND ERROR]",
       error
     );
 
     return api.sendMessage(
 `⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬
 
-❌ حدث خطأ أثناء تنفيذ الأمر.`,
+❌ حدث خطأ أثناء فحص حيوانك.`,
       threadID,
       messageID
     );
@@ -334,10 +367,22 @@ module.exports.handleReply = async function ({
   // ==================================================
 
   if (
-    String(
-      handleReply.author
-    ) !==
+    String(handleReply.author) !==
     String(senderID)
+  ) {
+
+    return;
+
+  }
+
+
+  // ==================================================
+  // التحقق من نوع الرد
+  // ==================================================
+
+  if (
+    handleReply.type !==
+    "createPet"
   ) {
 
     return;
@@ -351,18 +396,19 @@ module.exports.handleReply = async function ({
 
   const choice =
     parseInt(
-      String(body).trim()
+      String(body || "").trim(),
+      10
     );
 
 
   if (
-    isNaN(choice)
+    Number.isNaN(choice)
   ) {
 
     return api.sendMessage(
 `⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬
 
-❌ أرسل رقم الحيوان فقط.`,
+أرسل رقم الحيوان فقط.`,
       threadID,
       messageID
     );
@@ -371,7 +417,7 @@ module.exports.handleReply = async function ({
 
 
   // ==================================================
-  // البحث عن الاختيار
+  // البحث عن الحيوان
   // ==================================================
 
   const selectedPet =
@@ -386,9 +432,9 @@ module.exports.handleReply = async function ({
     return api.sendMessage(
 `⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬
 
-❌ رقم الحيوان غير صحيح.
+رقم الحيوان غير صحيح.
 
-↪️ اختر رقمًا من القائمة.`,
+اختر رقمًا من القائمة.`,
       threadID,
       messageID
     );
@@ -397,15 +443,18 @@ module.exports.handleReply = async function ({
 
 
   // ==================================================
-  // الحصول على مودل الحيوانات
+  // الحصول على المودل
   // ==================================================
 
   const Pets =
-    models?.Pets ||
-    global.models?.Pets;
+    getPetsModel(models);
 
 
   if (!Pets) {
+
+    console.error(
+      "[PETS] Model not loaded in handleReply"
+    );
 
     return api.sendMessage(
 `⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬
@@ -421,13 +470,13 @@ module.exports.handleReply = async function ({
   try {
 
     // ==================================================
-    // التأكد مرة أخرى
+    // التأكد أن المستخدم لا يملك حيوانًا
     // ==================================================
 
     const alreadyHasPet =
       await Pets.findOne({
         where: {
-          userID: senderID
+          userID: String(senderID)
         }
       });
 
@@ -437,9 +486,9 @@ module.exports.handleReply = async function ({
       return api.sendMessage(
 `⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬
 
-⚠️ لديك حيوان بالفعل.
+لديك حيوان بالفعل.
 
-🐾 ${alreadyHasPet.type}`,
+حيوانك: ${alreadyHasPet.type}`,
         threadID,
         messageID
       );
@@ -455,7 +504,7 @@ module.exports.handleReply = async function ({
       await Pets.create({
 
         userID:
-          senderID,
+          String(senderID),
 
         type:
           selectedPet.type,
@@ -482,23 +531,48 @@ module.exports.handleReply = async function ({
 
 
     // ==================================================
-    // إرسال النتيجة
+    // حذف جلسة الاختيار
+    // ==================================================
+
+    if (
+      Array.isArray(
+        global.client.handleReply
+      )
+    ) {
+
+      global.client.handleReply =
+        global.client.handleReply.filter(
+          item =>
+            !(
+              item.name ===
+                module.exports.config.name &&
+              String(item.messageID) ===
+                String(handleReply.messageID)
+            )
+        );
+
+    }
+
+
+    // ==================================================
+    // النتيجة
     // ==================================================
 
     return api.sendMessage(
 `⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬
 
-🎉 تم إنشاء حيوانك بنجاح.
+تم إنشاء حيوانك بنجاح.
 
-🐾 الحيوان: ${pet.type}
+الحيوان: ${pet.type}
+الاسم: ${pet.name}
 
-⭐ المستوى: ${pet.level}
-✨ الخبرة: ${pet.exp}
+المستوى: ${pet.level}
+الخبرة: ${pet.exp}
 
-❤️ الصحة: ${pet.health}/100
-🍖 الجوع: ${pet.hunger}/100
+الصحة: ${pet.health}/100
+الجوع: ${pet.hunger}/100
 
-😊 الحالة: ${pet.status}`,
+الحالة: ${pet.status}`,
       threadID,
       messageID
     );
@@ -513,7 +587,9 @@ module.exports.handleReply = async function ({
     return api.sendMessage(
 `⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬
 
-❌ تعذر إنشاء الحيوان.`,
+❌ تعذر إنشاء الحيوان.
+
+${error.message || ""}`,
       threadID,
       messageID
     );
