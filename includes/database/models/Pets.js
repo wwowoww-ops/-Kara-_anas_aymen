@@ -27,6 +27,16 @@ module.exports = function({ sequelize, Sequelize }) {
       defaultValue: 1
     },
 
+    exp: {
+      type: Sequelize.INTEGER,
+      defaultValue: 0
+    },
+
+    status: {
+      type: Sequelize.STRING,
+      defaultValue: "سعيد" 
+    },
+
     health: {
       type: Sequelize.INTEGER,
       defaultValue: 100
