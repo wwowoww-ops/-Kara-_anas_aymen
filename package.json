@@ -53,6 +53,7 @@
 "node-superfetch": "^0.2.3",
 "ora": "^8.0.1",
 "pidusage": "^3.0.2",
+"pg": "^8.16.3", 
 "request": "^2.88.2",
 "sequelize": "^6.37.1",
 "shuffle-array": "^1.0.1",
