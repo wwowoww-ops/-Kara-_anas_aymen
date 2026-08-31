@@ -1,6 +1,6 @@
 module.exports.config = {
   name: "حيوان",
-  version: "1.1.0",
+  version: "1.2.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
   description: "نظام الحيوانات",
@@ -83,8 +83,6 @@ const PETS = [
 
 function getPetsModel(models) {
 
-  let Pets = null;
-
   try {
 
     if (
@@ -92,7 +90,12 @@ function getPetsModel(models) {
       typeof models.use === "function"
     ) {
 
-      Pets = models.use("Pets");
+      const Pets =
+        models.use("Pets");
+
+      if (Pets) {
+        return Pets;
+      }
 
     }
 
@@ -100,29 +103,36 @@ function getPetsModel(models) {
 
     console.error(
       "[PETS MODEL USE ERROR]",
-      error.message
+      error?.name,
+      error?.message,
+      error?.stack
     );
 
   }
 
 
-  if (!Pets) {
+  try {
 
-    Pets =
-      models?.Pets ||
-      global.models?.Pets ||
-      global.data?.Pets ||
-      null;
+    if (models?.Pets) {
+      return models.Pets;
+    }
+
+  } catch (error) {
+
+    console.error(
+      "[PETS MODEL FALLBACK ERROR]",
+      error?.message
+    );
 
   }
 
-  return Pets;
 
+  return null;
 }
 
 
 // ==================================================
-// تنسيق معلومات الحيوان
+// عرض معلومات الحيوان
 // ==================================================
 
 function formatPet(pet) {
@@ -147,10 +157,10 @@ function formatPet(pet) {
 
 
 // ==================================================
-// إرسال القائمة
+// إرسال قائمة الحيوانات
 // ==================================================
 
-function sendPetList({
+async function sendPetList({
   api,
   threadID,
   messageID,
@@ -185,16 +195,27 @@ function sendPetList({
     api.sendMessage(
       message,
       threadID,
+
       (error, info) => {
 
-        if (
-          error ||
-          !info?.messageID
-        ) {
+        if (error) {
 
           console.error(
             "[PET LIST SEND ERROR]",
-            error
+            error?.name,
+            error?.message,
+            error?.stack
+          );
+
+          resolve(null);
+          return;
+        }
+
+
+        if (!info?.messageID) {
+
+          console.error(
+            "[PET LIST SEND ERROR] No messageID"
           );
 
           resolve(null);
@@ -258,8 +279,23 @@ module.exports.run = async function ({
   } = event;
 
 
+  console.log(
+    "[PET COMMAND]",
+    {
+      senderID,
+      threadID,
+      hasModels:
+        Boolean(models),
+      modelKeys:
+        models
+          ? Object.keys(models)
+          : []
+    }
+  );
+
+
   // ==================================================
-  // الحصول على Pets
+  // الحصول على المودل
   // ==================================================
 
   const Pets =
@@ -285,16 +321,30 @@ module.exports.run = async function ({
 
   try {
 
+    console.log(
+      "[PETS] Searching for user:",
+      senderID
+    );
+
+
     // ==================================================
-    // البحث عن حيوان المستخدم
+    // البحث عن الحيوان
     // ==================================================
 
     const existingPet =
       await Pets.findOne({
         where: {
-          userID: String(senderID)
+          userID: senderID
         }
       });
+
+
+    console.log(
+      "[PETS] Search result:",
+      existingPet
+        ? existingPet.toJSON()
+        : null
+    );
 
 
     // ==================================================
@@ -323,17 +373,48 @@ module.exports.run = async function ({
       senderID
     });
 
+
   } catch (error) {
 
     console.error(
-      "[PET COMMAND ERROR]",
+      "=================================================="
+    );
+
+    console.error(
+      "[PET COMMAND ERROR]"
+    );
+
+    console.error(
+      "NAME:",
+      error?.name
+    );
+
+    console.error(
+      "MESSAGE:",
+      error?.message
+    );
+
+    console.error(
+      "STACK:",
+      error?.stack
+    );
+
+    console.error(
+      "FULL ERROR:",
       error
     );
+
+    console.error(
+      "=================================================="
+    );
+
 
     return api.sendMessage(
 `⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬
 
-❌ حدث خطأ أثناء فحص حيوانك.`,
+❌ حدث خطأ أثناء فحص حيوانك.
+
+راجع Console في Railway لمعرفة الخطأ الحقيقي.`,
       threadID,
       messageID
     );
@@ -344,7 +425,7 @@ module.exports.run = async function ({
 
 
 // ==================================================
-// اختيار الحيوان
+// الرد على قائمة الحيوانات
 // ==================================================
 
 module.exports.handleReply = async function ({
@@ -363,7 +444,7 @@ module.exports.handleReply = async function ({
 
 
   // ==================================================
-  // التحقق من صاحب القائمة
+  // صاحب القائمة
   // ==================================================
 
   if (
@@ -377,7 +458,7 @@ module.exports.handleReply = async function ({
 
 
   // ==================================================
-  // التحقق من نوع الرد
+  // نوع الرد
   // ==================================================
 
   if (
@@ -391,7 +472,7 @@ module.exports.handleReply = async function ({
 
 
   // ==================================================
-  // قراءة الرقم
+  // قراءة الاختيار
   // ==================================================
 
   const choice =
@@ -417,7 +498,7 @@ module.exports.handleReply = async function ({
 
 
   // ==================================================
-  // البحث عن الحيوان
+  // البحث عن الحيوان المختار
   // ==================================================
 
   const selectedPet =
@@ -453,7 +534,7 @@ module.exports.handleReply = async function ({
   if (!Pets) {
 
     console.error(
-      "[PETS] Model not loaded in handleReply"
+      "[PETS REPLY] Model not loaded"
     );
 
     return api.sendMessage(
@@ -469,14 +550,24 @@ module.exports.handleReply = async function ({
 
   try {
 
+    console.log(
+      "[PETS CREATE]",
+      {
+        userID: senderID,
+        selectedPet:
+          selectedPet.type
+      }
+    );
+
+
     // ==================================================
-    // التأكد أن المستخدم لا يملك حيوانًا
+    // التأكد من عدم وجود حيوان
     // ==================================================
 
     const alreadyHasPet =
       await Pets.findOne({
         where: {
-          userID: String(senderID)
+          userID: senderID
         }
       });
 
@@ -504,7 +595,7 @@ module.exports.handleReply = async function ({
       await Pets.create({
 
         userID:
-          String(senderID),
+          senderID,
 
         type:
           selectedPet.type,
@@ -530,8 +621,14 @@ module.exports.handleReply = async function ({
       });
 
 
+    console.log(
+      "[PETS CREATED]",
+      pet.toJSON()
+    );
+
+
     // ==================================================
-    // حذف جلسة الاختيار
+    // إزالة جلسة الرد
     // ==================================================
 
     if (
@@ -555,7 +652,7 @@ module.exports.handleReply = async function ({
 
 
     // ==================================================
-    // النتيجة
+    // رسالة النجاح
     // ==================================================
 
     return api.sendMessage(
@@ -577,19 +674,48 @@ module.exports.handleReply = async function ({
       messageID
     );
 
+
   } catch (error) {
 
     console.error(
-      "[PET CREATE ERROR]",
+      "=================================================="
+    );
+
+    console.error(
+      "[PET CREATE ERROR]"
+    );
+
+    console.error(
+      "NAME:",
+      error?.name
+    );
+
+    console.error(
+      "MESSAGE:",
+      error?.message
+    );
+
+    console.error(
+      "STACK:",
+      error?.stack
+    );
+
+    console.error(
+      "FULL ERROR:",
       error
     );
+
+    console.error(
+      "=================================================="
+    );
+
 
     return api.sendMessage(
 `⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬
 
 ❌ تعذر إنشاء الحيوان.
 
-${error.message || ""}`,
+راجع Console في Railway لمعرفة السبب.`,
       threadID,
       messageID
     );
