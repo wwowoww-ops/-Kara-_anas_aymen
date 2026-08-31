@@ -1,11 +1,11 @@
 module.exports.config = {
   name: "حيوان",
-  version: "3.0.0",
+  version: "4.0.0",
   credits: "أبو هريرة",
   description: "نظام الحيوانات الأليفة",
-  commandCategory: "games",
+  commandCategory: "Games",
   hasPermssion: 0,
-  usages: "حيوان",
+  usages: "حيوان | حيوان قائمة",
   cooldowns: 3
 };
 
@@ -14,151 +14,597 @@ module.exports.config = {
 // ============================================================
 
 const PETS = [
-  { id: 1,  type: "قطة",       name: "قطة",       price: 0,     rarity: "شائع",      power: 10,  emoji: "🐱" },
-  { id: 2,  type: "كلب",       name: "كلب",       price: 0,     rarity: "شائع",      power: 12,  emoji: "🐶" },
-  { id: 3,  type: "أرنب",      name: "أرنب",      price: 0,     rarity: "شائع",      power: 8,   emoji: "🐰" },
-  { id: 4,  type: "هامستر",    name: "هامستر",    price: 0,     rarity: "شائع",      power: 7,   emoji: "🐹" },
 
-  { id: 5,  type: "ثعلب",      name: "ثعلب",      price: 500,   rarity: "نادر",      power: 25,  emoji: "🦊" },
-  { id: 6,  type: "ذئب",       name: "ذئب",       price: 1000,  rarity: "نادر",      power: 35,  emoji: "🐺" },
-  { id: 7,  type: "باندا",     name: "باندا",     price: 1500,  rarity: "نادر",      power: 30,  emoji: "🐼" },
-  { id: 8,  type: "نمر",       name: "نمر",       price: 2500,  rarity: "نادر",      power: 50,  emoji: "🐯" },
-  { id: 9,  type: "أسد",       name: "أسد",       price: 3500,  rarity: "نادر",      power: 60,  emoji: "🦁" },
-  { id: 10, type: "دب",        name: "دب",        price: 4000,  rarity: "نادر",      power: 65,  emoji: "🐻" },
+  // ==================== شائع ====================
 
-  { id: 11, type: "غزال",      name: "غزال",      price: 5000,  rarity: "ملحمي",     power: 45,  emoji: "🦌" },
-  { id: 12, type: "نسر",       name: "نسر",       price: 6000,  rarity: "ملحمي",     power: 70,  emoji: "🦅" },
-  { id: 13, type: "تنين",      name: "تنين",      price: 10000, rarity: "أسطوري",    power: 100, emoji: "🐉" },
+  {
+    id: 1,
+    type: "قطة",
+    name: "قطة",
+    price: 0,
+    rarity: "شائع",
+    power: 10,
+    emoji: "🐱"
+  },
 
-  { id: 14, type: "حصان",      name: "حصان",      price: 3000,  rarity: "نادر",      power: 55,  emoji: "🐴" },
-  { id: 15, type: "بومة",      name: "بومة",      price: 4500,  rarity: "ملحمي",     power: 58,  emoji: "🦉" },
-  { id: 16, type: "ببغاء",     name: "ببغاء",     price: 2500,  rarity: "نادر",      power: 32,  emoji: "🦜" },
-  { id: 17, type: "سلحفاة",   name: "سلحفاة",   price: 1800,  rarity: "نادر",      power: 28,  emoji: "🐢" },
-  { id: 18, type: "بطريق",     name: "بطريق",     price: 2200,  rarity: "نادر",      power: 25,  emoji: "🐧" },
-  { id: 19, type: "كوالا",     name: "كوالا",     price: 2800,  rarity: "نادر",      power: 27,  emoji: "🐨" },
-  { id: 20, type: "غوريلا",    name: "غوريلا",    price: 7000,  rarity: "ملحمي",     power: 85,  emoji: "🦍" },
+  {
+    id: 2,
+    type: "كلب",
+    name: "كلب",
+    price: 0,
+    rarity: "شائع",
+    power: 12,
+    emoji: "🐶"
+  },
 
-  { id: 21, type: "فهد",       name: "فهد",       price: 7500,  rarity: "ملحمي",     power: 88,  emoji: "🐆" },
-  { id: 22, type: "تمساح",     name: "تمساح",     price: 6500,  rarity: "ملحمي",     power: 78,  emoji: "🐊" },
-  { id: 23, type: "قرش",       name: "قرش",       price: 8000,  rarity: "ملحمي",     power: 82,  emoji: "🦈" },
-  { id: 24, type: "حوت",       name: "حوت",       price: 9000,  rarity: "ملحمي",     power: 90,  emoji: "🐋" },
-  { id: 25, type: "وحيد القرن", name: "وحيد القرن", price: 11000, rarity: "أسطوري", power: 105, emoji: "🦏" },
+  {
+    id: 3,
+    type: "أرنب",
+    name: "أرنب",
+    price: 0,
+    rarity: "شائع",
+    power: 8,
+    emoji: "🐰"
+  },
 
-  { id: 26, type: "فيل",       name: "فيل",       price: 12000, rarity: "أسطوري",    power: 110, emoji: "🐘" },
-  { id: 27, type: "زرافة",     name: "زرافة",     price: 8500,  rarity: "ملحمي",     power: 65,  emoji: "🦒" },
-  { id: 28, type: "شمبانزي",   name: "شمبانزي",   price: 5500,  rarity: "ملحمي",     power: 55,  emoji: "🐒" },
-  { id: 29, type: "صقر",       name: "صقر",       price: 9500,  rarity: "أسطوري",    power: 95,  emoji: "🦅" },
-  { id: 30, type: "وحش أسطوري", name: "وحش أسطوري", price: 20000, rarity: "أسطوري", power: 150, emoji: "👹" }
+  {
+    id: 4,
+    type: "هامستر",
+    name: "هامستر",
+    price: 0,
+    rarity: "شائع",
+    power: 7,
+    emoji: "🐹"
+  },
+
+  // ==================== غير شائع ====================
+
+  {
+    id: 5,
+    type: "ثعلب",
+    name: "ثعلب",
+    price: 500,
+    rarity: "غير شائع",
+    power: 25,
+    emoji: "🦊"
+  },
+
+  {
+    id: 6,
+    type: "باندا",
+    name: "باندا",
+    price: 1500,
+    rarity: "غير شائع",
+    power: 30,
+    emoji: "🐼"
+  },
+
+  {
+    id: 7,
+    type: "ببغاء",
+    name: "ببغاء",
+    price: 2500,
+    rarity: "غير شائع",
+    power: 32,
+    emoji: "🦜"
+  },
+
+  {
+    id: 8,
+    type: "سلحفاة",
+    name: "سلحفاة",
+    price: 1800,
+    rarity: "غير شائع",
+    power: 28,
+    emoji: "🐢"
+  },
+
+  {
+    id: 9,
+    type: "بطريق",
+    name: "بطريق",
+    price: 2200,
+    rarity: "غير شائع",
+    power: 25,
+    emoji: "🐧"
+  },
+
+  {
+    id: 10,
+    type: "كوالا",
+    name: "كوالا",
+    price: 2800,
+    rarity: "غير شائع",
+    power: 27,
+    emoji: "🐨"
+  },
+
+  // ==================== نادر ====================
+
+  {
+    id: 11,
+    type: "ذئب",
+    name: "ذئب",
+    price: 1000,
+    rarity: "نادر",
+    power: 35,
+    emoji: "🐺"
+  },
+
+  {
+    id: 12,
+    type: "حصان",
+    name: "حصان",
+    price: 3000,
+    rarity: "نادر",
+    power: 55,
+    emoji: "🐴"
+  },
+
+  {
+    id: 13,
+    type: "نمر",
+    name: "نمر",
+    price: 2500,
+    rarity: "نادر",
+    power: 50,
+    emoji: "🐯"
+  },
+
+  {
+    id: 14,
+    type: "أسد",
+    name: "أسد",
+    price: 3500,
+    rarity: "نادر",
+    power: 60,
+    emoji: "🦁"
+  },
+
+  {
+    id: 15,
+    type: "دب",
+    name: "دب",
+    price: 4000,
+    rarity: "نادر",
+    power: 65,
+    emoji: "🐻"
+  },
+
+  // ==================== ملحمي ====================
+
+  {
+    id: 16,
+    type: "غزال",
+    name: "غزال",
+    price: 5000,
+    rarity: "ملحمي",
+    power: 45,
+    emoji: "🦌"
+  },
+
+  {
+    id: 17,
+    type: "نسر",
+    name: "نسر",
+    price: 6000,
+    rarity: "ملحمي",
+    power: 70,
+    emoji: "🦅"
+  },
+
+  {
+    id: 18,
+    type: "بومة",
+    name: "بومة",
+    price: 4500,
+    rarity: "ملحمي",
+    power: 58,
+    emoji: "🦉"
+  },
+
+  {
+    id: 19,
+    type: "غوريلا",
+    name: "غوريلا",
+    price: 7000,
+    rarity: "ملحمي",
+    power: 85,
+    emoji: "🦍"
+  },
+
+  {
+    id: 20,
+    type: "فهد",
+    name: "فهد",
+    price: 7500,
+    rarity: "ملحمي",
+    power: 88,
+    emoji: "🐆"
+  },
+
+  {
+    id: 21,
+    type: "تمساح",
+    name: "تمساح",
+    price: 6500,
+    rarity: "ملحمي",
+    power: 78,
+    emoji: "🐊"
+  },
+
+  {
+    id: 22,
+    type: "قرش",
+    name: "قرش",
+    price: 8000,
+    rarity: "ملحمي",
+    power: 82,
+    emoji: "🦈"
+  },
+
+  {
+    id: 23,
+    type: "حوت",
+    name: "حوت",
+    price: 9000,
+    rarity: "ملحمي",
+    power: 90,
+    emoji: "🐋"
+  },
+
+  {
+    id: 24,
+    type: "زرافة",
+    name: "زرافة",
+    price: 8500,
+    rarity: "ملحمي",
+    power: 65,
+    emoji: "🦒"
+  },
+
+  {
+    id: 25,
+    type: "شمبانزي",
+    name: "شمبانزي",
+    price: 5500,
+    rarity: "ملحمي",
+    power: 55,
+    emoji: "🐒"
+  },
+
+  // ==================== أسطوري ====================
+
+  {
+    id: 26,
+    type: "تنين",
+    name: "تنين",
+    price: 10000,
+    rarity: "أسطوري",
+    power: 100,
+    emoji: "🐉"
+  },
+
+  {
+    id: 27,
+    type: "وحيد القرن",
+    name: "وحيد القرن",
+    price: 11000,
+    rarity: "أسطوري",
+    power: 105,
+    emoji: "🦏"
+  },
+
+  {
+    id: 28,
+    type: "فيل",
+    name: "فيل",
+    price: 12000,
+    rarity: "أسطوري",
+    power: 110,
+    emoji: "🐘"
+  },
+
+  {
+    id: 29,
+    type: "صقر",
+    name: "صقر",
+    price: 9500,
+    rarity: "أسطوري",
+    power: 95,
+    emoji: "🦅"
+  },
+
+  // ==================== خرافي ====================
+
+  {
+    id: 30,
+    type: "يونيكورن",
+    name: "يونيكورن",
+    price: 18000,
+    rarity: "خرافي",
+    power: 140,
+    emoji: "🦄"
+  },
+
+  {
+    id: 31,
+    type: "وحش أسطوري",
+    name: "وحش أسطوري",
+    price: 20000,
+    rarity: "خرافي",
+    power: 150,
+    emoji: "👹"
+  }
 ];
 
 // ============================================================
-// جلب المودلات
+// ترتيب الندرة
+// ============================================================
+
+const RARITY_ORDER = [
+  "شائع",
+  "غير شائع",
+  "نادر",
+  "ملحمي",
+  "أسطوري",
+  "خرافي"
+];
+
+// ============================================================
+// جلب Pets
 // ============================================================
 
 function getPetsModel(models) {
+
   try {
-    if (models && typeof models.use === "function") {
-      const Pets = models.use("Pets");
-      if (Pets) return Pets;
+
+    if (
+      models &&
+      typeof models.use === "function"
+    ) {
+
+      const Pets =
+        models.use("Pets");
+
+      if (Pets) {
+        return Pets;
+      }
     }
+
   } catch (error) {
-    console.error("[PET MODEL ERROR]", error);
+
+    console.error(
+      "[PET MODEL USE ERROR]",
+      error
+    );
   }
 
   try {
-    if (models?.Pets) return models.Pets;
+
+    if (
+      models &&
+      models.Pets
+    ) {
+
+      return models.Pets;
+    }
+
   } catch {}
 
-  return null;
-}
-
-function getCurrenciesModel(models) {
   try {
-    if (models && typeof models.use === "function") {
-      const Currencies = models.use("Currencies");
-      if (Currencies) return Currencies;
+
+    if (
+      global.models &&
+      global.models.Pets
+    ) {
+
+      return global.models.Pets;
     }
-  } catch (error) {
-    console.error("[CURRENCY MODEL ERROR]", error);
-  }
 
-  try {
-    if (models?.Currencies) return models.Currencies;
   } catch {}
 
   return null;
 }
 
 // ============================================================
-// البحث
+// جلب العملات
+// ============================================================
+
+function getCurrenciesModel(models) {
+
+  try {
+
+    if (
+      models &&
+      typeof models.use === "function"
+    ) {
+
+      const Currencies =
+        models.use("Currencies");
+
+      if (Currencies) {
+        return Currencies;
+      }
+    }
+
+  } catch (error) {
+
+    console.error(
+      "[CURRENCY MODEL USE ERROR]",
+      error
+    );
+  }
+
+  try {
+
+    if (
+      models &&
+      models.Currencies
+    ) {
+
+      return models.Currencies;
+    }
+
+  } catch {}
+
+  try {
+
+    if (
+      global.models &&
+      global.models.Currencies
+    ) {
+
+      return global.models.Currencies;
+    }
+
+  } catch {}
+
+  return null;
+}
+
+// ============================================================
+// البحث عن حيوان
 // ============================================================
 
 function getPetByID(id) {
-  return PETS.find(pet => pet.id === Number(id));
+
+  return PETS.find(
+    pet =>
+      pet.id === Number(id)
+  );
 }
 
 function getPetByType(type) {
+
   return PETS.find(
-    pet => String(pet.type) === String(type)
+    pet =>
+      String(pet.type) ===
+      String(type)
   );
 }
 
 // ============================================================
-// إضافة جلسة Reply
+// Reply
 // ============================================================
 
 function addReply(data) {
-  if (!global.client.handleReply) {
+
+  if (
+    !global.client.handleReply
+  ) {
+
     global.client.handleReply = [];
   }
 
   global.client.handleReply.push(data);
 }
 
-// ============================================================
-// حذف جلسة Reply
-// ============================================================
-
 function removeReply(handleReply) {
+
   try {
-    const list = global.client.handleReply;
 
-    if (!Array.isArray(list)) return;
+    if (
+      !global.client.handleReply
+    ) {
+      return;
+    }
 
-    const index = list.indexOf(handleReply);
+    const index =
+      global.client.handleReply.indexOf(
+        handleReply
+      );
 
     if (index !== -1) {
-      list.splice(index, 1);
+
+      global.client.handleReply.splice(
+        index,
+        1
+      );
     }
+
   } catch {}
 }
 
 // ============================================================
-// القائمة
+// القائمة المجانية
 // ============================================================
 
-function getPetList() {
+function getFreePetsList() {
 
   let text =
     "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n";
 
   text +=
-    "🐾 اختر حيوانك بالرد على هذه الرسالة برقم الحيوان\n\n";
+    "اختر حيوانك الأول\n" +
+    "رد على هذه الرسالة برقم الحيوان\n\n";
 
-  for (const pet of PETS) {
+  const freePets =
+    PETS.filter(
+      pet =>
+        pet.price === 0
+    );
 
-    const price =
-      pet.price === 0
-        ? "مجاني"
-        : `${pet.price} عملة`;
+  for (
+    const pet of freePets
+  ) {
 
     text +=
       `${pet.id}. ${pet.emoji} ${pet.name}\n` +
-      `   الندرة: ${pet.rarity} | القوة: ${pet.power} | السعر: ${price}\n`;
+      `   الندرة: ${pet.rarity} | القوة: ${pet.power}\n`;
   }
 
   text +=
-    "\n↪️ رد برقم الحيوان";
+    "\n↪️ رد برقم الحيوان لإنشائه\n" +
+    "لرؤية الحيوانات الأخرى استخدم: حيوان قائمة";
+
+  return text;
+}
+
+// ============================================================
+// قائمة الحيوانات المدفوعة
+// ============================================================
+
+function getShopList() {
+
+  let text =
+    "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n";
+
+  text +=
+    "🛒 قائمة الحيوانات المتاحة للشراء\n\n";
+
+  for (
+    const rarity of RARITY_ORDER
+  ) {
+
+    const pets =
+      PETS.filter(
+        pet =>
+          pet.price > 0 &&
+          pet.rarity === rarity
+      );
+
+    if (!pets.length) {
+      continue;
+    }
+
+    text +=
+      `【 ${rarity} 】\n\n`;
+
+    for (
+      const pet of pets
+    ) {
+
+      text +=
+        `${pet.id}. ${pet.emoji} ${pet.name}\n` +
+        `   القوة: ${pet.power} | السعر: ${pet.price} عملة\n`;
+    }
+
+    text += "\n";
+  }
+
+  text +=
+    "↪️ رد برقم الحيوان لبدء الشراء";
 
   return text;
 }
@@ -170,33 +616,48 @@ function getPetList() {
 function getPetInfo(pet) {
 
   const found =
-    getPetByType(pet.type);
+    getPetByType(
+      pet.type
+    );
 
   const emoji =
-    found?.emoji || "🐾";
+    found?.emoji ||
+    "🐾";
 
   const rarity =
-    found?.rarity || "غير معروف";
+    found?.rarity ||
+    "غير معروف";
 
   const power =
-    found?.power || 0;
+    found?.power ||
+    0;
 
   const level =
-    Number(pet.level || 1);
+    Number(
+      pet.level || 1
+    );
 
   const exp =
-    Number(pet.exp || 0);
+    Number(
+      pet.exp || 0
+    );
 
   const health =
-    Number(pet.health ?? 100);
+    Number(
+      pet.health ?? 100
+    );
 
   const hunger =
-    Number(pet.hunger ?? 100);
+    Number(
+      pet.hunger ?? 100
+    );
 
   const status =
-    pet.status || "طبيعي";
+    pet.status ||
+    "طبيعي";
 
   return (
+
     "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
 
     `${emoji} ${pet.name}\n\n` +
@@ -210,10 +671,12 @@ function getPetInfo(pet) {
     `الصحة: ${health}/100\n` +
     `الشبع: ${hunger}/100\n\n` +
 
-    "↪️ رد على هذه الرسالة بأحد الأرقام:\n" +
+    "اختر العملية بالرد برقم:\n\n" +
+
     "1. بيع الحيوان\n" +
-    "2. إطعام\n" +
-    "3. تدريب"
+    "2. إطعام الحيوان\n" +
+    "3. تدريب الحيوان"
+
   );
 }
 
@@ -221,38 +684,66 @@ function getPetInfo(pet) {
 // إنشاء الحيوان
 // ============================================================
 
-async function createPet(Pets, senderID, selected) {
+async function createPet(
+  Pets,
+  senderID,
+  selected
+) {
 
   const existing =
     await Pets.findOne({
       where: {
-        userID: String(senderID)
+        userID:
+          String(senderID)
       }
     });
 
   if (existing) {
+
     return {
       success: false,
-      message: "❌ لديك حيوان بالفعل."
+      message:
+        "❌ لديك حيوان بالفعل."
     };
   }
 
   await Pets.create({
-    userID: String(senderID),
-    type: selected.type,
-    name: selected.name,
-    level: 1,
-    health: 100,
-    hunger: 100,
-    status: "سعيد",
-    exp: 0
+
+    userID:
+      String(senderID),
+
+    type:
+      selected.type,
+
+    name:
+      selected.name,
+
+    level:
+      1,
+
+    health:
+      100,
+
+    hunger:
+      100,
+
+    status:
+      "سعيد",
+
+    exp:
+      0
   });
 
   return {
+
     success: true,
+
     message:
+
       "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+
       `${selected.emoji} تم إنشاء حيوانك بنجاح\n\n` +
+
       `الحيوان: ${selected.name}\n` +
       `الندرة: ${selected.rarity}\n` +
       `القوة: ${selected.power}\n` +
@@ -263,39 +754,109 @@ async function createPet(Pets, senderID, selected) {
 }
 
 // ============================================================
-// سعر البيع
+// حساب سعر البيع
+// القوة تؤثر على السعر
 // ============================================================
 
 function getSellPrice(pet) {
 
   const found =
-    getPetByType(pet.type);
+    getPetByType(
+      pet.type
+    );
 
-  if (!found) return 0;
+  if (!found) {
+    return 0;
+  }
 
   const level =
-    Number(pet.level || 1);
+    Number(
+      pet.level || 1
+    );
 
-  const base =
-    Math.floor(found.price / 2);
+  const power =
+    Number(
+      found.power || 0
+    );
 
+  const basePrice =
+    Number(
+      found.price || 0
+    );
+
+  // نصف السعر الأساسي
+  const halfPrice =
+    Math.floor(
+      basePrice / 2
+    );
+
+  // زيادة حسب القوة
+  const powerBonus =
+    power * 10;
+
+  // زيادة حسب المستوى
   const levelBonus =
     Math.max(
       0,
-      (level - 1) * 100
-    );
+      level - 1
+    ) * 100;
 
-  return base + levelBonus;
+  return (
+    halfPrice +
+    powerBonus +
+    levelBonus
+  );
 }
 
 // ============================================================
-// الأمر الأساسي
+// إرسال رسالة مع Reply
 // ============================================================
 
-module.exports.run = async function ({
+function sendReply(
+  api,
+  message,
+  threadID,
+  messageID
+) {
+
+  return new Promise(
+    resolve => {
+
+      api.sendMessage(
+        message,
+        threadID,
+        (error, info) => {
+
+          if (error) {
+
+            console.error(
+              "[PET SEND ERROR]",
+              error
+            );
+
+            resolve(null);
+            return;
+          }
+
+          resolve(info);
+        },
+        messageID
+      );
+
+    }
+  );
+}
+
+// ============================================================
+// الأمر الرئيسي
+// ============================================================
+
+module.exports.run =
+async function ({
   api,
   event,
-  models
+  models,
+  args
 }) {
 
   const {
@@ -307,34 +868,105 @@ module.exports.run = async function ({
   try {
 
     const Pets =
-      getPetsModel(models);
+      getPetsModel(
+        models
+      );
 
     const Currencies =
-      getCurrenciesModel(models);
+      getCurrenciesModel(
+        models
+      );
 
     if (!Pets) {
+
       return api.sendMessage(
+
         "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
-        "❌ مودل الحيوانات غير محمّل.",
+
+        "❌ مودل الحيوانات غير محمّل.\n\n" +
+
+        "تأكد أن Pets موجود داخل models ومسجل في نظام قاعدة البيانات.",
+
         threadID,
         messageID
       );
     }
 
     if (!Currencies) {
+
       return api.sendMessage(
+
         "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+
         "❌ مودل العملات غير محمّل.",
+
         threadID,
         messageID
       );
     }
 
+    const subCommand =
+      Array.isArray(args)
+        ? args
+            .join(" ")
+            .trim()
+            .toLowerCase()
+        : "";
+
+    // ========================================================
+    // حيوان قائمة
+    // ========================================================
+
+    if (
+      subCommand === "قائمة" ||
+      subCommand === "list" ||
+      subCommand === "shop"
+    ) {
+
+      const sent =
+        await sendReply(
+          api,
+          getShopList(),
+          threadID,
+          messageID
+        );
+
+      if (
+        sent &&
+        sent.messageID
+      ) {
+
+        addReply({
+
+          name:
+            module.exports.config.name,
+
+          messageID:
+            sent.messageID,
+
+          author:
+            String(senderID),
+
+          type:
+            "pet_select"
+        });
+      }
+
+      return;
+    }
+
+    // ========================================================
+    // البحث عن حيوان المستخدم
+    // ========================================================
+
     const pet =
       await Pets.findOne({
+
         where: {
-          userID: String(senderID)
+          userID:
+            String(senderID)
         }
+
       });
 
     // ========================================================
@@ -343,35 +975,22 @@ module.exports.run = async function ({
 
     if (pet) {
 
-      const info =
-        await new Promise(resolve => {
+      const sent =
+        await sendReply(
+          api,
+          getPetInfo(
+            pet.toJSON
+              ? pet.toJSON()
+              : pet
+          ),
+          threadID,
+          messageID
+        );
 
-          api.sendMessage(
-            getPetInfo(
-              pet.toJSON
-                ? pet.toJSON()
-                : pet
-            ),
-            threadID,
-            (error, sent) => {
-
-              if (error) {
-                console.error(
-                  "[PET INFO SEND ERROR]",
-                  error
-                );
-
-                resolve(null);
-                return;
-              }
-
-              resolve(sent);
-            },
-            messageID
-          );
-        });
-
-      if (info?.messageID) {
+      if (
+        sent &&
+        sent.messageID
+      ) {
 
         addReply({
 
@@ -379,7 +998,7 @@ module.exports.run = async function ({
             module.exports.config.name,
 
           messageID:
-            info.messageID,
+            sent.messageID,
 
           author:
             String(senderID),
@@ -397,30 +1016,17 @@ module.exports.run = async function ({
     // ========================================================
 
     const sent =
-      await new Promise(resolve => {
+      await sendReply(
+        api,
+        getFreePetsList(),
+        threadID,
+        messageID
+      );
 
-        api.sendMessage(
-          getPetList(),
-          threadID,
-          (error, info) => {
-
-            if (error) {
-              console.error(
-                "[PET LIST ERROR]",
-                error
-              );
-
-              resolve(null);
-              return;
-            }
-
-            resolve(info);
-          },
-          messageID
-        );
-      });
-
-    if (sent?.messageID) {
+    if (
+      sent &&
+      sent.messageID
+    ) {
 
       addReply({
 
@@ -446,9 +1052,13 @@ module.exports.run = async function ({
     );
 
     return api.sendMessage(
+
       "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
-      "❌ حدث خطأ أثناء فحص حيوانك.\n\n" +
+
+      "❌ حدث خطأ أثناء تنفيذ الأمر.\n\n" +
+
       `📝 ${error.message}`,
+
       threadID,
       messageID
     );
@@ -459,7 +1069,8 @@ module.exports.run = async function ({
 // HANDLE REPLY
 // ============================================================
 
-module.exports.handleReply = async function ({
+module.exports.handleReply =
+async function ({
   api,
   event,
   handleReply,
@@ -476,7 +1087,7 @@ module.exports.handleReply = async function ({
   try {
 
     // ========================================================
-    // صاحب الجلسة
+    // التأكد من صاحب القائمة
     // ========================================================
 
     if (
@@ -484,18 +1095,33 @@ module.exports.handleReply = async function ({
       String(handleReply.author) !==
       String(senderID)
     ) {
+
       return;
     }
 
     const Pets =
-      getPetsModel(models);
+      getPetsModel(
+        models
+      );
 
     const Currencies =
-      getCurrenciesModel(models);
+      getCurrenciesModel(
+        models
+      );
 
-    if (!Pets || !Currencies) {
+    if (!Pets) {
+
       return api.sendMessage(
-        "❌ تعذر تحميل مودلات الحيوانات أو العملات.",
+        "❌ مودل الحيوانات غير محمّل.",
+        threadID,
+        messageID
+      );
+    }
+
+    if (!Currencies) {
+
+      return api.sendMessage(
+        "❌ مودل العملات غير محمّل.",
         threadID,
         messageID
       );
@@ -506,7 +1132,7 @@ module.exports.handleReply = async function ({
         .trim();
 
     // ========================================================
-    // اختيار الحيوان
+    // اختيار حيوان
     // ========================================================
 
     if (
@@ -529,32 +1155,42 @@ module.exports.handleReply = async function ({
       }
 
       const selected =
-        getPetByID(number);
+        getPetByID(
+          number
+        );
 
       if (!selected) {
 
         return api.sendMessage(
-          `❌ الحيوان رقم ${number} غير موجود.\n` +
+
+          "❌ رقم الحيوان غير صحيح.\n\n" +
+
           `اختر رقمًا من 1 إلى ${PETS.length}.`,
+
           threadID,
           messageID
         );
       }
 
       // ------------------------------------------------------
-      // التأكد من عدم امتلاك حيوان
+      // التأكد من عدم وجود حيوان
       // ------------------------------------------------------
 
       const existing =
         await Pets.findOne({
+
           where: {
-            userID: String(senderID)
+            userID:
+              String(senderID)
           }
+
         });
 
       if (existing) {
 
-        removeReply(handleReply);
+        removeReply(
+          handleReply
+        );
 
         return api.sendMessage(
           "❌ لديك حيوان بالفعل.",
@@ -564,10 +1200,12 @@ module.exports.handleReply = async function ({
       }
 
       // ------------------------------------------------------
-      // مجاني
+      // الحيوان المجاني
       // ------------------------------------------------------
 
-      if (selected.price === 0) {
+      if (
+        selected.price === 0
+      ) {
 
         const result =
           await createPet(
@@ -576,7 +1214,9 @@ module.exports.handleReply = async function ({
             selected
           );
 
-        removeReply(handleReply);
+        removeReply(
+          handleReply
+        );
 
         return api.sendMessage(
           result.message,
@@ -586,47 +1226,39 @@ module.exports.handleReply = async function ({
       }
 
       // ------------------------------------------------------
-      // مدفوع
+      // الحيوان المدفوع
       // ------------------------------------------------------
 
       const sent =
-        await new Promise(resolve => {
+        await sendReply(
 
-          api.sendMessage(
+          api,
 
-            "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+          "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
 
-            `${selected.emoji} ${selected.name}\n\n` +
+          `${selected.emoji} ${selected.name}\n\n` +
 
-            `الندرة: ${selected.rarity}\n` +
-            `القوة: ${selected.power}\n` +
-            `السعر: ${selected.price} عملة\n\n` +
+          `الندرة: ${selected.rarity}\n` +
+          `القوة: ${selected.power}\n` +
+          `السعر: ${selected.price} عملة\n\n` +
 
-            "هل تريد شراء هذا الحيوان؟\n\n" +
+          "هل تريد شراء هذا الحيوان؟\n\n" +
 
-            "↪️ رد بـ نعم للتأكيد\n" +
-            "↪️ رد بـ لا للإلغاء",
+          "↪️ نعم\n" +
+          "↪️ لا",
 
-            threadID,
+          threadID,
+          messageID
+        );
 
-            (error, info) => {
+      if (
+        sent &&
+        sent.messageID
+      ) {
 
-              if (error) {
-                resolve(null);
-                return;
-              }
-
-              resolve(info);
-            },
-
-            messageID
-          );
-
-        });
-
-      if (sent?.messageID) {
-
-        removeReply(handleReply);
+        removeReply(
+          handleReply
+        );
 
         addReply({
 
@@ -664,12 +1296,13 @@ module.exports.handleReply = async function ({
 
       if (
         answer === "لا" ||
-        answer === "لا شراء" ||
         answer === "الغاء" ||
         answer === "إلغاء"
       ) {
 
-        removeReply(handleReply);
+        removeReply(
+          handleReply
+        );
 
         return api.sendMessage(
           "تم إلغاء عملية الشراء.",
@@ -679,9 +1312,9 @@ module.exports.handleReply = async function ({
       }
 
       if (
-        answer !== "نعم" &&
-        answer !== "نعم شراء"
+        answer !== "نعم"
       ) {
+
         return api.sendMessage(
           "↪️ رد بـ نعم للشراء أو لا للإلغاء.",
           threadID,
@@ -695,7 +1328,10 @@ module.exports.handleReply = async function ({
         );
 
       if (!selected) {
-        removeReply(handleReply);
+
+        removeReply(
+          handleReply
+        );
 
         return api.sendMessage(
           "❌ الحيوان غير موجود.",
@@ -705,19 +1341,24 @@ module.exports.handleReply = async function ({
       }
 
       // ------------------------------------------------------
-      // التأكد من الحيوان
+      // التأكد من عدم امتلاك حيوان
       // ------------------------------------------------------
 
       const existing =
         await Pets.findOne({
+
           where: {
-            userID: String(senderID)
+            userID:
+              String(senderID)
           }
+
         });
 
       if (existing) {
 
-        removeReply(handleReply);
+        removeReply(
+          handleReply
+        );
 
         return api.sendMessage(
           "❌ لديك حيوان بالفعل.",
@@ -727,28 +1368,34 @@ module.exports.handleReply = async function ({
       }
 
       // ------------------------------------------------------
-      // حساب العملات
+      // جلب الحساب
       // ------------------------------------------------------
 
       let currency =
         await Currencies.findOne({
+
           where: {
-            userID: String(senderID)
+            userID:
+              String(senderID)
           }
+
         });
 
       if (!currency) {
 
-        currency =
-          await Currencies.create({
-            userID: String(senderID),
-            money: 0,
-            exp: 0
-          });
+        return api.sendMessage(
+
+          "❌ لم يتم العثور على حساب العملات الخاص بك.",
+
+          threadID,
+          messageID
+        );
       }
 
       const money =
-        Number(currency.money || 0);
+        Number(
+          currency.money || 0
+        );
 
       if (
         money <
@@ -756,6 +1403,7 @@ module.exports.handleReply = async function ({
       ) {
 
         return api.sendMessage(
+
           "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
 
           "❌ لا تملك عملات كافية.\n\n" +
@@ -770,19 +1418,17 @@ module.exports.handleReply = async function ({
       }
 
       // ------------------------------------------------------
-      // خصم العملات
+      // خصم السعر
       // ------------------------------------------------------
 
       await currency.update({
+
         money:
-          money - selected.price
+          money -
+          selected.price
       });
 
       try {
-
-        // ----------------------------------------------------
-        // إنشاء الحيوان
-        // ----------------------------------------------------
 
         await Pets.create({
 
@@ -813,20 +1459,22 @@ module.exports.handleReply = async function ({
 
       } catch (error) {
 
-        // ----------------------------------------------------
-        // إرجاع المال في حالة فشل إنشاء الحيوان
-        // ----------------------------------------------------
+        // إرجاع المال إذا فشل إنشاء الحيوان
 
         try {
+
           await currency.update({
             money
           });
+
         } catch {}
 
         throw error;
       }
 
-      removeReply(handleReply);
+      removeReply(
+        handleReply
+      );
 
       return api.sendMessage(
 
@@ -837,12 +1485,12 @@ module.exports.handleReply = async function ({
         `الحيوان: ${selected.name}\n` +
         `الندرة: ${selected.rarity}\n` +
         `القوة: ${selected.power}\n` +
-        `السعر: ${selected.price}\n` +
-        `المتبقي: ${money - selected.price}\n\n` +
+        `السعر: ${selected.price} عملة\n` +
+        `المتبقي: ${money - selected.price} عملة\n\n` +
 
-        `المستوى: 1\n` +
-        `XP: 0\n` +
-        `الحالة: سعيد`,
+        "المستوى: 1\n" +
+        "XP: 0\n" +
+        "الحالة: سعيد",
 
         threadID,
         messageID
@@ -863,70 +1511,81 @@ module.exports.handleReply = async function ({
 
       const pet =
         await Pets.findOne({
+
           where: {
-            userID: String(senderID)
+            userID:
+              String(senderID)
           }
+
         });
 
       if (!pet) {
 
-        removeReply(handleReply);
+        removeReply(
+          handleReply
+        );
 
         return api.sendMessage(
-          "❌ لم تعد تملك حيوانًا.",
+          "❌ لا تملك حيوانًا.",
           threadID,
           messageID
         );
       }
 
-      // ------------------------------------------------------
+      // ======================================================
       // بيع
-      // ------------------------------------------------------
+      // ======================================================
 
-      if (choice === 1) {
+      if (
+        choice === 1
+      ) {
 
         const data =
           pet.toJSON
             ? pet.toJSON()
             : pet;
 
-        const price =
-          getSellPrice(data);
+        const sellPrice =
+          getSellPrice(
+            data
+          );
+
+        const found =
+          getPetByType(
+            data.type
+          );
 
         const sent =
-          await new Promise(resolve => {
+          await sendReply(
 
-            api.sendMessage(
+            api,
 
-              "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+            "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
 
-              `هل تريد بيع ${data.name}؟\n\n` +
+            `${found?.emoji || "🐾"} ${data.name}\n\n` +
 
-              `قيمة البيع: ${price} عملة\n\n` +
+            `القوة: ${found?.power || 0}\n` +
+            `المستوى: ${data.level || 1}\n\n` +
 
-              "↪️ رد بـ نعم للتأكيد\n" +
-              "↪️ رد بـ لا للإلغاء",
+            `قيمة البيع: ${sellPrice} عملة\n\n` +
 
-              threadID,
+            "هل تريد بيع حيوانك؟\n\n" +
 
-              (error, info) => {
+            "↪️ نعم\n" +
+            "↪️ لا",
 
-                if (error) {
-                  resolve(null);
-                  return;
-                }
+            threadID,
+            messageID
+          );
 
-                resolve(info);
-              },
+        if (
+          sent &&
+          sent.messageID
+        ) {
 
-              messageID
-            );
-
-          });
-
-        if (sent?.messageID) {
-
-          removeReply(handleReply);
+          removeReply(
+            handleReply
+          );
 
           addReply({
 
@@ -940,24 +1599,25 @@ module.exports.handleReply = async function ({
               String(senderID),
 
             type:
-              "pet_sell_confirm",
-
-            sellPrice:
-              price
+              "pet_sell_confirm"
           });
         }
 
         return;
       }
 
-      // ------------------------------------------------------
+      // ======================================================
       // إطعام
-      // ------------------------------------------------------
+      // ======================================================
 
-      if (choice === 2) {
+      if (
+        choice === 2
+      ) {
 
         const hunger =
-          Number(pet.hunger ?? 100);
+          Number(
+            pet.hunger ?? 100
+          );
 
         const newHunger =
           Math.min(
@@ -971,93 +1631,136 @@ module.exports.handleReply = async function ({
             newHunger,
 
           status:
-            newHunger >= 70
+            newHunger >= 80
               ? "سعيد"
-              : "طبيعي"
+              : newHunger >= 40
+                ? "طبيعي"
+                : "جائع"
         });
 
-        removeReply(handleReply);
+        removeReply(
+          handleReply
+        );
 
         return api.sendMessage(
 
           "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
 
-          `🍖 تم إطعام ${pet.name}\n\n` +
+          `تم إطعام ${pet.name}\n\n` +
 
           `الشبع: ${newHunger}/100\n` +
-          `الحالة: ${newHunger >= 70 ? "سعيد" : "طبيعي"}`,
+
+          `الحالة: ${
+            newHunger >= 80
+              ? "سعيد"
+              : newHunger >= 40
+                ? "طبيعي"
+                : "جائع"
+          }`,
 
           threadID,
           messageID
         );
       }
 
-      // ------------------------------------------------------
+      // ======================================================
       // تدريب
-      // ------------------------------------------------------
+      // ======================================================
 
-      if (choice === 3) {
+      if (
+        choice === 3
+      ) {
 
         const currentExp =
-          Number(pet.exp || 0);
+          Number(
+            pet.exp || 0
+          );
 
         const currentLevel =
-          Number(pet.level || 1);
+          Number(
+            pet.level || 1
+          );
 
-        const newExp =
-          currentExp + 20;
+        const gainedExp =
+          20;
 
-        const required =
-          currentLevel * 100;
+        const totalExp =
+          currentExp +
+          gainedExp;
 
-        let level =
+        const requiredExp =
+          currentLevel *
+          100;
+
+        let newLevel =
           currentLevel;
 
-        let exp =
-          newExp;
+        let newExp =
+          totalExp;
 
-        if (newExp >= required) {
+        if (
+          totalExp >=
+          requiredExp
+        ) {
 
-          level =
+          newLevel =
             currentLevel + 1;
 
-          exp =
-            newExp - required;
+          newExp =
+            totalExp -
+            requiredExp;
         }
 
         await pet.update({
 
-          exp,
+          exp:
+            newExp,
 
-          level,
+          level:
+            newLevel,
 
           status:
             "سعيد"
         });
 
-        removeReply(handleReply);
+        removeReply(
+          handleReply
+        );
 
-        return api.sendMessage(
+        let message =
 
           "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
 
-          `🏋️ تم تدريب ${pet.name}\n\n` +
+          `تم تدريب ${pet.name}\n\n` +
 
-          `XP: ${exp}\n` +
-          `المستوى: ${level}` +
-          (
-            level > currentLevel
-              ? "\n\n🎉 ارتفع مستوى حيوانك!"
-              : ""
-          ),
+          `+${gainedExp} XP\n` +
+          `XP: ${newExp}\n` +
+          `المستوى: ${newLevel}`;
 
+        if (
+          newLevel >
+          currentLevel
+        ) {
+
+          message +=
+            "\n\nارتفع مستوى حيوانك!";
+        }
+
+        return api.sendMessage(
+          message,
           threadID,
           messageID
         );
       }
 
       return api.sendMessage(
-        "❌ اختر رقمًا من 1 إلى 3.",
+
+        "❌ الاختيار غير صحيح.\n\n" +
+
+        "1. بيع\n" +
+        "2. إطعام\n" +
+        "3. تدريب",
+
         threadID,
         messageID
       );
@@ -1081,7 +1784,9 @@ module.exports.handleReply = async function ({
         answer === "إلغاء"
       ) {
 
-        removeReply(handleReply);
+        removeReply(
+          handleReply
+        );
 
         return api.sendMessage(
           "تم إلغاء عملية البيع.",
@@ -1090,7 +1795,9 @@ module.exports.handleReply = async function ({
         );
       }
 
-      if (answer !== "نعم") {
+      if (
+        answer !== "نعم"
+      ) {
 
         return api.sendMessage(
           "↪️ رد بـ نعم للبيع أو لا للإلغاء.",
@@ -1101,53 +1808,70 @@ module.exports.handleReply = async function ({
 
       const pet =
         await Pets.findOne({
+
           where: {
-            userID: String(senderID)
+            userID:
+              String(senderID)
           }
+
         });
 
       if (!pet) {
 
-        removeReply(handleReply);
+        removeReply(
+          handleReply
+        );
 
         return api.sendMessage(
-          "❌ لم تعد تملك حيوانًا.",
+          "❌ لا تملك حيوانًا.",
           threadID,
           messageID
         );
       }
 
-      const price =
+      const data =
+        pet.toJSON
+          ? pet.toJSON()
+          : pet;
+
+      const sellPrice =
         getSellPrice(
-          pet.toJSON
-            ? pet.toJSON()
-            : pet
+          data
         );
 
       let currency =
         await Currencies.findOne({
+
           where: {
-            userID: String(senderID)
+            userID:
+              String(senderID)
           }
+
         });
 
       if (!currency) {
 
-        currency =
-          await Currencies.create({
-            userID: String(senderID),
-            money: 0,
-            exp: 0
-          });
+        removeReply(
+          handleReply
+        );
+
+        return api.sendMessage(
+          "❌ لم يتم العثور على حساب العملات.",
+          threadID,
+          messageID
+        );
       }
 
       const money =
-        Number(currency.money || 0);
+        Number(
+          currency.money || 0
+        );
 
       await currency.update({
 
         money:
-          money + price
+          money +
+          sellPrice
       });
 
       const petName =
@@ -1155,16 +1879,18 @@ module.exports.handleReply = async function ({
 
       await pet.destroy();
 
-      removeReply(handleReply);
+      removeReply(
+        handleReply
+      );
 
       return api.sendMessage(
 
         "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
 
-        `💰 تم بيع ${petName} بنجاح\n\n` +
+        `تم بيع ${petName} بنجاح\n\n` +
 
-        `قيمة البيع: ${price} عملة\n` +
-        `رصيدك الجديد: ${money + price}`,
+        `قيمة البيع: ${sellPrice} عملة\n` +
+        `رصيدك الجديد: ${money + sellPrice} عملة`,
 
         threadID,
         messageID
