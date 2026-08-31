@@ -1,84 +1,263 @@
 module.exports.config = {
-  name: "سبوتي",
-  version: "2.2.0",
-  hasPermssion: 0,
-  credits: "ايمن",
-  description: "البحث عن الأغاني وإرسالها (نسخة مستقرة)",
-  commandCategory: "media",
-  usages: "سبوتي [اسم الأغنية]",
-  cooldowns: 10
+name: "سبوتي",
+version: "2.2.0",
+hasPermssion: 0,
+credits: "أبو هريرة",
+description: "البحث عن الأغاني وإرسالها (نسخة مستقرة)",
+commandCategory: "media",
+usages: "سبوتي [اسم الأغنية]",
+cooldowns: 10
 };
 
 module.exports.run = async function({ api, event, args }) {
-  const axios = require("axios");
-  const fs = require("fs-extra");
-  const path = require("path");
-  const { threadID, messageID, senderID } = event;
+const axios = require("axios");
+const fs = require("fs-extra");
+const path = require("path");
+const { threadID, messageID } = event;
 
-  const songName = args.join(" ");
+const songName = args.join(" ");
 
-  if (!songName) {
-    return api.sendMessage("⌬ ━━ 𝗞𝗜𝗥𝗔 ━━ ⌬\n\nيرجى كتابة اسم الأغنية التي تبحث عنها!", threadID, messageID);
-  }
+if (!songName) {
+return api.sendMessage(
+"⌬ ━━ 𝗛𝗜𝗡𝗔 𝗦𝗣𝗢𝗧𝗜 ━━ ⌬\n\nيرجى كتابة اسم الأغنية التي تبحث عنها!",
+threadID,
+messageID
+);
+}
 
-  api.setMessageReaction("🔍", messageID, () => {}, true);
+api.setMessageReaction(
+"🔍",
+messageID,
+() => {},
+true
+);
 
-  try {
-    // استخدام API ديزر للبحث
-    const res = await axios.get(`https://api.deezer.com/search?q=${encodeURIComponent(songName)}&limit=1`);
-    
-    if (!res.data.data || res.data.data.length === 0) {
-      api.setMessageReaction("❌", messageID, () => {}, true);
-      return api.sendMessage("⌬ ━━ 𝗞𝗜𝗥𝗔 ━━ ⌬\n\nلم أجد هذا المقطع، جرب كتابة اسم الفنان مع الأغنية.", threadID, messageID);
+try {
+
+const res = await axios.get(
+  `https://api.deezer.com/search?q=${encodeURIComponent(songName)}&limit=1`
+);
+
+if (
+  !res.data.data ||
+  res.data.data.length === 0
+) {
+
+  api.setMessageReaction(
+    "❌",
+    messageID,
+    () => {},
+    true
+  );
+
+  return api.sendMessage(
+    "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗦𝗣𝗢𝗧𝗜 ━━ ⌬\n\nلم أجد هذا المقطع، جرب كتابة اسم الفنان مع الأغنية.",
+    threadID,
+    messageID
+  );
+}
+
+const song =
+  res.data.data[0];
+
+const audioUrl =
+  song.preview;
+
+const title =
+  song.title;
+
+const artist =
+  song.artist.name;
+
+const coverUrl =
+  song.album.cover_big;
+
+const cacheDir =
+  path.join(
+    __dirname,
+    "cache"
+  );
+
+if (
+  !fs.existsSync(cacheDir)
+) {
+  fs.ensureDirSync(cacheDir);
+}
+
+const timestamp =
+  Date.now();
+
+const audioPath =
+  path.join(
+    cacheDir,
+    `${timestamp}_audio.mp3`
+  );
+
+const coverPath =
+  path.join(
+    cacheDir,
+    `${timestamp}_cover.jpg`
+  );
+
+api.setMessageReaction(
+  "🎵",
+  messageID,
+  () => {},
+  true
+);
+
+const [
+  audioRes,
+  coverRes
+] = await Promise.all([
+
+  axios.get(
+    audioUrl,
+    {
+      responseType:
+        "arraybuffer"
+    }
+  ),
+
+  axios.get(
+    coverUrl,
+    {
+      responseType:
+        "arraybuffer"
+    }
+  )
+
+]);
+
+fs.writeFileSync(
+  audioPath,
+  Buffer.from(
+    audioRes.data
+  )
+);
+
+fs.writeFileSync(
+  coverPath,
+  Buffer.from(
+    coverRes.data
+  )
+);
+
+const msg = {
+
+  body:
+
+`⌬ ━━ 𝗛𝗜𝗡𝗔 𝗦𝗣𝗢𝗧𝗜 ━━ ⌬
+
+🎤 الفنان: ${artist}
+🎵 الأغنية: ${title}
+
+جاري إرسال المقطع الصوتي...`,
+
+  attachment:
+    fs.createReadStream(
+      coverPath
+    )
+};
+
+return api.sendMessage(
+  msg,
+  threadID,
+
+  (err, info) => {
+
+    if (err) {
+
+      console.error(
+        "❌ Cover Send Error:",
+        err
+      );
+
+      return;
     }
 
-    const song = res.data.data[0];
-    const audioUrl = song.preview; // رابط المقطع الصوتي (30 ثانية بجودة عالية)
-    const title = song.title;
-    const artist = song.artist.name;
-    const coverUrl = song.album.cover_big;
+    api.sendMessage(
+      {
+        body:
+          `🎶 مقطع: ${title}`,
 
-    const cacheDir = path.join(__dirname, "cache");
-    if (!fs.existsSync(cacheDir)) fs.ensureDirSync(cacheDir);
+        attachment:
+          fs.createReadStream(
+            audioPath
+          )
+      },
 
-    const audioPath = path.join(cacheDir, `${Date.now()}_audio.mp3`);
-    const coverPath = path.join(cacheDir, `${Date.now()}_cover.jpg`);
+      threadID,
 
-    api.setMessageReaction("🎵", messageID, () => {}, true);
+      () => {
 
-    // تحميل الغلاف والصوت
-    const [audioRes, coverRes] = await Promise.all([
-      axios.get(audioUrl, { responseType: "arraybuffer" }),
-      axios.get(coverUrl, { responseType: "arraybuffer" })
-    ]);
+        try {
 
-    fs.writeFileSync(audioPath, Buffer.from(audioRes.data));
-    fs.writeFileSync(coverPath, Buffer.from(coverRes.data));
+          if (
+            fs.existsSync(
+              audioPath
+            )
+          ) {
+            fs.unlinkSync(
+              audioPath
+            );
+          }
 
-    const msg = {
-      body: `⌬ ━━ 𝗞𝗜𝗥𝗔 𝗦𝗣𝗢𝗧𝗜𝗙𝗬 ━━ ⌬\n\n` +
-            `🎤 الفنان: ${artist}\n` +
-            `🎵 الأغنية: ${title}\n\n` +
-            `جاري إرسال المقطع الصوتي...`,
-      attachment: fs.createReadStream(coverPath)
-    };
+          if (
+            fs.existsSync(
+              coverPath
+            )
+          ) {
+            fs.unlinkSync(
+              coverPath
+            );
+          }
 
-    // إرسال الصورة مع النص أولاً، ثم إرسال المقطع الصوتي
-    return api.sendMessage(msg, threadID, (err, info) => {
-      api.sendMessage({
-        body: `🎶 مقطع: ${title}`,
-        attachment: fs.createReadStream(audioPath)
-      }, threadID, () => {
-        // تنظيف الملفات بعد الإرسال
-        if (fs.existsSync(audioPath)) fs.unlinkSync(audioPath);
-        if (fs.existsSync(coverPath)) fs.unlinkSync(coverPath);
-        api.setMessageReaction("✅", messageID, () => {}, true);
-      }, messageID);
-    }, messageID);
+        } catch (error) {
 
-  } catch (error) {
-    console.error(error);
-    api.setMessageReaction("❌", messageID, () => {}, true);
-    return api.sendMessage("⌬ ━━ 𝗞𝗜𝗥𝗔 ━━ ⌬\n\nحدث خطأ أثناء الاتصال بالمخدم، حاول لاحقاً.", threadID, messageID);
-  }
+          console.error(
+            "❌ Cache Cleanup Error:",
+            error
+          );
+
+        }
+
+        api.setMessageReaction(
+          "✅",
+          messageID,
+          () => {},
+          true
+        );
+
+      },
+
+      messageID
+    );
+
+  },
+
+  messageID
+);
+
+} catch (error) {
+
+console.error(
+  "❌ HINA SPOTI ERROR:",
+  error
+);
+
+api.setMessageReaction(
+  "❌",
+  messageID,
+  () => {},
+  true
+);
+
+return api.sendMessage(
+  "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗦𝗣𝗢𝗧𝗜 ━━ ⌬\n\nحدث خطأ أثناء الاتصال بالمخدم، حاول لاحقاً.",
+  threadID,
+  messageID
+);
+
+}
 };
