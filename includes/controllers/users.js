@@ -1,91 +1,138 @@
-const path = require("path");
-
 module.exports = function ({ models, api }) {
-    // استدعاء محرك المونغو لربط المستخدمين
-    const mongodb = require(path.join(process.cwd(), "includes", "mongodb.js"));
+    const Users = models.use("Users");
 
     async function getInfo(id) {
         try {
-            return (await api.getUserInfo(id))[id];
-        }
-        catch (e) {
+            const info = await api.getUserInfo(id);
+            return info[id] || false;
+        } catch (error) {
             return false;
         }
     }
 
     async function getNameUser(id) {
         try {
-            // محاولة جلب الاسم من ذاكرة البوت أولاً للسرعة
-            if (global.data.userName.has(id)) return global.data.userName.get(id);
-            
-            // إذا لم يوجد، نجلب البيانات من المونغو
-            const userData = await mongodb.getUserData(id);
-            if (userData && userData.user.name) {
-                return userData.user.name;
-            } else {
-                // محاولة أخيرة من فيسبوك
-                const info = await api.getUserInfo(id);
-                return info[id].name || "مستخدم فيسبوك";
+            if (global.data.userName.has(id)) {
+                return global.data.userName.get(id);
             }
-        }
-        catch (error) { 
-            return "مستخدم فيسبوك"; 
+
+            const user = await Users.findOne({
+                where: { userID: String(id) }
+            });
+
+            if (user && user.name) {
+                return user.name;
+            }
+
+            const info = await getInfo(id);
+
+            if (info && info.name) {
+                return info.name;
+            }
+
+            return "مستخدم فيسبوك";
+        } catch (error) {
+            return "مستخدم فيسبوك";
         }
     }
 
     async function getData(userID) {
         try {
-            // جلب كامل بيانات العضو من البنك السحابي
-            let data = await mongodb.getUserData(userID);
-            if (data) {
-                // تنسيق البيانات لتناسب السورس
-                return {
-                    userID: data.senderID,
-                    name: data.user.name,
-                    exp: data.currency.exp,
-                    money: data.currency.money,
-                    data: data.user
-                };
-            }
-            return false;
-        }
-        catch (error) {
-            console.error("❌ [Users] خطأ في جلب البيانات:", error);
+            return await Users.findOne({
+                where: { userID: String(userID) }
+            });
+        } catch (error) {
+            console.error("❌ [Users] getData:", error);
             return false;
         }
     }
 
     async function setData(userID, options = {}) {
         try {
-            // تحديث بيانات المستخدم (مثل الاسم أو الرتبة) في المونغو
-            await mongodb.updateUserData(userID, options);
-            return true;
-        }
-        catch (error) {
-            console.error("❌ [Users] فشل في تحديث بيانات العضو");
+            let user = await getData(userID);
+
+            if (!user) {
+                user = await createData(userID, options);
+            }
+
+            if (!user) return false;
+
+            const allowed = [
+                "name",
+                "gender",
+                "data"
+            ];
+
+            for (const key of allowed) {
+                if (Object.prototype.hasOwnProperty.call(options, key)) {
+                    user[key] = options[key];
+                }
+            }
+
+            await user.save();
+
+            if (user.name) {
+                global.data.userName.set(
+                    String(userID),
+                    user.name
+                );
+            }
+
+            return user;
+        } catch (error) {
+            console.error("❌ [Users] setData:", error);
             return false;
         }
     }
 
     async function createData(userID, defaults = {}) {
         try {
-            // ✅ التعديل هنا: استخدام ensureUser بدلاً من createUser
-            await mongodb.ensureUser(userID);
-            return true;
-        }
-        catch (error) {
-            console.error(error);
+            let user = await getData(userID);
+
+            if (user) return user;
+
+            let name = defaults.name || null;
+
+            if (!name) {
+                const info = await getInfo(userID);
+                if (info) name = info.name || null;
+            }
+
+            user = await Users.create({
+                userID: String(userID),
+                name,
+                gender: defaults.gender || null,
+                data: defaults.data || {}
+            });
+
+            if (user.name) {
+                global.data.userName.set(
+                    String(userID),
+                    user.name
+                );
+            }
+
+            return user;
+        } catch (error) {
+            console.error("❌ [Users] createData:", error);
             return false;
         }
     }
 
     async function getAll() {
         try {
-            // جلب قائمة بجميع المستخدمين المسجلين في KiraDB
-            return await mongodb.getAllUsers();
-        }
-        catch (error) {
+            return await Users.findAll();
+        } catch (error) {
+            console.error("❌ [Users] getAll:", error);
             return [];
+        }
+    }
+
+    async function getUserFull(id) {
+        try {
+            return await getInfo(id);
+        } catch (error) {
+            return false;
         }
     }
 
@@ -96,9 +143,6 @@ module.exports = function ({ models, api }) {
         getData,
         setData,
         createData,
-        // بقيت دالة getUserFull كما هي لجلب البيانات العميقة من فيسبوك عند الحاجة
-        getUserFull: async function(id) {
-            // الكود الخاص بـ Graph API
-        }
+        getUserFull
     };
 };
