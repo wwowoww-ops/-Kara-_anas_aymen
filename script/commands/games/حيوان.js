@@ -1,542 +1,676 @@
+const fs = require("fs-extra");
+
 module.exports.config = {
-  name: "حيوان",
-  version: "1.0.0",
-  hasPermssion: 0,
-  credits: "أبو هريرة",
-  description: "نظام الحيوانات الأليفة",
-  commandCategory: "Games",
-  usages: "حيوان",
-  cooldowns: 3
+name: "حيوان",
+version: "1.0.0",
+credits: "أبو هريرة",
+description: "نظام الحيوانات الأليفة",
+commandCategory: "Fun",
+hasPermssion: 0,
+usages: "حيوان",
+cooldowns: 3
 };
 
+// ============================================================
+// الحيوانات المتاحة
+// ============================================================
+
 const PETS = [
-  {
-    type: "قطة",
-    name: "قطة",
-    price: 0
-  },
-  {
-    type: "كلب",
-    name: "كلب",
-    price: 0
-  },
-  {
-    type: "أرنب",
-    name: "أرنب",
-    price: 0
-  },
-  {
-    type: "هامستر",
-    name: "هامستر",
-    price: 0
-  },
-  {
-    type: "ببغاء",
-    name: "ببغاء",
-    price: 0
-  },
-  {
-    type: "سلحفاة",
-    name: "سلحفاة",
-    price: 0
-  },
-  {
-    type: "ثعلب",
-    name: "ثعلب",
-    price: 5000
-  },
-  {
-    type: "ذئب",
-    name: "ذئب",
-    price: 8000
-  },
-  {
-    type: "نمر",
-    name: "نمر",
-    price: 15000
-  },
-  {
-    type: "أسد",
-    name: "أسد",
-    price: 20000
-  },
-  {
-    type: "تنين",
-    name: "تنين",
-    price: 50000
-  }
+{
+id: 1,
+type: "قطة",
+name: "قطة",
+price: 0,
+emoji: "🐱"
+},
+{
+id: 2,
+type: "كلب",
+name: "كلب",
+price: 0,
+emoji: "🐶"
+},
+{
+id: 3,
+type: "أرنب",
+name: "أرنب",
+price: 0,
+emoji: "🐰"
+},
+{
+id: 4,
+type: "هامستر",
+name: "هامستر",
+price: 0,
+emoji: "🐹"
+},
+{
+id: 5,
+type: "ثعلب",
+name: "ثعلب",
+price: 500,
+emoji: "🦊"
+},
+{
+id: 6,
+type: "ذئب",
+name: "ذئب",
+price: 1000,
+emoji: "🐺"
+},
+{
+id: 7,
+type: "باندا",
+name: "باندا",
+price: 1500,
+emoji: "🐼"
+},
+{
+id: 8,
+type: "نمر",
+name: "نمر",
+price: 2500,
+emoji: "🐯"
+},
+{
+id: 9,
+type: "أسد",
+name: "أسد",
+price: 3500,
+emoji: "🦁"
+},
+{
+id: 10,
+type: "دب",
+name: "دب",
+price: 4000,
+emoji: "🐻"
+},
+{
+id: 11,
+type: "غزال",
+name: "غزال",
+price: 5000,
+emoji: "🦌"
+},
+{
+id: 12,
+type: "نسر",
+name: "نسر",
+price: 6000,
+emoji: "🦅"
+},
+{
+id: 13,
+type: "تنين",
+name: "تنين",
+price: 10000,
+emoji: "🐉"
+}
 ];
+
+// ============================================================
+// الحالات
+// ============================================================
 
 const STATES = [
-  "سعيد",
-  "حزين",
-  "غاضب",
-  "جائع",
-  "نعسان",
-  "نشيط"
+"سعيد",
+"حزين",
+"غاضب",
+"جائع",
+"متعب",
+"طبيعي"
 ];
 
+// ============================================================
+// جلب مودل الحيوانات
+// ============================================================
+
+function getPetsModel(models) {
+
+try {
+
+if (
+  models &&
+  typeof models.use === "function"
+) {
+
+  const Pets =
+    models.use("Pets");
+
+  if (Pets) {
+    return Pets;
+  }
+}
+
+} catch (error) {
+
+console.error(
+  "[PET MODEL USE ERROR]",
+  error
+);
+
+}
+
+try {
+
+if (
+  models &&
+  models.Pets
+) {
+
+  return models.Pets;
+
+}
+
+} catch (error) {}
+
+try {
+
+if (
+  global.models &&
+  global.models.Pets
+) {
+
+  return global.models.Pets;
+
+}
+
+} catch (error) {}
+
+return null;
+}
+
+// ============================================================
+// رسالة القائمة
+// ============================================================
+
+function getPetList() {
+
+let text =
+"⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n";
+
+text +=
+"اختر حيوانك الأول بالرد على هذه الرسالة برقم الحيوان\n\n";
+
+for (const pet of PETS) {
+
+const price =
+  pet.price === 0
+    ? "مجاني"
+    : `${pet.price} عملة`;
+
+text +=
+  `${pet.id}. ${pet.emoji} ${pet.name} — ${price}\n`;
+
+}
+
+text +=
+"\n↪️ رد برقم الحيوان لإنشائه";
+
+return text;
+}
+
+// ============================================================
+// معلومات الحيوان
+// ============================================================
+
+function getPetInfo(pet) {
+
+const found =
+PETS.find(
+item =>
+String(item.type) ===
+String(pet.type)
+);
+
+const emoji =
+found?.emoji || "🐾";
+
+const state =
+pet.state ||
+"طبيعي";
+
+const xp =
+Number(pet.xp || 0);
+
+const level =
+Number(pet.level || 1);
+
+const health =
+Number(pet.health ?? 100);
+
+const hunger =
+Number(pet.hunger ?? 100);
+
+return (
+"⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+
+`${emoji} حيوانك: ${pet.name}\n` +
+
+`النوع: ${pet.type}\n` +
+
+`المستوى: ${level}\n` +
+
+`XP: ${xp}\n` +
+
+`الحالة: ${state}\n` +
+
+`الصحة: ${health}/100\n` +
+
+`الشبع: ${hunger}/100\n\n` +
+
+`يمكنك تطوير حيوانك والعناية به لرفع مستواه.`
+
+);
+}
+
+// ============================================================
+// الأمر
+// ============================================================
+
 module.exports.run = async function ({
-  api,
-  event,
-  args,
-  Currencies,
-  models
+api,
+event,
+models
 }) {
 
-  const {
+const {
+threadID,
+messageID,
+senderID
+} = event;
+
+try {
+
+// ========================================================
+// تحميل المودل
+// ========================================================
+
+const Pets =
+  getPetsModel(models);
+
+if (!Pets) {
+
+  console.error(
+    "[PET COMMAND] Pets model not found",
+    {
+      hasModels:
+        Boolean(models),
+
+      modelKeys:
+        models
+          ? Object.keys(models)
+          : []
+    }
+  );
+
+  return api.sendMessage(
+    `⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n` +
+    `❌ مودل الحيوانات غير محمّل\n\n` +
+    `تأكد أن Pets مسجل في نظام قاعدة البيانات.`,
     threadID,
-    messageID,
-    senderID
-  } = event;
+    messageID
+  );
 
-  try {
+}
 
-    // ==================================================
-    // الحصول على Pets
-    // ==================================================
 
-    let Pets = null;
+// ========================================================
+// البحث عن حيوان المستخدم
+// ========================================================
 
-    /*
-     * أولًا نحاول الحصول عليه من models
-     */
-
-    if (
-      models &&
-      models.Pets
-    ) {
-      Pets = models.Pets;
+const pet =
+  await Pets.findOne({
+    where: {
+      userID: String(senderID)
     }
+  });
 
-    /*
-     * ثم نحاول الحصول عليه من Currencies
-     * في حال كان النظام يضع المودلز داخله
-     */
 
-    if (
-      !Pets &&
-      Currencies &&
-      Currencies.Pets
-    ) {
-      Pets = Currencies.Pets;
-    }
+// ========================================================
+// لديه حيوان
+// ========================================================
 
-    /*
-     * ثم global.models
-     */
+if (pet) {
 
-    if (
-      !Pets &&
-      global.models &&
-      global.models.Pets
-    ) {
-      Pets = global.models.Pets;
-    }
+  return api.sendMessage(
+    getPetInfo(
+      pet.toJSON
+        ? pet.toJSON()
+        : pet
+    ),
 
-    // ==================================================
-    // التحقق
-    // ==================================================
+    threadID,
+    messageID
+  );
 
-    if (
-      !Pets ||
-      typeof Pets.findOne !== "function"
-    ) {
+}
 
-      console.error(
-        "[PET COMMAND ERROR] Pets model is not available"
-      );
 
-      return api.sendMessage(
-        `⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬
+// ========================================================
+// ليس لديه حيوان
+// ========================================================
 
-❌ مودل الحيوانات غير محمّل
-
-تأكد أن Pets موجود داخل models.`,
-        threadID,
-        messageID
-      );
-    }
-
-    // ==================================================
-    // البحث عن الحيوان
-    // ==================================================
-
-    const pet = await Pets.findOne({
-      where: {
-        userID: String(senderID)
-      }
-    });
-
-    // ==================================================
-    // لديه حيوان
-    // ==================================================
-
-    if (pet) {
-
-      const state =
-        pet.state ||
-        pet.status ||
-        "سعيد";
-
-      const level =
-        Number(pet.level) || 1;
-
-      const health =
-        Number(pet.health) || 100;
-
-      const hunger =
-        Number(pet.hunger) || 100;
-
-      const xp =
-        Number(pet.xp) || 0;
-
-      return api.sendMessage(
-
-`⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬
-
-🐾 حيوانك
-
-النوع: ${pet.type}
-الاسم: ${pet.name}
-
-الحالة: ${state}
-
-المستوى: ${level}
-الخبرة: ${xp} XP
-
-الصحة: ${health}/100
-الجوع: ${hunger}/100`,
-
-        threadID,
-        messageID
-      );
-    }
-
-    // ==================================================
-    // لا يملك حيوان
-    // ==================================================
-
-    let message =
-`⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬
-
-🐾 لم تقم بامتلاك حيوان بعد
-
-اختر الحيوان الذي تريد إنشاءه:
-
-`;
-
-    PETS.forEach(
-      (pet, index) => {
-
-        const price =
-          pet.price === 0
-            ? "مجاني"
-            : `${pet.price} عملة`;
-
-        message +=
-          `${index + 1}. ${pet.name} — ${price}\n`;
-      }
-    );
-
-    message +=
-`
-
-↪️ رد على هذه الرسالة برقم الحيوان لإنشائه`;
-
-    // ==================================================
-    // إرسال القائمة
-    // ==================================================
-
-    return new Promise(resolve => {
+const message =
+  await new Promise(
+    resolve => {
 
       api.sendMessage(
-        message,
+        getPetList(),
+
         threadID,
-        async (error, info) => {
+
+        (error, info) => {
 
           if (error) {
 
             console.error(
-              "[PET SEND ERROR]",
+              "[PET MENU SEND ERROR]",
               error
             );
 
-            resolve();
+            resolve(null);
             return;
           }
 
-          if (!info?.messageID) {
-            resolve();
-            return;
-          }
+          resolve(info);
 
-          // ==================================================
-          // حفظ جلسة الاختيار
-          // ==================================================
-
-          if (
-            !global.client.handleReply
-          ) {
-            global.client.handleReply = [];
-          }
-
-          global.client.handleReply.push({
-
-            name:
-              module.exports.config.name,
-
-            messageID:
-              info.messageID,
-
-            author:
-              String(senderID),
-
-            type:
-              "pet_create"
-
-          });
-
-          resolve();
         },
 
         messageID
       );
 
-    });
+    }
+  );
 
-  } catch (error) {
 
-    console.error(
-      "[PET COMMAND ERROR]",
-      error
-    );
+if (
+  !message ||
+  !message.messageID
+) {
 
-    return api.sendMessage(
+  return;
 
-`⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬
+}
 
-❌ حدث خطأ أثناء فحص حيوانك.
 
-${error?.message || "خطأ غير معروف"}`,
+// ========================================================
+// حفظ جلسة الاختيار
+// ========================================================
 
-      threadID,
-      messageID
-    );
-  }
+if (
+  !global.client.handleReply
+) {
+
+  global.client.handleReply = [];
+
+}
+
+
+global.client.handleReply.push({
+
+  name:
+    module.exports.config.name,
+
+  messageID:
+    message.messageID,
+
+  author:
+    String(senderID),
+
+  type:
+    "pet_create"
+
+});
+
+} catch (error) {
+
+console.error(
+  "[PET COMMAND ERROR]",
+  error
+);
+
+return api.sendMessage(
+  `⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n` +
+  `❌ حدث خطأ أثناء فحص حيوانك.\n\n` +
+  `📝 ${error.message}`,
+
+  threadID,
+  messageID
+);
+
+}
+
 };
 
-
 // ============================================================
-// الرد على قائمة الحيوانات
+// الرد على القائمة
 // ============================================================
 
 module.exports.handleReply = async function ({
-  api,
-  event,
-  handleReply,
-  Currencies,
-  models
+api,
+event,
+handleReply,
+models
 }) {
 
-  const {
+const {
+threadID,
+messageID,
+senderID,
+body
+} = event;
+
+try {
+
+// ========================================================
+// التأكد أن الرد لصاحب القائمة
+// ========================================================
+
+if (
+  handleReply.author &&
+  String(handleReply.author) !==
+  String(senderID)
+) {
+
+  return;
+
+}
+
+
+// ========================================================
+// التحقق من نوع الرد
+// ========================================================
+
+if (
+  handleReply.type !==
+  "pet_create"
+) {
+
+  return;
+
+}
+
+
+// ========================================================
+// الرقم
+// ========================================================
+
+const number =
+  Number(
+    String(body || "")
+      .trim()
+  );
+
+
+if (
+  !Number.isInteger(number)
+) {
+
+  return api.sendMessage(
+    `⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n` +
+    `❌ أرسل رقم الحيوان فقط.`,
+
     threadID,
-    messageID,
-    senderID,
-    body
-  } = event;
+    messageID
+  );
 
-  try {
+}
 
-    // ==================================================
-    // التحقق من صاحب القائمة
-    // ==================================================
 
-    if (
-      String(handleReply.author) !==
-      String(senderID)
-    ) {
+// ========================================================
+// البحث عن الحيوان
+// ========================================================
 
-      return api.sendMessage(
-        `⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬
+const selected =
+  PETS.find(
+    pet =>
+      pet.id === number
+  );
 
-⛔ هذه القائمة ليست خاصة بك.`,
-        threadID,
-        messageID
-      );
+
+if (!selected) {
+
+  return api.sendMessage(
+    `⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n` +
+    `❌ رقم الحيوان غير صحيح.\n\n` +
+    `أرسل رقمًا من 1 إلى ${PETS.length}.`,
+
+    threadID,
+    messageID
+  );
+
+}
+
+
+// ========================================================
+// مودل الحيوانات
+// ========================================================
+
+const Pets =
+  getPetsModel(models);
+
+
+if (!Pets) {
+
+  console.error(
+    "[PET REPLY] Pets model not found"
+  );
+
+  return api.sendMessage(
+    `⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n` +
+    `❌ مودل الحيوانات غير محمّل.`,
+
+    threadID,
+    messageID
+  );
+
+}
+
+
+// ========================================================
+// التأكد مرة أخرى
+// ========================================================
+
+const existing =
+  await Pets.findOne({
+    where: {
+      userID: String(senderID)
     }
+  });
 
-    // ==================================================
-    // قراءة الرقم
-    // ==================================================
 
-    const choice =
-      Number(
-        String(body || "").trim()
-      );
+if (existing) {
 
-    if (
-      !Number.isInteger(choice) ||
-      choice < 1 ||
-      choice > PETS.length
-    ) {
+  return api.sendMessage(
+    `⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n` +
+    `❌ لديك حيوان بالفعل.`,
 
-      return api.sendMessage(
-        `⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬
+    threadID,
+    messageID
+  );
 
-❌ اختر رقمًا صحيحًا من القائمة.`,
-        threadID,
-        messageID
-      );
-    }
+}
 
-    const selected =
-      PETS[choice - 1];
 
-    // ==================================================
-    // الحصول على Pets
-    // ==================================================
+// ========================================================
+// إنشاء الحيوان
+// ========================================================
 
-    let Pets = null;
+const pet =
+  await Pets.create({
 
-    if (
-      models &&
-      models.Pets
-    ) {
-      Pets = models.Pets;
-    }
+    userID:
+      String(senderID),
 
-    if (
-      !Pets &&
-      global.models &&
-      global.models.Pets
-    ) {
-      Pets = global.models.Pets;
-    }
+    type:
+      selected.type,
 
-    if (
-      !Pets ||
-      typeof Pets.findOne !== "function"
-    ) {
+    name:
+      selected.name,
 
-      console.error(
-        "[PET REPLY ERROR] Pets model unavailable"
-      );
+    level:
+      1,
 
-      return api.sendMessage(
-        `⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬
+    health:
+      100,
 
-❌ مودل الحيوانات غير محمّل.`,
-        threadID,
-        messageID
-      );
-    }
+    hunger:
+      100,
 
-    // ==================================================
-    // التأكد مرة أخرى أنه لا يملك حيوان
-    // ==================================================
+    state:
+      "سعيد",
 
-    const existing =
-      await Pets.findOne({
-        where: {
-          userID: String(senderID)
-        }
-      });
+    xp:
+      0
 
-    if (existing) {
+  });
 
-      return api.sendMessage(
-        `⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬
 
-❌ لديك حيوان بالفعل:
+// ========================================================
+// الرسالة
+// ========================================================
 
-🐾 ${existing.name}
+return api.sendMessage(
 
-لا يمكنك إنشاء حيوان آخر الآن.`,
-        threadID,
-        messageID
-      );
-    }
+  `⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n` +
 
-    // ==================================================
-    // إنشاء الحيوان
-    // ==================================================
+  `${selected.emoji} تم إنشاء حيوانك بنجاح\n\n` +
 
-    const petData = {
+  `الحيوان: ${selected.name}\n` +
 
-      userID:
-        String(senderID),
+  `المستوى: 1\n` +
 
-      type:
-        selected.type,
+  `XP: 0\n` +
 
-      name:
-        selected.name,
+  `الحالة: سعيد\n` +
 
-      level:
-        1,
+  `الصحة: 100/100\n` +
 
-      health:
-        100,
+  `الشبع: 100/100`,
 
-      hunger:
-        100,
+  threadID,
+  messageID
 
-      state:
-        "سعيد",
+);
 
-      xp:
-        0
+} catch (error) {
 
-    };
+console.error(
+  "[PET REPLY ERROR]",
+  error
+);
 
-    const newPet =
-      await Pets.create(
-        petData
-      );
+return api.sendMessage(
+  `⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n` +
+  `❌ حدث خطأ أثناء إنشاء الحيوان.\n\n` +
+  `📝 ${error.message}`,
 
-    // ==================================================
-    // النجاح
-    // ==================================================
+  threadID,
+  messageID
+);
 
-    return api.sendMessage(
+}
 
-`⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬
-
-🎉 تم إنشاء حيوانك بنجاح
-
-🐾 النوع: ${newPet.type}
-📝 الاسم: ${newPet.name}
-
-الحالة: سعيد
-
-المستوى: 1
-الخبرة: 0 XP
-
-الصحة: 100/100
-الجوع: 100/100`,
-
-      threadID,
-      messageID
-    );
-
-  } catch (error) {
-
-    console.error(
-      "[PET REPLY ERROR]",
-      error
-    );
-
-    return api.sendMessage(
-
-`⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬
-
-❌ حدث خطأ أثناء إنشاء الحيوان.
-
-${error?.message || "خطأ غير معروف"}`,
-
-      threadID,
-      messageID
-    );
-  }
 };
