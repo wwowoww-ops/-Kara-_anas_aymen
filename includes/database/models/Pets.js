@@ -1,10 +1,20 @@
-module.exports = function({ sequelize, Sequelize }) {
+module.exports = function ({ sequelize, Sequelize }) {
+
   const Pets = sequelize.define("Pets", {
+
+    // ==================================================
+    // ID
+    // ==================================================
+
     id: {
       type: Sequelize.INTEGER,
       primaryKey: true,
       autoIncrement: true
     },
+
+    // ==================================================
+    // صاحب الحيوان
+    // ==================================================
 
     userID: {
       type: Sequelize.BIGINT,
@@ -12,45 +22,104 @@ module.exports = function({ sequelize, Sequelize }) {
       allowNull: false
     },
 
+    // ==================================================
+    // نوع الحيوان
+    // ==================================================
+
     type: {
       type: Sequelize.STRING,
       allowNull: false
     },
+
+    // ==================================================
+    // اسم الحيوان
+    // ==================================================
 
     name: {
       type: Sequelize.STRING,
       allowNull: false
     },
 
+    // ==================================================
+    // الندرة
+    // ==================================================
+
+    rarity: {
+      type: Sequelize.STRING,
+      allowNull: false,
+      defaultValue: "عادي"
+    },
+
+    // ==================================================
+    // القوة الأساسية
+    // ==================================================
+
+    power: {
+      type: Sequelize.INTEGER,
+      allowNull: false,
+      defaultValue: 5
+    },
+
+    // ==================================================
+    // المستوى
+    // ==================================================
+
     level: {
       type: Sequelize.INTEGER,
+      allowNull: false,
       defaultValue: 1
     },
 
+    // ==================================================
+    // الخبرة
+    // ==================================================
+
     exp: {
       type: Sequelize.INTEGER,
+      allowNull: false,
       defaultValue: 0
     },
 
-    status: {
-      type: Sequelize.STRING,
-      defaultValue: "سعيد" 
-    },
+    // ==================================================
+    // الصحة
+    // ==================================================
 
     health: {
       type: Sequelize.INTEGER,
+      allowNull: false,
       defaultValue: 100
     },
 
+    // ==================================================
+    // الجوع
+    // ==================================================
+
     hunger: {
       type: Sequelize.INTEGER,
+      allowNull: false,
       defaultValue: 100
     },
+
+    // ==================================================
+    // الحالة النفسية
+    // سعيد / حزين / غاضب / طبيعي
+    // ==================================================
+
+    status: {
+      type: Sequelize.STRING,
+      allowNull: false,
+      defaultValue: "سعيد"
+    },
+
+    // ==================================================
+    // تاريخ إنشاء الحيوان
+    // ==================================================
 
     createdAt: {
       type: Sequelize.DATE,
       defaultValue: Sequelize.NOW
     }
+
   });
 
   return Pets;
