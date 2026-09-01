@@ -4,7 +4,7 @@ module.exports.config = {
         "log:subscribe",
         "log:user-nickname"
     ],
-    version: "2.0.0",
+    version: "2.1.0",
     credits: "أبو هريرة",
     description: "حفظ واسترجاع كنيات الأعضاء تلقائياً"
 };
@@ -39,33 +39,64 @@ module.exports.run = async function ({
         return;
     }
 
+    /*
+     * في FCA:
+     *
+     * event.type
+     * = "event"
+     *
+     * event.logMessageType
+     * = "log:subscribe"
+     * أو
+     * = "log:user-nickname"
+     */
+
+    const eventType =
+        event.logMessageType ||
+        event.type;
+
 
     // =========================================================
     // تغيير كنية عضو
     // =========================================================
 
     if (
-        event.type === "log:user-nickname"
+        eventType === "log:user-nickname"
     ) {
 
+        const data =
+            event.logMessageData || {};
+
         let userID =
+            data.participant_id ||
+            data.participantID ||
+            data.changedFor ||
+            data.userID ||
+            data.userFbId ||
             event.participantID ||
             event.changedFor ||
             event.userID ||
             event.userFbId;
 
         if (!userID) {
+            console.log(
+                "[nicknameRestore] لم يتم العثور على userID في حدث تغيير الكنية"
+            );
             return;
         }
 
         userID = String(userID);
 
+
         let nickname =
+            data.nickname ??
+            data.newNickname ??
+            data.new_nickname ??
             event.nickname ??
             event.newNickname ??
             event.new_nickname ??
-            event.name ??
             "";
+
 
         if (
             nickname === null ||
@@ -74,7 +105,8 @@ module.exports.run = async function ({
             nickname = "";
         }
 
-        nickname = String(nickname).trim();
+        nickname =
+            String(nickname).trim();
 
 
         // -----------------------------------------------------
@@ -102,6 +134,7 @@ module.exports.run = async function ({
                     "[nicknameRestore] فشل حذف الكنية:",
                     error.message || error
                 );
+
             }
 
             return;
@@ -109,13 +142,16 @@ module.exports.run = async function ({
 
 
         // -----------------------------------------------------
-        // الحصول على الاسم الحقيقي وتخزينه
+        // الحصول على الاسم الحقيقي
         // -----------------------------------------------------
 
         let userName =
+            data.userName ||
+            data.fullName ||
             event.userName ||
             event.fullName ||
             "عضو غير معروف";
+
 
         try {
 
@@ -128,9 +164,12 @@ module.exports.run = async function ({
                     userData &&
                     userData.name
                 ) {
+
                     userName =
                         userData.name;
+
                 }
+
             }
 
         } catch (_) {}
@@ -160,6 +199,7 @@ module.exports.run = async function ({
                 "[nicknameRestore] فشل حفظ الكنية:",
                 error.message || error
             );
+
         }
 
         return;
@@ -171,16 +211,25 @@ module.exports.run = async function ({
     // =========================================================
 
     if (
-        event.type === "log:subscribe"
+        eventType === "log:subscribe"
     ) {
 
+        const data =
+            event.logMessageData || {};
+
         const addedParticipants =
-            event.addedParticipants || [];
+            data.addedParticipants || [];
+
 
         if (
             !Array.isArray(addedParticipants) ||
             addedParticipants.length === 0
         ) {
+
+            console.log(
+                "[nicknameRestore] log:subscribe بدون أعضاء مضافين"
+            );
+
             return;
         }
 
@@ -195,29 +244,58 @@ module.exports.run = async function ({
                     participant.userFbId ||
                     participant.userID ||
                     participant.id ||
+                    participant.userId ||
                     ""
                 );
+
 
             if (!userID) {
                 continue;
             }
 
 
+            console.log(
+                `[nicknameRestore] عضو جديد: ${userID}`
+            );
+
+
             // -------------------------------------------------
             // البحث عن الكنية القديمة
             // -------------------------------------------------
 
-            const savedRecord =
-                await Nicknames.findOne({
-                    where: {
-                        threadID,
-                        userID
-                    }
-                });
+            let savedRecord = null;
+
+            try {
+
+                savedRecord =
+                    await Nicknames.findOne({
+                        where: {
+                            threadID,
+                            userID
+                        }
+                    });
+
+            } catch (error) {
+
+                console.error(
+                    "[nicknameRestore] فشل البحث عن الكنية:",
+                    error.message || error
+                );
+
+                continue;
+            }
 
 
-            // لا يوجد سجل قديم = لا نفعل شيئاً
+            // -------------------------------------------------
+            // لا يوجد سجل سابق
+            // -------------------------------------------------
+
             if (!savedRecord) {
+
+                console.log(
+                    `[nicknameRestore] لا توجد كنية محفوظة للعضو ${userID}`
+                );
+
                 continue;
             }
 
@@ -226,6 +304,7 @@ module.exports.run = async function ({
                 String(
                     savedRecord.nickname || ""
                 ).trim();
+
 
             if (!nickname) {
                 continue;
@@ -254,6 +333,7 @@ module.exports.run = async function ({
                                 }
 
                                 resolve();
+
                             }
                         );
 
@@ -262,13 +342,18 @@ module.exports.run = async function ({
 
 
                 // ------------------------------------------------
-                // رسالة HINA
+                // الاسم المحفوظ
                 // ------------------------------------------------
 
                 const userName =
                     savedRecord.userName ||
                     participant.fullName ||
                     "عضو غير معروف";
+
+
+                // ------------------------------------------------
+                // رسالة HINA
+                // ------------------------------------------------
 
                 await new Promise(
                     resolve => {
@@ -292,13 +377,18 @@ module.exports.run = async function ({
                     `[nicknameRestore] تم استرجاع كنية ${userName}: ${nickname}`
                 );
 
+
             } catch (error) {
 
                 console.error(
                     `[nicknameRestore] فشل استرجاع كنية ${userID}:`,
                     error.message || error
                 );
+
             }
+
         }
+
     }
+
 };
