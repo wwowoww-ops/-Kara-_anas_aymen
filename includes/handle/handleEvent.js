@@ -243,7 +243,10 @@ module.exports = function ({
             }
 
             // ==================================================
-            // 🦧 HINA — التفاعل التلقائي
+            // 🦧🦊🦋 HINA — التفاعلات التلقائية
+            // ==================================================
+            // يعمل بشكل مستقل عن الأوامر
+            // ولا ينتظر انتهاء التفاعل
             // ==================================================
 
             if (
@@ -254,9 +257,16 @@ module.exports = function ({
 
                 const text =
                     String(event.body)
-                        .toLowerCase();
+                        .toLowerCase()
+                        .trim();
 
-                const triggerWords = [
+                let reaction = null;
+
+                // ==================================================
+                // 🦧 يوتا / شفق / هريرة
+                // ==================================================
+
+                const monkeyWords = [
                     "يوتا",
                     "شفق",
                     "الشفق",
@@ -265,53 +275,91 @@ module.exports = function ({
                     "أبو هريرة"
                 ];
 
-                const matched =
-                    triggerWords.some(
+                // ==================================================
+                // 🦊 رؤى
+                // ==================================================
+
+                const foxWords = [
+                    "رؤى",
+                    "ࢪؤى"
+                ];
+
+                // ==================================================
+                // 🦋 فريال
+                // ==================================================
+
+                const butterflyWords = [
+                    "فريال",
+                    "فࢪيال"
+                ];
+
+                // ==================================================
+                // تحديد التفاعل
+                // ==================================================
+
+                if (
+                    monkeyWords.some(
                         word =>
                             text.includes(
                                 word.toLowerCase()
                             )
-                    );
+                    )
+                ) {
 
-                if (matched) {
+                    reaction = "🦧";
+
+                } else if (
+                    foxWords.some(
+                        word =>
+                            text.includes(
+                                word.toLowerCase()
+                            )
+                    )
+                ) {
+
+                    reaction = "🦊";
+
+                } else if (
+                    butterflyWords.some(
+                        word =>
+                            text.includes(
+                                word.toLowerCase()
+                            )
+                    )
+                ) {
+
+                    reaction = "🦋";
+                }
+
+                // ==================================================
+                // إرسال التفاعل بدون انتظار
+                // ==================================================
+
+                if (reaction) {
 
                     try {
 
-                        await new Promise(
-                            (resolve) => {
+                        api.setMessageReaction(
+                            reaction,
+                            String(event.messageID),
+                            error => {
 
-                                api.setMessageReaction(
-                                    "🦧",
-                                    String(event.messageID),
-                                    error => {
+                                if (error) {
 
-                                        if (error) {
+                                    console.error(
+                                        `[HINA REACTION ERROR] ${reaction}`,
+                                        error.message || error
+                                    );
+                                }
 
-                                            console.error(
-                                                "[HINA 🦧 REACTION ERROR]",
-                                                error
-                                            );
-
-                                        } else {
-
-                                            console.log(
-                                                "[HINA 🦧] تم وضع التفاعل"
-                                            );
-
-                                        }
-
-                                        resolve();
-                                    },
-                                    true
-                                );
-
-                            }
+                            },
+                            true
                         );
 
                     } catch (error) {
 
                         console.error(
-                            "[HINA 🦧 REACTION ERROR]",
+                            "[HINA REACTION ERROR]",
                             error
                         );
                     }
@@ -591,7 +639,7 @@ module.exports = function ({
                 }
 
                 // ==================================================
-                // Object الخاص بالـ Event
+                // Object الخاص بالـEvent
                 // ==================================================
 
                 const Obj = {
