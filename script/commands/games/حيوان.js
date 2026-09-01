@@ -2,29 +2,25 @@ module.exports.config = {
   name: "حيوان",
   version: "11.0.0",
   credits: "أبو هريرة",
-  description: "نظام الحيوانات الأليفة والعملات والمتجر والسرقة والمتصدرين",
-  commandCategory: "Games",
+  description: "نظام الحيوانات الأليفة والاقتصاد والاستثمار والسرقة",
+  commandCategory: "games",
   hasPermssion: 0,
-  usages: "حيوان | حيوان قائمة | حيوان متجر | حيوان رصيد | حيوان عمل | حيوان يومي | حيوان تصدر | حيوان سرقة",
+  usages: "حيوان | حيوان قائمة | حيوان متجر | حيوان رصيد | حيوان عمل | حيوان يومي | حيوان استثمار | حيوان سرقة | حيوان تصدر",
   cooldowns: 3
 };
 
 // ============================================================
-// الإعدادات
+// إعدادات
 // ============================================================
 
 const TRAIN_COOLDOWN = 30 * 60 * 1000;
 const WORK_COOLDOWN = 30 * 60 * 1000;
 const DAILY_COOLDOWN = 24 * 60 * 60 * 1000;
-const STEAL_COOLDOWN = 60 * 60 * 1000;
+const THEFT_COOLDOWN = 60 * 60 * 1000;
+const SHIELD_DURATION = 24 * 60 * 60 * 1000;
 
 const TRAIN_XP = 20;
 const POWER_PER_LEVEL = 5;
-
-const STEAL_SUCCESS_CHANCE = 0.55;
-const STEAL_PERCENT_MIN = 0.10;
-const STEAL_PERCENT_MAX = 0.25;
-const STEAL_FAIL_LOSS = 100;
 
 // ============================================================
 // الحيوانات
@@ -85,7 +81,42 @@ const RARITY_ORDER = [
 ];
 
 // ============================================================
-// الموديلات
+// المتجر
+// ============================================================
+
+const SHOP = [
+  {
+    id: "food",
+    name: "طعام الحيوان",
+    price: 100,
+    description: "يزيد الشبع 30 نقطة",
+    emoji: "🍖"
+  },
+  {
+    id: "medicine",
+    name: "دواء الحيوان",
+    price: 250,
+    description: "يزيد الصحة 30 نقطة",
+    emoji: "💊"
+  },
+  {
+    id: "shield",
+    name: "درع الحماية",
+    price: 1500,
+    description: "يحميك من السرقة لمدة 24 ساعة",
+    emoji: "🛡️"
+  },
+  {
+    id: "investment_card",
+    name: "بطاقة الاستثمار",
+    price: 2000,
+    description: "تضمن 50% استثمار إضافي",
+    emoji: "🎫"
+  }
+];
+
+// ============================================================
+// المودلات
 // ============================================================
 
 function getModel(models, name) {
@@ -95,10 +126,12 @@ function getModel(models, name) {
       if (model) return model;
     }
   } catch (e) {
-    console.error(`[PET MODEL ERROR] ${name}`, e);
+    console.error(`[PET MODEL] ${name}`, e);
   }
 
-  if (models && models[name]) return models[name];
+  if (models && models[name]) {
+    return models[name];
+  }
 
   if (global.models && global.models[name]) {
     return global.models[name];
@@ -140,7 +173,8 @@ function sendReply(api, message, threadID, messageID) {
       (error, info) => {
         if (error) {
           console.error("[PET SEND ERROR]", error);
-          return resolve(null);
+          resolve(null);
+          return;
         }
 
         resolve(info);
@@ -151,11 +185,13 @@ function sendReply(api, message, threadID, messageID) {
 }
 
 // ============================================================
-// البحث عن الحيوانات
+// الحيوانات
 // ============================================================
 
 function getPetByID(id) {
-  return PETS.find(pet => pet.id === Number(id));
+  return PETS.find(
+    pet => pet.id === Number(id)
+  );
 }
 
 function getPetByType(type) {
@@ -165,89 +201,7 @@ function getPetByType(type) {
 }
 
 // ============================================================
-// الحالة
-// ============================================================
-
-function calculatePetState(health, hunger) {
-  health = Math.max(0, Math.min(100, Number(health)));
-  hunger = Math.max(0, Math.min(100, Number(hunger)));
-
-  if (health < 20) return "مريض";
-  if (hunger < 20) return "جائع";
-  if (health < 50) return "متعب";
-  if (hunger < 50) return "حزين";
-
-  if (health >= 80 && hunger >= 80) {
-    return "سعيد";
-  }
-
-  return "طبيعي";
-}
-
-// ============================================================
-// تحديث الحيوان مع الوقت
-// ============================================================
-
-async function updatePetOverTime(pet) {
-  const now = Date.now();
-
-  const updatedAt = pet.updatedAt
-    ? new Date(pet.updatedAt).getTime()
-    : now;
-
-  const hoursPassed = Math.floor(
-    (now - updatedAt) / (1000 * 60 * 60)
-  );
-
-  if (hoursPassed <= 0) {
-    return pet;
-  }
-
-  const hunger = Math.max(
-    0,
-    Math.min(100, Number(pet.hunger ?? 100))
-  );
-
-  const health = Math.max(
-    0,
-    Math.min(100, Number(pet.health ?? 100))
-  );
-
-  const newHunger = Math.max(
-    0,
-    hunger - hoursPassed * 5
-  );
-
-  let healthLoss = 0;
-
-  if (newHunger < 20) {
-    healthLoss = hoursPassed * 4;
-  } else if (newHunger < 50) {
-    healthLoss = hoursPassed * 2;
-  }
-
-  const newHealth = Math.max(
-    0,
-    health - healthLoss
-  );
-
-  const status = calculatePetState(
-    newHealth,
-    newHunger
-  );
-
-  await pet.update({
-    hunger: newHunger,
-    health: newHealth,
-    status,
-    updatedAt: new Date()
-  });
-
-  return pet;
-}
-
-// ============================================================
-// PetCurrency
+// العملة
 // ============================================================
 
 async function getPetCurrency(PetCurrency, userID) {
@@ -255,18 +209,20 @@ async function getPetCurrency(PetCurrency, userID) {
     throw new Error("مودل PetCurrency غير محمّل.");
   }
 
-  let currency = await PetCurrency.findOne({
-    where: {
-      userID: String(userID)
-    }
-  });
+  let currency =
+    await PetCurrency.findOne({
+      where: {
+        userID: String(userID)
+      }
+    });
 
   if (!currency) {
-    currency = await PetCurrency.create({
-      userID: String(userID),
-      money: 0,
-      data: {}
-    });
+    currency =
+      await PetCurrency.create({
+        userID: String(userID),
+        money: 0,
+        data: {}
+      });
   }
 
   return currency;
@@ -305,7 +261,8 @@ async function updateCurrencyData(currency, changes) {
 function getRemainingCooldown(lastTime, cooldown) {
   if (!lastTime) return 0;
 
-  const last = new Date(lastTime).getTime();
+  const last =
+    new Date(lastTime).getTime();
 
   if (!Number.isFinite(last)) return 0;
 
@@ -323,10 +280,14 @@ function formatTime(milliseconds) {
     Math.floor(totalSeconds / 86400);
 
   const hours =
-    Math.floor((totalSeconds % 86400) / 3600);
+    Math.floor(
+      (totalSeconds % 86400) / 3600
+    );
 
   const minutes =
-    Math.floor((totalSeconds % 3600) / 60);
+    Math.floor(
+      (totalSeconds % 3600) / 60
+    );
 
   const seconds =
     totalSeconds % 60;
@@ -343,117 +304,243 @@ function formatTime(milliseconds) {
 }
 
 // ============================================================
-// استخراج الشخص المستهدف
+// حالة الحيوان
+// ============================================================
+
+function calculatePetState(health, hunger) {
+  health =
+    Math.max(
+      0,
+      Math.min(100, Number(health))
+    );
+
+  hunger =
+    Math.max(
+      0,
+      Math.min(100, Number(hunger))
+    );
+
+  if (health < 20) return "مريض";
+  if (hunger < 20) return "جائع";
+  if (health < 50) return "متعب";
+  if (hunger < 50) return "حزين";
+
+  if (
+    health >= 80 &&
+    hunger >= 80
+  ) {
+    return "سعيد";
+  }
+
+  return "طبيعي";
+}
+
+// ============================================================
+// تحديث الحيوان مع الوقت
+// ============================================================
+
+async function updatePetOverTime(pet) {
+  const now = Date.now();
+
+  const updatedAt =
+    pet.updatedAt
+      ? new Date(pet.updatedAt).getTime()
+      : now;
+
+  const hoursPassed =
+    Math.floor(
+      (now - updatedAt) /
+      (1000 * 60 * 60)
+    );
+
+  if (hoursPassed <= 0) {
+    return pet;
+  }
+
+  const hunger =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        Number(pet.hunger ?? 100)
+      )
+    );
+
+  const health =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        Number(pet.health ?? 100)
+      )
+    );
+
+  const newHunger =
+    Math.max(
+      0,
+      hunger - hoursPassed * 5
+    );
+
+  let healthLoss = 0;
+
+  if (newHunger < 20) {
+    healthLoss = hoursPassed * 4;
+  } else if (newHunger < 50) {
+    healthLoss = hoursPassed * 2;
+  }
+
+  const newHealth =
+    Math.max(
+      0,
+      health - healthLoss
+    );
+
+  const status =
+    calculatePetState(
+      newHealth,
+      newHunger
+    );
+
+  await pet.update({
+    hunger: newHunger,
+    health: newHealth,
+    status
+  });
+
+  return pet;
+}
+
+// ============================================================
+// اسم المستخدم
+// ============================================================
+
+async function getUserName(api, userID) {
+  try {
+    const info =
+      await new Promise(resolve => {
+        api.getUserInfo(
+          String(userID),
+          (error, result) => {
+            if (error || !result) {
+              resolve(null);
+              return;
+            }
+
+            resolve(result);
+          }
+        );
+      });
+
+    if (
+      info &&
+      info[userID] &&
+      info[userID].name
+    ) {
+      return info[userID].name;
+    }
+  } catch (e) {
+    console.error(
+      "[PET USER INFO ERROR]",
+      e
+    );
+  }
+
+  return "مستخدم";
+}
+
+// ============================================================
+// استخراج المستخدم المستهدف
 // ============================================================
 
 function getTargetUserID(event) {
-  // أولاً: الرد على رسالة
+
+  // المنشن له الأولوية
+  if (
+    event.mentions &&
+    Object.keys(event.mentions).length > 0
+  ) {
+    return String(
+      Object.keys(event.mentions)[0]
+    );
+  }
+
+  // ثم الرد
   if (
     event.messageReply &&
     event.messageReply.senderID
   ) {
-    return String(event.messageReply.senderID);
-  }
-
-  // ثانياً: المنشن
-  if (
-    event.mentions &&
-    typeof event.mentions === "object"
-  ) {
-    const ids = Object.keys(event.mentions);
-
-    if (ids.length > 0) {
-      return String(ids[0]);
-    }
+    return String(
+      event.messageReply.senderID
+    );
   }
 
   return null;
 }
 
-function getTargetName(event, targetID) {
-  if (
-    event.mentions &&
-    event.mentions[targetID]
-  ) {
-    return event.mentions[targetID]
-      .replace("@", "")
-      .trim();
-  }
-
-  return `المستخدم ${targetID}`;
-}
-
 // ============================================================
-// القائمة الكاملة
+// القائمة الكاملة للحيوانات
 // ============================================================
 
 function getFullPetsList() {
   let text =
-    "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+    "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n";
+
+  text +=
     "🐾 قائمة جميع الحيوانات\n\n";
 
   for (const rarity of RARITY_ORDER) {
-    const pets = PETS.filter(
-      pet => pet.rarity === rarity
-    );
+
+    const pets =
+      PETS.filter(
+        pet => pet.rarity === rarity
+      );
 
     if (!pets.length) continue;
 
-    text += `【 ${rarity} 】\n\n`;
+    text +=
+      `【 ${rarity} 】\n\n`;
 
     for (const pet of pets) {
+
       text +=
         `${pet.id}. ${pet.emoji} ${pet.name}\n` +
-        `   القوة: ${pet.power}`;
-
-      if (pet.price === 0) {
-        text += " | مجاني";
-      } else {
-        text += ` | السعر: ${pet.price} عملة`;
-      }
-
-      text += "\n";
+        `   القوة: ${pet.power} | السعر: ${
+          pet.price === 0
+            ? "مجاني"
+            : pet.price + " عملة"
+        }\n`;
     }
 
     text += "\n";
   }
 
-  text +=
-    "↪️ حيوان متجر لعرض الحيوانات القابلة للشراء.";
-
   return text;
 }
 
 // ============================================================
-// المتجر
+// متجر الأدوات والأكل
 // ============================================================
 
 function getShopList() {
   let text =
-    "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+    "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n";
+
+  text +=
     "🛒 متجر الحيوانات\n\n";
 
-  for (const rarity of RARITY_ORDER) {
-    const pets = PETS.filter(
-      pet =>
-        pet.price > 0 &&
-        pet.rarity === rarity
-    );
+  text +=
+    "الأكل والأدوات المتاحة:\n\n";
 
-    if (!pets.length) continue;
+  for (const item of SHOP) {
 
-    text += `【 ${rarity} 】\n\n`;
-
-    for (const pet of pets) {
-      text +=
-        `${pet.id}. ${pet.emoji} ${pet.name}\n` +
-        `   القوة: ${pet.power}\n` +
-        `   السعر: ${pet.price} عملة\n\n`;
-    }
+    text +=
+      `${item.emoji} ${item.name}\n` +
+      `💰 السعر: ${item.price} عملة\n` +
+      `${item.description}\n\n`;
   }
 
   text +=
-    "↪️ رد برقم الحيوان لبدء الشراء.";
+    "↪️ للشراء رد على رسالة المتجر باسم الأداة أو الطعام.";
 
   return text;
 }
@@ -463,36 +550,44 @@ function getShopList() {
 // ============================================================
 
 function getPetInfo(pet) {
-  const found = getPetByType(pet.type);
 
-  const emoji = found?.emoji || "🐾";
+  const found =
+    getPetByType(pet.type);
+
+  const emoji =
+    found?.emoji || "🐾";
 
   const rarity =
     pet.rarity ||
     found?.rarity ||
     "شائع";
 
-  const power = Number(
-    pet.power ??
-    found?.power ??
-    0
-  );
+  const power =
+    Number(
+      pet.power ??
+      found?.power ??
+      0
+    );
 
-  const level = Number(
-    pet.level || 1
-  );
+  const level =
+    Number(
+      pet.level || 1
+    );
 
-  const exp = Number(
-    pet.exp || 0
-  );
+  const exp =
+    Number(
+      pet.exp || 0
+    );
 
-  const health = Number(
-    pet.health ?? 100
-  );
+  const health =
+    Number(
+      pet.health ?? 100
+    );
 
-  const hunger = Number(
-    pet.hunger ?? 100
-  );
+  const hunger =
+    Number(
+      pet.hunger ?? 100
+    );
 
   const status =
     pet.status ||
@@ -524,23 +619,49 @@ function getPetInfo(pet) {
 }
 
 // ============================================================
-// إنشاء الحيوان
+// إنشاء حيوان
 // ============================================================
 
-async function createPet(Pets, senderID, selected) {
+async function createPet(
+  Pets,
+  senderID,
+  selected
+) {
+
   await Pets.create({
-    userID: String(senderID),
-    type: selected.type,
-    name: selected.name,
-    rarity: selected.rarity,
-    power: selected.power,
-    level: 1,
-    exp: 0,
-    health: 100,
-    hunger: 100,
-    status: "سعيد",
-    lastTrain: null,
-    updatedAt: new Date()
+
+    userID:
+      String(senderID),
+
+    type:
+      selected.type,
+
+    name:
+      selected.name,
+
+    rarity:
+      selected.rarity,
+
+    power:
+      selected.power,
+
+    level:
+      1,
+
+    exp:
+      0,
+
+    health:
+      100,
+
+    hunger:
+      100,
+
+    status:
+      "سعيد",
+
+    lastTrain:
+      null
   });
 
   return (
@@ -564,7 +685,9 @@ async function createPet(Pets, senderID, selected) {
 // ============================================================
 
 function getSellPrice(pet) {
-  const found = getPetByType(pet.type);
+
+  const found =
+    getPetByType(pet.type);
 
   if (!found) return 0;
 
@@ -597,10 +720,9 @@ async function sendPetBalance(
   threadID,
   messageID,
   PetCurrency,
-  targetID,
-  targetName,
-  own
+  targetID
 ) {
+
   const currency =
     await getPetCurrency(
       PetCurrency,
@@ -610,24 +732,29 @@ async function sendPetBalance(
   const money =
     Number(currency.money || 0);
 
-  let message =
-    "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
-    "💰 رصيد الحيوانات\n\n";
+  const targetName =
+    await getUserName(
+      api,
+      targetID
+    );
 
-  if (own) {
-    message +=
-      `💳 رصيدك: ${money} عملة\n\n`;
-  } else {
-    message +=
-      `👤 ${targetName}\n` +
-      `💳 الرصيد: ${money} عملة\n\n`;
-  }
+  const data =
+    getCurrencyData(currency);
 
-  message +=
-    "هذا الرصيد مستقل عن رصيد البوت العام.";
+  const investmentPoints =
+    Number(
+      data.investmentPoints || 0
+    );
 
   return api.sendMessage(
-    message,
+
+    "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+
+    `👤 ${targetName}\n\n` +
+
+    `💰 رصيد الحيوان: ${money} عملة\n` +
+    `📈 نقاط الاستثمار: ${investmentPoints}`,
+
     threadID,
     messageID
   );
@@ -645,21 +772,24 @@ async function doWork(
   PetCurrency,
   senderID
 ) {
-  let pet = await Pets.findOne({
-    where: {
-      userID: String(senderID)
-    }
-  });
+
+  let pet =
+    await Pets.findOne({
+      where: {
+        userID: String(senderID)
+      }
+    });
 
   if (!pet) {
     return api.sendMessage(
-      "❌ لا تملك حيوانًا.\n\nأنشئ حيوانًا أولًا باستخدام الأمر حيوان.",
+      "❌ لا تملك حيوانًا.",
       threadID,
       messageID
     );
   }
 
-  pet = await updatePetOverTime(pet);
+  pet =
+    await updatePetOverTime(pet);
 
   const currency =
     await getPetCurrency(
@@ -678,7 +808,6 @@ async function doWork(
 
   if (remaining > 0) {
     return api.sendMessage(
-      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
       "❌ حيوانك يحتاج إلى الراحة.\n\n" +
       `⏳ العمل القادم بعد: ${formatTime(remaining)}`,
       threadID,
@@ -713,11 +842,16 @@ async function doWork(
   );
 
   return api.sendMessage(
+
     "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+
     `🐾 ${pet.name} عمل بنجاح\n\n` +
+
     `💰 المكافأة: +${reward} عملة\n` +
     `💳 رصيدك الجديد: ${money + reward} عملة\n\n` +
+
     "⏳ يمكنك العمل مرة أخرى بعد 30 دقيقة.",
+
     threadID,
     messageID
   );
@@ -735,6 +869,7 @@ async function doDaily(
   PetCurrency,
   senderID
 ) {
+
   const pet =
     await Pets.findOne({
       where: {
@@ -767,7 +902,6 @@ async function doDaily(
 
   if (remaining > 0) {
     return api.sendMessage(
-      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
       "❌ لقد أخذت مكافأة اليوم بالفعل.\n\n" +
       `⏳ اليومي القادم بعد: ${formatTime(remaining)}`,
       threadID,
@@ -778,17 +912,43 @@ async function doDaily(
   const money =
     Number(currency.money || 0);
 
+  /*
+   * كلما زاد الرصيد زادت النسبة
+   *
+   * 250 حد أدنى
+   * 5% من الرصيد كحد أساسي
+   * 10,000 حد أقصى
+   */
+
+  let percentage =
+    0.05;
+
+  if (money >= 100000) {
+    percentage = 0.07;
+  }
+
+  if (money >= 500000) {
+    percentage = 0.09;
+  }
+
+  if (money >= 1000000) {
+    percentage = 0.10;
+  }
+
   const reward =
     Math.min(
       10000,
       Math.max(
         250,
-        Math.floor(money * 0.05)
+        Math.floor(
+          money * percentage
+        )
       )
     );
 
   await currency.update({
-    money: money + reward
+    money:
+      money + reward
   });
 
   await updateCurrencyData(
@@ -800,65 +960,257 @@ async function doDaily(
   );
 
   return api.sendMessage(
+
     "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+
     "🎁 مكافأة اليومي\n\n" +
+
     `🐾 الحيوان: ${pet.name}\n` +
     `💰 رصيدك قبل المكافأة: ${money}\n` +
+    `📊 نسبة اليومي: ${percentage * 100}%\n` +
     `🎁 المكافأة: +${reward} عملة\n` +
     `💳 رصيدك الجديد: ${money + reward} عملة\n\n` +
+
     "⏳ يمكنك أخذ اليومي مرة أخرى بعد 24 ساعة.",
+
     threadID,
     messageID
   );
 }
 
 // ============================================================
-// المتصدرين
+// الاستثمار
 // ============================================================
 
-async function sendLeaderboard(
+async function doInvestment(
   api,
   threadID,
   messageID,
-  Pets
+  PetCurrency,
+  senderID,
+  amount
 ) {
-  const pets =
-    await Pets.findAll({
-      order: [
-        ["power", "DESC"],
-        ["level", "DESC"],
-        ["exp", "DESC"]
-      ],
-      limit: 10
-    });
 
-  if (!pets.length) {
+  const currency =
+    await getPetCurrency(
+      PetCurrency,
+      senderID
+    );
+
+  const money =
+    Number(currency.money || 0);
+
+  const data =
+    getCurrencyData(currency);
+
+  if (!amount) {
     return api.sendMessage(
-      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\nلا يوجد متصدرون حتى الآن.",
+
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+
+      "📈 الاستثمار\n\n" +
+
+      `رصيدك: ${money} عملة\n\n` +
+
+      "استخدم:\n" +
+      "حيوان استثمار 1000\n\n" +
+
+      "المبلغ المستثمَر يتحول إلى نقاط استثمار فورًا.",
+
       threadID,
       messageID
     );
   }
 
-  let text =
-    "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
-    "🏆 المتصدرون\n\n";
+  amount =
+    Number(
+      String(amount)
+        .replace(/,/g, "")
+    );
 
-  for (let i = 0; i < pets.length; i++) {
-    const pet = pets[i].toJSON();
-
-    const found =
-      getPetByType(pet.type);
-
-    text +=
-      `${i + 1}. ${pet.userID}\n` +
-      `${found?.emoji || "🐾"} ${pet.name}\n` +
-      `المستوى: ${pet.level || 1}\n` +
-      `القوة: ${pet.power || 0}\n\n`;
+  if (
+    !Number.isFinite(amount) ||
+    amount <= 0
+  ) {
+    return api.sendMessage(
+      "❌ مبلغ الاستثمار غير صحيح.",
+      threadID,
+      messageID
+    );
   }
 
+  amount =
+    Math.floor(amount);
+
+  if (money < amount) {
+    return api.sendMessage(
+      "❌ رصيدك غير كافٍ.\n\n" +
+      `رصيدك: ${money}\n` +
+      `المبلغ المطلوب: ${amount}\n` +
+      `ينقصك: ${amount - money}`,
+      threadID,
+      messageID
+    );
+  }
+
+  /*
+   * كل 100 عملة = نقطة استثمار
+   */
+
+  let points =
+    Math.max(
+      1,
+      Math.floor(amount / 100)
+    );
+
+  let cardUsed = false;
+
+  if (
+    Number(data.investmentCards || 0) > 0
+  ) {
+
+    points =
+      Math.floor(
+        points * 1.5
+      );
+
+    data.investmentCards--;
+
+    cardUsed = true;
+  }
+
+  const currentPoints =
+    Number(
+      data.investmentPoints || 0
+    );
+
+  await currency.update({
+    money:
+      money - amount
+  });
+
+  await updateCurrencyData(
+    currency,
+    {
+      investmentPoints:
+        currentPoints + points,
+
+      investmentCards:
+        Number(data.investmentCards || 0),
+
+      lastInvestment:
+        new Date().toISOString()
+    }
+  );
+
   return api.sendMessage(
-    text,
+
+    "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+
+    "📈 تمت عملية الاستثمار\n\n" +
+
+    `💰 المبلغ: ${amount} عملة\n` +
+    `📊 نقاط الاستثمار: +${points}\n` +
+
+    (
+      cardUsed
+        ? "\n🎫 تم استخدام بطاقة الاستثمار\n" +
+          "✨ حصلت على زيادة 50%\n"
+        : ""
+    ) +
+
+    `\n📊 مجموع نقاط الاستثمار: ${
+      currentPoints + points
+    }\n` +
+
+    `💳 رصيدك الجديد: ${money - amount} عملة`,
+
+    threadID,
+    messageID
+  );
+}
+
+// ============================================================
+// الدرع
+// ============================================================
+
+async function useShield(
+  api,
+  threadID,
+  messageID,
+  PetCurrency,
+  senderID
+) {
+
+  const currency =
+    await getPetCurrency(
+      PetCurrency,
+      senderID
+    );
+
+  const data =
+    getCurrencyData(currency);
+
+  if (
+    Number(data.shields || 0) <= 0
+  ) {
+
+    return api.sendMessage(
+      "❌ لا تملك درع حماية.\n\n" +
+      "يمكنك شراء الدرع من حيوان متجر.",
+      threadID,
+      messageID
+    );
+  }
+
+  const activeUntil =
+    data.shieldUntil
+      ? new Date(data.shieldUntil).getTime()
+      : 0;
+
+  if (
+    activeUntil > Date.now()
+  ) {
+
+    return api.sendMessage(
+      "🛡️ الدرع مفعل بالفعل.\n\n" +
+      `⏳ ينتهي بعد: ${formatTime(
+        activeUntil - Date.now()
+      )}`,
+      threadID,
+      messageID
+    );
+  }
+
+  data.shields--;
+
+  const until =
+    new Date(
+      Date.now() + SHIELD_DURATION
+    ).toISOString();
+
+  await updateCurrencyData(
+    currency,
+    {
+      shields:
+        Number(data.shields || 0),
+
+      shieldUntil:
+        until
+    }
+  );
+
+  return api.sendMessage(
+
+    "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+
+    "🛡️ تم تفعيل درع الحماية\n\n" +
+
+    "لن يستطيع أي مستخدم سرقتك لمدة 24 ساعة.\n\n" +
+
+    `⏳ ينتهي بعد: 24 ساعة\n` +
+    `🛡️ الدروع المتبقية: ${data.shields}`,
+
     threadID,
     messageID
   );
@@ -868,27 +1220,38 @@ async function sendLeaderboard(
 // السرقة
 // ============================================================
 
-async function doSteal(
+async function doTheft(
   api,
   threadID,
   messageID,
-  PetCurrency,
   Pets,
-  thiefID,
+  PetCurrency,
+  senderID,
   targetID
 ) {
+
   if (!targetID) {
     return api.sendMessage(
-      "❌ يجب تحديد الشخص.\n\nاستخدم:\nحيوان سرقة @منشن\nأو قم بالرد على رسالة الشخص ثم اكتب:\nحيوان سرقة",
+
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+
+      "🦹 السرقة\n\n" +
+
+      "منشن الشخص أو قم بالرد على رسالته ثم اكتب:\n\n" +
+
+      "حيوان سرقة",
+
       threadID,
       messageID
     );
   }
 
-  targetID = String(targetID);
-  thiefID = String(thiefID);
+  targetID =
+    String(targetID);
 
-  if (targetID === thiefID) {
+  if (
+    targetID === String(senderID)
+  ) {
     return api.sendMessage(
       "❌ لا يمكنك سرقة نفسك.",
       threadID,
@@ -899,7 +1262,8 @@ async function doSteal(
   const thiefPet =
     await Pets.findOne({
       where: {
-        userID: thiefID
+        userID:
+          String(senderID)
       }
     });
 
@@ -914,13 +1278,14 @@ async function doSteal(
   const targetPet =
     await Pets.findOne({
       where: {
-        userID: targetID
+        userID:
+          targetID
       }
     });
 
   if (!targetPet) {
     return api.sendMessage(
-      "❌ الشخص المستهدف لا يملك حيوانًا.",
+      "❌ هذا المستخدم لا يملك حيوانًا.",
       threadID,
       messageID
     );
@@ -929,7 +1294,7 @@ async function doSteal(
   const thiefCurrency =
     await getPetCurrency(
       PetCurrency,
-      thiefID
+      senderID
     );
 
   const targetCurrency =
@@ -943,92 +1308,281 @@ async function doSteal(
       thiefCurrency
     );
 
-  const remaining =
-    getRemainingCooldown(
-      thiefData.petLastSteal,
-      STEAL_COOLDOWN
+  const targetData =
+    getCurrencyData(
+      targetCurrency
     );
 
-  if (remaining > 0) {
+  // ==========================================================
+  // كولداون السارق
+  // ==========================================================
+
+  const theftRemaining =
+    getRemainingCooldown(
+      thiefData.petLastTheft,
+      THEFT_COOLDOWN
+    );
+
+  if (theftRemaining > 0) {
     return api.sendMessage(
-      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
       "❌ لا يمكنك السرقة الآن.\n\n" +
-      `⏳ المحاولة القادمة بعد: ${formatTime(remaining)}`,
+      `⏳ المحاولة القادمة بعد: ${
+        formatTime(theftRemaining)
+      }`,
       threadID,
       messageID
     );
   }
 
+  // ==========================================================
+  // الدرع
+  // ==========================================================
+
+  const shieldUntil =
+    targetData.shieldUntil
+      ? new Date(
+          targetData.shieldUntil
+        ).getTime()
+      : 0;
+
+  if (
+    shieldUntil > Date.now()
+  ) {
+
+    await updateCurrencyData(
+      thiefCurrency,
+      {
+        petLastTheft:
+          new Date().toISOString()
+      }
+    );
+
+    return api.sendMessage(
+
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+
+      "🛡️ فشلت السرقة\n\n" +
+
+      "هذا المستخدم محمي بدرع الحماية.\n\n" +
+
+      `⏳ الدرع ينتهي بعد: ${
+        formatTime(
+          shieldUntil - Date.now()
+        )
+      }`,
+
+      threadID,
+      messageID
+    );
+  }
+
+  const thiefMoney =
+    Number(
+      thiefCurrency.money || 0
+    );
+
   const targetMoney =
-    Number(targetCurrency.money || 0);
+    Number(
+      targetCurrency.money || 0
+    );
 
   if (targetMoney <= 0) {
     return api.sendMessage(
-      "❌ لا يوجد لدى الشخص أي عملات حيوانات لسرقتها.",
+      "❌ لا يوجد شيء يمكن سرقته من هذا المستخدم.",
       threadID,
       messageID
     );
   }
 
-  const success =
-    Math.random() <
-    STEAL_SUCCESS_CHANCE;
+  // ==========================================================
+  // الغرامة ونسبة السرقة
+  // ==========================================================
+
+  /*
+   * الغرامة تزيد مع رصيد السارق
+   *
+   * 5% أساسية
+   * 7% عند 10000
+   * 10% عند 50000
+   * 12% عند 100000
+   */
+
+  let fineRate = 0.05;
+
+  if (thiefMoney >= 10000) {
+    fineRate = 0.07;
+  }
+
+  if (thiefMoney >= 50000) {
+    fineRate = 0.10;
+  }
+
+  if (thiefMoney >= 100000) {
+    fineRate = 0.12;
+  }
+
+  /*
+   * نسبة المسروقات تزيد مع رصيد الضحية
+   *
+   * 5% أساسية
+   * 7% عند 10000
+   * 9% عند 50000
+   * 12% عند 100000
+   *
+   * الحد الأعلى 15%
+   */
+
+  let stealRate = 0.05;
+
+  if (targetMoney >= 10000) {
+    stealRate = 0.07;
+  }
+
+  if (targetMoney >= 50000) {
+    stealRate = 0.09;
+  }
+
+  if (targetMoney >= 100000) {
+    stealRate = 0.12;
+  }
+
+  // ==========================================================
+  // احتمال النجاح
+  // ==========================================================
+
+  let successChance = 55;
+
+  const thiefLevel =
+    Number(thiefPet.level || 1);
+
+  const targetLevel =
+    Number(targetPet.level || 1);
+
+  const thiefPower =
+    Number(thiefPet.power || 0);
+
+  const targetPower =
+    Number(targetPet.power || 0);
+
+  successChance +=
+    Math.min(
+      20,
+      thiefLevel * 1.5
+    );
+
+  successChance +=
+    Math.min(
+      15,
+      thiefPower / 20
+    );
+
+  successChance -=
+    Math.min(
+      20,
+      targetLevel
+    );
+
+  successChance -=
+    Math.min(
+      15,
+      targetPower / 20
+    );
+
+  successChance =
+    Math.max(
+      20,
+      Math.min(
+        80,
+        successChance
+      )
+    );
+
+  const roll =
+    Math.random() * 100;
+
+  // ==========================================================
+  // تحديد الكولداون
+  // ==========================================================
 
   await updateCurrencyData(
     thiefCurrency,
     {
-      petLastSteal:
+      petLastTheft:
         new Date().toISOString()
     }
   );
 
-  if (!success) {
-    const thiefMoney =
-      Number(thiefCurrency.money || 0);
+  // ==========================================================
+  // فشل السرقة
+  // ==========================================================
 
-    const loss =
+  if (roll > successChance) {
+
+    const fine =
+      Math.max(
+        50,
+        Math.floor(
+          thiefMoney * fineRate
+        )
+      );
+
+    const actualFine =
       Math.min(
-        STEAL_FAIL_LOSS,
+        fine,
         thiefMoney
       );
 
     await thiefCurrency.update({
-      money: thiefMoney - loss
+      money:
+        thiefMoney - actualFine
     });
 
+    const targetName =
+      await getUserName(
+        api,
+        targetID
+      );
+
     return api.sendMessage(
+
       "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
-      "❌ فشلت عملية السرقة.\n\n" +
-      `🐾 ${thiefPet.name} لم يتمكن من مساعدتك.\n` +
-      `💸 خسرت: ${loss} عملة\n\n` +
-      "⏳ حاول مرة أخرى بعد ساعة.",
+
+      "❌ فشلت عملية السرقة\n\n" +
+
+      `👤 الهدف: ${targetName}\n` +
+      `🎯 نسبة النجاح: ${successChance.toFixed(1)}%\n\n` +
+
+      `💸 الغرامة: -${actualFine} عملة\n` +
+      `💳 رصيدك الجديد: ${
+        thiefMoney - actualFine
+      } عملة`,
+
       threadID,
       messageID
     );
   }
 
-  const percentage =
-    STEAL_PERCENT_MIN +
-    Math.random() *
-    (STEAL_PERCENT_MAX - STEAL_PERCENT_MIN);
+  // ==========================================================
+  // نجاح السرقة
+  // ==========================================================
 
-  const stolen =
+  let stolen =
+    Math.floor(
+      targetMoney * stealRate
+    );
+
+  stolen =
     Math.max(
       1,
-      Math.floor(
-        targetMoney * percentage
+      Math.min(
+        stolen,
+        targetMoney
       )
     );
 
-  const thiefMoney =
-    Number(thiefCurrency.money || 0);
-
   await targetCurrency.update({
     money:
-      Math.max(
-        0,
-        targetMoney - stolen
-      )
+      targetMoney - stolen
   });
 
   await thiefCurrency.update({
@@ -1036,28 +1590,137 @@ async function doSteal(
       thiefMoney + stolen
   });
 
+  const targetName =
+    await getUserName(
+      api,
+      targetID
+    );
+
   return api.sendMessage(
+
     "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
-    "🦹 تمت السرقة بنجاح\n\n" +
-    `🐾 حيوانك: ${thiefPet.name}\n` +
-    `💰 المبلغ المسروق: ${stolen} عملة\n` +
-    `💳 رصيدك الجديد: ${thiefMoney + stolen} عملة\n\n` +
-    "⏳ يمكنك محاولة السرقة مرة أخرى بعد ساعة.",
+
+    "✅ نجحت عملية السرقة\n\n" +
+
+    `👤 الهدف: ${targetName}\n` +
+
+    `🎯 نسبة النجاح: ${successChance.toFixed(1)}%\n` +
+
+    `💰 نسبة المسروقات: ${stealRate * 100}%\n\n` +
+
+    `💸 المسروق: +${stolen} عملة\n` +
+
+    `💳 رصيدك الجديد: ${
+      thiefMoney + stolen
+    } عملة`,
+
     threadID,
     messageID
   );
 }
 
 // ============================================================
+// التصدر
+// ============================================================
+
+async function getLeaderboard(
+  api,
+  Pets,
+  PetCurrency
+) {
+
+  const pets =
+    await Pets.findAll({
+      order: [
+        ["level", "DESC"],
+        ["power", "DESC"]
+      ]
+    });
+
+  const rows = [];
+
+  for (
+    const pet of pets
+  ) {
+
+    if (rows.length >= 10) {
+      break;
+    }
+
+    const currency =
+      await PetCurrency.findOne({
+        where: {
+          userID:
+            String(pet.userID)
+        }
+      });
+
+    const money =
+      Number(
+        currency?.money || 0
+      );
+
+    const name =
+      await getUserName(
+        api,
+        pet.userID
+      );
+
+    const found =
+      getPetByType(
+        pet.type
+      );
+
+    rows.push({
+      name,
+      pet:
+        `${found?.emoji || "🐾"} ${
+          pet.name
+        }`,
+      level:
+        Number(pet.level || 1),
+      money
+    });
+  }
+
+  let text =
+    "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n";
+
+  text +=
+    "🏆 أعلى 10 متصدرين\n\n";
+
+  if (!rows.length) {
+    text +=
+      "لا توجد بيانات حتى الآن.";
+    return text;
+  }
+
+  rows.forEach(
+    (row, index) => {
+
+      text +=
+        `${index + 1}. ${row.name}\n` +
+        `   الحيوان: ${row.pet}\n` +
+        `   المستوى: ${row.level}\n` +
+        `   الرصيد: ${row.money} عملة\n\n`;
+    }
+  );
+
+  return text;
+}
+
+// ============================================================
 // RUN
 // ============================================================
 
-module.exports.run = async function ({
+module.exports.run =
+async function ({
   api,
   event,
   models,
   args
 }) {
+
   const {
     threadID,
     messageID,
@@ -1065,15 +1728,22 @@ module.exports.run = async function ({
   } = event;
 
   try {
+
     const Pets =
-      getModel(models, "Pets");
+      getModel(
+        models,
+        "Pets"
+      );
 
     const PetCurrency =
-      getModel(models, "PetCurrency");
+      getModel(
+        models,
+        "PetCurrency"
+      );
 
     if (!Pets) {
       return api.sendMessage(
-        "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n❌ مودل الحيوانات غير محمّل.",
+        "❌ مودل الحيوانات غير محمّل.",
         threadID,
         messageID
       );
@@ -1081,7 +1751,7 @@ module.exports.run = async function ({
 
     if (!PetCurrency) {
       return api.sendMessage(
-        "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n❌ مودل PetCurrency غير محمّل.",
+        "❌ مودل PetCurrency غير محمّل.",
         threadID,
         messageID
       );
@@ -1096,89 +1766,114 @@ module.exports.run = async function ({
       rawArgs.toLowerCase();
 
     // ========================================================
-    // رصيد
+    // الرصيد
     // ========================================================
 
     if (
       subCommand === "رصيد" ||
       subCommand === "balance"
     ) {
+
       const targetID =
-        getTargetUserID(event);
-
-      if (targetID) {
-        const name =
-          getTargetName(
-            event,
-            targetID
-          );
-
-        return sendPetBalance(
-          api,
-          threadID,
-          messageID,
-          PetCurrency,
-          targetID,
-          name,
-          false
-        );
-      }
+        getTargetUserID(event) ||
+        String(senderID);
 
       return sendPetBalance(
         api,
         threadID,
         messageID,
         PetCurrency,
-        senderID,
-        null,
-        true
+        targetID
       );
     }
 
     // ========================================================
-    // رصيد مع منشن
+    // التصدر
     // ========================================================
 
     if (
-      subCommand.startsWith("رصيد ") ||
-      subCommand.startsWith("balance ")
+      subCommand === "تصدر" ||
+      subCommand === "تصدّر" ||
+      subCommand === "leaderboard"
     ) {
-      const targetID =
-        getTargetUserID(event);
 
-      if (!targetID) {
-        return api.sendMessage(
-          "❌ قم بمنشن الشخص أو الرد على رسالته.",
-          threadID,
-          messageID
-        );
-      }
-
-      const name =
-        getTargetName(
-          event,
-          targetID
+      const text =
+        await getLeaderboard(
+          api,
+          Pets,
+          PetCurrency
         );
 
-      return sendPetBalance(
-        api,
+      return api.sendMessage(
+        text,
         threadID,
-        messageID,
-        PetCurrency,
-        targetID,
-        name,
-        false
+        messageID
       );
     }
 
     // ========================================================
-    // عمل
+    // متجر
+    // ========================================================
+
+    if (
+      subCommand === "متجر" ||
+      subCommand === "store"
+    ) {
+
+      const sent =
+        await sendReply(
+          api,
+          getShopList(),
+          threadID,
+          messageID
+        );
+
+      if (sent?.messageID) {
+
+        addReply({
+
+          name:
+            module.exports.config.name,
+
+          messageID:
+            sent.messageID,
+
+          author:
+            String(senderID),
+
+          type:
+            "pet_shop"
+        });
+      }
+
+      return;
+    }
+
+    // ========================================================
+    // القائمة الكاملة للحيوانات
+    // ========================================================
+
+    if (
+      subCommand === "قائمة" ||
+      subCommand === "list"
+    ) {
+
+      return api.sendMessage(
+        getFullPetsList(),
+        threadID,
+        messageID
+      );
+    }
+
+    // ========================================================
+    // العمل
     // ========================================================
 
     if (
       subCommand === "عمل" ||
       subCommand === "work"
     ) {
+
       return doWork(
         api,
         threadID,
@@ -1190,13 +1885,14 @@ module.exports.run = async function ({
     }
 
     // ========================================================
-    // يومي
+    // اليومي
     // ========================================================
 
     if (
       subCommand === "يومي" ||
       subCommand === "daily"
     ) {
+
       return doDaily(
         api,
         threadID,
@@ -1208,63 +1904,60 @@ module.exports.run = async function ({
     }
 
     // ========================================================
-    // القائمة الكاملة
+    // الاستثمار
     // ========================================================
 
     if (
-      subCommand === "قائمة" ||
-      subCommand === "list"
+      subCommand === "استثمار" ||
+      subCommand === "invest"
     ) {
-      return api.sendMessage(
-        getFullPetsList(),
+
+      return doInvestment(
+        api,
         threadID,
-        messageID
+        messageID,
+        PetCurrency,
+        senderID,
+        null
       );
     }
 
     // ========================================================
-    // المتجر
+    // الاستثمار + مبلغ
     // ========================================================
 
-    if (
-      subCommand === "متجر" ||
-      subCommand === "shop"
-    ) {
-      const sent =
-        await sendReply(
-          api,
-          getShopList(),
-          threadID,
-          messageID
-        );
+    const investmentMatch =
+      rawArgs.match(
+        /^(?:استثمار|invest)\s+([\d,]+)$/i
+      );
 
-      if (sent?.messageID) {
-        addReply({
-          name: module.exports.config.name,
-          messageID: sent.messageID,
-          author: String(senderID),
-          type: "pet_select_shop"
-        });
-      }
+    if (investmentMatch) {
 
-      return;
-    }
-
-    // ========================================================
-    // المتصدرون
-    // ========================================================
-
-    if (
-      subCommand === "تصدّر" ||
-      subCommand === "تصدر" ||
-      subCommand === "متصدرين" ||
-      subCommand === "top"
-    ) {
-      return sendLeaderboard(
+      return doInvestment(
         api,
         threadID,
         messageID,
-        Pets
+        PetCurrency,
+        senderID,
+        investmentMatch[1]
+      );
+    }
+
+    // ========================================================
+    // الدرع
+    // ========================================================
+
+    if (
+      subCommand === "درع" ||
+      subCommand === "shield"
+    ) {
+
+      return useShield(
+        api,
+        threadID,
+        messageID,
+        PetCurrency,
+        senderID
       );
     }
 
@@ -1274,148 +1967,155 @@ module.exports.run = async function ({
 
     if (
       subCommand === "سرقة" ||
-      subCommand === "سرقه" ||
+      subCommand === "سرق" ||
+      subCommand === "theft" ||
       subCommand === "steal"
     ) {
+
       const targetID =
         getTargetUserID(event);
 
-      return doSteal(
+      return doTheft(
         api,
         threadID,
         messageID,
-        PetCurrency,
         Pets,
+        PetCurrency,
         senderID,
         targetID
       );
     }
 
     // ========================================================
-    // شراء مباشر برقم
-    // ========================================================
-
-    if (/^\d+$/.test(rawArgs)) {
-      const selected =
-        getPetByID(
-          Number(rawArgs)
-        );
-
-      if (!selected) {
-        return api.sendMessage(
-          "❌ رقم الحيوان غير صحيح.",
-          threadID,
-          messageID
-        );
-      }
-
-      if (selected.price === 0) {
-        return api.sendMessage(
-          "❌ هذا الحيوان مجاني ويتم اختياره من خلال حيوان فقط.",
-          threadID,
-          messageID
-        );
-      }
-
-      const sent =
-        await sendReply(
-          api,
-
-          "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
-
-          `${selected.emoji} ${selected.name}\n\n` +
-
-          `الندرة: ${selected.rarity}\n` +
-          `القوة: ${selected.power}\n` +
-          `السعر: ${selected.price} عملة\n\n` +
-
-          "هل تريد شراء هذا الحيوان؟\n\n" +
-          "نعم\n" +
-          "لا",
-
-          threadID,
-          messageID
-        );
-
-      if (sent?.messageID) {
-        addReply({
-          name: module.exports.config.name,
-          messageID: sent.messageID,
-          author: String(senderID),
-          type: "pet_purchase",
-          petID: selected.id
-        });
-      }
-
-      return;
-    }
-
-    // ========================================================
-    // الحيوان الخاص بالمستخدم
+    // البحث عن حيوان المستخدم
     // ========================================================
 
     let pet =
       await Pets.findOne({
         where: {
-          userID: String(senderID)
+          userID:
+            String(senderID)
         }
       });
 
     if (pet) {
+
       pet =
-        await updatePetOverTime(pet);
+        await updatePetOverTime(
+          pet
+        );
     }
 
+    // ========================================================
     // لديه حيوان
+    // ========================================================
+
     if (pet) {
+
       const sent =
         await sendReply(
           api,
-          getPetInfo(pet.toJSON()),
+          getPetInfo(
+            pet.toJSON()
+          ),
           threadID,
           messageID
         );
 
       if (sent?.messageID) {
+
         addReply({
-          name: module.exports.config.name,
-          messageID: sent.messageID,
-          author: String(senderID),
-          type: "pet_actions"
+
+          name:
+            module.exports.config.name,
+
+          messageID:
+            sent.messageID,
+
+          author:
+            String(senderID),
+
+          type:
+            "pet_actions"
         });
       }
 
       return;
     }
 
-    // لا يملك حيوان
+    // ========================================================
+    // لا يملك حيوانًا
+    // ========================================================
+
+    let text =
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n";
+
+    text +=
+      "🐾 مرحبًا بك في نظام الحيوانات\n\n";
+
+    text +=
+      "لا تملك حيوانًا حتى الآن.\n\n";
+
+    text +=
+      "الحيوانات المجانية:\n\n";
+
+    const freePets =
+      PETS.filter(
+        pet => pet.price === 0
+      );
+
+    for (
+      const freePet of freePets
+    ) {
+
+      text +=
+        `${freePet.id}. ${freePet.emoji} ${freePet.name}\n`;
+    }
+
+    text +=
+      "\n↪️ رد برقم الحيوان لاختياره";
+
     const sent =
       await sendReply(
         api,
-        getFreePetsList(),
+        text,
         threadID,
         messageID
       );
 
     if (sent?.messageID) {
+
       addReply({
-        name: module.exports.config.name,
-        messageID: sent.messageID,
-        author: String(senderID),
-        type: "pet_select_free"
+
+        name:
+          module.exports.config.name,
+
+        messageID:
+          sent.messageID,
+
+        author:
+          String(senderID),
+
+        type:
+          "pet_select"
       });
     }
 
   } catch (error) {
+
     console.error(
-      "[PET RUN ERROR]",
+      "[PET COMMAND ERROR]",
       error
     );
 
     return api.sendMessage(
+
       "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+
       "❌ حدث خطأ أثناء تنفيذ الأمر.\n\n" +
+
       `📝 ${error.message}`,
+
       threadID,
       messageID
     );
@@ -1426,12 +2126,14 @@ module.exports.run = async function ({
 // HANDLE REPLY
 // ============================================================
 
-module.exports.handleReply = async function ({
+module.exports.handleReply =
+async function ({
   api,
   event,
   handleReply,
   models
 }) {
+
   const {
     threadID,
     messageID,
@@ -1440,6 +2142,7 @@ module.exports.handleReply = async function ({
   } = event;
 
   try {
+
     if (
       handleReply.author &&
       String(handleReply.author) !==
@@ -1449,36 +2152,40 @@ module.exports.handleReply = async function ({
     }
 
     const Pets =
-      getModel(models, "Pets");
+      getModel(
+        models,
+        "Pets"
+      );
 
     const PetCurrency =
-      getModel(models, "PetCurrency");
+      getModel(
+        models,
+        "PetCurrency"
+      );
 
     if (!Pets || !PetCurrency) {
-      return api.sendMessage(
-        "❌ موديلات نظام الحيوانات غير محمّلة.",
-        threadID,
-        messageID
-      );
+      return;
     }
 
     const input =
       String(body)
-        .trim()
-        .toLowerCase();
+        .trim();
 
     // ========================================================
-    // اختيار الحيوان المجاني
+    // اختيار الحيوان
     // ========================================================
 
     if (
       handleReply.type ===
-      "pet_select_free"
+      "pet_select"
     ) {
+
       const number =
         Number(input);
 
-      if (!Number.isInteger(number)) {
+      if (
+        !Number.isInteger(number)
+      ) {
         return api.sendMessage(
           "❌ أرسل رقم الحيوان فقط.",
           threadID,
@@ -1497,26 +2204,32 @@ module.exports.handleReply = async function ({
         );
       }
 
-      if (selected.price !== 0) {
+      const existing =
+        await Pets.findOne({
+          where: {
+            userID:
+              String(senderID)
+          }
+        });
+
+      if (existing) {
+
+        removeReply(handleReply);
+
         return api.sendMessage(
-          "❌ هذا الحيوان ليس مجانيًا.\n\nاستخدم حيوان متجر لشرائه.",
+          "❌ لديك حيوان بالفعل.",
           threadID,
           messageID
         );
       }
 
-      const existing =
-        await Pets.findOne({
-          where: {
-            userID: String(senderID)
-          }
-        });
-
-      if (existing) {
-        removeReply(handleReply);
+      if (
+        selected.price > 0
+      ) {
 
         return api.sendMessage(
-          "❌ لديك حيوان بالفعل.",
+          "❌ هذا الحيوان غير مجاني.\n\n" +
+          "يمكنك شراؤه من متجر الحيوانات.",
           threadID,
           messageID
         );
@@ -1529,7 +2242,9 @@ module.exports.handleReply = async function ({
           selected
         );
 
-      removeReply(handleReply);
+      removeReply(
+        handleReply
+      );
 
       return api.sendMessage(
         message,
@@ -1539,152 +2254,74 @@ module.exports.handleReply = async function ({
     }
 
     // ========================================================
-    // اختيار حيوان من المتجر
+    // المتجر
     // ========================================================
 
     if (
       handleReply.type ===
-      "pet_select_shop"
+      "pet_shop"
     ) {
-      const number =
-        Number(input);
 
-      if (!Number.isInteger(number)) {
-        return api.sendMessage(
-          "❌ أرسل رقم الحيوان فقط.",
-          threadID,
-          messageID
+      const answer =
+        input.toLowerCase();
+
+      let item =
+        SHOP.find(
+          shop =>
+            answer ===
+              shop.name.toLowerCase()
         );
+
+      if (!item) {
+
+        if (
+          answer.includes("طعام") ||
+          answer.includes("اكل") ||
+          answer.includes("أكل")
+        ) {
+          item = SHOP.find(
+            x => x.id === "food"
+          );
+        }
+
+        else if (
+          answer.includes("دواء")
+        ) {
+          item = SHOP.find(
+            x => x.id === "medicine"
+          );
+        }
+
+        else if (
+          answer.includes("درع")
+        ) {
+          item = SHOP.find(
+            x => x.id === "shield"
+          );
+        }
+
+        else if (
+          answer.includes("بطاقة") ||
+          answer.includes("استثمار")
+        ) {
+          item = SHOP.find(
+            x => x.id === "investment_card"
+          );
+        }
       }
 
-      const selected =
-        getPetByID(number);
-
-      if (!selected) {
-        return api.sendMessage(
-          "❌ رقم الحيوان غير صحيح.",
-          threadID,
-          messageID
-        );
-      }
-
-      if (selected.price === 0) {
-        return api.sendMessage(
-          "❌ هذا الحيوان مجاني ولا يحتاج إلى الشراء.",
-          threadID,
-          messageID
-        );
-      }
-
-      const existing =
-        await Pets.findOne({
-          where: {
-            userID: String(senderID)
-          }
-        });
-
-      if (existing) {
-        removeReply(handleReply);
+      if (!item) {
 
         return api.sendMessage(
-          "❌ لديك حيوان بالفعل.",
-          threadID,
-          messageID
-        );
-      }
 
-      const sent =
-        await sendReply(
-          api,
+          "❌ المنتج غير موجود.\n\n" +
 
-          "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+          "يمكنك شراء:\n" +
+          "طعام الحيوان\n" +
+          "دواء الحيوان\n" +
+          "درع الحماية\n" +
+          "بطاقة الاستثمار",
 
-          `${selected.emoji} ${selected.name}\n\n` +
-
-          `الندرة: ${selected.rarity}\n` +
-          `القوة: ${selected.power}\n` +
-          `السعر: ${selected.price} عملة\n\n` +
-
-          "هل تريد شراء هذا الحيوان؟\n\n" +
-          "نعم\n" +
-          "لا",
-
-          threadID,
-          messageID
-        );
-
-      if (sent?.messageID) {
-        removeReply(handleReply);
-
-        addReply({
-          name: module.exports.config.name,
-          messageID: sent.messageID,
-          author: String(senderID),
-          type: "pet_purchase",
-          petID: selected.id
-        });
-      }
-
-      return;
-    }
-
-    // ========================================================
-    // تأكيد الشراء
-    // ========================================================
-
-    if (
-      handleReply.type ===
-      "pet_purchase"
-    ) {
-      if (
-        input === "لا" ||
-        input === "الغاء" ||
-        input === "إلغاء"
-      ) {
-        removeReply(handleReply);
-
-        return api.sendMessage(
-          "تم إلغاء عملية الشراء.",
-          threadID,
-          messageID
-        );
-      }
-
-      if (input !== "نعم") {
-        return api.sendMessage(
-          "↪️ رد بـ نعم للشراء أو لا للإلغاء.",
-          threadID,
-          messageID
-        );
-      }
-
-      const selected =
-        getPetByID(
-          handleReply.petID
-        );
-
-      if (!selected) {
-        removeReply(handleReply);
-
-        return api.sendMessage(
-          "❌ الحيوان غير موجود.",
-          threadID,
-          messageID
-        );
-      }
-
-      const existing =
-        await Pets.findOne({
-          where: {
-            userID: String(senderID)
-          }
-        });
-
-      if (existing) {
-        removeReply(handleReply);
-
-        return api.sendMessage(
-          "❌ لديك حيوان بالفعل.",
           threadID,
           messageID
         );
@@ -1697,70 +2334,226 @@ module.exports.handleReply = async function ({
         );
 
       const money =
-        Number(currency.money || 0);
+        Number(
+          currency.money || 0
+        );
 
-      if (money < selected.price) {
+      if (
+        money < item.price
+      ) {
+
         return api.sendMessage(
-          "❌ لا تملك عملات حيوانات كافية.\n\n" +
-          `السعر: ${selected.price}\n` +
-          `رصيدك: ${money}\n` +
-          `ينقصك: ${selected.price - money}`,
+
+          "❌ رصيدك غير كافٍ.\n\n" +
+
+          `المنتج: ${item.name}\n` +
+          `السعر: ${item.price} عملة\n` +
+          `رصيدك: ${money} عملة\n` +
+          `ينقصك: ${item.price - money} عملة`,
+
           threadID,
           messageID
         );
       }
 
-      await currency.update({
-        money:
-          money -
-          selected.price
-      });
+      const data =
+        getCurrencyData(
+          currency
+        );
 
-      try {
-        await Pets.create({
-          userID: String(senderID),
-          type: selected.type,
-          name: selected.name,
-          rarity: selected.rarity,
-          power: selected.power,
-          level: 1,
-          exp: 0,
-          health: 100,
-          hunger: 100,
-          status: "سعيد",
-          lastTrain: null,
-          updatedAt: new Date()
-        });
-      } catch (error) {
+      // ======================================================
+      // الطعام
+      // ======================================================
+
+      if (
+        item.id === "food"
+      ) {
+
+        const pet =
+          await Pets.findOne({
+            where: {
+              userID:
+                String(senderID)
+            }
+          });
+
+        if (!pet) {
+          return api.sendMessage(
+            "❌ يجب أن تملك حيوانًا لشراء الطعام.",
+            threadID,
+            messageID
+          );
+        }
+
         await currency.update({
-          money
+          money:
+            money - item.price
         });
 
-        throw error;
+        data.food =
+          Number(data.food || 0) + 1;
+
+        await updateCurrencyData(
+          currency,
+          {
+            food:
+              data.food
+          }
+        );
+
+        removeReply(handleReply);
+
+        return api.sendMessage(
+
+          "🍖 تم شراء طعام الحيوان.\n\n" +
+
+          `💰 السعر: ${item.price} عملة\n` +
+          `🍖 الطعام لديك: ${data.food}\n` +
+          `💳 رصيدك: ${money - item.price} عملة`,
+
+          threadID,
+          messageID
+        );
       }
 
-      removeReply(handleReply);
+      // ======================================================
+      // الدواء
+      // ======================================================
 
-      return api.sendMessage(
-        "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+      if (
+        item.id === "medicine"
+      ) {
 
-        `${selected.emoji} تم شراء حيوانك بنجاح\n\n` +
+        const pet =
+          await Pets.findOne({
+            where: {
+              userID:
+                String(senderID)
+            }
+          });
 
-        `الحيوان: ${selected.name}\n` +
-        `الندرة: ${selected.rarity}\n` +
-        `القوة: ${selected.power}\n` +
-        `السعر: ${selected.price} عملة\n` +
-        `المتبقي: ${money - selected.price} عملة\n\n` +
+        if (!pet) {
+          return api.sendMessage(
+            "❌ يجب أن تملك حيوانًا لشراء الدواء.",
+            threadID,
+            messageID
+          );
+        }
 
-        "المستوى: 1\n" +
-        "XP: 0/100\n" +
-        "الحالة: سعيد\n" +
-        "الصحة: 100/100\n" +
-        "الشبع: 100/100",
+        await currency.update({
+          money:
+            money - item.price
+        });
 
-        threadID,
-        messageID
-      );
+        data.medicine =
+          Number(data.medicine || 0) + 1;
+
+        await updateCurrencyData(
+          currency,
+          {
+            medicine:
+              data.medicine
+          }
+        );
+
+        removeReply(handleReply);
+
+        return api.sendMessage(
+
+          "💊 تم شراء دواء الحيوان.\n\n" +
+
+          `💰 السعر: ${item.price} عملة\n` +
+          `💊 الأدوية لديك: ${data.medicine}\n` +
+          `💳 رصيدك: ${money - item.price} عملة`,
+
+          threadID,
+          messageID
+        );
+      }
+
+      // ======================================================
+      // الدرع
+      // ======================================================
+
+      if (
+        item.id === "shield"
+      ) {
+
+        await currency.update({
+          money:
+            money - item.price
+        });
+
+        data.shields =
+          Number(data.shields || 0) + 1;
+
+        await updateCurrencyData(
+          currency,
+          {
+            shields:
+              data.shields
+          }
+        );
+
+        removeReply(handleReply);
+
+        return api.sendMessage(
+
+          "🛡️ تم شراء درع الحماية.\n\n" +
+
+          `💰 السعر: ${item.price} عملة\n` +
+          `🛡️ الدروع لديك: ${data.shields}\n` +
+          `💳 رصيدك: ${money - item.price} عملة\n\n` +
+
+          "اكتب حيوان درع لتفعيل الدرع لمدة 24 ساعة.",
+
+          threadID,
+          messageID
+        );
+      }
+
+      // ======================================================
+      // بطاقة الاستثمار
+      // ======================================================
+
+      if (
+        item.id === "investment_card"
+      ) {
+
+        await currency.update({
+          money:
+            money - item.price
+        });
+
+        data.investmentCards =
+          Number(
+            data.investmentCards || 0
+          ) + 1;
+
+        await updateCurrencyData(
+          currency,
+          {
+            investmentCards:
+              data.investmentCards
+          }
+        );
+
+        removeReply(handleReply);
+
+        return api.sendMessage(
+
+          "🎫 تم شراء بطاقة الاستثمار.\n\n" +
+
+          `💰 السعر: ${item.price} عملة\n` +
+          `🎫 البطاقات لديك: ${data.investmentCards}\n` +
+          `💳 رصيدك: ${money - item.price} عملة\n\n` +
+
+          "ستُستخدم تلقائيًا في عملية الاستثمار القادمة وتمنحك +50%.",
+
+          threadID,
+          messageID
+        );
+      }
     }
 
     // ========================================================
@@ -1771,14 +2564,17 @@ module.exports.handleReply = async function ({
       handleReply.type ===
       "pet_actions"
     ) {
+
       let pet =
         await Pets.findOne({
           where: {
-            userID: String(senderID)
+            userID:
+              String(senderID)
           }
         });
 
       if (!pet) {
+
         removeReply(handleReply);
 
         return api.sendMessage(
@@ -1789,27 +2585,37 @@ module.exports.handleReply = async function ({
       }
 
       pet =
-        await updatePetOverTime(pet);
+        await updatePetOverTime(
+          pet
+        );
 
       const choice =
         Number(input);
 
-      // ------------------------------------------------------
-      // بيع
-      // ------------------------------------------------------
+      // ======================================================
+      // البيع
+      // ======================================================
 
-      if (choice === 1) {
+      if (
+        choice === 1
+      ) {
+
         const data =
           pet.toJSON();
 
         const sellPrice =
-          getSellPrice(data);
+          getSellPrice(
+            data
+          );
 
         const found =
-          getPetByType(data.type);
+          getPetByType(
+            data.type
+          );
 
         const sent =
           await sendReply(
+
             api,
 
             "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
@@ -1821,6 +2627,7 @@ module.exports.handleReply = async function ({
             `قيمة البيع: ${sellPrice} عملة\n\n` +
 
             "هل تريد بيع حيوانك؟\n\n" +
+
             "نعم\n" +
             "لا",
 
@@ -1829,100 +2636,174 @@ module.exports.handleReply = async function ({
           );
 
         if (sent?.messageID) {
+
           removeReply(handleReply);
 
           addReply({
-            name: module.exports.config.name,
-            messageID: sent.messageID,
-            author: String(senderID),
-            type: "pet_sell_confirm"
+
+            name:
+              module.exports.config.name,
+
+            messageID:
+              sent.messageID,
+
+            author:
+              String(senderID),
+
+            type:
+              "pet_sell_confirm"
           });
         }
 
         return;
       }
 
-      // ------------------------------------------------------
+      // ======================================================
       // إطعام
-      // ------------------------------------------------------
+      // ======================================================
 
-      if (choice === 2) {
-        const hunger =
-          Number(pet.hunger ?? 100);
+      if (
+        choice === 2
+      ) {
 
-        const newHunger =
-          Math.min(
-            100,
-            hunger + 20
+        const currency =
+          await getPetCurrency(
+            PetCurrency,
+            senderID
           );
 
-        const health =
-          Number(pet.health ?? 100);
-
-        const status =
-          calculatePetState(
-            health,
-            newHunger
+        const data =
+          getCurrencyData(
+            currency
           );
 
-        await pet.update({
-          hunger: newHunger,
-          status,
-          updatedAt: new Date()
-        });
+        const food =
+          Number(
+            data.food || 0
+          );
 
-        removeReply(handleReply);
+        // إذا كان لديه طعام يستخدمه
+        if (food > 0) {
+
+          const hunger =
+            Number(
+              pet.hunger ?? 100
+            );
+
+          const newHunger =
+            Math.min(
+              100,
+              hunger + 30
+            );
+
+          const health =
+            Number(
+              pet.health ?? 100
+            );
+
+          const status =
+            calculatePetState(
+              health,
+              newHunger
+            );
+
+          await pet.update({
+            hunger:
+              newHunger,
+            status
+          });
+
+          data.food =
+            food - 1;
+
+          await updateCurrencyData(
+            currency,
+            {
+              food:
+                data.food
+            }
+          );
+
+          removeReply(handleReply);
+
+          return api.sendMessage(
+
+            "🍖 تم إطعام الحيوان\n\n" +
+
+            `🐾 الحيوان: ${pet.name}\n` +
+            `🍖 الشبع: ${newHunger}/100\n` +
+            `❤️ الصحة: ${health}/100\n` +
+            `📦 الطعام المتبقي: ${data.food}\n` +
+            `الحالة: ${status}`,
+
+            threadID,
+            messageID
+          );
+        }
 
         return api.sendMessage(
-          "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
 
-          `تم إطعام ${pet.name}\n\n` +
+          "❌ لا تملك طعامًا.\n\n" +
 
-          `الشبع: ${newHunger}/100\n` +
-          `الصحة: ${health}/100\n` +
-          `الحالة: ${status}`,
+          "يمكنك شراء الطعام من:\n" +
+          "حيوان متجر",
 
           threadID,
           messageID
         );
       }
 
-      // ------------------------------------------------------
-      // تدريب
-      // ------------------------------------------------------
+      // ======================================================
+      // التدريب
+      // ======================================================
 
-      if (choice === 3) {
+      if (
+        choice === 3
+      ) {
+
         const remaining =
           getRemainingCooldown(
             pet.lastTrain,
             TRAIN_COOLDOWN
           );
 
-        if (remaining > 0) {
+        if (
+          remaining > 0
+        ) {
+
           return api.sendMessage(
-            "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+
             "❌ حيوانك يحتاج إلى الراحة.\n\n" +
-            `⏳ الوقت المتبقي: ${formatTime(remaining)}`,
+
+            `⏳ الوقت المتبقي: ${
+              formatTime(remaining)
+            }`,
+
             threadID,
             messageID
           );
         }
 
         const currentLevel =
-          Number(pet.level || 1);
+          Number(
+            pet.level || 1
+          );
 
         const currentExp =
-          Number(pet.exp || 0);
+          Number(
+            pet.exp || 0
+          );
 
         const currentPower =
-          Number(pet.power || 0);
+          Number(
+            pet.power || 0
+          );
 
         let newLevel =
           currentLevel;
 
         let newExp =
-          currentExp +
-          TRAIN_XP;
+          currentExp + TRAIN_XP;
 
         let newPower =
           currentPower;
@@ -1933,27 +2814,30 @@ module.exports.handleReply = async function ({
           newExp >=
           newLevel * 100
         ) {
+
           newExp -=
             newLevel * 100;
 
           newLevel++;
+
           levelsGained++;
 
           newPower +=
             POWER_PER_LEVEL;
         }
 
-        const oldHunger =
-          Number(pet.hunger ?? 100);
-
         const newHunger =
           Math.max(
             0,
-            oldHunger - 10
+            Number(
+              pet.hunger ?? 100
+            ) - 10
           );
 
         const health =
-          Number(pet.health ?? 100);
+          Number(
+            pet.health ?? 100
+          );
 
         const status =
           calculatePetState(
@@ -1962,18 +2846,29 @@ module.exports.handleReply = async function ({
           );
 
         await pet.update({
-          exp: newExp,
-          level: newLevel,
-          power: newPower,
-          hunger: newHunger,
+
+          exp:
+            newExp,
+
+          level:
+            newLevel,
+
+          power:
+            newPower,
+
+          hunger:
+            newHunger,
+
           status,
-          lastTrain: new Date(),
-          updatedAt: new Date()
+
+          lastTrain:
+            new Date()
         });
 
         removeReply(handleReply);
 
         let message =
+
           "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
 
           `تم تدريب ${pet.name}\n\n` +
@@ -1987,10 +2882,16 @@ module.exports.handleReply = async function ({
 
           "⏳ التدريب القادم بعد 30 دقيقة.";
 
-        if (levelsGained > 0) {
+        if (
+          levelsGained > 0
+        ) {
+
           message +=
+
             "\n\n" +
+
             `ارتفع المستوى إلى ${newLevel}!\n` +
+
             `+${levelsGained * POWER_PER_LEVEL} قوة`;
         }
 
@@ -2002,10 +2903,13 @@ module.exports.handleReply = async function ({
       }
 
       return api.sendMessage(
+
         "❌ الاختيار غير صحيح.\n\n" +
+
         "1. بيع الحيوان\n" +
         "2. إطعام الحيوان\n" +
         "3. تدريب الحيوان",
+
         threadID,
         messageID
       );
@@ -2019,11 +2923,16 @@ module.exports.handleReply = async function ({
       handleReply.type ===
       "pet_sell_confirm"
     ) {
+
+      const answer =
+        input.toLowerCase();
+
       if (
-        input === "لا" ||
-        input === "الغاء" ||
-        input === "إلغاء"
+        answer === "لا" ||
+        answer === "الغاء" ||
+        answer === "إلغاء"
       ) {
+
         removeReply(handleReply);
 
         return api.sendMessage(
@@ -2033,7 +2942,10 @@ module.exports.handleReply = async function ({
         );
       }
 
-      if (input !== "نعم") {
+      if (
+        answer !== "نعم"
+      ) {
+
         return api.sendMessage(
           "↪️ رد بـ نعم للبيع أو لا للإلغاء.",
           threadID,
@@ -2044,11 +2956,13 @@ module.exports.handleReply = async function ({
       const pet =
         await Pets.findOne({
           where: {
-            userID: String(senderID)
+            userID:
+              String(senderID)
           }
         });
 
       if (!pet) {
+
         removeReply(handleReply);
 
         return api.sendMessage(
@@ -2058,11 +2972,10 @@ module.exports.handleReply = async function ({
         );
       }
 
-      const data =
-        pet.toJSON();
-
       const sellPrice =
-        getSellPrice(data);
+        getSellPrice(
+          pet.toJSON()
+        );
 
       const currency =
         await getPetCurrency(
@@ -2071,12 +2984,13 @@ module.exports.handleReply = async function ({
         );
 
       const money =
-        Number(currency.money || 0);
+        Number(
+          currency.money || 0
+        );
 
       await currency.update({
         money:
-          money +
-          sellPrice
+          money + sellPrice
       });
 
       const petName =
@@ -2087,12 +3001,15 @@ module.exports.handleReply = async function ({
       removeReply(handleReply);
 
       return api.sendMessage(
+
         "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
 
         `تم بيع ${petName} بنجاح\n\n` +
 
         `قيمة البيع: ${sellPrice} عملة\n` +
-        `رصيد الحيوانات الجديد: ${money + sellPrice} عملة`,
+        `رصيد الحيوانات الجديد: ${
+          money + sellPrice
+        } عملة`,
 
         threadID,
         messageID
@@ -2100,15 +3017,20 @@ module.exports.handleReply = async function ({
     }
 
   } catch (error) {
+
     console.error(
       "[PET REPLY ERROR]",
       error
     );
 
     return api.sendMessage(
+
       "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+
       "❌ حدث خطأ أثناء تنفيذ العملية.\n\n" +
+
       `📝 ${error.message}`,
+
       threadID,
       messageID
     );
