@@ -1,67 +1,49 @@
-module.exports = function ({ sequelize, Sequelize }) {
+module.exports = function ({
+    sequelize,
+    Sequelize
+}) {
 
-const Nicknames = sequelize.define("Nicknames", {
+    const Nicknames =
+        sequelize.define(
+            "Nicknames",
+            {
 
-    // ==================================================
-    // ID
-    // ==================================================
+                id: {
+                    type: Sequelize.INTEGER,
+                    primaryKey: true,
+                    autoIncrement: true
+                },
 
-    id: {
-        type: Sequelize.INTEGER,
-        primaryKey: true,
-        autoIncrement: true
-    },
+                threadID: {
+                    type: Sequelize.STRING,
+                    allowNull: false,
+                    unique: "nickname_member"
+                },
 
-    // ==================================================
-    // المجموعة
-    // ==================================================
+                userID: {
+                    type: Sequelize.STRING,
+                    allowNull: false,
+                    unique: "nickname_member"
+                },
 
-    threadID: {
-        type: Sequelize.STRING,
-        allowNull: false,
-        unique: "nickname_member"
-    },
+                userName: {
+                    type: Sequelize.STRING,
+                    allowNull: false
+                },
 
-    // ==================================================
-    // العضو
-    // ==================================================
+                nickname: {
+                    type: Sequelize.STRING,
+                    allowNull: false
+                },
 
-    userID: {
-        type: Sequelize.STRING,
-        allowNull: false,
-        unique: "nickname_member"
-    },
+                updatedAt: {
+                    type: Sequelize.DATE,
+                    allowNull: false,
+                    defaultValue: Sequelize.NOW
+                }
 
-    // ==================================================
-    // اسم العضو من قاعدة Users
-    // ==================================================
+            }
+        );
 
-    userName: {
-        type: Sequelize.STRING,
-        allowNull: false
-    },
-
-    // ==================================================
-    // الكنية
-    // ==================================================
-
-    nickname: {
-        type: Sequelize.STRING,
-        allowNull: false
-    },
-
-    // ==================================================
-    // آخر تحديث
-    // ==================================================
-
-    updatedAt: {
-        type: Sequelize.DATE,
-        allowNull: false,
-        defaultValue: Sequelize.NOW
-    }
-
-});
-
-return Nicknames;
-
+    return Nicknames;
 };
