@@ -243,6 +243,74 @@ module.exports = function ({
             }
 
             // ==================================================
+            // 🦧 HINA — التفاعل التلقائي
+            // ==================================================
+            // هذا القسم مستقل عن الأوامر والحظر وDeveloperMode
+            // ويعمل طالما أن الرسالة وصلت إلى Handle Event.
+            // ==================================================
+
+            if (
+                event.type === "message" &&
+                event.body &&
+                event.messageID
+            ) {
+
+                const text =
+                    String(event.body)
+                        .toLowerCase();
+
+                const triggerWords = [
+                    "يوتا",
+                    "شفق",
+                    "الشفق",
+                    "هريرة",
+                    "ابو هريرة",
+                    "أبو هريرة"
+                ];
+
+                const matched =
+                    triggerWords.some(
+                        word =>
+                            text.includes(
+                                word.toLowerCase()
+                            )
+                    );
+
+                if (matched) {
+
+                    try {
+
+                        await new Promise(
+                            (resolve, reject) => {
+
+                                api.setMessageReaction(
+                                    "🦧",
+                                    event.messageID,
+                                    error => {
+
+                                        if (error) {
+                                            reject(error);
+                                            return;
+                                        }
+
+                                        resolve();
+                                    }
+                                );
+
+                            }
+                        );
+
+                    } catch (error) {
+
+                        console.error(
+                            "[HINA WORD REACTION ERROR]",
+                            error.message
+                        );
+                    }
+                }
+            }
+
+            // ==================================================
             // 📊 تسجيل نشاط الرسائل
             // ==================================================
 
