@@ -1,6 +1,5 @@
 module.exports = function({ sequelize, Sequelize }) {
     const PetCurrency = sequelize.define("PetCurrency", {
-
         id: {
             type: Sequelize.INTEGER,
             primaryKey: true,
@@ -19,9 +18,10 @@ module.exports = function({ sequelize, Sequelize }) {
         },
 
         data: {
-            type: Sequelize.JSON
+            type: Sequelize.JSON,
+            allowNull: false,
+            defaultValue: {}
         }
-
     });
 
     return PetCurrency;
