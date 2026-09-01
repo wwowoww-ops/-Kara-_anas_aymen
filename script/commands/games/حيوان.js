@@ -226,7 +226,15 @@ async function getPetCurrency(PetCurrency, userID) {
 }
 
 function getCurrencyData(currency) {
-  let data = currency.data;
+  let data = currency?.data;
+
+  if (typeof data === "string") {
+    try {
+      data = JSON.parse(data);
+    } catch (e) {
+      data = {};
+    }
+  }
 
   if (
     !data ||
