@@ -1,9 +1,9 @@
 module.exports.config = {
   name: "حيوان",
-  version: "5.0.0",
+  version: "7.0.0",
   credits: "أبو هريرة",
   description: "نظام الحيوانات الأليفة",
-  commandCategory: "games",
+  commandCategory: "Games",
   hasPermssion: 0,
   usages: "حيوان | حيوان قائمة",
   cooldowns: 3
@@ -77,10 +77,30 @@ const PETS = [
     emoji: "🦋"
   },
 
+  {
+    id: 7,
+    type: "حلزون",
+    name: "حلزون",
+    price: 0,
+    rarity: "شائع",
+    power: 5,
+    emoji: "🐌"
+  },
+
+  {
+    id: 8,
+    type: "سمكة",
+    name: "سمكة",
+    price: 0,
+    rarity: "شائع",
+    power: 7,
+    emoji: "🐟"
+  },
+
   // ==================== غير شائع ====================
 
   {
-    id: 7,
+    id: 9,
     type: "ثعلب",
     name: "ثعلب",
     price: 500,
@@ -90,7 +110,7 @@ const PETS = [
   },
 
   {
-    id: 8,
+    id: 10,
     type: "باندا",
     name: "باندا",
     price: 1500,
@@ -100,7 +120,7 @@ const PETS = [
   },
 
   {
-    id: 9,
+    id: 11,
     type: "ببغاء",
     name: "ببغاء",
     price: 2500,
@@ -110,7 +130,7 @@ const PETS = [
   },
 
   {
-    id: 10,
+    id: 12,
     type: "سلحفاة",
     name: "سلحفاة",
     price: 1800,
@@ -120,7 +140,7 @@ const PETS = [
   },
 
   {
-    id: 11,
+    id: 13,
     type: "بطريق",
     name: "بطريق",
     price: 2200,
@@ -130,7 +150,7 @@ const PETS = [
   },
 
   {
-    id: 12,
+    id: 14,
     type: "كوالا",
     name: "كوالا",
     price: 2800,
@@ -140,7 +160,7 @@ const PETS = [
   },
 
   {
-    id: 13,
+    id: 15,
     type: "غراب",
     name: "غراب",
     price: 3000,
@@ -152,50 +172,50 @@ const PETS = [
   // ==================== نادر ====================
 
   {
-    id: 14,
+    id: 16,
     type: "ذئب",
     name: "ذئب",
-    price: 1000,
+    price: 4000,
     rarity: "نادر",
     power: 35,
     emoji: "🐺"
   },
 
   {
-    id: 15,
+    id: 17,
     type: "حصان",
     name: "حصان",
-    price: 3000,
+    price: 5000,
     rarity: "نادر",
     power: 55,
     emoji: "🐴"
   },
 
   {
-    id: 16,
+    id: 18,
     type: "نمر",
     name: "نمر",
-    price: 2500,
+    price: 6000,
     rarity: "نادر",
     power: 50,
     emoji: "🐯"
   },
 
   {
-    id: 17,
+    id: 19,
     type: "أسد",
     name: "أسد",
-    price: 3500,
+    price: 7000,
     rarity: "نادر",
     power: 60,
     emoji: "🦁"
   },
 
   {
-    id: 18,
+    id: 20,
     type: "دب",
     name: "دب",
-    price: 4000,
+    price: 7500,
     rarity: "نادر",
     power: 65,
     emoji: "🐻"
@@ -204,100 +224,100 @@ const PETS = [
   // ==================== ملحمي ====================
 
   {
-    id: 19,
+    id: 21,
     type: "غزال",
     name: "غزال",
-    price: 5000,
+    price: 8000,
     rarity: "ملحمي",
     power: 45,
     emoji: "🦌"
   },
 
   {
-    id: 20,
+    id: 22,
     type: "نسر",
     name: "نسر",
-    price: 6000,
+    price: 9000,
     rarity: "ملحمي",
     power: 70,
     emoji: "🦅"
   },
 
   {
-    id: 21,
+    id: 23,
     type: "بومة",
     name: "بومة",
-    price: 4500,
+    price: 9500,
     rarity: "ملحمي",
     power: 58,
     emoji: "🦉"
   },
 
   {
-    id: 22,
+    id: 24,
     type: "غوريلا",
     name: "غوريلا",
-    price: 7000,
+    price: 10000,
     rarity: "ملحمي",
     power: 85,
     emoji: "🦍"
   },
 
   {
-    id: 23,
+    id: 25,
     type: "فهد",
     name: "فهد",
-    price: 7500,
+    price: 11000,
     rarity: "ملحمي",
     power: 88,
     emoji: "🐆"
   },
 
   {
-    id: 24,
+    id: 26,
     type: "تمساح",
     name: "تمساح",
-    price: 6500,
+    price: 10500,
     rarity: "ملحمي",
     power: 78,
     emoji: "🐊"
   },
 
   {
-    id: 25,
+    id: 27,
     type: "قرش",
     name: "قرش",
-    price: 8000,
+    price: 12000,
     rarity: "ملحمي",
     power: 82,
     emoji: "🦈"
   },
 
   {
-    id: 26,
+    id: 28,
     type: "حوت",
     name: "حوت",
-    price: 9000,
+    price: 13000,
     rarity: "ملحمي",
     power: 90,
     emoji: "🐋"
   },
 
   {
-    id: 27,
+    id: 29,
     type: "زرافة",
     name: "زرافة",
-    price: 8500,
+    price: 11500,
     rarity: "ملحمي",
     power: 65,
     emoji: "🦒"
   },
 
   {
-    id: 28,
+    id: 30,
     type: "شمبانزي",
     name: "شمبانزي",
-    price: 5500,
+    price: 8500,
     rarity: "ملحمي",
     power: 55,
     emoji: "🐒"
@@ -306,55 +326,33 @@ const PETS = [
   // ==================== أسطوري ====================
 
   {
-    id: 29,
+    id: 31,
     type: "وحيد القرن",
     name: "وحيد القرن",
-    price: 11000,
+    price: 15000,
     rarity: "أسطوري",
     power: 105,
     emoji: "🦏"
   },
 
   {
-    id: 30,
+    id: 32,
     type: "فيل",
     name: "فيل",
-    price: 12000,
+    price: 16000,
     rarity: "أسطوري",
     power: 110,
     emoji: "🐘"
   },
 
   {
-    id: 31,
+    id: 33,
     type: "صقر",
     name: "صقر",
-    price: 9500,
+    price: 14000,
     rarity: "أسطوري",
     power: 95,
     emoji: "🦅"
-  },
-
-  // ==================== خرافي ====================
-
-  {
-    id: 32,
-    type: "تنين",
-    name: "تنين",
-    price: 10000,
-    rarity: "خرافي",
-    power: 150,
-    emoji: "🐉"
-  },
-
-  {
-    id: 33,
-    type: "يونيكورن",
-    name: "يونيكورن",
-    price: 18000,
-    rarity: "خرافي",
-    power: 140,
-    emoji: "🦄"
   },
 
   {
@@ -362,16 +360,38 @@ const PETS = [
     type: "وحش أسطوري",
     name: "وحش أسطوري",
     price: 20000,
-    rarity: "خرافي",
+    rarity: "أسطوري",
     power: 150,
     emoji: "👹"
   },
 
+  // ==================== خرافي ====================
+
   {
     id: 35,
+    type: "تنين",
+    name: "تنين",
+    price: 30000,
+    rarity: "خرافي",
+    power: 150,
+    emoji: "🐉"
+  },
+
+  {
+    id: 36,
+    type: "يونيكورن",
+    name: "يونيكورن",
+    price: 25000,
+    rarity: "خرافي",
+    power: 140,
+    emoji: "🦄"
+  },
+
+  {
+    id: 37,
     type: "كراكن",
     name: "كراكن",
-    price: 25000,
+    price: 40000,
     rarity: "خرافي",
     power: 180,
     emoji: "🐙"
@@ -420,35 +440,27 @@ function getModel(models, name) {
     );
   }
 
-  try {
+  if (
+    models &&
+    models[name]
+  ) {
 
-    if (
-      models &&
-      models[name]
-    ) {
+    return models[name];
+  }
 
-      return models[name];
-    }
+  if (
+    global.models &&
+    global.models[name]
+  ) {
 
-  } catch {}
-
-  try {
-
-    if (
-      global.models &&
-      global.models[name]
-    ) {
-
-      return global.models[name];
-    }
-
-  } catch {}
+    return global.models[name];
+  }
 
   return null;
 }
 
 // ============================================================
-// إضافة Reply
+// إدارة الردود
 // ============================================================
 
 function addReply(data) {
@@ -460,44 +472,29 @@ function addReply(data) {
     global.client.handleReply = [];
   }
 
-  global.client.handleReply.push(
-    data
-  );
+  global.client.handleReply.push(data);
 }
-
-// ============================================================
-// إزالة Reply
-// ============================================================
 
 function removeReply(handleReply) {
 
   try {
 
-    if (
-      !global.client.handleReply
-    ) {
+    const list =
+      global.client.handleReply;
+
+    if (!Array.isArray(list)) {
       return;
     }
 
     const index =
-      global.client.handleReply.indexOf(
-        handleReply
-      );
+      list.indexOf(handleReply);
 
     if (index !== -1) {
-
-      global.client.handleReply.splice(
-        index,
-        1
-      );
+      list.splice(index, 1);
     }
 
   } catch {}
 }
-
-// ============================================================
-// إرسال Reply
-// ============================================================
 
 function sendReply(
   api,
@@ -553,6 +550,185 @@ function getPetByType(type) {
       String(pet.type) ===
       String(type)
   );
+}
+
+// ============================================================
+// تحديث حالة الحيوان
+// ============================================================
+
+function calculatePetState(
+  health,
+  hunger
+) {
+
+  health =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        Number(health)
+      )
+    );
+
+  hunger =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        Number(hunger)
+      )
+    );
+
+  // الصحة لها الأولوية
+
+  if (health < 20) {
+    return "مريض";
+  }
+
+  if (health < 50) {
+    return "متعب";
+  }
+
+  // بعدها الشبع
+
+  if (hunger < 20) {
+    return "جائع";
+  }
+
+  if (hunger < 50) {
+    return "حزين";
+  }
+
+  if (
+    health >= 80 &&
+    hunger >= 80
+  ) {
+
+    return "سعيد";
+  }
+
+  return "طبيعي";
+}
+
+// ============================================================
+// تحديث الشبع والصحة حسب الوقت
+// ============================================================
+
+async function updatePetOverTime(pet) {
+
+  const now =
+    Date.now();
+
+  const lastUpdate =
+    pet.updatedAt
+      ? new Date(
+          pet.updatedAt
+        ).getTime()
+      : now;
+
+  if (!lastUpdate) {
+    return pet;
+  }
+
+  const hoursPassed =
+    Math.floor(
+      (
+        now -
+        lastUpdate
+      ) /
+      (1000 * 60 * 60)
+    );
+
+  if (
+    hoursPassed <= 0
+  ) {
+
+    return pet;
+  }
+
+  const oldHunger =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        Number(
+          pet.hunger ?? 100
+        )
+      )
+    );
+
+  const oldHealth =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        Number(
+          pet.health ?? 100
+        )
+      )
+    );
+
+  // ==========================================================
+  // نقصان الشبع
+  // ==========================================================
+
+  const hungerLoss =
+    hoursPassed * 5;
+
+  const newHunger =
+    Math.max(
+      0,
+      oldHunger -
+      hungerLoss
+    );
+
+  // ==========================================================
+  // تأثير الجوع على الصحة
+  // ==========================================================
+
+  let healthLoss = 0;
+
+  if (
+    newHunger < 20
+  ) {
+
+    healthLoss =
+      hoursPassed * 4;
+
+  } else if (
+    newHunger < 50
+  ) {
+
+    healthLoss =
+      hoursPassed * 2;
+  }
+
+  const newHealth =
+    Math.max(
+      0,
+      oldHealth -
+      healthLoss
+    );
+
+  const newStatus =
+    calculatePetState(
+      newHealth,
+      newHunger
+    );
+
+  await pet.update({
+
+    hunger:
+      newHunger,
+
+    health:
+      newHealth,
+
+    status:
+      newStatus
+  });
+
+  return pet;
 }
 
 // ============================================================
@@ -653,12 +829,16 @@ function getPetInfo(pet) {
     "🐾";
 
   const rarity =
+    pet.rarity ||
     found?.rarity ||
-    "غير معروف";
+    "شائع";
 
   const power =
-    found?.power ||
-    0;
+    Number(
+      pet.power ??
+      found?.power ??
+      0
+    );
 
   const level =
     Number(
@@ -682,7 +862,10 @@ function getPetInfo(pet) {
 
   const status =
     pet.status ||
-    "طبيعي";
+    calculatePetState(
+      health,
+      hunger
+    );
 
   return (
 
@@ -728,8 +911,17 @@ async function createPet(
     name:
       selected.name,
 
+    rarity:
+      selected.rarity,
+
+    power:
+      selected.power,
+
     level:
       1,
+
+    exp:
+      0,
 
     health:
       100,
@@ -738,10 +930,7 @@ async function createPet(
       100,
 
     status:
-      "سعيد",
-
-    exp:
-      0
+      "سعيد"
   });
 
   return (
@@ -755,7 +944,9 @@ async function createPet(
     `القوة: ${selected.power}\n` +
     `المستوى: 1\n` +
     `XP: 0\n` +
-    `الحالة: سعيد`
+    `الحالة: سعيد\n` +
+    `الصحة: 100/100\n` +
+    `الشبع: 100/100`
   );
 }
 
@@ -781,7 +972,9 @@ function getSellPrice(pet) {
 
   const power =
     Number(
-      found.power || 0
+      pet.power ??
+      found.power ??
+      0
     );
 
   const level =
@@ -789,17 +982,14 @@ function getSellPrice(pet) {
       pet.level || 1
     );
 
-  // نصف السعر الأساسي
   const halfPrice =
     Math.floor(
       basePrice / 2
     );
 
-  // القوة ترفع سعر الاسترداد
   const powerBonus =
     power * 10;
 
-  // المستوى يضيف قيمة بسيطة
   const levelBonus =
     Math.max(
       0,
@@ -863,11 +1053,7 @@ async function ({
     if (!Currencies) {
 
       return api.sendMessage(
-
-        "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
-
         "❌ مودل العملات غير محمّل.",
-
         threadID,
         messageID
       );
@@ -882,7 +1068,7 @@ async function ({
         : "";
 
     // ========================================================
-    // حيوان قائمة
+    // قائمة المتجر
     // ========================================================
 
     if (
@@ -928,7 +1114,7 @@ async function ({
     // البحث عن الحيوان
     // ========================================================
 
-    const pet =
+    let pet =
       await Pets.findOne({
 
         where: {
@@ -937,6 +1123,18 @@ async function ({
         }
 
       });
+
+    // ========================================================
+    // تحديث الحيوان حسب الوقت
+    // ========================================================
+
+    if (pet) {
+
+      pet =
+        await updatePetOverTime(
+          pet
+        );
+    }
 
     // ========================================================
     // لديه حيوان
@@ -991,9 +1189,7 @@ async function ({
       await sendReply(
 
         api,
-
         getFreePetsList(),
-
         threadID,
         messageID
       );
@@ -1063,7 +1259,9 @@ async function ({
 
     if (
       handleReply.author &&
-      String(handleReply.author) !==
+      String(
+        handleReply.author
+      ) !==
       String(senderID)
     ) {
 
@@ -1195,7 +1393,7 @@ async function ({
       }
 
       // ======================================================
-      // مدفوع
+      // تأكيد الشراء
       // ======================================================
 
       const sent =
@@ -1394,8 +1592,17 @@ async function ({
           name:
             selected.name,
 
+          rarity:
+            selected.rarity,
+
+          power:
+            selected.power,
+
           level:
             1,
+
+          exp:
+            0,
 
           health:
             100,
@@ -1404,10 +1611,7 @@ async function ({
             100,
 
           status:
-            "سعيد",
-
-          exp:
-            0
+            "سعيد"
         });
 
       } catch (error) {
@@ -1441,7 +1645,9 @@ async function ({
 
         "المستوى: 1\n" +
         "XP: 0\n" +
-        "الحالة: سعيد",
+        "الحالة: سعيد\n" +
+        "الصحة: 100/100\n" +
+        "الشبع: 100/100",
 
         threadID,
         messageID
@@ -1457,10 +1663,7 @@ async function ({
       "pet_actions"
     ) {
 
-      const choice =
-        Number(input);
-
-      const pet =
+      let pet =
         await Pets.findOne({
 
           where: {
@@ -1482,6 +1685,14 @@ async function ({
           messageID
         );
       }
+
+      pet =
+        await updatePetOverTime(
+          pet
+        );
+
+      const choice =
+        Number(input);
 
       // ======================================================
       // البيع
@@ -1515,7 +1726,7 @@ async function ({
 
             `${found?.emoji || "🐾"} ${data.name}\n\n` +
 
-            `القوة: ${found?.power || 0}\n` +
+            `القوة: ${data.power || found?.power || 0}\n` +
             `المستوى: ${data.level || 1}\n\n` +
 
             `قيمة البيع: ${sellPrice} عملة\n\n` +
@@ -1558,7 +1769,7 @@ async function ({
       }
 
       // ======================================================
-      // الإطعام
+      // إطعام
       // ======================================================
 
       if (
@@ -1576,23 +1787,16 @@ async function ({
             hunger + 20
           );
 
-        let status =
-          "طبيعي";
+        const health =
+          Number(
+            pet.health ?? 100
+          );
 
-        if (
-          newHunger >= 80
-        ) {
-
-          status =
-            "سعيد";
-
-        } else if (
-          newHunger < 40
-        ) {
-
-          status =
-            "جائع";
-        }
+        const status =
+          calculatePetState(
+            health,
+            newHunger
+          );
 
         await pet.update({
 
@@ -1613,6 +1817,7 @@ async function ({
           `تم إطعام ${pet.name}\n\n` +
 
           `الشبع: ${newHunger}/100\n` +
+          `الصحة: ${health}/100\n` +
           `الحالة: ${status}`,
 
           threadID,
@@ -1621,7 +1826,7 @@ async function ({
       }
 
       // ======================================================
-      // التدريب
+      // تدريب
       // ======================================================
 
       if (
@@ -1668,6 +1873,22 @@ async function ({
             requiredExp;
         }
 
+        const hunger =
+          Number(
+            pet.hunger ?? 100
+          );
+
+        const health =
+          Number(
+            pet.health ?? 100
+          );
+
+        const status =
+          calculatePetState(
+            health,
+            hunger
+          );
+
         await pet.update({
 
           exp:
@@ -1676,8 +1897,7 @@ async function ({
           level:
             newLevel,
 
-          status:
-            "سعيد"
+          status
         });
 
         removeReply(
@@ -1692,7 +1912,8 @@ async function ({
 
           `+${gainedExp} XP\n` +
           `XP: ${newExp}\n` +
-          `المستوى: ${newLevel}`;
+          `المستوى: ${newLevel}\n` +
+          `الحالة: ${status}`;
 
         if (
           newLevel >
