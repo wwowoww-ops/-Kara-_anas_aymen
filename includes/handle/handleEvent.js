@@ -245,9 +245,6 @@ module.exports = function ({
             // ==================================================
             // 🦧 HINA — التفاعل التلقائي
             // ==================================================
-            // هذا القسم مستقل عن الأوامر والحظر وDeveloperMode
-            // ويعمل طالما أن الرسالة وصلت إلى Handle Event.
-            // ==================================================
 
             if (
                 event.type === "message" &&
@@ -281,20 +278,31 @@ module.exports = function ({
                     try {
 
                         await new Promise(
-                            (resolve, reject) => {
+                            (resolve) => {
 
                                 api.setMessageReaction(
                                     "🦧",
-                                    event.messageID,
+                                    String(event.messageID),
                                     error => {
 
                                         if (error) {
-                                            reject(error);
-                                            return;
+
+                                            console.error(
+                                                "[HINA 🦧 REACTION ERROR]",
+                                                error
+                                            );
+
+                                        } else {
+
+                                            console.log(
+                                                "[HINA 🦧] تم وضع التفاعل"
+                                            );
+
                                         }
 
                                         resolve();
-                                    }
+                                    },
+                                    true
                                 );
 
                             }
@@ -303,8 +311,8 @@ module.exports = function ({
                     } catch (error) {
 
                         console.error(
-                            "[HINA WORD REACTION ERROR]",
-                            error.message
+                            "[HINA 🦧 REACTION ERROR]",
+                            error
                         );
                     }
                 }
