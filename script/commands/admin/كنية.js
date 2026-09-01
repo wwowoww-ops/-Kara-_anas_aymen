@@ -4,16 +4,16 @@ module.exports.config = {
   hasPermssion: 0,
   credits: "أبو هريرة",
   description: "تغيير كنية عضو عن طريق الرد على رسالته",
-  commandCategory: "إدارة",
-  usages: "كنية <الكنية>",
+  commandCategory: "admin",
+  usages: "كنية <الكنية> (رد على رسالة العضو)",
   cooldowns: 3
 };
 
-module.exports.run = async ({
+module.exports.run = async function ({
   api,
   event,
   args
-}) => {
+}) {
   const {
     threadID,
     messageID,
@@ -24,7 +24,7 @@ module.exports.run = async ({
   try {
 
     // ======================================================
-    // معلومات المجموعة والتحقق من الأدمن
+    // معلومات المجموعة
     // ======================================================
 
     const threadInfo =
@@ -32,39 +32,38 @@ module.exports.run = async ({
         threadID
       );
 
-    if (
-      !threadInfo
-    ) {
+    if (!threadInfo) {
       return api.sendMessage(
+        "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬\n\n" +
         "❌ تعذر الحصول على معلومات المجموعة.",
         threadID,
         messageID
       );
     }
 
-    const adminIDs =
-      Array.isArray(
-        threadInfo.adminIDs
-      )
-        ? threadInfo.adminIDs.map(
-            id => String(id)
-          )
-        : [];
+    // ======================================================
+    // التحقق من أدمن المجموعة
+    // نفس النظام المستخدم في أمر بانكاي
+    // ======================================================
 
-    if (
-      !adminIDs.includes(
-        String(senderID)
-      )
-    ) {
+    const isAdmin =
+      threadInfo.adminIDs.some(
+        admin =>
+          String(admin.id) ===
+          String(senderID)
+      );
+
+    if (!isAdmin) {
       return api.sendMessage(
-        "❌ هذا الأمر مخصص لأدمن المجموعة فقط.",
+        "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬\n\n" +
+        "⛔ هذا الأمر للأدمن فقط!",
         threadID,
         messageID
       );
     }
 
     // ======================================================
-    // التأكد من وجود رد على عضو
+    // التأكد من الرد على عضو
     // ======================================================
 
     if (
@@ -72,8 +71,9 @@ module.exports.run = async ({
       !messageReply.senderID
     ) {
       return api.sendMessage(
-        "❌ يجب أن ترد على رسالة العضو أولًا.\n\n" +
-        "مثال:\n" +
+        "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬\n\n" +
+        "📝 الاستخدام:\n\n" +
+        "قم بالرد على رسالة العضو ثم اكتب:\n\n" +
         "كنية Ⓜ︎ - ●【 جــنــديـة - غـــيـمـــــة 】●",
         threadID,
         messageID
@@ -91,8 +91,9 @@ module.exports.run = async ({
 
     if (!nickname) {
       return api.sendMessage(
-        "❌ اكتب الكنية التي تريد وضعها.\n\n" +
-        "مثال:\n" +
+        "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬\n\n" +
+        "❌ لم تحدد الكنية.\n\n" +
+        "📝 مثال:\n" +
         "كنية Ⓜ︎ - ●【 جــنــديـة - غـــيـمـــــة 】●",
         threadID,
         messageID
@@ -121,9 +122,40 @@ module.exports.run = async ({
       targetID === botID
     ) {
       return api.sendMessage(
-        "❌ لا يمكن تغيير كنية البوت.",
+        "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬\n\n" +
+        "😅 لا يمكن تغيير كنية البوت!",
         threadID,
         messageID
+      );
+    }
+
+    // ======================================================
+    // الحصول على اسم العضو
+    // ======================================================
+
+    let userName =
+      "العضو";
+
+    try {
+      const userInfo =
+        await api.getUserInfo(
+          targetID
+        );
+
+      if (
+        userInfo &&
+        userInfo[targetID]
+      ) {
+        userName =
+          userInfo[targetID].name ||
+          userInfo[targetID].firstName ||
+          "العضو";
+      }
+
+    } catch (e) {
+      console.error(
+        "[HINA NICKNAME USER INFO ERROR]",
+        e
       );
     }
 
@@ -138,34 +170,14 @@ module.exports.run = async ({
     );
 
     // ======================================================
-    // الحصول على اسم العضو
+    // رسالة النجاح
     // ======================================================
-
-    let name =
-      "العضو";
-
-    try {
-      const userInfo =
-        await api.getUserInfo(
-          targetID
-        );
-
-      name =
-        userInfo?.[targetID]?.name ||
-        userInfo?.[targetID]?.firstName ||
-        "العضو";
-    } catch (e) {
-      console.error(
-        "[NICKNAME USER INFO ERROR]",
-        e
-      );
-    }
 
     return api.sendMessage(
       "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬\n\n" +
-      "✅ تم تغيير الكنية بنجاح.\n\n" +
-      `👤 العضو: ${name}\n` +
-      `🏷️ الكنية الجديدة: ${nickname}`,
+      "✅ تم تغيير الكنية بنجاح!\n\n" +
+      `👤 العضو: ${userName}\n` +
+      `🏷️ الكنية: ${nickname}`,
       threadID,
       messageID
     );
@@ -173,12 +185,13 @@ module.exports.run = async ({
   } catch (error) {
 
     console.error(
-      "[NICKNAME ERROR]",
+      "❌ [HINA NICKNAME ERROR]",
       error
     );
 
     return api.sendMessage(
-      "❌ تعذر تغيير الكنية.\n\n" +
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬\n\n" +
+      "❌ حدث خطأ أثناء تغيير الكنية.\n\n" +
       "تأكد أن البوت يملك صلاحية تغيير كنيات أعضاء المجموعة.",
       threadID,
       messageID
