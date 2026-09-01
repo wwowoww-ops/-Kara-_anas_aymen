@@ -61,16 +61,18 @@ module.exports = function ({
                 return {};
             }
 
-            const content = fs.readFileSync(
-                file,
-                "utf8"
-            );
+            const content =
+                fs.readFileSync(
+                    file,
+                    "utf8"
+                );
 
             if (!content.trim()) {
                 return {};
             }
 
-            const data = JSON.parse(content);
+            const data =
+                JSON.parse(content);
 
             if (
                 !data ||
@@ -97,11 +99,15 @@ module.exports = function ({
     // 💾 حفظ نشاط المجموعة
     // ==================================================
 
-    function saveActivity(threadID, activity) {
+    function saveActivity(
+        threadID,
+        activity
+    ) {
 
         try {
 
-            const file = getActivityFile(threadID);
+            const file =
+                getActivityFile(threadID);
 
             fs.writeFileSync(
                 file,
@@ -126,9 +132,15 @@ module.exports = function ({
     // 📈 تسجيل نشاط العضو
     // ==================================================
 
-    function registerActivity(threadID, senderID) {
+    function registerActivity(
+        threadID,
+        senderID
+    ) {
 
-        if (!threadID || !senderID) {
+        if (
+            !threadID ||
+            !senderID
+        ) {
             return;
         }
 
@@ -199,7 +211,10 @@ module.exports = function ({
 
                 const cleaned = {};
 
-                for (const uid of keep) {
+                for (
+                    const uid of keep
+                ) {
+
                     cleaned[uid] =
                         activity[uid];
                 }
@@ -230,7 +245,9 @@ module.exports = function ({
     // 🚀 Handle Event
     // ==================================================
 
-    return async function ({ event }) {
+    return async function ({
+        event
+    }) {
 
         try {
 
@@ -245,9 +262,6 @@ module.exports = function ({
             // ==================================================
             // 🦧🦊🦋 HINA — التفاعلات التلقائية
             // ==================================================
-            // يعمل بشكل مستقل عن الأوامر
-            // ولا ينتظر انتهاء التفاعل
-            // ==================================================
 
             if (
                 event.type === "message" &&
@@ -261,9 +275,10 @@ module.exports = function ({
                         .trim();
 
                 let reaction = null;
+                let matchedWord = null;
 
                 // ==================================================
-                // 🦧 يوتا / شفق / هريرة
+                // 🦧
                 // ==================================================
 
                 const monkeyWords = [
@@ -276,7 +291,7 @@ module.exports = function ({
                 ];
 
                 // ==================================================
-                // 🦊 رؤى
+                // 🦊
                 // ==================================================
 
                 const foxWords = [
@@ -285,7 +300,7 @@ module.exports = function ({
                 ];
 
                 // ==================================================
-                // 🦋 فريال
+                // 🦋
                 // ==================================================
 
                 const butterflyWords = [
@@ -294,75 +309,148 @@ module.exports = function ({
                 ];
 
                 // ==================================================
-                // تحديد التفاعل
+                // تحديد 🦧
                 // ==================================================
 
-                if (
-                    monkeyWords.some(
-                        word =>
-                            text.includes(
-                                word.toLowerCase()
-                            )
-                    )
+                for (
+                    const word of monkeyWords
                 ) {
 
-                    reaction = "🦧";
+                    if (
+                        text.includes(
+                            word.toLowerCase()
+                        )
+                    ) {
 
-                } else if (
-                    foxWords.some(
-                        word =>
-                            text.includes(
-                                word.toLowerCase()
-                            )
-                    )
-                ) {
-
-                    reaction = "🦊";
-
-                } else if (
-                    butterflyWords.some(
-                        word =>
-                            text.includes(
-                                word.toLowerCase()
-                            )
-                    )
-                ) {
-
-                    reaction = "🦋";
+                        reaction = "🦧";
+                        matchedWord = word;
+                        break;
+                    }
                 }
 
                 // ==================================================
-                // إرسال التفاعل بدون انتظار
+                // تحديد 🦊
+                // ==================================================
+
+                if (!reaction) {
+
+                    for (
+                        const word of foxWords
+                    ) {
+
+                        if (
+                            text.includes(
+                                word.toLowerCase()
+                            )
+                        ) {
+
+                            reaction = "🦊";
+                            matchedWord = word;
+                            break;
+                        }
+                    }
+                }
+
+                // ==================================================
+                // تحديد 🦋
+                // ==================================================
+
+                if (!reaction) {
+
+                    for (
+                        const word of butterflyWords
+                    ) {
+
+                        if (
+                            text.includes(
+                                word.toLowerCase()
+                            )
+                        ) {
+
+                            reaction = "🦋";
+                            matchedWord = word;
+                            break;
+                        }
+                    }
+                }
+
+                // ==================================================
+                // 🚀 تنفيذ التفاعل
                 // ==================================================
 
                 if (reaction) {
 
-                    try {
+                    const startedAt =
+                        Date.now();
 
-                        api.setMessageReaction(
-                            reaction,
-                            String(event.messageID),
-                            error => {
+                    // إرسال التفاعل فورًا
+                    api.setMessageReaction(
+                        reaction,
+                        String(
+                            event.messageID
+                        ),
 
-                                if (error) {
+                        async error => {
 
-                                    console.error(
-                                        `[HINA REACTION ERROR] ${reaction}`,
-                                        error.message || error
-                                    );
-                                }
+                            const elapsed =
+                                Date.now() -
+                                startedAt;
 
-                            },
-                            true
-                        );
+                            // ==================================================
+                            // نتيجة التفاعل
+                            // ==================================================
 
-                    } catch (error) {
+                            const status =
+                                error
+                                    ? "❌ فشل التفاعل"
+                                    : "✅ نجح التفاعل";
 
-                        console.error(
-                            "[HINA REACTION ERROR]",
-                            error
-                        );
-                    }
+                            const errorText =
+                                error
+                                    ? `\n\n📝 الخطأ:\n${error.message || String(error)}`
+                                    : "";
+
+                            // ==================================================
+                            // رسالة التشخيص
+                            // ==================================================
+
+                            const debugMessage =
+                                "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬\n\n" +
+
+                                "🔍 فحص سرعة التفاعل\n\n" +
+
+                                `📝 الكلمة: ${matchedWord}\n` +
+                                `🎯 التفاعل: ${reaction}\n` +
+                                `🆔 Message ID: ${event.messageID}\n\n` +
+
+                                `⏱️ مدة طلب التفاعل: ${elapsed}ms\n\n` +
+
+                                status +
+                                errorText;
+
+                            // ==================================================
+                            // إرسال نتيجة الفحص
+                            // ==================================================
+
+                            try {
+
+                                await api.sendMessage(
+                                    debugMessage,
+                                    event.threadID,
+                                    event.messageID
+                                );
+
+                            } catch (sendError) {
+
+                                console.error(
+                                    "[HINA DEBUG MESSAGE ERROR]",
+                                    sendError
+                                );
+                            }
+                        },
+
+                        true
+                    );
                 }
             }
 
@@ -377,8 +465,12 @@ module.exports = function ({
             ) {
 
                 registerActivity(
-                    String(event.threadID),
-                    String(event.senderID)
+                    String(
+                        event.threadID
+                    ),
+                    String(
+                        event.senderID
+                    )
                 );
             }
 
@@ -427,9 +519,11 @@ module.exports = function ({
 
             if (
                 userBanned &&
-                typeof userBanned.has === "function" &&
+                typeof userBanned.has ===
+                    "function" &&
                 userBanned.has(senderID)
             ) {
+
                 return;
             }
 
@@ -439,9 +533,11 @@ module.exports = function ({
 
             if (
                 threadBanned &&
-                typeof threadBanned.has === "function" &&
+                typeof threadBanned.has ===
+                    "function" &&
                 threadBanned.has(threadID)
             ) {
+
                 return;
             }
 
@@ -453,6 +549,7 @@ module.exports = function ({
                 allowInbox === false &&
                 senderID === threadID
             ) {
+
                 return;
             }
 
@@ -462,7 +559,6 @@ module.exports = function ({
 
             let registeredEvents = [];
 
-            // الطريقة الأساسية
             if (
                 global.client.events &&
                 global.client.events instanceof Map
@@ -516,7 +612,9 @@ module.exports = function ({
                     }
                 }
 
-                if (oldEvents.length > 0) {
+                if (
+                    oldEvents.length > 0
+                ) {
 
                     registeredEvents =
                         oldEvents;
@@ -567,6 +665,7 @@ module.exports = function ({
                     typeof eventModule.handleEvent !==
                     "function"
                 ) {
+
                     continue;
                 }
 
@@ -676,7 +775,9 @@ module.exports = function ({
                         `❌ EVENT ERROR: ${eventName}`
                     );
 
-                    console.error(error);
+                    console.error(
+                        error
+                    );
 
                     try {
 
