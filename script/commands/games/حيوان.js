@@ -414,7 +414,19 @@ async function getUserName(api, userID) {
         api.getUserInfo(
           uid,
           (error, result) => {
-            if (error || !result) {
+            console.log(
+  "[PET GET USER INFO]",
+  uid,
+  error,
+  result
+);
+
+if (error || !result) {
+  resolve(null);
+  return;
+}
+
+resolve(result); {
               resolve(null);
               return;
             }
