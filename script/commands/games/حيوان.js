@@ -2083,12 +2083,13 @@ const Users =
         String(senderID);
 
       return sendPetBalance(
-        api,
-        threadID,
-        messageID,
-        PetCurrency,
-        targetID
-      );
+  api,
+  threadID,
+  messageID,
+  PetCurrency,
+  Users,
+  targetID
+);
     }
 
     // ========================================================
