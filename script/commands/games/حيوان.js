@@ -2477,276 +2477,276 @@ async function ({
     // المتجر
     // ========================================================
 
-    if (
-      handleReply.type ===
-      "pet_shop"
-    ) {
-      const answer =
-        input.toLowerCase();
+     if (
+  handleReply.type ===
+  "pet_shop"
+) {
+  const answer =
+    input.toLowerCase();
 
-      let item = null;
+  let item = null;
 
-      if (
-        answer === "1" ||
-        answer.includes("طعام") ||
-        answer.includes("اكل") ||
-        answer.includes("أكل")
-      ) {
-        item =
-          SHOP.find(
-            x => x.id === "food"
-          );
-      }
-
-      else if (
-        answer === "2" ||
-        answer.includes("دواء")
-      ) {
-        item =
-          SHOP.find(
-            x => x.id === "medicine"
-          );
-      }
-
-      else if (
-        answer === "3" ||
-        answer.includes("درع")
-      ) {
-        item =
-          SHOP.find(
-            x => x.id === "shield"
-          );
-      }
-
-      else if (
-        answer === "4" ||
-        answer.includes("بطاقة") ||
-        answer.includes("استثمار")
-      ) {
-        item =
-          SHOP.find(
-            x => x.id === "investment_card"
-          );
-      }
-
-      if (!item) {
-        return api.sendMessage(
-          "❌ المنتج غير موجود.\n\n" +
-          "1. طعام الحيوان\n" +
-          "2. دواء الحيوان\n" +
-          "3. درع الحماية\n" +
-          "4. بطاقة الاستثمار",
-          threadID,
-          messageID
-        );
-      }
-
-      const currency =
-        await getPetCurrency(
-          PetCurrency,
-          senderID
-        );
-
-      const money =
-        Number(
-          currency.money || 0
-        );
-
-      if (
-        money < item.price
-      ) {
-        return api.sendMessage(
-          "❌ رصيدك غير كافٍ.\n\n" +
-          `المنتج: ${item.name}\n` +
-          `السعر: ${item.price} عملة\n` +
-          `رصيدك: ${money} عملة\n` +
-          `ينقصك: ${item.price - money} عملة`,
-          threadID,
-          messageID
-        );
-      }
-
-      const data =
-        getCurrencyData(
-          currency
-        );
-
-      // ======================================================
-      // الطعام
-      // ======================================================
-
-      if (
-        item.id === "food"
-      ) {
-        const pet =
-          await Pets.findOne({
-            where: {
-              userID:
-                String(senderID)
-            }
-          });
-
-        if (!pet) {
-          return api.sendMessage(
-            "❌ يجب أن تملك حيوانًا لشراء الطعام.",
-            threadID,
-            messageID
-          );
-        }
-
-        await currency.update({
-          money:
-            money - item.price
-        });
-
-        data.food =
-          Number(data.food || 0) + 1;
-
-        await updateCurrencyData(
-          currency,
-          {
-            food:
-              data.food
-          }
-        );
-
-        removeReply(handleReply);
-
-        return api.sendMessage(
-          "🍖 تم شراء طعام الحيوان.\n\n" +
-          `💰 السعر: ${item.price} عملة\n` +
-          `🍖 الطعام لديك: ${data.food}\n` +
-          `💳 رصيدك: ${money - item.price} عملة`,
-          threadID,
-          messageID
-        );
-      }
-
-      // ======================================================
-      // الدواء
-      // ======================================================
-
-      if (
-        item.id === "medicine"
-      ) {
-        const pet =
-          await Pets.findOne({
-            where: {
-              userID:
-                String(senderID)
-            }
-          });
-
-        if (!pet) {
-          return api.sendMessage(
-            "❌ يجب أن تملك حيوانًا لشراء الدواء.",
-            threadID,
-            messageID
-          );
-        }
-
-        await currency.update({
-          money:
-            money - item.price
-        });
-
-        data.medicine =
-          Number(data.medicine || 0) + 1;
-
-        await updateCurrencyData(
-          currency,
-          {
-            medicine:
-              data.medicine
-          }
-        );
-
-        removeReply(handleReply);
-
-        return api.sendMessage(
-          "💊 تم شراء دواء الحيوان.\n\n" +
-          `💰 السعر: ${item.price} عملة\n` +
-          `💊 الأدوية لديك: ${data.medicine}\n` +
-          `💳 رصيدك: ${money - item.price} عملة`,
-          threadID,
-          messageID
-        );
-      }
-
-      // ======================================================
-      // الدرع
-      // ======================================================
-
-      if (
-        item.id === "shield"
-      ) {
-        await currency.update({
-          money:
-            money - item.price
-        });
-
-        const newShields =
-  Number(data.shields || 0) + 1;
-
-await updateCurrencyData(
-  currency,
-  {
-    shields: newShields
+  if (
+    answer === "1" ||
+    answer.includes("طعام") ||
+    answer.includes("اكل") ||
+    answer.includes("أكل")
+  ) {
+    item =
+      SHOP.find(
+        x => x.id === "food"
+      );
   }
-);
 
-        removeReply(handleReply);
+  else if (
+    answer === "2" ||
+    answer.includes("دواء")
+  ) {
+    item =
+      SHOP.find(
+        x => x.id === "medicine"
+      );
+  }
 
-        return api.sendMessage(
-          "🛡️ تم شراء درع الحماية.\n\n" +
-          `💰 السعر: ${item.price} عملة\n` +
-          `🛡️ الدروع لديك: ${data.shields}\n` +
-          `💳 رصيدك: ${money - item.price} عملة\n\n` +
-          "اكتب حيوان درع لتفعيل الدرع لمدة 24 ساعة.",
-          threadID,
-          messageID
-        );
-      }
+  else if (
+    answer === "3" ||
+    answer.includes("درع")
+  ) {
+    item =
+      SHOP.find(
+        x => x.id === "shield"
+      );
+  }
 
-      // ======================================================
-      // بطاقة الاستثمار
-      // ======================================================
+  else if (
+    answer === "4" ||
+    answer.includes("بطاقة") ||
+    answer.includes("استثمار")
+  ) {
+    item =
+      SHOP.find(
+        x => x.id === "investment_card"
+      );
+  }
 
-      if (
-        item.id === "investment_card"
-      ) {
-        await currency.update({
-          money:
-            money - item.price
-        });
+  if (!item) {
+    return api.sendMessage(
+      "❌ المنتج غير موجود.\n\n" +
+      "1. طعام الحيوان\n" +
+      "2. دواء الحيوان\n" +
+      "3. درع الحماية\n" +
+      "4. بطاقة الاستثمار",
+      threadID,
+      messageID
+    );
+  }
 
-        data.investmentCards =
-          Number(
-            data.investmentCards || 0
-          ) + 1;
+  const currency =
+    await getPetCurrency(
+      PetCurrency,
+      senderID
+    );
 
-        await updateCurrencyData(
-          currency,
-          {
-            investmentCards:
-              data.investmentCards
-          }
-        );
+  const money =
+    Number(
+      currency.money || 0
+    );
 
-        removeReply(handleReply);
+  if (
+    money < item.price
+  ) {
+    return api.sendMessage(
+      "❌ رصيدك غير كافٍ.\n\n" +
+      `المنتج: ${item.name}\n` +
+      `السعر: ${item.price} عملة\n` +
+      `رصيدك: ${money} عملة\n` +
+      `ينقصك: ${item.price - money} عملة`,
+      threadID,
+      messageID
+    );
+  }
 
-        return api.sendMessage(
-          "🎫 تم شراء بطاقة الاستثمار.\n\n" +
-          `💰 السعر: ${item.price} عملة\n` +
-          `🎫 البطاقات لديك: ${data.investmentCards}\n` +
-          `💳 رصيدك: ${money - item.price} عملة\n\n` +
-          "البطاقة ترفع نسبة الاستثمار من 10% إلى 60% في الاستثمار القادم.",
-          threadID,
-          messageID
-        );
-      }
+  const data =
+    getCurrencyData(
+      currency
+    );
+
+  // ======================================================
+  // الطعام
+  // ======================================================
+
+  if (
+    item.id === "food"
+  ) {
+    const pet =
+      await Pets.findOne({
+        where: {
+          userID:
+            String(senderID)
+        }
+      });
+
+    if (!pet) {
+      return api.sendMessage(
+        "❌ يجب أن تملك حيوانًا لشراء الطعام.",
+        threadID,
+        messageID
+      );
     }
 
+    const newFood =
+      Number(data.food || 0) + 1;
+
+    await currency.update({
+      money:
+        money - item.price
+    });
+
+    await updateCurrencyData(
+      currency,
+      {
+        food:
+          newFood
+      }
+    );
+
+    removeReply(handleReply);
+
+    return api.sendMessage(
+      "🍖 تم شراء طعام الحيوان.\n\n" +
+      `💰 السعر: ${item.price} عملة\n` +
+      `🍖 الطعام لديك: ${newFood}\n` +
+      `💳 رصيدك: ${money - item.price} عملة`,
+      threadID,
+      messageID
+    );
+  }
+
+  // ======================================================
+  // الدواء
+  // ======================================================
+
+  if (
+    item.id === "medicine"
+  ) {
+    const pet =
+      await Pets.findOne({
+        where: {
+          userID:
+            String(senderID)
+        }
+      });
+
+    if (!pet) {
+      return api.sendMessage(
+        "❌ يجب أن تملك حيوانًا لشراء الدواء.",
+        threadID,
+        messageID
+      );
+    }
+
+    const newMedicine =
+      Number(data.medicine || 0) + 1;
+
+    await currency.update({
+      money:
+        money - item.price
+    });
+
+    await updateCurrencyData(
+      currency,
+      {
+        medicine:
+          newMedicine
+      }
+    );
+
+    removeReply(handleReply);
+
+    return api.sendMessage(
+      "💊 تم شراء دواء الحيوان.\n\n" +
+      `💰 السعر: ${item.price} عملة\n` +
+      `💊 الأدوية لديك: ${newMedicine}\n` +
+      `💳 رصيدك: ${money - item.price} عملة`,
+      threadID,
+      messageID
+    );
+  }
+
+  // ======================================================
+  // الدرع
+  // ======================================================
+
+  if (
+    item.id === "shield"
+  ) {
+    const newShields =
+      Number(data.shields || 0) + 1;
+
+    await currency.update({
+      money:
+        money - item.price
+    });
+
+    await updateCurrencyData(
+      currency,
+      {
+        shields:
+          newShields
+      }
+    );
+
+    removeReply(handleReply);
+
+    return api.sendMessage(
+      "🛡️ تم شراء درع الحماية.\n\n" +
+      `💰 السعر: ${item.price} عملة\n` +
+      `🛡️ الدروع لديك: ${newShields}\n` +
+      `💳 رصيدك: ${money - item.price} عملة\n\n` +
+      "اكتب حيوان درع لتفعيل الدرع لمدة 24 ساعة.",
+      threadID,
+      messageID
+    );
+  }
+
+  // ======================================================
+  // بطاقة الاستثمار
+  // ======================================================
+
+  if (
+    item.id === "investment_card"
+  ) {
+    const newInvestmentCards =
+      Number(
+        data.investmentCards || 0
+      ) + 1;
+
+    await currency.update({
+      money:
+        money - item.price
+    });
+
+    await updateCurrencyData(
+      currency,
+      {
+        investmentCards:
+          newInvestmentCards
+      }
+    );
+
+    removeReply(handleReply);
+
+    return api.sendMessage(
+      "🎫 تم شراء بطاقة الاستثمار.\n\n" +
+      `💰 السعر: ${item.price} عملة\n` +
+      `🎫 البطاقات لديك: ${newInvestmentCards}\n` +
+      `💳 رصيدك: ${money - item.price} عملة\n\n` +
+      "البطاقة ترفع نسبة الاستثمار من 10% إلى 60% في الاستثمار القادم.",
+      threadID,
+      messageID
+    );
+  }
+}
     // ========================================================
     // إجراءات الحيوان
     // ========================================================
