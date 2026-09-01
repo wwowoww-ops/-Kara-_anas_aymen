@@ -207,7 +207,7 @@ function getPetByType(type) {
 // العملة
 // ============================================================
 
-async function getPetCurrency(PetCurrency, userID) {
+async function getsyou(PetCurrency, userID) {
   let currency = await PetCurrency.findOne({
     where: {
       userID: String(userID)
@@ -736,6 +736,7 @@ async function sendPetBalance(
   threadID,
   messageID,
   PetCurrency,
+  Users, 
   targetID
 ) {
   const currency =
@@ -1855,7 +1856,8 @@ async function buyPet(
 async function getLeaderboard(
   api,
   Pets,
-  PetCurrency
+  PetCurrency,
+  Users
 ) {
   const pets =
     await Pets.findAll({
@@ -1912,6 +1914,7 @@ async function getLeaderboard(
     const name =
       await getUserName(
         api,
+        Users,
         pet.userID
       );
 
@@ -1947,6 +1950,7 @@ async function getLeaderboard(
   const developerName =
     await getUserName(
       api,
+      Users,
       DEVELOPER_ID
     );
 
@@ -1980,7 +1984,6 @@ async function getLeaderboard(
 
   return text;
 }
-
 // ============================================================
 // RUN
 // ============================================================
@@ -2009,6 +2012,12 @@ async function ({
       getModel(
         models,
         "PetCurrency"
+      );
+
+const Users =
+      getModel(
+        models,
+        "Users"
       );
 
     if (!Pets) {
