@@ -1,6 +1,6 @@
 module.exports.config = {
   name: "حيوان",
-  version: "7.0.0",
+  version: "8.0.0",
   credits: "أبو هريرة",
   description: "نظام الحيوانات الأليفة",
   commandCategory: "Games",
@@ -8,6 +8,14 @@ module.exports.config = {
   usages: "حيوان | حيوان قائمة",
   cooldowns: 3
 };
+
+// ============================================================
+// إعدادات التدريب
+// ============================================================
+
+const TRAIN_COOLDOWN = 30 * 60 * 1000;
+const TRAIN_XP = 20;
+const POWER_PER_LEVEL = 5;
 
 // ============================================================
 // الحيوانات
@@ -412,7 +420,7 @@ const RARITY_ORDER = [
 ];
 
 // ============================================================
-// الحصول على المودل
+// مودل
 // ============================================================
 
 function getModel(models, name) {
@@ -460,7 +468,7 @@ function getModel(models, name) {
 }
 
 // ============================================================
-// إدارة الردود
+// الردود
 // ============================================================
 
 function addReply(data) {
@@ -479,18 +487,27 @@ function removeReply(handleReply) {
 
   try {
 
-    const list =
-      global.client.handleReply;
-
-    if (!Array.isArray(list)) {
+    if (
+      !Array.isArray(
+        global.client.handleReply
+      )
+    ) {
       return;
     }
 
     const index =
-      list.indexOf(handleReply);
+      global.client.handleReply.indexOf(
+        handleReply
+      );
 
-    if (index !== -1) {
-      list.splice(index, 1);
+    if (
+      index !== -1
+    ) {
+
+      global.client.handleReply.splice(
+        index,
+        1
+      );
     }
 
   } catch {}
@@ -519,6 +536,7 @@ function sendReply(
             );
 
             resolve(null);
+
             return;
           }
 
@@ -539,7 +557,8 @@ function getPetByID(id) {
 
   return PETS.find(
     pet =>
-      pet.id === Number(id)
+      pet.id ===
+      Number(id)
   );
 }
 
@@ -553,7 +572,7 @@ function getPetByType(type) {
 }
 
 // ============================================================
-// تحديث حالة الحيوان
+// الحالة
 // ============================================================
 
 function calculatePetState(
@@ -579,23 +598,31 @@ function calculatePetState(
       )
     );
 
-  // الصحة لها الأولوية
+  if (
+    health < 20
+  ) {
 
-  if (health < 20) {
     return "مريض";
   }
 
-  if (health < 50) {
+  if (
+    health < 50
+  ) {
+
     return "متعب";
   }
 
-  // بعدها الشبع
+  if (
+    hunger < 20
+  ) {
 
-  if (hunger < 20) {
     return "جائع";
   }
 
-  if (hunger < 50) {
+  if (
+    hunger < 50
+  ) {
+
     return "حزين";
   }
 
@@ -611,30 +638,28 @@ function calculatePetState(
 }
 
 // ============================================================
-// تحديث الشبع والصحة حسب الوقت
+// تحديث الوقت
 // ============================================================
 
-async function updatePetOverTime(pet) {
+async function updatePetOverTime(
+  pet
+) {
 
   const now =
     Date.now();
 
-  const lastUpdate =
+  const updatedAt =
     pet.updatedAt
       ? new Date(
           pet.updatedAt
         ).getTime()
       : now;
 
-  if (!lastUpdate) {
-    return pet;
-  }
-
   const hoursPassed =
     Math.floor(
       (
         now -
-        lastUpdate
+        updatedAt
       ) /
       (1000 * 60 * 60)
     );
@@ -646,7 +671,7 @@ async function updatePetOverTime(pet) {
     return pet;
   }
 
-  const oldHunger =
+  const hunger =
     Math.max(
       0,
       Math.min(
@@ -657,7 +682,7 @@ async function updatePetOverTime(pet) {
       )
     );
 
-  const oldHealth =
+  const health =
     Math.max(
       0,
       Math.min(
@@ -668,23 +693,12 @@ async function updatePetOverTime(pet) {
       )
     );
 
-  // ==========================================================
-  // نقصان الشبع
-  // ==========================================================
-
-  const hungerLoss =
-    hoursPassed * 5;
-
   const newHunger =
     Math.max(
       0,
-      oldHunger -
-      hungerLoss
+      hunger -
+      hoursPassed * 5
     );
-
-  // ==========================================================
-  // تأثير الجوع على الصحة
-  // ==========================================================
 
   let healthLoss = 0;
 
@@ -706,11 +720,11 @@ async function updatePetOverTime(pet) {
   const newHealth =
     Math.max(
       0,
-      oldHealth -
+      health -
       healthLoss
     );
 
-  const newStatus =
+  const status =
     calculatePetState(
       newHealth,
       newHunger
@@ -724,8 +738,7 @@ async function updatePetOverTime(pet) {
     health:
       newHealth,
 
-    status:
-      newStatus
+    status
   });
 
   return pet;
@@ -742,7 +755,7 @@ function getFreePetsList() {
 
   text +=
     "اختر حيوانك الأول\n" +
-    "رد على الرسالة برقم الحيوان\n\n";
+    "رد برقم الحيوان\n\n";
 
   const freePets =
     PETS.filter(
@@ -760,13 +773,13 @@ function getFreePetsList() {
   }
 
   text +=
-    "\n↪️ الحيوانات المدفوعة: حيوان قائمة";
+    "\n↪️ لعرض المتجر: حيوان قائمة";
 
   return text;
 }
 
 // ============================================================
-// قائمة المتجر
+// المتجر
 // ============================================================
 
 function getShopList() {
@@ -788,7 +801,10 @@ function getShopList() {
           pet.rarity === rarity
       );
 
-    if (!pets.length) {
+    if (
+      !pets.length
+    ) {
+
       continue;
     }
 
@@ -817,7 +833,9 @@ function getShopList() {
 // معلومات الحيوان
 // ============================================================
 
-function getPetInfo(pet) {
+function getPetInfo(
+  pet
+) {
 
   const found =
     getPetByType(
@@ -877,7 +895,7 @@ function getPetInfo(pet) {
     `الندرة: ${rarity}\n` +
     `القوة: ${power}\n` +
     `المستوى: ${level}\n` +
-    `XP: ${exp}\n` +
+    `XP: ${exp}/${level * 100}\n` +
     `الحالة: ${status}\n` +
     `الصحة: ${health}/100\n` +
     `الشبع: ${hunger}/100\n\n` +
@@ -891,7 +909,7 @@ function getPetInfo(pet) {
 }
 
 // ============================================================
-// إنشاء الحيوان
+// إنشاء
 // ============================================================
 
 async function createPet(
@@ -943,7 +961,7 @@ async function createPet(
     `الندرة: ${selected.rarity}\n` +
     `القوة: ${selected.power}\n` +
     `المستوى: 1\n` +
-    `XP: 0\n` +
+    `XP: 0/100\n` +
     `الحالة: سعيد\n` +
     `الصحة: 100/100\n` +
     `الشبع: 100/100`
@@ -951,10 +969,12 @@ async function createPet(
 }
 
 // ============================================================
-// سعر البيع
+// البيع
 // ============================================================
 
-function getSellPrice(pet) {
+function getSellPrice(
+  pet
+) {
 
   const found =
     getPetByType(
@@ -1032,13 +1052,7 @@ async function ({
     if (!Pets) {
 
       return api.sendMessage(
-
-        "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
-
-        "❌ مودل الحيوانات غير محمّل.\n\n" +
-
-        "تأكد أن Pets موجود داخل models ومسجل في نظام قاعدة البيانات.",
-
+        "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n❌ مودل الحيوانات غير محمّل.",
         threadID,
         messageID
       );
@@ -1061,14 +1075,11 @@ async function ({
 
     const subCommand =
       Array.isArray(args)
-        ? args
-            .join(" ")
-            .trim()
-            .toLowerCase()
+        ? args.join(" ").trim().toLowerCase()
         : "";
 
     // ========================================================
-    // قائمة المتجر
+    // القائمة
     // ========================================================
 
     if (
@@ -1079,7 +1090,6 @@ async function ({
 
       const sent =
         await sendReply(
-
           api,
           getShopList(),
           threadID,
@@ -1087,8 +1097,7 @@ async function ({
         );
 
       if (
-        sent &&
-        sent.messageID
+        sent?.messageID
       ) {
 
         addReply({
@@ -1111,7 +1120,7 @@ async function ({
     }
 
     // ========================================================
-    // البحث عن الحيوان
+    // الحيوان
     // ========================================================
 
     let pet =
@@ -1124,10 +1133,6 @@ async function ({
 
       });
 
-    // ========================================================
-    // تحديث الحيوان حسب الوقت
-    // ========================================================
-
     if (pet) {
 
       pet =
@@ -1135,10 +1140,6 @@ async function ({
           pet
         );
     }
-
-    // ========================================================
-    // لديه حيوان
-    // ========================================================
 
     if (pet) {
 
@@ -1148,9 +1149,7 @@ async function ({
           api,
 
           getPetInfo(
-            pet.toJSON
-              ? pet.toJSON()
-              : pet
+            pet.toJSON()
           ),
 
           threadID,
@@ -1158,8 +1157,7 @@ async function ({
         );
 
       if (
-        sent &&
-        sent.messageID
+        sent?.messageID
       ) {
 
         addReply({
@@ -1182,12 +1180,11 @@ async function ({
     }
 
     // ========================================================
-    // لا يملك حيوان
+    // إنشاء مجاني
     // ========================================================
 
     const sent =
       await sendReply(
-
         api,
         getFreePetsList(),
         threadID,
@@ -1195,8 +1192,7 @@ async function ({
       );
 
     if (
-      sent &&
-      sent.messageID
+      sent?.messageID
     ) {
 
       addReply({
@@ -1333,11 +1329,7 @@ async function ({
       if (!selected) {
 
         return api.sendMessage(
-
-          "❌ رقم الحيوان غير صحيح.\n\n" +
-
-          `اختر رقمًا من 1 إلى ${PETS.length}.`,
-
+          `❌ رقم الحيوان غير صحيح.\n\nاختر رقمًا من 1 إلى ${PETS.length}.`,
           threadID,
           messageID
         );
@@ -1367,7 +1359,7 @@ async function ({
       }
 
       // ======================================================
-      // مجاني
+      // المجاني
       // ======================================================
 
       if (
@@ -1393,7 +1385,7 @@ async function ({
       }
 
       // ======================================================
-      // تأكيد الشراء
+      // شراء
       // ======================================================
 
       const sent =
@@ -1419,8 +1411,7 @@ async function ({
         );
 
       if (
-        sent &&
-        sent.messageID
+        sent?.messageID
       ) {
 
         removeReply(
@@ -1543,7 +1534,7 @@ async function ({
       if (!currency) {
 
         return api.sendMessage(
-          "❌ لم يتم العثور على حساب العملات الخاص بك.",
+          "❌ لم يتم العثور على حساب العملات.",
           threadID,
           messageID
         );
@@ -1644,7 +1635,7 @@ async function ({
         `المتبقي: ${money - selected.price} عملة\n\n` +
 
         "المستوى: 1\n" +
-        "XP: 0\n" +
+        "XP: 0/100\n" +
         "الحالة: سعيد\n" +
         "الصحة: 100/100\n" +
         "الشبع: 100/100",
@@ -1703,9 +1694,7 @@ async function ({
       ) {
 
         const data =
-          pet.toJSON
-            ? pet.toJSON()
-            : pet;
+          pet.toJSON();
 
         const sellPrice =
           getSellPrice(
@@ -1726,9 +1715,8 @@ async function ({
 
             `${found?.emoji || "🐾"} ${data.name}\n\n` +
 
-            `القوة: ${data.power || found?.power || 0}\n` +
-            `المستوى: ${data.level || 1}\n\n` +
-
+            `القوة: ${data.power}\n` +
+            `المستوى: ${data.level}\n` +
             `قيمة البيع: ${sellPrice} عملة\n\n` +
 
             "هل تريد بيع حيوانك؟\n\n" +
@@ -1741,8 +1729,7 @@ async function ({
           );
 
         if (
-          sent &&
-          sent.messageID
+          sent?.messageID
         ) {
 
           removeReply(
@@ -1769,7 +1756,7 @@ async function ({
       }
 
       // ======================================================
-      // إطعام
+      // الإطعام
       // ======================================================
 
       if (
@@ -1826,56 +1813,153 @@ async function ({
       }
 
       // ======================================================
-      // تدريب
+      // التدريب
       // ======================================================
 
       if (
         choice === 3
       ) {
 
-        const currentExp =
+        // ----------------------------------------------------
+        // إنشاء مساحة الكولداون
+        // ----------------------------------------------------
+
+        if (
+          !global.petTrainCooldown
+        ) {
+
+          global.petTrainCooldown =
+            {};
+        }
+
+        const userKey =
+          String(senderID);
+
+        const lastTrain =
           Number(
-            pet.exp || 0
+            global.petTrainCooldown[userKey] || 0
           );
+
+        const now =
+          Date.now();
+
+        const remaining =
+          TRAIN_COOLDOWN -
+          (
+            now -
+            lastTrain
+          );
+
+        // ----------------------------------------------------
+        // الكولداون
+        // ----------------------------------------------------
+
+        if (
+          remaining > 0
+        ) {
+
+          const minutes =
+            Math.floor(
+              remaining /
+              60000
+            );
+
+          const seconds =
+            Math.floor(
+              (
+                remaining %
+                60000
+              ) /
+              1000
+            );
+
+          return api.sendMessage(
+
+            "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+
+            "❌ حيوانك يحتاج إلى الراحة.\n\n" +
+
+            `⏳ الوقت المتبقي: ${minutes} دقيقة و ${seconds} ثانية\n\n` +
+
+            "يمكنك تدريبه مرة أخرى بعد انتهاء الكولداون.",
+
+            threadID,
+            messageID
+          );
+        }
+
+        // ----------------------------------------------------
+        // تحديث وقت التدريب
+        // ----------------------------------------------------
+
+        global.petTrainCooldown[userKey] =
+          now;
+
+        // ----------------------------------------------------
+        // البيانات
+        // ----------------------------------------------------
 
         const currentLevel =
           Number(
             pet.level || 1
           );
 
-        const gainedExp =
-          20;
+        const currentExp =
+          Number(
+            pet.exp || 0
+          );
 
-        const requiredExp =
-          currentLevel *
-          100;
-
-        const totalExp =
-          currentExp +
-          gainedExp;
+        const currentPower =
+          Number(
+            pet.power || 0
+          );
 
         let newLevel =
           currentLevel;
 
         let newExp =
-          totalExp;
+          currentExp +
+          TRAIN_XP;
 
-        if (
-          totalExp >=
-          requiredExp
+        let newPower =
+          currentPower;
+
+        let levelsGained =
+          0;
+
+        // ----------------------------------------------------
+        // حساب المستوى
+        // ----------------------------------------------------
+
+        while (
+          newExp >=
+          newLevel * 100
         ) {
 
-          newLevel =
-            currentLevel + 1;
+          newExp -=
+            newLevel * 100;
 
-          newExp =
-            totalExp -
-            requiredExp;
+          newLevel++;
+
+          levelsGained++;
+
+          newPower +=
+            POWER_PER_LEVEL;
         }
 
-        const hunger =
+        // ----------------------------------------------------
+        // التدريب يؤثر على الشبع
+        // ----------------------------------------------------
+
+        const oldHunger =
           Number(
             pet.hunger ?? 100
+          );
+
+        const newHunger =
+          Math.max(
+            0,
+            oldHunger - 10
           );
 
         const health =
@@ -1886,8 +1970,12 @@ async function ({
         const status =
           calculatePetState(
             health,
-            hunger
+            newHunger
           );
+
+        // ----------------------------------------------------
+        // الحفظ
+        // ----------------------------------------------------
 
         await pet.update({
 
@@ -1897,6 +1985,12 @@ async function ({
           level:
             newLevel,
 
+          power:
+            newPower,
+
+          hunger:
+            newHunger,
+
           status
         });
 
@@ -1904,24 +1998,41 @@ async function ({
           handleReply
         );
 
+        // ----------------------------------------------------
+        // الرسالة
+        // ----------------------------------------------------
+
         let message =
 
           "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
 
           `تم تدريب ${pet.name}\n\n` +
 
-          `+${gainedExp} XP\n` +
-          `XP: ${newExp}\n` +
+          `+${TRAIN_XP} XP\n` +
+
+          `XP: ${newExp}/${newLevel * 100}\n` +
+
           `المستوى: ${newLevel}\n` +
-          `الحالة: ${status}`;
+
+          `القوة: ${newPower}\n` +
+
+          `الشبع: ${newHunger}/100\n` +
+
+          `الحالة: ${status}\n\n` +
+
+          "⏳ التدريب القادم بعد 30 دقيقة.";
 
         if (
-          newLevel >
-          currentLevel
+          levelsGained > 0
         ) {
 
           message +=
-            "\n\nارتفع مستوى حيوانك!";
+
+            "\n\n" +
+
+            `ارتفع المستوى إلى ${newLevel}!\n` +
+
+            `+${levelsGained * POWER_PER_LEVEL} قوة`;
         }
 
         return api.sendMessage(
@@ -2008,9 +2119,7 @@ async function ({
       }
 
       const data =
-        pet.toJSON
-          ? pet.toJSON()
-          : pet;
+        pet.toJSON();
 
       const sellPrice =
         getSellPrice(
@@ -2068,6 +2177,7 @@ async function ({
         `تم بيع ${petName} بنجاح\n\n` +
 
         `قيمة البيع: ${sellPrice} عملة\n` +
+
         `رصيدك الجديد: ${money + sellPrice} عملة`,
 
         threadID,
