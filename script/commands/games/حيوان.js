@@ -399,30 +399,44 @@ async function updatePetOverTime(pet) {
 // ============================================================
 
 async function getUserName(api, userID) {
-  try {
-    const info = await new Promise(resolve => {
-      api.getUserInfo(
-        String(userID),
-        (error, result) => {
-          if (error || !result) {
-            resolve(null);
-            return;
+  const uid = String(userID);
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const info = await new Promise(resolve => {
+        api.getUserInfo(
+          uid,
+          (error, result) => {
+            if (error || !result) {
+              resolve(null);
+              return;
+            }
+
+            resolve(result);
           }
+        );
+      });
 
-          resolve(result);
-        }
+      if (
+        info &&
+        info[uid] &&
+        typeof info[uid].name === "string" &&
+        info[uid].name.trim()
+      ) {
+        return info[uid].name.trim();
+      }
+    } catch (e) {
+      console.error(
+        `[PET USER INFO ERROR] محاولة ${attempt + 1}:`,
+        e
       );
-    });
-
-    if (
-      info &&
-      info[String(userID)] &&
-      info[String(userID)].name
-    ) {
-      return info[String(userID)].name;
     }
-  } catch (e) {
-    console.error("[PET USER INFO ERROR]", e);
+
+    if (attempt < 2) {
+      await new Promise(resolve =>
+        setTimeout(resolve, 500)
+      );
+    }
   }
 
   return "مستخدم";
