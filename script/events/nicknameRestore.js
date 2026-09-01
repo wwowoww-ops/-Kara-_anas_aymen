@@ -4,231 +4,186 @@ module.exports.config = {
         "log:subscribe",
         "log:user-nickname"
     ],
-    version: "3.0.0",
+    version: "2.0.0",
     credits: "أبو هريرة",
-    description: "حفظ واسترجاع كنى الأعضاء",
-    category: "events"
+    description: "حفظ واسترجاع كنيات الأعضاء تلقائياً"
 };
 
-module.exports.handleEvent = async function ({
+module.exports.run = async function ({
     api,
     event,
-    Users,
-    Nicknames
+    models
 }) {
 
-    try {
+    if (!api || !event || !models) {
+        return;
+    }
 
-        if (
-            !event ||
-            !Nicknames
-        ) {
+    const Nicknames =
+        models.use("Nicknames");
+
+    const Users =
+        models.use("Users");
+
+    if (!Nicknames) {
+        console.error(
+            "[nicknameRestore] Nicknames model غير موجود"
+        );
+        return;
+    }
+
+    const threadID =
+        String(event.threadID || "");
+
+    if (!threadID) {
+        return;
+    }
+
+
+    // =========================================================
+    // تغيير كنية عضو
+    // =========================================================
+
+    if (
+        event.type === "log:user-nickname"
+    ) {
+
+        let userID =
+            event.participantID ||
+            event.changedFor ||
+            event.userID ||
+            event.userFbId;
+
+        if (!userID) {
             return;
         }
 
-        const threadID =
-            String(event.threadID || "");
+        userID = String(userID);
 
-        if (!threadID) {
-            return;
-        }
-
-        const botID =
-            String(
-                api.getCurrentUserID()
-            );
-
-        /*
-         * ==========================================================
-         * أولًا: حفظ الكنية عند تغييرها
-         * ==========================================================
-         */
+        let nickname =
+            event.nickname ??
+            event.newNickname ??
+            event.new_nickname ??
+            event.name ??
+            "";
 
         if (
-            event.logMessageType ===
-            "log:user-nickname"
+            nickname === null ||
+            nickname === undefined
         ) {
+            nickname = "";
+        }
 
-            const data =
-                event.logMessageData || {};
+        nickname = String(nickname).trim();
 
-            /*
-             * بعض نسخ FCA تستخدم changedFor
-             * وبعضها تستخدم participantID
-             */
 
-            const userID =
-                String(
-                    data.changedFor ||
-                    data.participantID ||
-                    data.userFbId ||
-                    data.userID ||
-                    ""
-                );
+        // -----------------------------------------------------
+        // إذا تم حذف الكنية
+        // -----------------------------------------------------
 
-            if (
-                !userID ||
-                userID === botID
-            ) {
-                return;
-            }
-
-            /*
-             * محاولة استخراج الكنية الجديدة
-             */
-
-            const nickname =
-                String(
-                    data.nickname ||
-                    data.newNickname ||
-                    data.new_nickname ||
-                    ""
-                ).trim();
-
-            /*
-             * إذا أصبحت الكنية فارغة
-             * فهذا يعني أن العضو أزيلت كنيته
-             * لذلك نحذف السجل القديم
-             */
-
-            if (!nickname) {
-
-                try {
-
-                    await Nicknames.destroy({
-                        where: {
-                            threadID,
-                            userID
-                        }
-                    });
-
-                } catch (error) {
-
-                    console.error(
-                        "[nicknameRestore] DELETE NICKNAME ERROR:",
-                        error.message
-                    );
-
-                }
-
-                return;
-            }
-
-            let userName =
-                "العضو";
+        if (!nickname) {
 
             try {
 
-                if (
-                    Users &&
-                    typeof Users.getData ===
-                    "function"
-                ) {
-
-                    const userData =
-                        await Users.getData(
-                            userID
-                        );
-
-                    if (
-                        userData &&
-                        userData.name
-                    ) {
-
-                        userName =
-                            String(
-                                userData.name
-                            ).trim();
-
+                await Nicknames.destroy({
+                    where: {
+                        threadID,
+                        userID
                     }
-                }
-
-            } catch (error) {
-
-                console.error(
-                    "[nicknameRestore] USER NAME ERROR:",
-                    error.message
-                );
-
-            }
-
-            try {
-
-                await Nicknames.upsert({
-
-                    threadID,
-                    userID,
-                    userName,
-                    nickname,
-                    updatedAt:
-                        new Date()
-
                 });
 
+                console.log(
+                    `[nicknameRestore] تم حذف سجل الكنية: ${userID} | ${threadID}`
+                );
+
             } catch (error) {
 
                 console.error(
-                    "[nicknameRestore] SAVE NICKNAME ERROR:",
-                    error.message
+                    "[nicknameRestore] فشل حذف الكنية:",
+                    error.message || error
                 );
-
             }
 
             return;
         }
 
-        /*
-         * ==========================================================
-         * ثانيًا: استرجاع الكنية عند رجوع العضو
-         * ==========================================================
-         */
 
-        if (
-            event.logMessageType !==
-            "log:subscribe"
-        ) {
-            return;
+        // -----------------------------------------------------
+        // الحصول على الاسم الحقيقي وتخزينه
+        // -----------------------------------------------------
+
+        let userName =
+            event.userName ||
+            event.fullName ||
+            "عضو غير معروف";
+
+        try {
+
+            if (Users) {
+
+                const userData =
+                    await Users.getData(userID);
+
+                if (
+                    userData &&
+                    userData.name
+                ) {
+                    userName =
+                        userData.name;
+                }
+            }
+
+        } catch (_) {}
+
+
+        // -----------------------------------------------------
+        // حفظ الكنية
+        // -----------------------------------------------------
+
+        try {
+
+            await Nicknames.upsert({
+                threadID,
+                userID,
+                userName,
+                nickname,
+                updatedAt: new Date()
+            });
+
+            console.log(
+                `[nicknameRestore] تم حفظ الكنية: ${userID} -> ${nickname}`
+            );
+
+        } catch (error) {
+
+            console.error(
+                "[nicknameRestore] فشل حفظ الكنية:",
+                error.message || error
+            );
         }
 
-        const logData =
-            event.logMessageData || {};
+        return;
+    }
+
+
+    // =========================================================
+    // دخول عضو للمجموعة
+    // =========================================================
+
+    if (
+        event.type === "log:subscribe"
+    ) {
 
         const addedParticipants =
-            Array.isArray(
-                logData.addedParticipants
-            )
-                ? logData.addedParticipants
-                : [];
+            event.addedParticipants || [];
 
         if (
-            !addedParticipants.length
+            !Array.isArray(addedParticipants) ||
+            addedParticipants.length === 0
         ) {
             return;
         }
 
-        /*
-         * إذا دخل البوت نفسه
-         * لا نسترجع أي كنية
-         */
-
-        if (
-            addedParticipants.some(
-                participant =>
-                    String(
-                        participant.userFbId ||
-                        ""
-                    ) === botID
-            )
-        ) {
-            return;
-        }
-
-        /*
-         * نبحث فقط عن السجلات الموجودة مسبقًا
-         *
-         * مهم:
-         * لا نحفظ أي كنية جديدة هنا
-         */
 
         for (
             const participant
@@ -238,66 +193,48 @@ module.exports.handleEvent = async function ({
             const userID =
                 String(
                     participant.userFbId ||
+                    participant.userID ||
+                    participant.id ||
                     ""
                 );
 
-            if (
-                !userID ||
-                userID === botID
-            ) {
+            if (!userID) {
                 continue;
             }
 
-            let savedRecord = null;
 
-            try {
+            // -------------------------------------------------
+            // البحث عن الكنية القديمة
+            // -------------------------------------------------
 
-                savedRecord =
-                    await Nicknames.findOne({
-                        where: {
-                            threadID,
-                            userID
-                        }
-                    });
+            const savedRecord =
+                await Nicknames.findOne({
+                    where: {
+                        threadID,
+                        userID
+                    }
+                });
 
-            } catch (error) {
 
-                console.error(
-                    "[nicknameRestore] FIND ERROR:",
-                    error.message
-                );
-
-                continue;
-            }
-
-            /*
-             * لا يوجد سجل سابق
-             * إذن العضو جديد بالنسبة لنظام الكنى
-             */
-
+            // لا يوجد سجل قديم = لا نفعل شيئاً
             if (!savedRecord) {
                 continue;
             }
 
-            const savedNickname =
+
+            const nickname =
                 String(
-                    savedRecord.nickname ||
-                    ""
+                    savedRecord.nickname || ""
                 ).trim();
 
-            const savedUserName =
-                String(
-                    savedRecord.userName ||
-                    "العضو"
-                ).trim();
-
-            if (!savedNickname) {
+            if (!nickname) {
                 continue;
             }
 
-            /*
-             * تطبيق الكنية القديمة
-             */
+
+            // -------------------------------------------------
+            // استرجاع الكنية
+            // -------------------------------------------------
 
             try {
 
@@ -305,7 +242,7 @@ module.exports.handleEvent = async function ({
                     (resolve, reject) => {
 
                         api.changeNickname(
-                            savedNickname,
+                            nickname,
                             threadID,
                             userID,
                             error => {
@@ -317,48 +254,51 @@ module.exports.handleEvent = async function ({
                                 }
 
                                 resolve();
-
                             }
                         );
 
                     }
                 );
 
-                /*
-                 * رسالة HINA
-                 */
 
-                const message =
+                // ------------------------------------------------
+                // رسالة HINA
+                // ------------------------------------------------
+
+                const userName =
+                    savedRecord.userName ||
+                    participant.fullName ||
+                    "عضو غير معروف";
+
+                await new Promise(
+                    resolve => {
+
+                        api.sendMessage(
 `⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬
 
 🏷️ تم استرجاع الكنية بنجاح
 
-👤 ${savedUserName}
-✦ الكنية: ${savedNickname}`;
+👤 ${userName}
+✦ الكنية: ${nickname}`,
+                            threadID,
+                            () => resolve()
+                        );
 
-                await api.sendMessage(
-                    message,
-                    threadID
+                    }
+                );
+
+
+                console.log(
+                    `[nicknameRestore] تم استرجاع كنية ${userName}: ${nickname}`
                 );
 
             } catch (error) {
 
                 console.error(
-                    "[nicknameRestore] RESTORE ERROR:",
-                    error.message
+                    `[nicknameRestore] فشل استرجاع كنية ${userID}:`,
+                    error.message || error
                 );
-
             }
-
         }
-
-    } catch (error) {
-
-        console.error(
-            "❌ NICKNAME RESTORE ERROR:",
-            error
-        );
-
     }
-
 };
