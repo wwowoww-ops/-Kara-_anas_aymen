@@ -774,10 +774,11 @@ async function sendPetBalance(
     Number(currency.money || 0);
 
   const targetName =
-    await getUserName(
-      api,
-      targetID
-    );
+  await getUserName(
+    api,
+    Users,
+    targetID
+  );
 
   const data =
     getCurrencyData(currency);
