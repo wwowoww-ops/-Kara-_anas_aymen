@@ -1,55 +1,58 @@
 module.exports = function (input) {
 
-const force = false;
+    const force = false;
 
-const Users =
-    require("./models/users")(input);
+    const Users =
+        require("./models/users")(input);
 
-const Threads =
-    require("./models/threads")(input);
+    const Threads =
+        require("./models/threads")(input);
 
-const Currencies =
-    require("./models/currencies")(input);
+    const Currencies =
+        require("./models/currencies")(input);
 
-const Pets =
-    require("./models/Pets")(input);
+    const Pets =
+        require("./models/Pets")(input);
 
-const PetCurrency =
-    require("./models/PetCurrency")(input);
+    const PetCurrency =
+        require("./models/PetCurrency")(input);
 
-const Nicknames =
-    require("./models/Nicknames")(input);
+    const Nicknames =
+        require("./models/Nicknames")(input);
 
-// ==================================================
-// مزامنة الجداول
-// ==================================================
 
-Users.sync({ force });
-Threads.sync({ force });
-Currencies.sync({ force });
-Pets.sync({ force });
-PetCurrency.sync({ force });
-Nicknames.sync({ force });
+    // مزامنة الجداول
 
-return {
+    Users.sync({ force });
 
-    model: {
-        Users,
-        Threads,
-        Currencies,
-        Pets,
-        PetCurrency,
-        Nicknames
-    },
+    Threads.sync({ force });
 
-    use: function (modelName) {
+    Currencies.sync({ force });
 
-        return this.model[
-            `${modelName}`
-        ];
+    Pets.sync({ force });
 
-    }
+    PetCurrency.sync({ force });
 
-};
+    Nicknames.sync({ force });
 
+
+    return {
+
+        model: {
+            Users,
+            Threads,
+            Currencies,
+            Pets,
+            PetCurrency,
+            Nicknames
+        },
+
+        use: function (modelName) {
+
+            return this.model[
+                `${modelName}`
+            ];
+        }
+
+    };
 };
