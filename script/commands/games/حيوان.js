@@ -1,9 +1,9 @@
 module.exports.config = {
   name: "حيوان",
-  version: "4.0.0",
+  version: "5.0.0",
   credits: "أبو هريرة",
   description: "نظام الحيوانات الأليفة",
-  commandCategory: "Games",
+  commandCategory: "games",
   hasPermssion: 0,
   usages: "حيوان | حيوان قائمة",
   cooldowns: 3
@@ -56,7 +56,7 @@ const PETS = [
     power: 7,
     emoji: "🐹"
   },
-  
+
   {
     id: 5,
     type: "سنجاب",
@@ -67,10 +67,20 @@ const PETS = [
     emoji: "🐿️"
   },
 
+  {
+    id: 6,
+    type: "فراشة",
+    name: "فراشة",
+    price: 0,
+    rarity: "شائع",
+    power: 6,
+    emoji: "🦋"
+  },
+
   // ==================== غير شائع ====================
 
   {
-    id: 5,
+    id: 7,
     type: "ثعلب",
     name: "ثعلب",
     price: 500,
@@ -80,7 +90,7 @@ const PETS = [
   },
 
   {
-    id: 6,
+    id: 8,
     type: "باندا",
     name: "باندا",
     price: 1500,
@@ -90,7 +100,7 @@ const PETS = [
   },
 
   {
-    id: 7,
+    id: 9,
     type: "ببغاء",
     name: "ببغاء",
     price: 2500,
@@ -100,7 +110,7 @@ const PETS = [
   },
 
   {
-    id: 8,
+    id: 10,
     type: "سلحفاة",
     name: "سلحفاة",
     price: 1800,
@@ -110,7 +120,7 @@ const PETS = [
   },
 
   {
-    id: 9,
+    id: 11,
     type: "بطريق",
     name: "بطريق",
     price: 2200,
@@ -120,7 +130,7 @@ const PETS = [
   },
 
   {
-    id: 10,
+    id: 12,
     type: "كوالا",
     name: "كوالا",
     price: 2800,
@@ -129,10 +139,20 @@ const PETS = [
     emoji: "🐨"
   },
 
+  {
+    id: 13,
+    type: "غراب",
+    name: "غراب",
+    price: 3000,
+    rarity: "غير شائع",
+    power: 35,
+    emoji: "🐦‍⬛"
+  },
+
   // ==================== نادر ====================
 
   {
-    id: 11,
+    id: 14,
     type: "ذئب",
     name: "ذئب",
     price: 1000,
@@ -142,7 +162,7 @@ const PETS = [
   },
 
   {
-    id: 12,
+    id: 15,
     type: "حصان",
     name: "حصان",
     price: 3000,
@@ -152,7 +172,7 @@ const PETS = [
   },
 
   {
-    id: 13,
+    id: 16,
     type: "نمر",
     name: "نمر",
     price: 2500,
@@ -162,7 +182,7 @@ const PETS = [
   },
 
   {
-    id: 14,
+    id: 17,
     type: "أسد",
     name: "أسد",
     price: 3500,
@@ -172,7 +192,7 @@ const PETS = [
   },
 
   {
-    id: 15,
+    id: 18,
     type: "دب",
     name: "دب",
     price: 4000,
@@ -184,7 +204,7 @@ const PETS = [
   // ==================== ملحمي ====================
 
   {
-    id: 16,
+    id: 19,
     type: "غزال",
     name: "غزال",
     price: 5000,
@@ -194,7 +214,7 @@ const PETS = [
   },
 
   {
-    id: 17,
+    id: 20,
     type: "نسر",
     name: "نسر",
     price: 6000,
@@ -204,7 +224,7 @@ const PETS = [
   },
 
   {
-    id: 18,
+    id: 21,
     type: "بومة",
     name: "بومة",
     price: 4500,
@@ -214,7 +234,7 @@ const PETS = [
   },
 
   {
-    id: 19,
+    id: 22,
     type: "غوريلا",
     name: "غوريلا",
     price: 7000,
@@ -224,7 +244,7 @@ const PETS = [
   },
 
   {
-    id: 20,
+    id: 23,
     type: "فهد",
     name: "فهد",
     price: 7500,
@@ -234,7 +254,7 @@ const PETS = [
   },
 
   {
-    id: 21,
+    id: 24,
     type: "تمساح",
     name: "تمساح",
     price: 6500,
@@ -244,7 +264,7 @@ const PETS = [
   },
 
   {
-    id: 22,
+    id: 25,
     type: "قرش",
     name: "قرش",
     price: 8000,
@@ -254,7 +274,7 @@ const PETS = [
   },
 
   {
-    id: 23,
+    id: 26,
     type: "حوت",
     name: "حوت",
     price: 9000,
@@ -264,7 +284,7 @@ const PETS = [
   },
 
   {
-    id: 24,
+    id: 27,
     type: "زرافة",
     name: "زرافة",
     price: 8500,
@@ -274,7 +294,7 @@ const PETS = [
   },
 
   {
-    id: 25,
+    id: 28,
     type: "شمبانزي",
     name: "شمبانزي",
     price: 5500,
@@ -286,17 +306,7 @@ const PETS = [
   // ==================== أسطوري ====================
 
   {
-    id: 26,
-    type: "تنين",
-    name: "تنين",
-    price: 10000,
-    rarity: "أسطوري",
-    power: 100,
-    emoji: "🐉"
-  },
-
-  {
-    id: 27,
+    id: 29,
     type: "وحيد القرن",
     name: "وحيد القرن",
     price: 11000,
@@ -306,7 +316,7 @@ const PETS = [
   },
 
   {
-    id: 28,
+    id: 30,
     type: "فيل",
     name: "فيل",
     price: 12000,
@@ -316,7 +326,7 @@ const PETS = [
   },
 
   {
-    id: 29,
+    id: 31,
     type: "صقر",
     name: "صقر",
     price: 9500,
@@ -328,7 +338,17 @@ const PETS = [
   // ==================== خرافي ====================
 
   {
-    id: 30,
+    id: 32,
+    type: "تنين",
+    name: "تنين",
+    price: 10000,
+    rarity: "خرافي",
+    power: 150,
+    emoji: "🐉"
+  },
+
+  {
+    id: 33,
     type: "يونيكورن",
     name: "يونيكورن",
     price: 18000,
@@ -338,13 +358,23 @@ const PETS = [
   },
 
   {
-    id: 31,
+    id: 34,
     type: "وحش أسطوري",
     name: "وحش أسطوري",
     price: 20000,
     rarity: "خرافي",
     power: 150,
     emoji: "👹"
+  },
+
+  {
+    id: 35,
+    type: "كراكن",
+    name: "كراكن",
+    price: 25000,
+    rarity: "خرافي",
+    power: 180,
+    emoji: "🐙"
   }
 ];
 
@@ -362,10 +392,10 @@ const RARITY_ORDER = [
 ];
 
 // ============================================================
-// جلب Pets
+// الحصول على المودل
 // ============================================================
 
-function getPetsModel(models) {
+function getModel(models, name) {
 
   try {
 
@@ -374,18 +404,18 @@ function getPetsModel(models) {
       typeof models.use === "function"
     ) {
 
-      const Pets =
-        models.use("Pets");
+      const model =
+        models.use(name);
 
-      if (Pets) {
-        return Pets;
+      if (model) {
+        return model;
       }
     }
 
   } catch (error) {
 
     console.error(
-      "[PET MODEL USE ERROR]",
+      `[PET MODEL ERROR] ${name}`,
       error
     );
   }
@@ -394,10 +424,10 @@ function getPetsModel(models) {
 
     if (
       models &&
-      models.Pets
+      models[name]
     ) {
 
-      return models.Pets;
+      return models[name];
     }
 
   } catch {}
@@ -406,10 +436,10 @@ function getPetsModel(models) {
 
     if (
       global.models &&
-      global.models.Pets
+      global.models[name]
     ) {
 
-      return global.models.Pets;
+      return global.models[name];
     }
 
   } catch {}
@@ -418,84 +448,7 @@ function getPetsModel(models) {
 }
 
 // ============================================================
-// جلب العملات
-// ============================================================
-
-function getCurrenciesModel(models) {
-
-  try {
-
-    if (
-      models &&
-      typeof models.use === "function"
-    ) {
-
-      const Currencies =
-        models.use("Currencies");
-
-      if (Currencies) {
-        return Currencies;
-      }
-    }
-
-  } catch (error) {
-
-    console.error(
-      "[CURRENCY MODEL USE ERROR]",
-      error
-    );
-  }
-
-  try {
-
-    if (
-      models &&
-      models.Currencies
-    ) {
-
-      return models.Currencies;
-    }
-
-  } catch {}
-
-  try {
-
-    if (
-      global.models &&
-      global.models.Currencies
-    ) {
-
-      return global.models.Currencies;
-    }
-
-  } catch {}
-
-  return null;
-}
-
-// ============================================================
-// البحث عن حيوان
-// ============================================================
-
-function getPetByID(id) {
-
-  return PETS.find(
-    pet =>
-      pet.id === Number(id)
-  );
-}
-
-function getPetByType(type) {
-
-  return PETS.find(
-    pet =>
-      String(pet.type) ===
-      String(type)
-  );
-}
-
-// ============================================================
-// Reply
+// إضافة Reply
 // ============================================================
 
 function addReply(data) {
@@ -507,8 +460,14 @@ function addReply(data) {
     global.client.handleReply = [];
   }
 
-  global.client.handleReply.push(data);
+  global.client.handleReply.push(
+    data
+  );
 }
+
+// ============================================================
+// إزالة Reply
+// ============================================================
 
 function removeReply(handleReply) {
 
@@ -537,6 +496,66 @@ function removeReply(handleReply) {
 }
 
 // ============================================================
+// إرسال Reply
+// ============================================================
+
+function sendReply(
+  api,
+  message,
+  threadID,
+  messageID
+) {
+
+  return new Promise(
+    resolve => {
+
+      api.sendMessage(
+        message,
+        threadID,
+        (error, info) => {
+
+          if (error) {
+
+            console.error(
+              "[PET SEND ERROR]",
+              error
+            );
+
+            resolve(null);
+            return;
+          }
+
+          resolve(info);
+        },
+        messageID
+      );
+
+    }
+  );
+}
+
+// ============================================================
+// البحث
+// ============================================================
+
+function getPetByID(id) {
+
+  return PETS.find(
+    pet =>
+      pet.id === Number(id)
+  );
+}
+
+function getPetByType(type) {
+
+  return PETS.find(
+    pet =>
+      String(pet.type) ===
+      String(type)
+  );
+}
+
+// ============================================================
 // القائمة المجانية
 // ============================================================
 
@@ -547,7 +566,7 @@ function getFreePetsList() {
 
   text +=
     "اختر حيوانك الأول\n" +
-    "رد على هذه الرسالة برقم الحيوان\n\n";
+    "رد على الرسالة برقم الحيوان\n\n";
 
   const freePets =
     PETS.filter(
@@ -565,14 +584,13 @@ function getFreePetsList() {
   }
 
   text +=
-    "\n↪️ رد برقم الحيوان لإنشائه\n" +
-    "لرؤية الحيوانات الأخرى استخدم: حيوان قائمة";
+    "\n↪️ الحيوانات المدفوعة: حيوان قائمة";
 
   return text;
 }
 
 // ============================================================
-// قائمة الحيوانات المدفوعة
+// قائمة المتجر
 // ============================================================
 
 function getShopList() {
@@ -581,7 +599,7 @@ function getShopList() {
     "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n";
 
   text +=
-    "🛒 قائمة الحيوانات المتاحة للشراء\n\n";
+    "🛒 الحيوانات المتاحة للشراء\n\n";
 
   for (
     const rarity of RARITY_ORDER
@@ -614,7 +632,7 @@ function getShopList() {
   }
 
   text +=
-    "↪️ رد برقم الحيوان لبدء الشراء";
+    "↪️ رد برقم الحيوان للشراء";
 
   return text;
 }
@@ -686,7 +704,6 @@ function getPetInfo(pet) {
     "1. بيع الحيوان\n" +
     "2. إطعام الحيوان\n" +
     "3. تدريب الحيوان"
-
   );
 }
 
@@ -699,23 +716,6 @@ async function createPet(
   senderID,
   selected
 ) {
-
-  const existing =
-    await Pets.findOne({
-      where: {
-        userID:
-          String(senderID)
-      }
-    });
-
-  if (existing) {
-
-    return {
-      success: false,
-      message:
-        "❌ لديك حيوان بالفعل."
-    };
-  }
 
   await Pets.create({
 
@@ -744,28 +744,23 @@ async function createPet(
       0
   });
 
-  return {
+  return (
 
-    success: true,
+    "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
 
-    message:
+    `${selected.emoji} تم إنشاء حيوانك بنجاح\n\n` +
 
-      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
-
-      `${selected.emoji} تم إنشاء حيوانك بنجاح\n\n` +
-
-      `الحيوان: ${selected.name}\n` +
-      `الندرة: ${selected.rarity}\n` +
-      `القوة: ${selected.power}\n` +
-      `المستوى: 1\n` +
-      `XP: 0\n` +
-      `الحالة: سعيد`
-  };
+    `الحيوان: ${selected.name}\n` +
+    `الندرة: ${selected.rarity}\n` +
+    `القوة: ${selected.power}\n` +
+    `المستوى: 1\n` +
+    `XP: 0\n` +
+    `الحالة: سعيد`
+  );
 }
 
 // ============================================================
-// حساب سعر البيع
-// القوة تؤثر على السعر
+// سعر البيع
 // ============================================================
 
 function getSellPrice(pet) {
@@ -779,9 +774,9 @@ function getSellPrice(pet) {
     return 0;
   }
 
-  const level =
+  const basePrice =
     Number(
-      pet.level || 1
+      found.price || 0
     );
 
   const power =
@@ -789,9 +784,9 @@ function getSellPrice(pet) {
       found.power || 0
     );
 
-  const basePrice =
+  const level =
     Number(
-      found.price || 0
+      pet.level || 1
     );
 
   // نصف السعر الأساسي
@@ -800,11 +795,11 @@ function getSellPrice(pet) {
       basePrice / 2
     );
 
-  // زيادة حسب القوة
+  // القوة ترفع سعر الاسترداد
   const powerBonus =
     power * 10;
 
-  // زيادة حسب المستوى
+  // المستوى يضيف قيمة بسيطة
   const levelBonus =
     Math.max(
       0,
@@ -819,46 +814,7 @@ function getSellPrice(pet) {
 }
 
 // ============================================================
-// إرسال رسالة مع Reply
-// ============================================================
-
-function sendReply(
-  api,
-  message,
-  threadID,
-  messageID
-) {
-
-  return new Promise(
-    resolve => {
-
-      api.sendMessage(
-        message,
-        threadID,
-        (error, info) => {
-
-          if (error) {
-
-            console.error(
-              "[PET SEND ERROR]",
-              error
-            );
-
-            resolve(null);
-            return;
-          }
-
-          resolve(info);
-        },
-        messageID
-      );
-
-    }
-  );
-}
-
-// ============================================================
-// الأمر الرئيسي
+// RUN
 // ============================================================
 
 module.exports.run =
@@ -878,13 +834,9 @@ async function ({
   try {
 
     const Pets =
-      getPetsModel(
-        models
-      );
-
-    const Currencies =
-      getCurrenciesModel(
-        models
+      getModel(
+        models,
+        "Pets"
       );
 
     if (!Pets) {
@@ -901,6 +853,12 @@ async function ({
         messageID
       );
     }
+
+    const Currencies =
+      getModel(
+        models,
+        "Currencies"
+      );
 
     if (!Currencies) {
 
@@ -935,6 +893,7 @@ async function ({
 
       const sent =
         await sendReply(
+
           api,
           getShopList(),
           threadID,
@@ -966,7 +925,7 @@ async function ({
     }
 
     // ========================================================
-    // البحث عن حيوان المستخدم
+    // البحث عن الحيوان
     // ========================================================
 
     const pet =
@@ -987,12 +946,15 @@ async function ({
 
       const sent =
         await sendReply(
+
           api,
+
           getPetInfo(
             pet.toJSON
               ? pet.toJSON()
               : pet
           ),
+
           threadID,
           messageID
         );
@@ -1027,8 +989,11 @@ async function ({
 
     const sent =
       await sendReply(
+
         api,
+
         getFreePetsList(),
+
         threadID,
         messageID
       );
@@ -1096,10 +1061,6 @@ async function ({
 
   try {
 
-    // ========================================================
-    // التأكد من صاحب القائمة
-    // ========================================================
-
     if (
       handleReply.author &&
       String(handleReply.author) !==
@@ -1110,13 +1071,15 @@ async function ({
     }
 
     const Pets =
-      getPetsModel(
-        models
+      getModel(
+        models,
+        "Pets"
       );
 
     const Currencies =
-      getCurrenciesModel(
-        models
+      getModel(
+        models,
+        "Currencies"
       );
 
     if (!Pets) {
@@ -1142,7 +1105,7 @@ async function ({
         .trim();
 
     // ========================================================
-    // اختيار حيوان
+    // اختيار الحيوان
     // ========================================================
 
     if (
@@ -1182,10 +1145,6 @@ async function ({
         );
       }
 
-      // ------------------------------------------------------
-      // التأكد من عدم وجود حيوان
-      // ------------------------------------------------------
-
       const existing =
         await Pets.findOne({
 
@@ -1209,15 +1168,15 @@ async function ({
         );
       }
 
-      // ------------------------------------------------------
-      // الحيوان المجاني
-      // ------------------------------------------------------
+      // ======================================================
+      // مجاني
+      // ======================================================
 
       if (
         selected.price === 0
       ) {
 
-        const result =
+        const message =
           await createPet(
             Pets,
             senderID,
@@ -1229,15 +1188,15 @@ async function ({
         );
 
         return api.sendMessage(
-          result.message,
+          message,
           threadID,
           messageID
         );
       }
 
-      // ------------------------------------------------------
-      // الحيوان المدفوع
-      // ------------------------------------------------------
+      // ======================================================
+      // مدفوع
+      // ======================================================
 
       const sent =
         await sendReply(
@@ -1350,10 +1309,6 @@ async function ({
         );
       }
 
-      // ------------------------------------------------------
-      // التأكد من عدم امتلاك حيوان
-      // ------------------------------------------------------
-
       const existing =
         await Pets.findOne({
 
@@ -1377,11 +1332,7 @@ async function ({
         );
       }
 
-      // ------------------------------------------------------
-      // جلب الحساب
-      // ------------------------------------------------------
-
-      let currency =
+      const currency =
         await Currencies.findOne({
 
           where: {
@@ -1394,9 +1345,7 @@ async function ({
       if (!currency) {
 
         return api.sendMessage(
-
           "❌ لم يتم العثور على حساب العملات الخاص بك.",
-
           threadID,
           messageID
         );
@@ -1414,8 +1363,6 @@ async function ({
 
         return api.sendMessage(
 
-          "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
-
           "❌ لا تملك عملات كافية.\n\n" +
 
           `السعر: ${selected.price}\n` +
@@ -1426,10 +1373,6 @@ async function ({
           messageID
         );
       }
-
-      // ------------------------------------------------------
-      // خصم السعر
-      // ------------------------------------------------------
 
       await currency.update({
 
@@ -1468,8 +1411,6 @@ async function ({
         });
 
       } catch (error) {
-
-        // إرجاع المال إذا فشل إنشاء الحيوان
 
         try {
 
@@ -1543,7 +1484,7 @@ async function ({
       }
 
       // ======================================================
-      // بيع
+      // البيع
       // ======================================================
 
       if (
@@ -1617,7 +1558,7 @@ async function ({
       }
 
       // ======================================================
-      // إطعام
+      // الإطعام
       // ======================================================
 
       if (
@@ -1635,17 +1576,30 @@ async function ({
             hunger + 20
           );
 
+        let status =
+          "طبيعي";
+
+        if (
+          newHunger >= 80
+        ) {
+
+          status =
+            "سعيد";
+
+        } else if (
+          newHunger < 40
+        ) {
+
+          status =
+            "جائع";
+        }
+
         await pet.update({
 
           hunger:
             newHunger,
 
-          status:
-            newHunger >= 80
-              ? "سعيد"
-              : newHunger >= 40
-                ? "طبيعي"
-                : "جائع"
+          status
         });
 
         removeReply(
@@ -1659,14 +1613,7 @@ async function ({
           `تم إطعام ${pet.name}\n\n` +
 
           `الشبع: ${newHunger}/100\n` +
-
-          `الحالة: ${
-            newHunger >= 80
-              ? "سعيد"
-              : newHunger >= 40
-                ? "طبيعي"
-                : "جائع"
-          }`,
+          `الحالة: ${status}`,
 
           threadID,
           messageID
@@ -1674,7 +1621,7 @@ async function ({
       }
 
       // ======================================================
-      // تدريب
+      // التدريب
       // ======================================================
 
       if (
@@ -1694,13 +1641,13 @@ async function ({
         const gainedExp =
           20;
 
-        const totalExp =
-          currentExp +
-          gainedExp;
-
         const requiredExp =
           currentLevel *
           100;
+
+        const totalExp =
+          currentExp +
+          gainedExp;
 
         let newLevel =
           currentLevel;
@@ -1767,9 +1714,9 @@ async function ({
 
         "❌ الاختيار غير صحيح.\n\n" +
 
-        "1. بيع\n" +
-        "2. إطعام\n" +
-        "3. تدريب",
+        "1. بيع الحيوان\n" +
+        "2. إطعام الحيوان\n" +
+        "3. تدريب الحيوان",
 
         threadID,
         messageID
@@ -1849,7 +1796,7 @@ async function ({
           data
         );
 
-      let currency =
+      const currency =
         await Currencies.findOne({
 
           where: {
