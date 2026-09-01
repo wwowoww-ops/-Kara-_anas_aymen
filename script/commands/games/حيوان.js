@@ -398,8 +398,15 @@ async function updatePetOverTime(pet) {
 // اسم المستخدم
 // ============================================================
 
+const petUserNameCache = new Map();
+
 async function getUserName(api, userID) {
   const uid = String(userID);
+
+  // إذا كان الاسم محفوظًا مسبقًا
+  if (petUserNameCache.has(uid)) {
+    return petUserNameCache.get(uid);
+  }
 
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
@@ -417,13 +424,24 @@ async function getUserName(api, userID) {
         );
       });
 
-      if (
+      const user =
         info &&
-        info[uid] &&
-        typeof info[uid].name === "string" &&
-        info[uid].name.trim()
+        info[uid];
+
+      if (
+        user &&
+        typeof user.name === "string" &&
+        user.name.trim()
       ) {
-        return info[uid].name.trim();
+        const name =
+          user.name.trim();
+
+        petUserNameCache.set(
+          uid,
+          name
+        );
+
+        return name;
       }
     } catch (e) {
       console.error(
@@ -434,14 +452,13 @@ async function getUserName(api, userID) {
 
     if (attempt < 2) {
       await new Promise(resolve =>
-        setTimeout(resolve, 500)
+        setTimeout(resolve, 700)
       );
     }
   }
 
   return "مستخدم";
 }
-
 // ============================================================
 // استخراج الهدف بالمنشن أو الرد
 // ============================================================
