@@ -207,7 +207,7 @@ function getPetByType(type) {
 // العملة
 // ============================================================
 
-async function getsyou(PetCurrency, userID) {
+async function getPetCurrency(PetCurrency, userID) {
   let currency = await PetCurrency.findOne({
     where: {
       userID: String(userID)
