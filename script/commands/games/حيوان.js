@@ -2102,11 +2102,12 @@ const Users =
       lower === "leaderboard"
     ) {
       const text =
-        await getLeaderboard(
-          api,
-          Pets,
-          PetCurrency
-        );
+  await getLeaderboard(
+    api,
+    Pets,
+    PetCurrency,
+    Users
+  );
 
       return api.sendMessage(
         text,
