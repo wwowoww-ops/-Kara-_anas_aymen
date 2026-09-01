@@ -457,7 +457,12 @@ async function getUserName(api, userID) {
     }
   }
 
-  return "مستخدم";
+  console.log(
+  "[PET NAME FAILED]",
+  uid
+);
+
+return `مستخدم (${uid})`;
 }
 // ============================================================
 // استخراج الهدف بالمنشن أو الرد
