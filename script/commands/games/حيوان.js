@@ -248,12 +248,15 @@ function getCurrencyData(currency) {
 }
 
 async function updateCurrencyData(currency, changes) {
-  const data = getCurrencyData(currency);
+  const oldData = getCurrencyData(currency);
 
-  Object.assign(data, changes);
+  const data = {
+    ...oldData,
+    ...changes
+  };
 
   await currency.update({
-    data
+    data: data
   });
 
   return data;
