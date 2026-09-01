@@ -243,87 +243,101 @@ module.exports = function ({
     }
 
     // ==================================================
-    // 🦧🦊🦋 HINA REACTION
+// 🦧🦊🦋 التفاعل التلقائي
+// ==================================================
+
+if (
+    event.type === "message" &&
+    event.body &&
+    event.messageID
+) {
+
+    const text =
+        String(event.body)
+            .toLowerCase()
+            .trim();
+
+    let reaction = null;
+
+    // ==================================================
+    // 🦧
     // ==================================================
 
-    function detectReaction(text) {
+    const monkeyWords = [
+        "يوتا",
+        "شفق",
+        "الشفق",
+        "هريرة",
+        "ابو هريرة",
+        "أبو هريرة"
+    ];
 
-        const monkeyWords = [
-            "يوتا",
-            "شفق",
-            "الشفق",
-            "هريرة",
-            "ابو هريرة",
-            "أبو هريرة"
-        ];
+    // ==================================================
+    // 🦊
+    // ==================================================
 
-        const foxWords = [
-            "رؤى",
-            "ࢪؤى"
-        ];
+    const foxWords = [
+        "رؤى",
+        "ࢪؤى"
+    ];
 
-        const butterflyWords = [
-            "فريال",
-            "فࢪيال"
-        ];
+    // ==================================================
+    // 🦋
+    // ==================================================
 
-        // 🦧
-        for (
-            const word of monkeyWords
-        ) {
+    const butterflyWords = [
+        "فريال",
+        "فࢪيال"
+    ];
 
-            if (
-                text.includes(
-                    word.toLowerCase()
-                )
-            ) {
-
-                return {
-                    reaction: "🦧",
-                    word
-                };
-            }
+    for (const word of monkeyWords) {
+        if (text.includes(word.toLowerCase())) {
+            reaction = "🦧";
+            break;
         }
-
-        // 🦊
-        for (
-            const word of foxWords
-        ) {
-
-            if (
-                text.includes(
-                    word.toLowerCase()
-                )
-            ) {
-
-                return {
-                    reaction: "🦊",
-                    word
-                };
-            }
-        }
-
-        // 🦋
-        for (
-            const word of butterflyWords
-        ) {
-
-            if (
-                text.includes(
-                    word.toLowerCase()
-                )
-            ) {
-
-                return {
-                    reaction: "🦋",
-                    word
-                };
-            }
-        }
-
-        return null;
     }
 
+    if (!reaction) {
+        for (const word of foxWords) {
+            if (text.includes(word.toLowerCase())) {
+                reaction = "🦊";
+                break;
+            }
+        }
+    }
+
+    if (!reaction) {
+        for (const word of butterflyWords) {
+            if (text.includes(word.toLowerCase())) {
+                reaction = "🦋";
+                break;
+            }
+        }
+    }
+
+    // ==================================================
+    // 🚀 تنفيذ التفاعل
+    // ==================================================
+
+    if (reaction) {
+
+        api.setMessageReaction(
+            reaction,
+            String(event.messageID),
+            error => {
+
+                if (error) {
+                    console.error(
+                        "[HINA REACTION ERROR]",
+                        error.message || error
+                    );
+                }
+
+            },
+            true
+        );
+    }
+}
     // ==================================================
     // 🚀 Handle Event
     // ==================================================
