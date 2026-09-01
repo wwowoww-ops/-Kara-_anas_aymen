@@ -400,41 +400,71 @@ async function updatePetOverTime(pet) {
 
 const petUserNameCache = new Map();
 
-async function getUserName(api, userID) {
+async function getUserName(
+  api,
+  Users,
+  userID
+) {
   const uid = String(userID);
 
-  // إذا كان الاسم محفوظًا مسبقًا
-  if (petUserNameCache.has(uid)) {
-    return petUserNameCache.get(uid);
+  // البحث في جدول Users أولًا
+  if (Users) {
+    try {
+      const user =
+        await Users.findOne({
+          where: {
+            userID: uid
+          }
+        });
+
+      if (
+        user &&
+        typeof user.name === "string" &&
+        user.name.trim()
+      ) {
+        const name =
+          user.name.trim();
+
+        petUserNameCache.set(
+          uid,
+          name
+        );
+
+        return name;
+      }
+    } catch (e) {
+      console.error(
+        "[PET USERS NAME ERROR]",
+        e
+      );
+    }
   }
 
-  for (let attempt = 0; attempt < 3; attempt++) {
+  // إذا لم يوجد الاسم في Users
+  // نجرب Facebook
+  for (
+    let attempt = 0;
+    attempt < 3;
+    attempt++
+  ) {
     try {
-      const info = await new Promise(resolve => {
-        api.getUserInfo(
-          uid,
-          (error, result) => {
-            console.log(
-  "[PET GET USER INFO]",
-  uid,
-  error,
-  result
-);
+      const info =
+        await new Promise(resolve => {
+          api.getUserInfo(
+            uid,
+            (error, result) => {
+              if (
+                error ||
+                !result
+              ) {
+                resolve(null);
+                return;
+              }
 
-if (error || !result) {
-  resolve(null);
-  return;
-}
-
-resolve(result); {
-              resolve(null);
-              return;
+              resolve(result);
             }
-
-            resolve(result);
-          }
-        );
-      });
+          );
+        });
 
       const user =
         info &&
@@ -469,12 +499,7 @@ resolve(result); {
     }
   }
 
-  console.log(
-  "[PET NAME FAILED]",
-  uid
-);
-
-return `مستخدم (${uid})`;
+  return `مستخدم (${uid})`;
 }
 // ============================================================
 // استخراج الهدف بالمنشن أو الرد
