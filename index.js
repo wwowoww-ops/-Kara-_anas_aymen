@@ -66,6 +66,13 @@ const login = require("hut-chat-api");
 const axios = require("axios");
 
 // ═══════════════════════════════════════════════
+// مزامنة الكنيات
+// ═══════════════════════════════════════════════
+
+const syncNicknames =
+    require("./utils/syncNicknames.js");
+
+// ═══════════════════════════════════════════════
 // INITIALIZATION
 // ═══════════════════════════════════════════════
 
@@ -132,14 +139,17 @@ global.language = new Object();
 var configValue;
 
 try {
-    global.client.configPath = join(
-        global.client.mainPath,
-        "config.json"
-    );
 
-    configValue = require(
-        global.client.configPath
-    );
+    global.client.configPath =
+        join(
+            global.client.mainPath,
+            "config.json"
+        );
+
+    configValue =
+        require(
+            global.client.configPath
+        );
 
     logger.loader(
         "Found file config: config.json"
@@ -158,7 +168,10 @@ try {
 try {
 
     for (const key in configValue) {
-        global.config[key] = configValue[key];
+
+        global.config[key] =
+            configValue[key];
+
     }
 
     logger.loader(
@@ -277,6 +290,7 @@ try {
 
         global.language[head][key] =
             value;
+
     }
 
 } catch (error) {
@@ -323,6 +337,7 @@ global.getText = function (...args) {
                     regEx,
                     args[i + 1]
                 );
+
         }
 
         return text;
@@ -371,6 +386,7 @@ if (process.env.APPSTATE) {
         );
 
         process.exit(1);
+
     }
 
 } else {
@@ -394,6 +410,7 @@ if (process.env.APPSTATE) {
         );
 
         process.exit(1);
+
     }
 
 }
@@ -460,6 +477,7 @@ function clearReconnectTimer() {
         );
 
         reconnectTimer = null;
+
     }
 
 }
@@ -505,6 +523,7 @@ function closeOldConnection() {
 
     activeApi = null;
     isConnected = false;
+
 }
 
 // ═══════════════════════════════════════════════
@@ -522,6 +541,7 @@ function scheduleReconnect(botModel) {
         );
 
         return;
+
     }
 
     reconnectAttempts++;
@@ -538,6 +558,7 @@ function scheduleReconnect(botModel) {
         );
 
         return;
+
     }
 
     const delay =
@@ -581,6 +602,7 @@ function onBot({ models: botModel }) {
         );
 
         return;
+
     }
 
     isConnecting = true;
@@ -630,6 +652,7 @@ function onBot({ models: botModel }) {
                 );
 
                 return;
+
             }
 
             // ═══════════════════════════════════
@@ -654,6 +677,7 @@ function onBot({ models: botModel }) {
                 );
 
                 return;
+
             }
 
             // ═══════════════════════════════════
@@ -674,6 +698,38 @@ function onBot({ models: botModel }) {
                     "✅ تم تسجيل الدخول بنجاح!"
                 )
             );
+
+            // ═══════════════════════════════════
+            // مزامنة الكنيات الحالية
+            // ═══════════════════════════════════
+
+            try {
+
+                const result =
+                    await syncNicknames({
+                        api: loginApiData,
+                        Users:
+                            botModel.use("Users"),
+                        Nicknames:
+                            botModel.use("Nicknames")
+                    });
+
+                console.log(
+                    chalk.green(
+                        `✅ تمت مزامنة الكنيات الحالية | محفوظ: ${result.saved} | متجاهل: ${result.skipped} | فشل: ${result.failed}`
+                    )
+                );
+
+            } catch (error) {
+
+                console.error(
+                    chalk.red(
+                        "❌ فشل مزامنة الكنيات الحالية:"
+                    ),
+                    error
+                );
+
+            }
 
             // ═══════════════════════════════════
             // OPTIONS
@@ -807,6 +863,7 @@ function onBot({ models: botModel }) {
                     );
 
                     continue;
+
                 }
 
                 for (
@@ -895,6 +952,7 @@ function onBot({ models: botModel }) {
                     );
 
                     events = [];
+
                 }
 
                 for (
@@ -1004,6 +1062,7 @@ function onBot({ models: botModel }) {
                 );
 
                 return;
+
             }
 
             // ═══════════════════════════════════
@@ -1025,6 +1084,7 @@ function onBot({ models: botModel }) {
                         ) {
 
                             return;
+
                         }
 
                         // ═══════════════════════════
@@ -1051,6 +1111,7 @@ function onBot({ models: botModel }) {
                             ) {
 
                                 return;
+
                             }
 
                             // إزالة الـ API القديم
@@ -1088,6 +1149,7 @@ function onBot({ models: botModel }) {
                             );
 
                             return;
+
                         }
 
                         // ═══════════════════════════
@@ -1136,6 +1198,7 @@ function onBot({ models: botModel }) {
                 );
 
                 return;
+
             }
 
             // ═══════════════════════════════════
@@ -1202,6 +1265,7 @@ function onBot({ models: botModel }) {
                         ) {
 
                             return;
+
                         }
 
                         try {
