@@ -39,7 +39,7 @@ const ADMIN_ID = "61578581225040";
 // const GROQ_API_KEY = "gsk_xxxxxxxxxxxxxxxxx";
 
 const GROQ_API_KEY =
-  "PUT_YOUR_GROQ_API_KEY_HERE";
+  "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";
 
 // ==================================================
 // Groq
