@@ -24,16 +24,25 @@ module.exports = function ({
     const MAX_ACTIVITY_MEMBERS = 5000;
 
     try {
+
         if (!fs.existsSync(ACTIVITY_DIR)) {
-            fs.mkdirSync(ACTIVITY_DIR, {
-                recursive: true
-            });
+
+            fs.mkdirSync(
+                ACTIVITY_DIR,
+                {
+                    recursive: true
+                }
+            );
+
         }
+
     } catch (error) {
+
         console.error(
             "[ACTIVITY] فشل إنشاء مجلد النشاط:",
             error.message
         );
+
     }
 
     // ==================================================
@@ -41,10 +50,12 @@ module.exports = function ({
     // ==================================================
 
     function getActivityFile(threadID) {
+
         return path.join(
             ACTIVITY_DIR,
             `${String(threadID)}.json`
         );
+
     }
 
     // ==================================================
@@ -80,7 +91,9 @@ module.exports = function ({
                 typeof data !== "object" ||
                 Array.isArray(data)
             ) {
+
                 return {};
+
             }
 
             return data;
@@ -126,6 +139,7 @@ module.exports = function ({
                 `[ACTIVITY] فشل حفظ ${threadID}:`,
                 error.message
             );
+
         }
     }
 
@@ -142,6 +156,7 @@ module.exports = function ({
             !threadID ||
             !senderID
         ) {
+
             return;
         }
 
@@ -150,6 +165,7 @@ module.exports = function ({
             String(threadID) ===
             String(senderID)
         ) {
+
             return;
         }
 
@@ -164,9 +180,13 @@ module.exports = function ({
             if (!activity[uid]) {
 
                 activity[uid] = {
+
                     messages: 0,
+
                     lastMessage: 0
+
                 };
+
             }
 
             activity[uid].messages =
@@ -202,6 +222,7 @@ module.exports = function ({
                         );
 
                     return countB - countA;
+
                 });
 
                 const keep =
@@ -218,6 +239,7 @@ module.exports = function ({
 
                     cleaned[uid] =
                         activity[uid];
+
                 }
 
                 saveActivity(
@@ -239,105 +261,10 @@ module.exports = function ({
                 "[ACTIVITY ERROR]",
                 error
             );
+
         }
     }
 
-    // ==================================================
-// 🦧🦊🦋 التفاعل التلقائي
-// ==================================================
-
-if (
-    event.type === "message" &&
-    event.body &&
-    event.messageID
-) {
-
-    const text =
-        String(event.body)
-            .toLowerCase()
-            .trim();
-
-    let reaction = null;
-
-    // ==================================================
-    // 🦧
-    // ==================================================
-
-    const monkeyWords = [
-        "يوتا",
-        "شفق",
-        "الشفق",
-        "هريرة",
-        "ابو هريرة",
-        "أبو هريرة"
-    ];
-
-    // ==================================================
-    // 🦊
-    // ==================================================
-
-    const foxWords = [
-        "رؤى",
-        "ࢪؤى"
-    ];
-
-    // ==================================================
-    // 🦋
-    // ==================================================
-
-    const butterflyWords = [
-        "فريال",
-        "فࢪيال"
-    ];
-
-    for (const word of monkeyWords) {
-        if (text.includes(word.toLowerCase())) {
-            reaction = "🦧";
-            break;
-        }
-    }
-
-    if (!reaction) {
-        for (const word of foxWords) {
-            if (text.includes(word.toLowerCase())) {
-                reaction = "🦊";
-                break;
-            }
-        }
-    }
-
-    if (!reaction) {
-        for (const word of butterflyWords) {
-            if (text.includes(word.toLowerCase())) {
-                reaction = "🦋";
-                break;
-            }
-        }
-    }
-
-    // ==================================================
-    // 🚀 تنفيذ التفاعل
-    // ==================================================
-
-    if (reaction) {
-
-        api.setMessageReaction(
-            reaction,
-            String(event.messageID),
-            error => {
-
-                if (error) {
-                    console.error(
-                        "[HINA REACTION ERROR]",
-                        error.message || error
-                    );
-                }
-
-            },
-            true
-        );
-    }
-}
     // ==================================================
     // 🚀 Handle Event
     // ==================================================
@@ -345,14 +272,6 @@ if (
     return async function ({
         event
     }) {
-
-        /*
-         * مهم:
-         * هذا الوقت يتم تسجيله فور دخول الحدث
-         * إلى handleEvent.
-         */
-        const eventReceivedAt =
-            Date.now();
 
         try {
 
@@ -374,106 +293,152 @@ if (
                 event.messageID
             ) {
 
-                const reactionData =
-                    detectReaction(
-                        String(event.body)
-                            .toLowerCase()
-                    );
+                const text =
+                    String(event.body)
+                        .toLowerCase()
+                        .trim();
 
-                if (reactionData) {
+                let reaction = null;
 
-                    /*
-                     * هذا الوقت يوضح كم استغرق
-                     * الوصول من بداية Handle Event
-                     * حتى بدء طلب reaction.
-                     */
-                    const reactionStartAt =
-                        Date.now();
+                // ==================================================
+                // 🦧 كلمات القرد
+                // ==================================================
 
-                    const beforeReaction =
-                        reactionStartAt -
-                        eventReceivedAt;
+                const monkeyWords = [
 
-                    /*
-                     * نرسل reaction مباشرة.
-                     *
-                     * لا يوجد await هنا.
-                     */
+                    "يوتا",
+
+                    "شفق",
+
+                    "الشفق",
+
+                    "هريرة",
+
+                    "ابو هريرة",
+
+                    "أبو هريرة"
+
+                ];
+
+                // ==================================================
+                // 🦊 كلمات الثعلب
+                // ==================================================
+
+                const foxWords = [
+
+                    "رؤى",
+
+                    "ࢪؤى"
+
+                ];
+
+                // ==================================================
+                // 🦋 كلمات الفراشة
+                // ==================================================
+
+                const butterflyWords = [
+
+                    "فريال",
+
+                    "فࢪيال"
+
+                ];
+
+                // ==================================================
+                // البحث عن 🦧
+                // ==================================================
+
+                for (
+                    const word of monkeyWords
+                ) {
+
+                    if (
+                        text.includes(
+                            word.toLowerCase()
+                        )
+                    ) {
+
+                        reaction = "🦧";
+
+                        break;
+                    }
+                }
+
+                // ==================================================
+                // البحث عن 🦊
+                // ==================================================
+
+                if (!reaction) {
+
+                    for (
+                        const word of foxWords
+                    ) {
+
+                        if (
+                            text.includes(
+                                word.toLowerCase()
+                            )
+                        ) {
+
+                            reaction = "🦊";
+
+                            break;
+                        }
+                    }
+                }
+
+                // ==================================================
+                // البحث عن 🦋
+                // ==================================================
+
+                if (!reaction) {
+
+                    for (
+                        const word of butterflyWords
+                    ) {
+
+                        if (
+                            text.includes(
+                                word.toLowerCase()
+                            )
+                        ) {
+
+                            reaction = "🦋";
+
+                            break;
+                        }
+                    }
+                }
+
+                // ==================================================
+                // 🚀 تنفيذ التفاعل مباشرة
+                // ==================================================
+
+                if (reaction) {
+
                     api.setMessageReaction(
-                        reactionData.reaction,
+                        reaction,
                         String(
                             event.messageID
                         ),
+                        error => {
 
-                        async error => {
-
-                            const reactionFinishedAt =
-                                Date.now();
-
-                            const apiTime =
-                                reactionFinishedAt -
-                                reactionStartAt;
-
-                            const totalTime =
-                                reactionFinishedAt -
-                                eventReceivedAt;
-
-                            // ==================================================
-                            // نتيجة التفاعل
-                            // ==================================================
-
-                            const status =
-                                error
-                                    ? "❌ فشل التفاعل"
-                                    : "✅ نجح التفاعل";
-
-                            const errorText =
-                                error
-                                    ? `\n\n📝 الخطأ:\n${error.message || String(error)}`
-                                    : "";
-
-                            // ==================================================
-                            // رسالة التشخيص
-                            // ==================================================
-
-                            const debugMessage =
-                                "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬\n\n" +
-
-                                "🔍 فحص تأخير التفاعل\n\n" +
-
-                                `📝 الكلمة: ${reactionData.word}\n` +
-                                `🎯 التفاعل: ${reactionData.reaction}\n\n` +
-
-                                `⏱️ الوصول إلى Handle Event: ${beforeReaction}ms\n` +
-                                `📡 طلب API: ${apiTime}ms\n` +
-                                `⏱️ المجموع حتى Callback: ${totalTime}ms\n\n` +
-
-                                status +
-                                errorText;
-
-                            /*
-                             * رسالة التشخيص مؤقتة فقط.
-                             */
-                            try {
-
-                                await api.sendMessage(
-                                    debugMessage,
-                                    event.threadID,
-                                    event.messageID
-                                );
-
-                            } catch (sendError) {
+                            if (error) {
 
                                 console.error(
-                                    "[HINA DEBUG MESSAGE ERROR]",
-                                    sendError
+                                    "[HINA REACTION ERROR]",
+                                    error.message ||
+                                    error
                                 );
-                            }
-                        },
 
+                            }
+
+                        },
                         true
                     );
+
                 }
+
             }
 
             // ==================================================
@@ -494,6 +459,7 @@ if (
                         event.senderID
                     )
                 );
+
             }
 
             // ==================================================
@@ -590,6 +556,7 @@ if (
                     Array.from(
                         global.client.events.entries()
                     );
+
             }
 
             // ==================================================
@@ -623,6 +590,7 @@ if (
                                 eventName,
                                 eventModule
                             ]);
+
                         }
 
                     } catch (error) {
@@ -631,6 +599,7 @@ if (
                             `[EVENT REGISTER ERROR] ${eventName}`,
                             error.message
                         );
+
                     }
                 }
 
@@ -640,7 +609,9 @@ if (
 
                     registeredEvents =
                         oldEvents;
+
                 }
+
             }
 
             // ==================================================
@@ -658,6 +629,7 @@ if (
                     console.log(
                         "[HANDLE EVENT] لا توجد Events مسجلة"
                     );
+
                 }
 
                 return;
@@ -697,7 +669,9 @@ if (
 
                 let getText =
                     function () {
+
                         return "";
+
                     };
 
                 if (
@@ -748,6 +722,7 @@ if (
                                                 values[i]
                                             )
                                         );
+
                                 }
 
                                 return text;
@@ -809,7 +784,9 @@ if (
                         );
 
                     } catch (e) {}
+
                 }
+
             }
 
         } catch (error) {
@@ -831,6 +808,8 @@ if (
                 );
 
             } catch (e) {}
+
         }
+
     };
 };
