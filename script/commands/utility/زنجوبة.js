@@ -1,4 +1,6 @@
 const axios = require("axios");
+const fs = require("fs");
+const path = require("path");
 
 // ==================================================
 // الذاكرة
@@ -31,15 +33,10 @@ module.exports.config = {
 
 const ADMIN_ID = "61578581225040";
 
-// ==================================================
-// 🔑 مفتاح Groq
-// ==================================================
-// ضع مفتاح Groq هنا
-// مثال:
-// const GROQ_API_KEY = "gsk_xxxxxxxxxxxxxxxxx";
-
-const GROQ_API_KEY =
-  "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";
+const CONFIG_PATH = path.join(
+  process.cwd(),
+  "config.json"
+);
 
 // ==================================================
 // Groq
@@ -52,30 +49,63 @@ const GROQ_MODEL =
   "llama-3.3-70b-versatile";
 
 // ==================================================
-// التحقق من المفتاح
+// قراءة مفتاح Groq من config.json
 // ==================================================
 
 function getGroqKey() {
 
-  const key =
-    String(
-      GROQ_API_KEY || ""
-    ).trim();
+  try {
 
-  if (
-    !key ||
-    key ===
-      "PUT_YOUR_GROQ_API_KEY_HERE"
-  ) {
+    if (!fs.existsSync(CONFIG_PATH)) {
+
+      console.error(
+        "❌ config.json غير موجود."
+      );
+
+      return null;
+
+    }
+
+    const config =
+      JSON.parse(
+        fs.readFileSync(
+          CONFIG_PATH,
+          "utf8"
+        )
+      );
+
+    const key =
+      String(
+        config.MODEL_API_KEY || ""
+      ).trim();
+
+    if (
+      !key ||
+      key === "PUT_YOUR_GROQ_API_KEY_HERE" ||
+      key === "ضع_مفتاح_Groq_هنا"
+    ) {
+
+      console.error(
+        "❌ لم يتم وضع مفتاح Groq داخل config.json."
+      );
+
+      return null;
+
+    }
+
+    return key;
+
+  } catch (error) {
 
     console.error(
-      "❌ لم يتم وضع مفتاح Groq داخل الكود."
+      "❌ خطأ في قراءة config.json:",
+      error.message
     );
 
     return null;
+
   }
 
-  return key;
 }
 
 // ==================================================
@@ -95,6 +125,7 @@ async function askGroq(
     throw new Error(
       "MODEL_API_KEY_MISSING"
     );
+
   }
 
   const response =
@@ -155,6 +186,7 @@ async function askGroq(
   }
 
   return answer;
+
 }
 
 // ==================================================
@@ -179,6 +211,7 @@ function reactSquirrel(
       );
 
       return;
+
     }
 
     api.setMessageReaction(
@@ -196,6 +229,7 @@ function reactSquirrel(
     );
 
   }
+
 }
 
 // ==================================================
@@ -205,11 +239,12 @@ function reactSquirrel(
 function detectDialect(text) {
 
   if (
-    /شنوة|شنيا|شبيك|كيفاش|علاش|وينك|وين|برشا|باهي|باهي برشا|توا|تو|مانيش|موش|موش لازم|نحب|تحب|تحبّ|نمشي|نمشيوا|ياخي|هاو|هاني|راهو|راهي|خاطر|خاطرش|زعمة|يزي|يعطيك الصحة|صحيت/i
+    /شنوة|شنيا|شبيك|كيفاش|علاش|وينك|وين|برشا|باهي|توا|تو|مانيش|موش|نحب|تحب|نمشي|ياخي|هاو|هاني|راهو|راهي|خاطر|خاطرش|زعمة|يزي|يعطيك الصحة|صحيت|فما|ما فماش|قداش|شنية|هكا/i
       .test(text)
   ) {
 
     return "تونسية";
+
   }
 
   if (
@@ -218,6 +253,7 @@ function detectDialect(text) {
   ) {
 
     return "عراقية";
+
   }
 
   if (
@@ -226,6 +262,7 @@ function detectDialect(text) {
   ) {
 
     return "شامية";
+
   }
 
   if (
@@ -234,6 +271,7 @@ function detectDialect(text) {
   ) {
 
     return "مصرية";
+
   }
 
   if (
@@ -242,6 +280,7 @@ function detectDialect(text) {
   ) {
 
     return "جزائرية";
+
   }
 
   if (
@@ -250,9 +289,11 @@ function detectDialect(text) {
   ) {
 
     return "إنجليزية";
+
   }
 
   return "تونسية";
+
 }
 
 // ==================================================
@@ -281,6 +322,7 @@ function getResponseLength(
         "جاوبي بجملة أو جملتين فقط وبطريقة طبيعية."
 
     };
+
   }
 
   if (
@@ -297,6 +339,7 @@ function getResponseLength(
         "جاوبي بإيجاز ووضوح وباللهجة التونسية."
 
     };
+
   }
 
   if (
@@ -313,6 +356,7 @@ function getResponseLength(
         "قدمي شرحًا مفصلًا وواضحًا لكن بدون حشو."
 
     };
+
   }
 
   return {
@@ -324,6 +368,7 @@ function getResponseLength(
       "جاوبي بشكل واضح ومباشر وباللهجة التونسية."
 
   };
+
 }
 
 // ==================================================
@@ -352,23 +397,26 @@ function buildSystemRole(
 - لا تتكلمي بلهجة جزائرية أو شامية أو مصرية إلا إذا كان ذلك مناسبًا لسياق المستخدم.
 - يمكنك فهم اللهجات العربية المختلفة والرد عليها.
 - استعملي كلمات تونسية مثل:
-  شنوة
-  شنية
-  كيفاش
-  علاش
-  وين
-  توا
-  برشا
-  باهي
-  موش
-  مانيش
-  نحب
-  تحب
-  خاطر
-  ياخي
-  يزي
-  هاو
-  هاني
+شنوة
+شنية
+كيفاش
+علاش
+وين
+توا
+برشا
+باهي
+موش
+مانيش
+نحب
+تحب
+خاطر
+ياخي
+يزي
+هاو
+هاني
+فما
+ما فماش
+قداش
 
 ━━━━━━━━━━━━━━━━━━
 الشخصية
@@ -387,7 +435,6 @@ function buildSystemRole(
 - السؤال البسيط = جواب قصير.
 - السؤال المعقد = شرح واضح.
 - لا تكرري نفس الجملة كثيرًا.
-- لا تقولي إنك روبوت في كل رد.
 - لا تبدئي كل جواب بنفس العبارة.
 
 ━━━━━━━━━━━━━━━━━━
@@ -482,6 +529,7 @@ ${
     : ""
 }
 `;
+
 }
 
 // ==================================================
@@ -545,6 +593,7 @@ async function generateReply(
         systemRole +
         "\n\n" +
         responseConfig.instruction
+
     },
 
     ...history.slice(-10),
@@ -555,6 +604,7 @@ async function generateReply(
 
       content:
         prompt
+
     }
 
   ];
@@ -573,6 +623,7 @@ async function generateReply(
 
       content:
         prompt
+
     },
 
     {
@@ -581,11 +632,11 @@ async function generateReply(
 
       content:
         answer
+
     }
 
   );
 
-  // الاحتفاظ بآخر 20 رسالة
   if (
     history.length > 20
   ) {
@@ -598,6 +649,7 @@ async function generateReply(
   }
 
   return answer;
+
 }
 
 // ==================================================
@@ -630,7 +682,7 @@ function sendGroqError(
 
     message =
       "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗨𝗧𝗜𝗟𝗜𝗧𝗬 ━━ ⌬\n\n" +
-      "🐿️ حط مفتاح Groq داخل الكود أولًا •-•";
+      "🐿️ حط مفتاح Groq في config.json أولًا •-•";
 
   }
 
@@ -680,6 +732,7 @@ function sendGroqError(
     event.threadID,
     event.messageID
   );
+
 }
 
 // ==================================================
@@ -697,6 +750,7 @@ function registerReply(
   ) {
 
     return;
+
   }
 
   if (
@@ -756,6 +810,7 @@ function sendZanjoobaReply(
         );
 
         return;
+
       }
 
       registerReply(
@@ -768,6 +823,7 @@ function sendZanjoobaReply(
     event.messageID
 
   );
+
 }
 
 // ==================================================
