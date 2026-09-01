@@ -1,11 +1,11 @@
 module.exports.config = {
   name: "حيوان",
-  version: "9.0.0",
+  version: "10.0.0",
   credits: "أبو هريرة",
   description: "نظام الحيوانات الأليفة",
   commandCategory: "Games",
   hasPermssion: 0,
-  usages: "حيوان | حيوان قائمة",
+  usages: "حيوان | حيوان قائمة | حيوان رصيد | حيوان عمل | حيوان يومي",
   cooldowns: 3
 };
 
@@ -14,6 +14,9 @@ module.exports.config = {
 // ============================================================
 
 const TRAIN_COOLDOWN = 30 * 60 * 1000;
+const WORK_COOLDOWN = 30 * 60 * 1000;
+const DAILY_COOLDOWN = 24 * 60 * 60 * 1000;
+
 const TRAIN_XP = 20;
 const POWER_PER_LEVEL = 5;
 
@@ -432,8 +435,7 @@ function getModel(models, name) {
       typeof models.use === "function"
     ) {
 
-      const model =
-        models.use(name);
+      const model = models.use(name);
 
       if (model) {
         return model;
@@ -556,8 +558,7 @@ function getPetByID(id) {
 
   return PETS.find(
     pet =>
-      pet.id ===
-      Number(id)
+      pet.id === Number(id)
   );
 }
 
@@ -565,8 +566,7 @@ function getPetByType(type) {
 
   return PETS.find(
     pet =>
-      String(pet.type) ===
-      String(type)
+      String(pet.type) === String(type)
   );
 }
 
@@ -597,31 +597,19 @@ function calculatePetState(
       )
     );
 
-  if (
-    health < 20
-  ) {
-
+  if (health < 20) {
     return "مريض";
   }
 
-  if (
-    hunger < 20
-  ) {
-
+  if (hunger < 20) {
     return "جائع";
   }
 
-  if (
-    health < 50
-  ) {
-
+  if (health < 50) {
     return "متعب";
   }
 
-  if (
-    hunger < 50
-  ) {
-
+  if (hunger < 50) {
     return "حزين";
   }
 
@@ -629,7 +617,6 @@ function calculatePetState(
     health >= 80 &&
     hunger >= 80
   ) {
-
     return "سعيد";
   }
 
@@ -640,33 +627,22 @@ function calculatePetState(
 // تحديث الشبع والصحة مع الوقت
 // ============================================================
 
-async function updatePetOverTime(
-  pet
-) {
+async function updatePetOverTime(pet) {
 
-  const now =
-    Date.now();
+  const now = Date.now();
 
   const updatedAt =
     pet.updatedAt
-      ? new Date(
-          pet.updatedAt
-        ).getTime()
+      ? new Date(pet.updatedAt).getTime()
       : now;
 
   const hoursPassed =
     Math.floor(
-      (
-        now -
-        updatedAt
-      ) /
+      (now - updatedAt) /
       (1000 * 60 * 60)
     );
 
-  if (
-    hoursPassed <= 0
-  ) {
-
+  if (hoursPassed <= 0) {
     return pet;
   }
 
@@ -675,9 +651,7 @@ async function updatePetOverTime(
       0,
       Math.min(
         100,
-        Number(
-          pet.hunger ?? 100
-        )
+        Number(pet.hunger ?? 100)
       )
     );
 
@@ -686,31 +660,24 @@ async function updatePetOverTime(
       0,
       Math.min(
         100,
-        Number(
-          pet.health ?? 100
-        )
+        Number(pet.health ?? 100)
       )
     );
 
   const newHunger =
     Math.max(
       0,
-      hunger -
-      hoursPassed * 5
+      hunger - hoursPassed * 5
     );
 
   let healthLoss = 0;
 
-  if (
-    newHunger < 20
-  ) {
+  if (newHunger < 20) {
 
     healthLoss =
       hoursPassed * 4;
 
-  } else if (
-    newHunger < 50
-  ) {
+  } else if (newHunger < 50) {
 
     healthLoss =
       hoursPassed * 2;
@@ -719,8 +686,7 @@ async function updatePetOverTime(
   const newHealth =
     Math.max(
       0,
-      health -
-      healthLoss
+      health - healthLoss
     );
 
   const status =
@@ -731,16 +697,164 @@ async function updatePetOverTime(
 
   await pet.update({
 
-    hunger:
-      newHunger,
+    hunger: newHunger,
 
-    health:
-      newHealth,
+    health: newHealth,
 
     status
   });
 
   return pet;
+}
+
+// ============================================================
+// Pet Currency
+// ============================================================
+
+async function getPetCurrency(
+  PetCurrency,
+  userID
+) {
+
+  if (!PetCurrency) {
+    throw new Error(
+      "مودل PetCurrency غير محمّل."
+    );
+  }
+
+  let currency =
+    await PetCurrency.findOne({
+
+      where: {
+        userID: String(userID)
+      }
+
+    });
+
+  if (!currency) {
+
+    currency =
+      await PetCurrency.create({
+
+        userID:
+          String(userID),
+
+        money:
+          0,
+
+        data:
+          {}
+
+      });
+  }
+
+  return currency;
+}
+
+// ============================================================
+// بيانات PetCurrency
+// ============================================================
+
+function getCurrencyData(currency) {
+
+  let data = currency.data;
+
+  if (
+    !data ||
+    typeof data !== "object" ||
+    Array.isArray(data)
+  ) {
+    data = {};
+  }
+
+  return data;
+}
+
+async function updateCurrencyData(
+  currency,
+  changes
+) {
+
+  const data =
+    getCurrencyData(currency);
+
+  Object.assign(
+    data,
+    changes
+  );
+
+  await currency.update({
+    data
+  });
+
+  return data;
+}
+
+// ============================================================
+// Cooldown
+// ============================================================
+
+function getRemainingCooldown(
+  lastTime,
+  cooldown
+) {
+
+  if (!lastTime) {
+    return 0;
+  }
+
+  const last =
+    new Date(lastTime).getTime();
+
+  if (!Number.isFinite(last)) {
+    return 0;
+  }
+
+  return Math.max(
+    0,
+    cooldown -
+    (Date.now() - last)
+  );
+}
+
+// ============================================================
+// تنسيق الوقت
+// ============================================================
+
+function formatTime(milliseconds) {
+
+  const totalSeconds =
+    Math.ceil(
+      milliseconds / 1000
+    );
+
+  const days =
+    Math.floor(
+      totalSeconds / 86400
+    );
+
+  const hours =
+    Math.floor(
+      (totalSeconds % 86400) / 3600
+    );
+
+  const minutes =
+    Math.floor(
+      (totalSeconds % 3600) / 60
+    );
+
+  const seconds =
+    totalSeconds % 60;
+
+  if (days > 0) {
+    return `${days} يوم و ${hours} ساعة`;
+  }
+
+  if (hours > 0) {
+    return `${hours} ساعة و ${minutes} دقيقة`;
+  }
+
+  return `${minutes} دقيقة و ${seconds} ثانية`;
 }
 
 // ============================================================
@@ -800,10 +914,7 @@ function getShopList() {
           pet.rarity === rarity
       );
 
-    if (
-      !pets.length
-    ) {
-
+    if (!pets.length) {
       continue;
     }
 
@@ -832,9 +943,7 @@ function getShopList() {
 // معلومات الحيوان
 // ============================================================
 
-function getPetInfo(
-  pet
-) {
+function getPetInfo(pet) {
 
   const found =
     getPetByType(
@@ -974,9 +1083,7 @@ async function createPet(
 // سعر البيع
 // ============================================================
 
-function getSellPrice(
-  pet
-) {
+function getSellPrice(pet) {
 
   const found =
     getPetByType(
@@ -1026,66 +1133,291 @@ function getSellPrice(
 }
 
 // ============================================================
-// حساب وقت الكولداون
+// رصيد الحيوان
 // ============================================================
 
-function getRemainingCooldown(
-  lastTrain
+async function sendPetBalance(
+  api,
+  threadID,
+  messageID,
+  PetCurrency,
+  senderID
 ) {
 
-  if (!lastTrain) {
-    return 0;
-  }
-
-  const last =
-    new Date(
-      lastTrain
-    ).getTime();
-
-  if (
-    !Number.isFinite(last)
-  ) {
-    return 0;
-  }
-
-  const remaining =
-    TRAIN_COOLDOWN -
-    (
-      Date.now() -
-      last
+  const currency =
+    await getPetCurrency(
+      PetCurrency,
+      senderID
     );
 
-  return Math.max(
-    0,
-    remaining
+  const money =
+    Number(
+      currency.money || 0
+    );
+
+  return api.sendMessage(
+
+    "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+
+    "💰 رصيد الحيوانات\n\n" +
+
+    `رصيدك: ${money} عملة\n\n` +
+
+    "هذا الرصيد مستقل عن رصيد البوت العام.",
+
+    threadID,
+    messageID
   );
 }
 
 // ============================================================
-// تنسيق الوقت
+// العمل
 // ============================================================
 
-function formatTime(
-  milliseconds
+async function doWork(
+  api,
+  threadID,
+  messageID,
+  Pets,
+  PetCurrency,
+  senderID
 ) {
 
-  const totalSeconds =
-    Math.ceil(
-      milliseconds /
-      1000
+  const pet =
+    await Pets.findOne({
+
+      where: {
+        userID:
+          String(senderID)
+      }
+
+    });
+
+  if (!pet) {
+
+    return api.sendMessage(
+
+      "❌ لا تملك حيوانًا.\n\n" +
+      "أنشئ حيوانًا أولًا باستخدام الأمر حيوان.",
+
+      threadID,
+      messageID
+    );
+  }
+
+  const currency =
+    await getPetCurrency(
+      PetCurrency,
+      senderID
     );
 
-  const minutes =
+  const data =
+    getCurrencyData(
+      currency
+    );
+
+  const remaining =
+    getRemainingCooldown(
+      data.petLastWork,
+      WORK_COOLDOWN
+    );
+
+  if (remaining > 0) {
+
+    return api.sendMessage(
+
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+
+      "❌ حيوانك يحتاج إلى الراحة.\n\n" +
+
+      `⏳ العمل القادم بعد: ${formatTime(remaining)}`,
+
+      threadID,
+      messageID
+    );
+  }
+
+  const power =
+    Number(
+      pet.power || 0
+    );
+
+  const level =
+    Number(
+      pet.level || 1
+    );
+
+  const reward =
+    Math.max(
+      100,
+      100 +
+      power * 5 +
+      (level - 1) * 25
+    );
+
+  const money =
+    Number(
+      currency.money || 0
+    );
+
+  await currency.update({
+
+    money:
+      money +
+      reward
+  });
+
+  await updateCurrencyData(
+    currency,
+    {
+      petLastWork:
+        new Date().toISOString()
+    }
+  );
+
+  return api.sendMessage(
+
+    "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+
+    `🐾 ${pet.name} عمل بنجاح\n\n` +
+
+    `💰 المكافأة: +${reward} عملة\n` +
+    `💳 رصيدك الجديد: ${money + reward} عملة\n\n` +
+
+    "⏳ يمكنك العمل مرة أخرى بعد 30 دقيقة.",
+
+    threadID,
+    messageID
+  );
+}
+
+// ============================================================
+// اليومي
+// ============================================================
+
+async function doDaily(
+  api,
+  threadID,
+  messageID,
+  Pets,
+  PetCurrency,
+  senderID
+) {
+
+  const pet =
+    await Pets.findOne({
+
+      where: {
+        userID:
+          String(senderID)
+      }
+
+    });
+
+  if (!pet) {
+
+    return api.sendMessage(
+
+      "❌ يجب أن تملك حيوانًا لاستخدام اليومي.",
+
+      threadID,
+      messageID
+    );
+  }
+
+  const currency =
+    await getPetCurrency(
+      PetCurrency,
+      senderID
+    );
+
+  const data =
+    getCurrencyData(
+      currency
+    );
+
+  const remaining =
+    getRemainingCooldown(
+      data.petLastDaily,
+      DAILY_COOLDOWN
+    );
+
+  if (remaining > 0) {
+
+    return api.sendMessage(
+
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+
+      "❌ لقد أخذت مكافأة اليوم بالفعل.\n\n" +
+
+      `⏳ اليومي القادم بعد: ${formatTime(remaining)}`,
+
+      threadID,
+      messageID
+    );
+  }
+
+  const money =
+    Number(
+      currency.money || 0
+    );
+
+  /*
+   * كلما زاد الرصيد زادت مكافأة اليومي
+   *
+   * 5% من الرصيد
+   * مع حد أدنى 250
+   * وحد أقصى 10000
+   */
+
+  const percentageReward =
     Math.floor(
-      totalSeconds /
-      60
+      money * 0.05
     );
 
-  const seconds =
-    totalSeconds %
-    60;
+  const reward =
+    Math.min(
+      10000,
+      Math.max(
+        250,
+        percentageReward
+      )
+    );
 
-  return `${minutes} دقيقة و ${seconds} ثانية`;
+  await currency.update({
+
+    money:
+      money +
+      reward
+  });
+
+  await updateCurrencyData(
+    currency,
+    {
+      petLastDaily:
+        new Date().toISOString()
+    }
+  );
+
+  return api.sendMessage(
+
+    "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+
+    "🎁 مكافأة اليومي\n\n" +
+
+    `🐾 الحيوان: ${pet.name}\n` +
+
+    `💰 رصيدك قبل المكافأة: ${money}\n` +
+
+    `🎁 المكافأة: +${reward} عملة\n` +
+
+    `💳 رصيدك الجديد: ${money + reward} عملة\n\n` +
+
+    "⏳ يمكنك أخذ اليومي مرة أخرى بعد 24 ساعة.",
+
+    threadID,
+    messageID
+  );
 }
 
 // ============================================================
@@ -1114,10 +1446,31 @@ async function ({
         "Pets"
       );
 
+    const PetCurrency =
+      getModel(
+        models,
+        "PetCurrency"
+      );
+
     if (!Pets) {
 
       return api.sendMessage(
-        "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n❌ مودل الحيوانات غير محمّل.",
+
+        "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+        "❌ مودل الحيوانات غير محمّل.",
+
+        threadID,
+        messageID
+      );
+    }
+
+    if (!PetCurrency) {
+
+      return api.sendMessage(
+
+        "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+        "❌ مودل PetCurrency غير محمّل.",
+
         threadID,
         messageID
       );
@@ -1127,6 +1480,62 @@ async function ({
       Array.isArray(args)
         ? args.join(" ").trim().toLowerCase()
         : "";
+
+    // ========================================================
+    // الرصيد
+    // ========================================================
+
+    if (
+      subCommand === "رصيد" ||
+      subCommand === "balance"
+    ) {
+
+      return sendPetBalance(
+        api,
+        threadID,
+        messageID,
+        PetCurrency,
+        senderID
+      );
+    }
+
+    // ========================================================
+    // العمل
+    // ========================================================
+
+    if (
+      subCommand === "عمل" ||
+      subCommand === "work"
+    ) {
+
+      return doWork(
+        api,
+        threadID,
+        messageID,
+        Pets,
+        PetCurrency,
+        senderID
+      );
+    }
+
+    // ========================================================
+    // اليومي
+    // ========================================================
+
+    if (
+      subCommand === "يومي" ||
+      subCommand === "daily"
+    ) {
+
+      return doDaily(
+        api,
+        threadID,
+        messageID,
+        Pets,
+        PetCurrency,
+        senderID
+      );
+    }
 
     // ========================================================
     // القائمة
@@ -1309,9 +1718,7 @@ async function ({
 
     if (
       handleReply.author &&
-      String(
-        handleReply.author
-      ) !==
+      String(handleReply.author) !==
       String(senderID)
     ) {
 
@@ -1324,6 +1731,12 @@ async function ({
         "Pets"
       );
 
+    const PetCurrency =
+      getModel(
+        models,
+        "PetCurrency"
+      );
+
     if (!Pets) {
 
       return api.sendMessage(
@@ -1333,9 +1746,17 @@ async function ({
       );
     }
 
+    if (!PetCurrency) {
+
+      return api.sendMessage(
+        "❌ مودل PetCurrency غير محمّل.",
+        threadID,
+        messageID
+      );
+    }
+
     const input =
-      String(body)
-        .trim();
+      String(body).trim();
 
     // ========================================================
     // اختيار الحيوان
@@ -1361,9 +1782,7 @@ async function ({
       }
 
       const selected =
-        getPetByID(
-          number
-        );
+        getPetByID(number);
 
       if (!selected) {
 
@@ -1386,9 +1805,7 @@ async function ({
 
       if (existing) {
 
-        removeReply(
-          handleReply
-        );
+        removeReply(handleReply);
 
         return api.sendMessage(
           "❌ لديك حيوان بالفعل.",
@@ -1560,39 +1977,11 @@ async function ({
         );
       }
 
-      const Currencies =
-        getModel(
-          models,
-          "Currencies"
-        );
-
-      if (!Currencies) {
-
-        return api.sendMessage(
-          "❌ مودل العملات غير محمّل.",
-          threadID,
-          messageID
-        );
-      }
-
       const currency =
-        await Currencies.findOne({
-
-          where: {
-            userID:
-              String(senderID)
-          }
-
-        });
-
-      if (!currency) {
-
-        return api.sendMessage(
-          "❌ لم يتم العثور على حساب العملات.",
-          threadID,
-          messageID
+        await getPetCurrency(
+          PetCurrency,
+          senderID
         );
-      }
 
       const money =
         Number(
@@ -1606,7 +1995,7 @@ async function ({
 
         return api.sendMessage(
 
-          "❌ لا تملك عملات كافية.\n\n" +
+          "❌ لا تملك عملات حيوانات كافية.\n\n" +
 
           `السعر: ${selected.price}\n` +
           `رصيدك: ${money}\n` +
@@ -1879,12 +2268,9 @@ async function ({
 
         const remaining =
           getRemainingCooldown(
-            pet.lastTrain
+            pet.lastTrain,
+            TRAIN_COOLDOWN
           );
-
-        // ----------------------------------------------------
-        // ما زال في الكولداون
-        // ----------------------------------------------------
 
         if (
           remaining > 0
@@ -1904,10 +2290,6 @@ async function ({
             messageID
           );
         }
-
-        // ----------------------------------------------------
-        // البيانات
-        // ----------------------------------------------------
 
         const currentLevel =
           Number(
@@ -1937,10 +2319,6 @@ async function ({
         let levelsGained =
           0;
 
-        // ----------------------------------------------------
-        // حساب المستويات
-        // ----------------------------------------------------
-
         while (
           newExp >=
           newLevel * 100
@@ -1956,10 +2334,6 @@ async function ({
           newPower +=
             POWER_PER_LEVEL;
         }
-
-        // ----------------------------------------------------
-        // الشبع
-        // ----------------------------------------------------
 
         const oldHunger =
           Number(
@@ -1982,10 +2356,6 @@ async function ({
             health,
             newHunger
           );
-
-        // ----------------------------------------------------
-        // الحفظ
-        // ----------------------------------------------------
 
         await pet.update({
 
@@ -2010,10 +2380,6 @@ async function ({
         removeReply(
           handleReply
         );
-
-        // ----------------------------------------------------
-        // الرسالة
-        // ----------------------------------------------------
 
         let message =
 
@@ -2139,43 +2505,11 @@ async function ({
           data
         );
 
-      const Currencies =
-        getModel(
-          models,
-          "Currencies"
-        );
-
-      if (!Currencies) {
-
-        return api.sendMessage(
-          "❌ مودل العملات غير محمّل.",
-          threadID,
-          messageID
-        );
-      }
-
       const currency =
-        await Currencies.findOne({
-
-          where: {
-            userID:
-              String(senderID)
-          }
-
-        });
-
-      if (!currency) {
-
-        removeReply(
-          handleReply
+        await getPetCurrency(
+          PetCurrency,
+          senderID
         );
-
-        return api.sendMessage(
-          "❌ لم يتم العثور على حساب العملات.",
-          threadID,
-          messageID
-        );
-      }
 
       const money =
         Number(
@@ -2206,7 +2540,7 @@ async function ({
 
         `قيمة البيع: ${sellPrice} عملة\n` +
 
-        `رصيدك الجديد: ${money + sellPrice} عملة`,
+        `رصيد الحيوانات الجديد: ${money + sellPrice} عملة`,
 
         threadID,
         messageID
