@@ -2685,16 +2685,15 @@ async function ({
             money - item.price
         });
 
-        data.shields =
-          Number(data.shields || 0) + 1;
+        const newShields =
+  Number(data.shields || 0) + 1;
 
-        await updateCurrencyData(
-          currency,
-          {
-            shields:
-              data.shields
-          }
-        );
+await updateCurrencyData(
+  currency,
+  {
+    shields: newShields
+  }
+);
 
         removeReply(handleReply);
 
