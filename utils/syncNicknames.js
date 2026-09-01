@@ -3,236 +3,158 @@ module.exports = async function syncNicknames({
     Users,
     Nicknames
 }) {
+    if (!api) {
+        throw new Error("syncNicknames: api غير موجود");
+    }
 
-    if (!api || !Nicknames) {
-        throw new Error(
-            "syncNicknames: api أو Nicknames غير موجود"
-        );
+    if (!Nicknames) {
+        throw new Error("syncNicknames: Nicknames model غير موجود");
     }
 
     console.log(
         "[nicknameSync] بدء مزامنة الكنيات الحالية..."
     );
 
-    const botID =
-        String(api.getCurrentUserID());
+    const botID = String(api.getCurrentUserID());
 
-    /*
-     * جلب قائمة المحادثات
-     */
-    const threadList =
-        await new Promise((resolve, reject) => {
-
-            api.getThreadList(
-                100,
-                null,
-                [],
-                (error, list) => {
-
-                    if (error) {
-                        return reject(error);
-                    }
-
-                    resolve(
-                        Array.isArray(list)
-                            ? list
-                            : []
-                    );
-
+    const threadList = await new Promise((resolve, reject) => {
+        api.getThreadList(
+            100,
+            null,
+            [],
+            (error, list) => {
+                if (error) {
+                    return reject(error);
                 }
-            );
 
-        });
+                resolve(
+                    Array.isArray(list)
+                        ? list
+                        : []
+                );
+            }
+        );
+    });
 
-    let groups = 0;
     let saved = 0;
+    let skipped = 0;
+    let failed = 0;
 
     for (const thread of threadList) {
 
-        const threadID =
-            String(
-                thread.threadID || ""
-            );
+        const threadID = String(
+            thread.threadID || ""
+        );
 
         if (!threadID) {
             continue;
         }
 
-        /*
-         * بعض المحادثات قد تكون فردية
-         * لذلك نعتمد على threadInfo
-         */
-        let threadInfo;
-
         try {
 
-            threadInfo =
-                await new Promise(
-                    (resolve, reject) => {
+            const threadInfo = await new Promise(
+                (resolve, reject) => {
 
-                        api.getThreadInfo(
-                            threadID,
-                            (error, info) => {
+                    api.getThreadInfo(
+                        threadID,
+                        (error, info) => {
 
-                                if (error) {
-                                    return reject(
-                                        error
-                                    );
-                                }
-
-                                resolve(info);
+                            if (error) {
+                                return reject(error);
                             }
-                        );
 
-                    }
-                );
-
-        } catch (error) {
-
-            console.error(
-                `[nicknameSync] فشل جلب المجموعة ${threadID}:`,
-                error.message
-            );
-
-            continue;
-        }
-
-        if (!threadInfo) {
-            continue;
-        }
-
-        /*
-         * لا نريد المحادثات الفردية
-         */
-        const participantIDs =
-            Array.isArray(
-                threadInfo.participantIDs
-            )
-                ? threadInfo.participantIDs
-                : [];
-
-        if (participantIDs.length < 2) {
-            continue;
-        }
-
-        const nicknames =
-            threadInfo.nicknames || {};
-
-        const nicknameIDs =
-            Object.keys(nicknames);
-
-        if (!nicknameIDs.length) {
-            continue;
-        }
-
-        groups++;
-
-        for (
-            const userID
-            of nicknameIDs
-        ) {
-
-            const normalizedUserID =
-                String(userID || "");
-
-            if (
-                !normalizedUserID ||
-                normalizedUserID === botID
-            ) {
-                continue;
-            }
-
-            const nickname =
-                String(
-                    nicknames[userID] || ""
-                ).trim();
-
-            if (!nickname) {
-                continue;
-            }
-
-            let userName =
-                "العضو";
-
-            /*
-             * الاسم من قاعدة Users
-             */
-            if (
-                Users &&
-                typeof Users.getData ===
-                "function"
-            ) {
-
-                try {
-
-                    const userData =
-                        await Users.getData(
-                            normalizedUserID
-                        );
-
-                    if (
-                        userData &&
-                        userData.name
-                    ) {
-
-                        userName =
-                            String(
-                                userData.name
-                            ).trim();
-
-                    }
-
-                } catch (error) {
-
-                    console.error(
-                        `[nicknameSync] فشل جلب اسم ${normalizedUserID}:`,
-                        error.message
+                            resolve(info);
+                        }
                     );
 
                 }
+            );
+
+            if (!threadInfo) {
+                continue;
             }
 
-            /*
-             * حفظ:
-             *
-             * threadID + userID
-             *
-             * لذلك نفس الشخص يستطيع امتلاك
-             * كنية مختلفة في مجموعة أخرى.
-             */
-            try {
+            const nicknames =
+                threadInfo.nicknames || {};
+
+            for (const [userID, nicknameValue] of Object.entries(
+                nicknames
+            )) {
+
+                const normalizedUserID =
+                    String(userID);
+
+                if (
+                    normalizedUserID === botID ||
+                    !nicknameValue ||
+                    typeof nicknameValue !== "string"
+                ) {
+                    skipped++;
+                    continue;
+                }
+
+                const nickname =
+                    nicknameValue.trim();
+
+                if (!nickname) {
+                    skipped++;
+                    continue;
+                }
+
+                let userName =
+                    "عضو غير معروف";
+
+                try {
+
+                    if (Users) {
+
+                        const userData =
+                            await Users.getData(
+                                normalizedUserID
+                            );
+
+                        if (
+                            userData &&
+                            userData.name
+                        ) {
+                            userName =
+                                userData.name;
+                        }
+                    }
+
+                } catch (_) {
+                    // نستخدم الاسم الافتراضي
+                }
 
                 await Nicknames.upsert({
-
                     threadID,
-                    userID:
-                        normalizedUserID,
+                    userID: normalizedUserID,
                     userName,
                     nickname,
-                    updatedAt:
-                        new Date()
-
+                    updatedAt: new Date()
                 });
 
                 saved++;
-
-            } catch (error) {
-
-                console.error(
-                    `[nicknameSync] فشل حفظ كنية ${normalizedUserID}:`,
-                    error.message
-                );
-
             }
+
+        } catch (error) {
+
+            failed++;
+
+            console.error(
+                `[nicknameSync] فشل في المجموعة ${threadID}:`,
+                error.message || error
+            );
         }
     }
 
     console.log(
-        `[nicknameSync] تمت المزامنة — مجموعات: ${groups} | كنيات محفوظة: ${saved}`
+        `[nicknameSync] انتهت المزامنة | محفوظ: ${saved} | متجاهل: ${skipped} | فشل: ${failed}`
     );
 
     return {
-        groups,
-        saved
+        saved,
+        skipped,
+        failed
     };
 };
