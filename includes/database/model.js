@@ -3,22 +3,22 @@ module.exports = function (input) {
 const force = false;
 
 const Users =
-	require("./models/users")(input);
+    require("./models/users")(input);
 
 const Threads =
-	require("./models/threads")(input);
+    require("./models/threads")(input);
 
 const Currencies =
-	require("./models/currencies")(input);
+    require("./models/currencies")(input);
 
 const Pets =
-	require("./models/Pets")(input);
+    require("./models/Pets")(input);
 
 const PetCurrency =
-	require("./models/PetCurrency")(input);
+    require("./models/PetCurrency")(input);
 
 const Nicknames =
-	require("./models/Nicknames")(input);
+    require("./models/Nicknames")(input);
 
 // ==================================================
 // مزامنة الجداول
@@ -31,30 +31,24 @@ Pets.sync({ force });
 PetCurrency.sync({ force });
 Nicknames.sync({ force });
 
-// ==================================================
-// Models
-// ==================================================
-
 return {
 
-	model: {
+    model: {
+        Users,
+        Threads,
+        Currencies,
+        Pets,
+        PetCurrency,
+        Nicknames
+    },
 
-		Users,
-		Threads,
-		Currencies,
-		Pets,
-		PetCurrency,
-		Nicknames
+    use: function (modelName) {
 
-	},
+        return this.model[
+            `${modelName}`
+        ];
 
-	use: function (modelName) {
-
-		return this.model[
-			`${modelName}`
-		];
-
-	}
+    }
 
 };
 
