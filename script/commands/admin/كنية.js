@@ -1,111 +1,185 @@
 module.exports.config = {
   name: "كنية",
-  version: "3.2.0",
+  version: "4.0.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
-  description: "تغيير كنية الأعضاء الذين لا يملكون كنية",
+  description: "تغيير كنية عضو عن طريق الرد على رسالته",
   commandCategory: "إدارة",
-  usages: "كنية",
-  cooldowns: 5
+  usages: "كنية <الكنية>",
+  cooldowns: 3
 };
 
-module.exports.run = async ({ api, event }) => {
-  const { threadID, messageID, senderID } = event;
-
-  // المطور الوحيد المسموح له باستخدام الأمر
-  const ADMIN_ID = "61578581225040";
-
-  // التحقق من المطور
-  if (senderID !== ADMIN_ID) {
-    return api.sendMessage(
-      "هذا الأمر للمطور فقط",
-      threadID,
-      messageID
-    );
-  }
+module.exports.run = async ({
+  api,
+  event,
+  args
+}) => {
+  const {
+    threadID,
+    messageID,
+    senderID,
+    messageReply
+  } = event;
 
   try {
-    const threadInfo = await api.getThreadInfo(threadID);
 
-    if (!threadInfo || !threadInfo.participantIDs) {
+    // ======================================================
+    // معلومات المجموعة والتحقق من الأدمن
+    // ======================================================
+
+    const threadInfo =
+      await api.getThreadInfo(
+        threadID
+      );
+
+    if (
+      !threadInfo
+    ) {
       return api.sendMessage(
-        "تعذر الحصول على معلومات المجموعة",
+        "❌ تعذر الحصول على معلومات المجموعة.",
         threadID,
         messageID
       );
     }
 
-    const participants = threadInfo.participantIDs;
-    const botID = api.getCurrentUserID();
+    const adminIDs =
+      Array.isArray(
+        threadInfo.adminIDs
+      )
+        ? threadInfo.adminIDs.map(
+            id => String(id)
+          )
+        : [];
 
-    let changed = 0;
-    let skipped = 0;
-    let errors = 0;
+    if (
+      !adminIDs.includes(
+        String(senderID)
+      )
+    ) {
+      return api.sendMessage(
+        "❌ هذا الأمر مخصص لأدمن المجموعة فقط.",
+        threadID,
+        messageID
+      );
+    }
 
-    for (const userID of participants) {
+    // ======================================================
+    // التأكد من وجود رد على عضو
+    // ======================================================
 
-      // تجاهل البوت
-      if (userID === botID) continue;
+    if (
+      !messageReply ||
+      !messageReply.senderID
+    ) {
+      return api.sendMessage(
+        "❌ يجب أن ترد على رسالة العضو أولًا.\n\n" +
+        "مثال:\n" +
+        "كنية Ⓜ︎ - ●【 جــنــديـة - غـــيـمـــــة 】●",
+        threadID,
+        messageID
+      );
+    }
 
-      // تجاهل المطور نفسه
-      if (userID === ADMIN_ID) continue;
+    // ======================================================
+    // استخراج الكنية
+    // ======================================================
 
-      try {
-        const userInfo = await api.getUserInfo(userID);
+    const nickname =
+      Array.isArray(args)
+        ? args.join(" ").trim()
+        : "";
 
-        const name =
-          userInfo[userID]?.name ||
-          userInfo[userID]?.firstName ||
-          "مستخدم";
+    if (!nickname) {
+      return api.sendMessage(
+        "❌ اكتب الكنية التي تريد وضعها.\n\n" +
+        "مثال:\n" +
+        "كنية Ⓜ︎ - ●【 جــنــديـة - غـــيـمـــــة 】●",
+        threadID,
+        messageID
+      );
+    }
 
-        // الكنية الحالية
-        const currentNickname =
-          threadInfo.nicknames?.[userID] || "";
+    // ======================================================
+    // العضو المستهدف
+    // ======================================================
 
-        // إذا لديه كنية مسبقًا لا نغيرها
-        if (currentNickname.trim() !== "") {
-          skipped++;
-          continue;
-        }
+    const targetID =
+      String(
+        messageReply.senderID
+      );
 
-        // حماية اتجاه الاسم الإنجليزي
-        const safeName = `\u200E${name}\u200E`;
+    // ======================================================
+    // منع تغيير كنية البوت
+    // ======================================================
 
-        // الكنية الجديدة
-        const newNickname =
-          `※ ${safeName}「جـنــدي」【✯】※`;
+    const botID =
+      String(
+        api.getCurrentUserID()
+      );
 
-        await api.changeNickname(
-          newNickname,
-          threadID,
-          userID
+    if (
+      targetID === botID
+    ) {
+      return api.sendMessage(
+        "❌ لا يمكن تغيير كنية البوت.",
+        threadID,
+        messageID
+      );
+    }
+
+    // ======================================================
+    // تغيير الكنية
+    // ======================================================
+
+    await api.changeNickname(
+      nickname,
+      threadID,
+      targetID
+    );
+
+    // ======================================================
+    // الحصول على اسم العضو
+    // ======================================================
+
+    let name =
+      "العضو";
+
+    try {
+      const userInfo =
+        await api.getUserInfo(
+          targetID
         );
 
-        changed++;
-
-      } catch (error) {
-        errors++;
-        console.error(
-          `خطأ في تغيير كنية ${userID}:`,
-          error
-        );
-      }
+      name =
+        userInfo?.[targetID]?.name ||
+        userInfo?.[targetID]?.firstName ||
+        "العضو";
+    } catch (e) {
+      console.error(
+        "[NICKNAME USER INFO ERROR]",
+        e
+      );
     }
 
     return api.sendMessage(
-      `تم تنفيذ الأمر\n\n` +
-      `تم تغيير الكنية: ${changed}\n` +
-      `تم تجاهل أصحاب الكنيات: ${skipped}\n` +
-      `فشل: ${errors}`,
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬\n\n" +
+      "✅ تم تغيير الكنية بنجاح.\n\n" +
+      `👤 العضو: ${name}\n` +
+      `🏷️ الكنية الجديدة: ${nickname}`,
       threadID,
       messageID
     );
 
   } catch (error) {
-    console.error("خطأ أمر كنية:", error);
+
+    console.error(
+      "[NICKNAME ERROR]",
+      error
+    );
 
     return api.sendMessage(
-      "حدث خطأ أثناء تنفيذ الأمر",
+      "❌ تعذر تغيير الكنية.\n\n" +
+      "تأكد أن البوت يملك صلاحية تغيير كنيات أعضاء المجموعة.",
       threadID,
       messageID
     );
