@@ -53,7 +53,8 @@ module.exports = function ({
 
     function loadActivity(threadID) {
 
-        const file = getActivityFile(threadID);
+        const file =
+            getActivityFile(threadID);
 
         try {
 
@@ -242,12 +243,102 @@ module.exports = function ({
     }
 
     // ==================================================
+    // 🦧🦊🦋 HINA REACTION
+    // ==================================================
+
+    function detectReaction(text) {
+
+        const monkeyWords = [
+            "يوتا",
+            "شفق",
+            "الشفق",
+            "هريرة",
+            "ابو هريرة",
+            "أبو هريرة"
+        ];
+
+        const foxWords = [
+            "رؤى",
+            "ࢪؤى"
+        ];
+
+        const butterflyWords = [
+            "فريال",
+            "فࢪيال"
+        ];
+
+        // 🦧
+        for (
+            const word of monkeyWords
+        ) {
+
+            if (
+                text.includes(
+                    word.toLowerCase()
+                )
+            ) {
+
+                return {
+                    reaction: "🦧",
+                    word
+                };
+            }
+        }
+
+        // 🦊
+        for (
+            const word of foxWords
+        ) {
+
+            if (
+                text.includes(
+                    word.toLowerCase()
+                )
+            ) {
+
+                return {
+                    reaction: "🦊",
+                    word
+                };
+            }
+        }
+
+        // 🦋
+        for (
+            const word of butterflyWords
+        ) {
+
+            if (
+                text.includes(
+                    word.toLowerCase()
+                )
+            ) {
+
+                return {
+                    reaction: "🦋",
+                    word
+                };
+            }
+        }
+
+        return null;
+    }
+
+    // ==================================================
     // 🚀 Handle Event
     // ==================================================
 
     return async function ({
         event
     }) {
+
+        /*
+         * مهم:
+         * هذا الوقت يتم تسجيله فور دخول الحدث
+         * إلى handleEvent.
+         */
+        const eventReceivedAt =
+            Date.now();
 
         try {
 
@@ -260,7 +351,7 @@ module.exports = function ({
             }
 
             // ==================================================
-            // 🦧🦊🦋 HINA — التفاعلات التلقائية
+            // 🦧🦊🦋 التفاعل التلقائي
             // ==================================================
 
             if (
@@ -269,132 +360,49 @@ module.exports = function ({
                 event.messageID
             ) {
 
-                const text =
-                    String(event.body)
-                        .toLowerCase()
-                        .trim();
+                const reactionData =
+                    detectReaction(
+                        String(event.body)
+                            .toLowerCase()
+                    );
 
-                let reaction = null;
-                let matchedWord = null;
+                if (reactionData) {
 
-                // ==================================================
-                // 🦧
-                // ==================================================
-
-                const monkeyWords = [
-                    "يوتا",
-                    "شفق",
-                    "الشفق",
-                    "هريرة",
-                    "ابو هريرة",
-                    "أبو هريرة"
-                ];
-
-                // ==================================================
-                // 🦊
-                // ==================================================
-
-                const foxWords = [
-                    "رؤى",
-                    "ࢪؤى"
-                ];
-
-                // ==================================================
-                // 🦋
-                // ==================================================
-
-                const butterflyWords = [
-                    "فريال",
-                    "فࢪيال"
-                ];
-
-                // ==================================================
-                // تحديد 🦧
-                // ==================================================
-
-                for (
-                    const word of monkeyWords
-                ) {
-
-                    if (
-                        text.includes(
-                            word.toLowerCase()
-                        )
-                    ) {
-
-                        reaction = "🦧";
-                        matchedWord = word;
-                        break;
-                    }
-                }
-
-                // ==================================================
-                // تحديد 🦊
-                // ==================================================
-
-                if (!reaction) {
-
-                    for (
-                        const word of foxWords
-                    ) {
-
-                        if (
-                            text.includes(
-                                word.toLowerCase()
-                            )
-                        ) {
-
-                            reaction = "🦊";
-                            matchedWord = word;
-                            break;
-                        }
-                    }
-                }
-
-                // ==================================================
-                // تحديد 🦋
-                // ==================================================
-
-                if (!reaction) {
-
-                    for (
-                        const word of butterflyWords
-                    ) {
-
-                        if (
-                            text.includes(
-                                word.toLowerCase()
-                            )
-                        ) {
-
-                            reaction = "🦋";
-                            matchedWord = word;
-                            break;
-                        }
-                    }
-                }
-
-                // ==================================================
-                // 🚀 تنفيذ التفاعل
-                // ==================================================
-
-                if (reaction) {
-
-                    const startedAt =
+                    /*
+                     * هذا الوقت يوضح كم استغرق
+                     * الوصول من بداية Handle Event
+                     * حتى بدء طلب reaction.
+                     */
+                    const reactionStartAt =
                         Date.now();
 
-                    // إرسال التفاعل فورًا
+                    const beforeReaction =
+                        reactionStartAt -
+                        eventReceivedAt;
+
+                    /*
+                     * نرسل reaction مباشرة.
+                     *
+                     * لا يوجد await هنا.
+                     */
                     api.setMessageReaction(
-                        reaction,
+                        reactionData.reaction,
                         String(
                             event.messageID
                         ),
 
                         async error => {
 
-                            const elapsed =
-                                Date.now() -
-                                startedAt;
+                            const reactionFinishedAt =
+                                Date.now();
+
+                            const apiTime =
+                                reactionFinishedAt -
+                                reactionStartAt;
+
+                            const totalTime =
+                                reactionFinishedAt -
+                                eventReceivedAt;
 
                             // ==================================================
                             // نتيجة التفاعل
@@ -417,21 +425,21 @@ module.exports = function ({
                             const debugMessage =
                                 "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬\n\n" +
 
-                                "🔍 فحص سرعة التفاعل\n\n" +
+                                "🔍 فحص تأخير التفاعل\n\n" +
 
-                                `📝 الكلمة: ${matchedWord}\n` +
-                                `🎯 التفاعل: ${reaction}\n` +
-                                `🆔 Message ID: ${event.messageID}\n\n` +
+                                `📝 الكلمة: ${reactionData.word}\n` +
+                                `🎯 التفاعل: ${reactionData.reaction}\n\n` +
 
-                                `⏱️ مدة طلب التفاعل: ${elapsed}ms\n\n` +
+                                `⏱️ الوصول إلى Handle Event: ${beforeReaction}ms\n` +
+                                `📡 طلب API: ${apiTime}ms\n` +
+                                `⏱️ المجموع حتى Callback: ${totalTime}ms\n\n` +
 
                                 status +
                                 errorText;
 
-                            // ==================================================
-                            // إرسال نتيجة الفحص
-                            // ==================================================
-
+                            /*
+                             * رسالة التشخيص مؤقتة فقط.
+                             */
                             try {
 
                                 await api.sendMessage(
