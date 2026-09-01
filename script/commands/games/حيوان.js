@@ -255,9 +255,8 @@ async function updateCurrencyData(currency, changes) {
     ...changes
   };
 
-  await currency.update({
-    data: data
-  });
+  await currency.set("data", data);
+await currency.save();
 
   return data;
 }
