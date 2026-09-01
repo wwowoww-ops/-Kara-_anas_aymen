@@ -1,6 +1,4 @@
 const axios = require("axios");
-const fs = require("fs");
-const path = require("path");
 
 // ==================================================
 // الذاكرة
@@ -18,10 +16,10 @@ if (!global.conversationHistory)
 
 module.exports.config = {
   name: "زنجوبة",
-  version: "15.0.0",
+  version: "16.0.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
-  description: "زنجوبة — ذكاء اصطناعي جزائري بجلسة جماعية",
+  description: "زنجوبة — ذكاء اصطناعي تونسي بجلسة جماعية",
   commandCategory: "utility",
   usages: ".زنجوبة [النص]",
   cooldowns: 3
@@ -33,8 +31,19 @@ module.exports.config = {
 
 const ADMIN_ID = "61578581225040";
 
-const CONFIG_PATH =
-  path.join(process.cwd(), "config.json");
+// ==================================================
+// 🔑 مفتاح Groq
+// ==================================================
+// ضع مفتاح Groq هنا
+// مثال:
+// const GROQ_API_KEY = "gsk_xxxxxxxxxxxxxxxxx";
+
+const GROQ_API_KEY =
+  "PUT_YOUR_GROQ_API_KEY_HERE";
+
+// ==================================================
+// Groq
+// ==================================================
 
 const GROQ_URL =
   "https://api.groq.com/openai/v1/chat/completions";
@@ -43,58 +52,30 @@ const GROQ_MODEL =
   "llama-3.3-70b-versatile";
 
 // ==================================================
-// قراءة MODEL_API_KEY
+// التحقق من المفتاح
 // ==================================================
 
 function getGroqKey() {
 
-  try {
+  const key =
+    String(
+      GROQ_API_KEY || ""
+    ).trim();
 
-    if (!fs.existsSync(CONFIG_PATH)) {
-
-      console.error(
-        "❌ config.json غير موجود"
-      );
-
-      return null;
-    }
-
-    const config =
-      JSON.parse(
-        fs.readFileSync(
-          CONFIG_PATH,
-          "utf8"
-        )
-      );
-
-    const key =
-      String(
-        config.MODEL_API_KEY || ""
-      ).trim();
-
-    if (
-      !key ||
-      key === "YOUR_API_KEY_HERE"
-    ) {
-
-      console.error(
-        "❌ MODEL_API_KEY غير موجود"
-      );
-
-      return null;
-    }
-
-    return key;
-
-  } catch (error) {
+  if (
+    !key ||
+    key ===
+      "PUT_YOUR_GROQ_API_KEY_HERE"
+  ) {
 
     console.error(
-      "❌ خطأ قراءة config.json:",
-      error.message
+      "❌ لم يتم وضع مفتاح Groq داخل الكود."
     );
 
     return null;
   }
+
+  return key;
 }
 
 // ==================================================
@@ -120,20 +101,27 @@ async function askGroq(
     await axios.post(
       GROQ_URL,
       {
-        model: GROQ_MODEL,
+
+        model:
+          GROQ_MODEL,
 
         messages,
 
-        temperature: 0.7,
+        temperature:
+          0.7,
 
         max_completion_tokens:
           maxTokens,
 
-        top_p: 0.95,
+        top_p:
+          0.95,
 
-        stream: false
+        stream:
+          false
+
       },
       {
+
         headers: {
 
           Authorization:
@@ -141,9 +129,12 @@ async function askGroq(
 
           "Content-Type":
             "application/json"
+
         },
 
-        timeout: 60000
+        timeout:
+          60000
+
       }
     );
 
@@ -160,13 +151,14 @@ async function askGroq(
     throw new Error(
       "EMPTY_GROQ_RESPONSE"
     );
+
   }
 
   return answer;
 }
 
 // ==================================================
-// تفاعل زنجوبة
+// 🐿️ تفاعل زنجوبة
 // ==================================================
 
 function reactSquirrel(
@@ -189,7 +181,6 @@ function reactSquirrel(
       return;
     }
 
-    // نفس الطريقة التي تعمل في أمر سبوتي
     api.setMessageReaction(
       "🐿️",
       messageID,
@@ -203,14 +194,23 @@ function reactSquirrel(
       "❌ Reaction Error:",
       error
     );
+
   }
 }
 
 // ==================================================
-// كشف اللهجة
+// 🇹🇳 اللهجة التونسية
 // ==================================================
 
 function detectDialect(text) {
+
+  if (
+    /شنوة|شنيا|شبيك|كيفاش|علاش|وينك|وين|برشا|باهي|باهي برشا|توا|تو|مانيش|موش|موش لازم|نحب|تحب|تحبّ|نمشي|نمشيوا|ياخي|هاو|هاني|راهو|راهي|خاطر|خاطرش|زعمة|يزي|يعطيك الصحة|صحيت/i
+      .test(text)
+  ) {
+
+    return "تونسية";
+  }
 
   if (
     /شلونك|شكو|ماكو|يابة|زين/i
@@ -221,7 +221,7 @@ function detectDialect(text) {
   }
 
   if (
-    /كيفك|هلق|يلا|شو|لسا/i
+    /هلق|شو|لسا|كيفك|وينك/i
       .test(text)
   ) {
 
@@ -234,14 +234,6 @@ function detectDialect(text) {
   ) {
 
     return "مصرية";
-  }
-
-  if (
-    /وش|ايش|الله يسعدك/i
-      .test(text)
-  ) {
-
-    return "خليجية";
   }
 
   if (
@@ -260,65 +252,77 @@ function detectDialect(text) {
     return "إنجليزية";
   }
 
-  return "جزائرية";
+  return "تونسية";
 }
 
 // ==================================================
 // تحديد طول الرد
 // ==================================================
 
-function getResponseLength(text) {
+function getResponseLength(
+  text
+) {
 
   const words =
     text
       .trim()
       .split(/\s+/);
 
-  if (words.length <= 3) {
+  if (
+    words.length <= 3
+  ) {
 
     return {
 
-      maxTokens: 100,
+      maxTokens:
+        100,
 
       instruction:
-        "جاوبي بجملة أو جملتين فقط."
+        "جاوبي بجملة أو جملتين فقط وبطريقة طبيعية."
+
     };
   }
 
   if (
-    /اشرح|وضح|كيف|ما هو|نصيحة/i
+    /اشرح|فسر|وضح|كيفاش|كيف|شنوة|شنيا|نصيحة/i
       .test(text)
   ) {
 
     return {
 
-      maxTokens: 250,
+      maxTokens:
+        250,
 
       instruction:
-        "جاوبي بإيجاز ووضوح."
+        "جاوبي بإيجاز ووضوح وباللهجة التونسية."
+
     };
   }
 
   if (
-    /حلل|قارن|احسب|معادلة|ترجم/i
+    /حلل|قارن|احسب|معادلة|ترجم|فسر بالتفصيل/i
       .test(text)
   ) {
 
     return {
 
-      maxTokens: 450,
+      maxTokens:
+        450,
 
       instruction:
-        "قدمي شرحًا مفصلًا ومفهومًا."
+        "قدمي شرحًا مفصلًا وواضحًا لكن بدون حشو."
+
     };
   }
 
   return {
 
-    maxTokens: 250,
+    maxTokens:
+      250,
 
     instruction:
-      "جاوبي بشكل واضح ومباشر."
+      "جاوبي بشكل واضح ومباشر وباللهجة التونسية."
+
   };
 }
 
@@ -335,18 +339,36 @@ function buildSystemRole(
   return `
 أنتِ فتاة اسمها "زنجوبة" 🐿️.
 
-أنتِ فتاة جزائرية ذكية وسريعة الفهم وساخرة بطريقة خفيفة.
+أنتِ فتاة تونسية ذكية وسريعة الفهم وعندك شخصية مرحة وساخرة بطريقة خفيفة.
 
 ━━━━━━━━━━━━━━━━━━
-طريقة الكلام
+🇹🇳 طريقة الكلام
 ━━━━━━━━━━━━━━━━━━
 
-- لهجتك الأساسية هي الدارجة الجزائرية.
-- تكلمي بشكل طبيعي مثل محادثة Messenger.
-- استعملي الكلمات الجزائرية بشكل طبيعي.
-- لا تبالغي في اللهجة.
-- يمكنك مجاراة المستخدم إذا تحدث بلهجة مختلفة.
-- لا تستخدمي تعابير مغربية أو تونسية بلا سبب.
+- لهجتك الأساسية تونسية.
+- تكلمي بطريقة طبيعية مثل محادثة Messenger بين تونسيين.
+- استعملي الدارجة التونسية بشكل طبيعي.
+- لا تبالغي في استعمال الكلمات التونسية.
+- لا تتكلمي بلهجة جزائرية أو شامية أو مصرية إلا إذا كان ذلك مناسبًا لسياق المستخدم.
+- يمكنك فهم اللهجات العربية المختلفة والرد عليها.
+- استعملي كلمات تونسية مثل:
+  شنوة
+  شنية
+  كيفاش
+  علاش
+  وين
+  توا
+  برشا
+  باهي
+  موش
+  مانيش
+  نحب
+  تحب
+  خاطر
+  ياخي
+  يزي
+  هاو
+  هاني
 
 ━━━━━━━━━━━━━━━━━━
 الشخصية
@@ -355,14 +377,18 @@ function buildSystemRole(
 - ذكية.
 - مباشرة.
 - سريعة الفهم.
+- مرحة.
 - ساخرة بشكل خفيف.
-- تحبين المزاح.
-- لا تستخدمي إهانات جارحة.
-- تحبين السناجب 🐿️.
-- يمكنك استخدام •-• أحيانًا.
-- لا تكثري الإيموجيات.
+- تحب المزاح.
+- لا تستعمل إهانات جارحة.
+- تحب السناجب 🐿️.
+- يمكنك استعمال •-• أحيانًا.
+- لا تكثري من الإيموجيات.
 - السؤال البسيط = جواب قصير.
 - السؤال المعقد = شرح واضح.
+- لا تكرري نفس الجملة كثيرًا.
+- لا تقولي إنك روبوت في كل رد.
+- لا تبدئي كل جواب بنفس العبارة.
 
 ━━━━━━━━━━━━━━━━━━
 الجلسة الجماعية
@@ -380,6 +406,7 @@ function buildSystemRole(
 
 لا تقولي للمستخدم:
 "هذه ليست محادثتك"
+
 ولا تطلبي منه بدء جلسة جديدة فقط لأنه شخص مختلف.
 
 ━━━━━━━━━━━━━━━━━━
@@ -441,8 +468,8 @@ ${
 }
 
 ━━━━━━━━━━━━━━━━━━
-
-اللهجة المطلوبة:
+اللهجة المطلوبة
+━━━━━━━━━━━━━━━━━━
 
 ${dialect}
 
@@ -477,6 +504,7 @@ async function generateReply(
       conversationKey,
       []
     );
+
   }
 
   const history =
@@ -485,10 +513,14 @@ async function generateReply(
     );
 
   const dialect =
-    detectDialect(prompt);
+    detectDialect(
+      prompt
+    );
 
   const responseConfig =
-    getResponseLength(prompt);
+    getResponseLength(
+      prompt
+    );
 
   const userName =
     global.usersNames.get(
@@ -499,13 +531,15 @@ async function generateReply(
     buildSystemRole(
       dialect,
       userName,
-      String(senderID) === ADMIN_ID
+      String(senderID) ===
+        ADMIN_ID
     );
 
   const messages = [
 
     {
-      role: "system",
+      role:
+        "system",
 
       content:
         systemRole +
@@ -516,9 +550,11 @@ async function generateReply(
     ...history.slice(-10),
 
     {
-      role: "user",
+      role:
+        "user",
 
-      content: prompt
+      content:
+        prompt
     }
 
   ];
@@ -532,24 +568,33 @@ async function generateReply(
   history.push(
 
     {
-      role: "user",
-      content: prompt
+      role:
+        "user",
+
+      content:
+        prompt
     },
 
     {
-      role: "assistant",
-      content: answer
+      role:
+        "assistant",
+
+      content:
+        answer
     }
 
   );
 
-  // الاحتفاظ بآخر 20 رسالة فقط
-  if (history.length > 20) {
+  // الاحتفاظ بآخر 20 رسالة
+  if (
+    history.length > 20
+  ) {
 
     history.splice(
       0,
       history.length - 20
     );
+
   }
 
   return answer;
@@ -572,8 +617,8 @@ function sendGroqError(
   );
 
   let message =
-    "⌬ ━━ HINA UTILITY ━━ ⌬\n\n" +
-    "🐿️ صرا خلل صغير… استنى شوية ونرجعلك •-• 🌰";
+    "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗨𝗧𝗜𝗟𝗜𝗧𝗬 ━━ ⌬\n\n" +
+    "🐿️ صارت مشكلة صغيرة... استنى شوية ونرجعلك •-•";
 
   const status =
     error.response?.status;
@@ -584,29 +629,39 @@ function sendGroqError(
   ) {
 
     message =
-      "⌬ ━━ HINA UTILITY ━━ ⌬\n\n" +
-      "🐿️ ما لقيتش MODEL_API_KEY في config.json •-•";
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗨𝗧𝗜𝗟𝗜𝗧𝗬 ━━ ⌬\n\n" +
+      "🐿️ حط مفتاح Groq داخل الكود أولًا •-•";
+
   }
 
-  else if (status === 401) {
+  else if (
+    status === 401
+  ) {
 
     message =
-      "⌬ ━━ HINA UTILITY ━━ ⌬\n\n" +
-      "🐿️ مفتاح Groq غير صالح أو منتهي.";
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗨𝗧𝗜𝗟𝗜𝗧𝗬 ━━ ⌬\n\n" +
+      "🐿️ مفتاح Groq موش صالح.";
+
   }
 
-  else if (status === 429) {
+  else if (
+    status === 429
+  ) {
 
     message =
-      "⌬ ━━ HINA UTILITY ━━ ⌬\n\n" +
-      "🐿️ وصلنا للحد المؤقت للطلبات، جرب بعد شوية •-•";
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗨𝗧𝗜𝗟𝗜𝗧𝗬 ━━ ⌬\n\n" +
+      "🐿️ وصلنا للحد المؤقت متاع الطلبات، جرب بعد شوية •-•";
+
   }
 
-  else if (status === 400) {
+  else if (
+    status === 400
+  ) {
 
     message =
-      "⌬ ━━ HINA UTILITY ━━ ⌬\n\n" +
-      "🐿️ Groq رفض الطلب، تأكد من إعدادات النموذج •-•";
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗨𝗧𝗜𝗟𝗜𝗧𝗬 ━━ ⌬\n\n" +
+      "🐿️ Groq رفض الطلب، ثبّت إعدادات النموذج •-•";
+
   }
 
   else if (
@@ -615,8 +670,9 @@ function sendGroqError(
   ) {
 
     message =
-      "⌬ ━━ HINA UTILITY ━━ ⌬\n\n" +
-      "🐿️ Groq تأخر في الرد، جرب مرة ثانية •-•";
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗨𝗧𝗜𝗟𝗜𝗧𝗬 ━━ ⌬\n\n" +
+      "🐿️ Groq تأخر في الرد، عاود جرب •-•";
+
   }
 
   return api.sendMessage(
@@ -627,7 +683,7 @@ function sendGroqError(
 }
 
 // ==================================================
-// حفظ رد زنجوبة في جلسة المجموعة
+// حفظ رد زنجوبة
 // ==================================================
 
 function registerReply(
@@ -639,6 +695,7 @@ function registerReply(
     !info ||
     !info.messageID
   ) {
+
     return;
   }
 
@@ -648,11 +705,13 @@ function registerReply(
 
     global.client.handleReply =
       [];
+
   }
 
-  // الجلسة مرتبطة بالمجموعة وليس بالشخص
   const conversationKey =
-    `group_${String(event.threadID)}`;
+    `group_${String(
+      event.threadID
+    )}`;
 
   global.client.handleReply.push({
 
@@ -668,6 +727,7 @@ function registerReply(
     conversationKey
 
   });
+
 }
 
 // ==================================================
@@ -681,7 +741,9 @@ function sendZanjoobaReply(
 ) {
 
   return api.sendMessage(
+
     `🐿️ ${answer} 🌰`,
+
     event.threadID,
 
     (err, info) => {
@@ -704,6 +766,7 @@ function sendZanjoobaReply(
     },
 
     event.messageID
+
   );
 }
 
@@ -726,19 +789,22 @@ async function ({
   } = event;
 
   const prompt =
-    args.join(" ").trim();
+    Array.isArray(args)
+      ? args.join(" ").trim()
+      : "";
 
   if (!prompt) {
 
     return api.sendMessage(
-      "🐿️ واش تستنى؟ اكتب سؤالك برك •-• 🌰",
+      "🐿️ شنوة تستنى؟ اكتب سؤالك برك •-• 🌰",
       threadID,
       messageID
     );
+
   }
 
   // ==================================================
-  // التفاعل على رسالة المستخدم
+  // 🐿️ التفاعل
   // ==================================================
 
   reactSquirrel(
@@ -761,6 +827,7 @@ async function ({
       String(senderID),
       nameMatch[1].trim()
     );
+
   }
 
   // ==================================================
@@ -768,7 +835,8 @@ async function ({
   // ==================================================
 
   if (
-    String(senderID) === ADMIN_ID
+    String(senderID) ===
+    ADMIN_ID
   ) {
 
     if (
@@ -777,7 +845,9 @@ async function ({
     ) {
 
       const targetID =
-        Object.keys(mentions)[0];
+        Object.keys(
+          mentions
+        )[0];
 
       try {
 
@@ -799,8 +869,11 @@ async function ({
           threadID,
           messageID
         );
+
       }
+
     }
+
   }
 
   // ==================================================
@@ -808,7 +881,9 @@ async function ({
   // ==================================================
 
   const conversationKey =
-    `group_${String(threadID)}`;
+    `group_${String(
+      threadID
+    )}`;
 
   try {
 
@@ -832,7 +907,9 @@ async function ({
       event,
       error
     );
+
   }
+
 };
 
 // ==================================================
@@ -859,26 +936,31 @@ async function ({
 
   if (
     handleReply.threadID &&
-    String(handleReply.threadID) !==
+    String(
+      handleReply.threadID
+    ) !==
       String(threadID)
   ) {
 
     return api.sendMessage(
-      "🐿️ هذي الجلسة تاع مجموعة أخرى •-• 🌰",
+      "🐿️ هذي جلسة متاع مجموعة أخرى •-• 🌰",
       threadID,
       messageID
     );
+
   }
 
   if (
     !body ||
     !body.trim()
   ) {
+
     return;
+
   }
 
   // ==================================================
-  // التفاعل على رسالة المستخدم
+  // 🐿️ التفاعل
   // ==================================================
 
   reactSquirrel(
@@ -887,7 +969,7 @@ async function ({
   );
 
   // ==================================================
-  // اسم المستخدم
+  // حفظ الاسم
   // ==================================================
 
   const nameMatch =
@@ -901,6 +983,7 @@ async function ({
       String(senderID),
       nameMatch[1].trim()
     );
+
   }
 
   // ==================================================
@@ -909,7 +992,9 @@ async function ({
 
   const conversationKey =
     handleReply.conversationKey ||
-    `group_${String(threadID)}`;
+    `group_${String(
+      threadID
+    )}`;
 
   try {
 
@@ -933,5 +1018,7 @@ async function ({
       event,
       error
     );
+
   }
+
 };
