@@ -2,56 +2,66 @@ module.exports = function ({ sequelize, Sequelize }) {
 
 const Nicknames = sequelize.define("Nicknames", {
 
-// ==================================================
-// ID
-// ==================================================
+    // ==================================================
+    // ID
+    // ==================================================
 
-id: {
-  type: Sequelize.INTEGER,
-  primaryKey: true,
-  autoIncrement: true
-},
+    id: {
+        type: Sequelize.INTEGER,
+        primaryKey: true,
+        autoIncrement: true
+    },
 
-// ==================================================
-// المجموعة
-// ==================================================
+    // ==================================================
+    // المجموعة
+    // ==================================================
 
-threadID: {
-  type: Sequelize.STRING,
-  allowNull: false,
-  unique: "nickname_member"
-},
+    threadID: {
+        type: Sequelize.STRING,
+        allowNull: false,
+        unique: "nickname_member"
+    },
 
-// ==================================================
-// العضو
-// ==================================================
+    // ==================================================
+    // العضو
+    // ==================================================
 
-userID: {
-  type: Sequelize.STRING,
-  allowNull: false,
-  unique: "nickname_member"
-},
+    userID: {
+        type: Sequelize.STRING,
+        allowNull: false,
+        unique: "nickname_member"
+    },
 
-// ==================================================
-// الكنية
-// ==================================================
+    // ==================================================
+    // اسم العضو من قاعدة Users
+    // ==================================================
 
-nickname: {
-  type: Sequelize.STRING,
-  allowNull: false
-},
+    userName: {
+        type: Sequelize.STRING,
+        allowNull: false
+    },
 
-// ==================================================
-// آخر تحديث
-// ==================================================
+    // ==================================================
+    // الكنية
+    // ==================================================
 
-updatedAt: {
-  type: Sequelize.DATE,
-  allowNull: false,
-  defaultValue: Sequelize.NOW
-}
+    nickname: {
+        type: Sequelize.STRING,
+        allowNull: false
+    },
+
+    // ==================================================
+    // آخر تحديث
+    // ==================================================
+
+    updatedAt: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.NOW
+    }
 
 });
 
 return Nicknames;
+
 };
