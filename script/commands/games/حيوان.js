@@ -1,6 +1,6 @@
 module.exports.config = {
   name: "حيوان",
-  version: "8.0.0",
+  version: "9.0.0",
   credits: "أبو هريرة",
   description: "نظام الحيوانات الأليفة",
   commandCategory: "Games",
@@ -10,7 +10,7 @@ module.exports.config = {
 };
 
 // ============================================================
-// إعدادات التدريب
+// إعدادات
 // ============================================================
 
 const TRAIN_COOLDOWN = 30 * 60 * 1000;
@@ -420,7 +420,7 @@ const RARITY_ORDER = [
 ];
 
 // ============================================================
-// مودل
+// الحصول على المودل
 // ============================================================
 
 function getModel(models, name) {
@@ -468,7 +468,7 @@ function getModel(models, name) {
 }
 
 // ============================================================
-// الردود
+// Reply System
 // ============================================================
 
 function addReply(data) {
@@ -536,7 +536,6 @@ function sendReply(
             );
 
             resolve(null);
-
             return;
           }
 
@@ -606,17 +605,17 @@ function calculatePetState(
   }
 
   if (
-    health < 50
-  ) {
-
-    return "متعب";
-  }
-
-  if (
     hunger < 20
   ) {
 
     return "جائع";
+  }
+
+  if (
+    health < 50
+  ) {
+
+    return "متعب";
   }
 
   if (
@@ -638,7 +637,7 @@ function calculatePetState(
 }
 
 // ============================================================
-// تحديث الوقت
+// تحديث الشبع والصحة مع الوقت
 // ============================================================
 
 async function updatePetOverTime(
@@ -773,7 +772,7 @@ function getFreePetsList() {
   }
 
   text +=
-    "\n↪️ لعرض المتجر: حيوان قائمة";
+    "\n↪️ لعرض جميع الحيوانات: حيوان قائمة";
 
   return text;
 }
@@ -909,7 +908,7 @@ function getPetInfo(
 }
 
 // ============================================================
-// إنشاء
+// إنشاء الحيوان
 // ============================================================
 
 async function createPet(
@@ -948,7 +947,10 @@ async function createPet(
       100,
 
     status:
-      "سعيد"
+      "سعيد",
+
+    lastTrain:
+      null
   });
 
   return (
@@ -969,7 +971,7 @@ async function createPet(
 }
 
 // ============================================================
-// البيع
+// سعر البيع
 // ============================================================
 
 function getSellPrice(
@@ -1024,6 +1026,69 @@ function getSellPrice(
 }
 
 // ============================================================
+// حساب وقت الكولداون
+// ============================================================
+
+function getRemainingCooldown(
+  lastTrain
+) {
+
+  if (!lastTrain) {
+    return 0;
+  }
+
+  const last =
+    new Date(
+      lastTrain
+    ).getTime();
+
+  if (
+    !Number.isFinite(last)
+  ) {
+    return 0;
+  }
+
+  const remaining =
+    TRAIN_COOLDOWN -
+    (
+      Date.now() -
+      last
+    );
+
+  return Math.max(
+    0,
+    remaining
+  );
+}
+
+// ============================================================
+// تنسيق الوقت
+// ============================================================
+
+function formatTime(
+  milliseconds
+) {
+
+  const totalSeconds =
+    Math.ceil(
+      milliseconds /
+      1000
+    );
+
+  const minutes =
+    Math.floor(
+      totalSeconds /
+      60
+    );
+
+  const seconds =
+    totalSeconds %
+    60;
+
+  return `${minutes} دقيقة و ${seconds} ثانية`;
+}
+
+// ============================================================
 // RUN
 // ============================================================
 
@@ -1053,21 +1118,6 @@ async function ({
 
       return api.sendMessage(
         "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n❌ مودل الحيوانات غير محمّل.",
-        threadID,
-        messageID
-      );
-    }
-
-    const Currencies =
-      getModel(
-        models,
-        "Currencies"
-      );
-
-    if (!Currencies) {
-
-      return api.sendMessage(
-        "❌ مودل العملات غير محمّل.",
         threadID,
         messageID
       );
@@ -1120,7 +1170,7 @@ async function ({
     }
 
     // ========================================================
-    // الحيوان
+    // البحث عن الحيوان
     // ========================================================
 
     let pet =
@@ -1140,6 +1190,10 @@ async function ({
           pet
         );
     }
+
+    // ========================================================
+    // لديه حيوان
+    // ========================================================
 
     if (pet) {
 
@@ -1270,25 +1324,10 @@ async function ({
         "Pets"
       );
 
-    const Currencies =
-      getModel(
-        models,
-        "Currencies"
-      );
-
     if (!Pets) {
 
       return api.sendMessage(
         "❌ مودل الحيوانات غير محمّل.",
-        threadID,
-        messageID
-      );
-    }
-
-    if (!Currencies) {
-
-      return api.sendMessage(
-        "❌ مودل العملات غير محمّل.",
         threadID,
         messageID
       );
@@ -1359,7 +1398,7 @@ async function ({
       }
 
       // ======================================================
-      // المجاني
+      // الحيوان المجاني
       // ======================================================
 
       if (
@@ -1385,7 +1424,7 @@ async function ({
       }
 
       // ======================================================
-      // شراء
+      // الحيوان المدفوع
       // ======================================================
 
       const sent =
@@ -1403,8 +1442,8 @@ async function ({
 
           "هل تريد شراء هذا الحيوان؟\n\n" +
 
-          "↪️ نعم\n" +
-          "↪️ لا",
+          "نعم\n" +
+          "لا",
 
           threadID,
           messageID
@@ -1521,6 +1560,21 @@ async function ({
         );
       }
 
+      const Currencies =
+        getModel(
+          models,
+          "Currencies"
+        );
+
+      if (!Currencies) {
+
+        return api.sendMessage(
+          "❌ مودل العملات غير محمّل.",
+          threadID,
+          messageID
+        );
+      }
+
       const currency =
         await Currencies.findOne({
 
@@ -1602,7 +1656,10 @@ async function ({
             100,
 
           status:
-            "سعيد"
+            "سعيد",
+
+          lastTrain:
+            null
         });
 
       } catch (error) {
@@ -1721,8 +1778,8 @@ async function ({
 
             "هل تريد بيع حيوانك؟\n\n" +
 
-            "↪️ نعم\n" +
-            "↪️ لا",
+            "نعم\n" +
+            "لا",
 
             threadID,
             messageID
@@ -1756,7 +1813,7 @@ async function ({
       }
 
       // ======================================================
-      // الإطعام
+      // إطعام
       // ======================================================
 
       if (
@@ -1820,58 +1877,18 @@ async function ({
         choice === 3
       ) {
 
-        // ----------------------------------------------------
-        // إنشاء مساحة الكولداون
-        // ----------------------------------------------------
-
-        if (
-          !global.petTrainCooldown
-        ) {
-
-          global.petTrainCooldown =
-            {};
-        }
-
-        const userKey =
-          String(senderID);
-
-        const lastTrain =
-          Number(
-            global.petTrainCooldown[userKey] || 0
-          );
-
-        const now =
-          Date.now();
-
         const remaining =
-          TRAIN_COOLDOWN -
-          (
-            now -
-            lastTrain
+          getRemainingCooldown(
+            pet.lastTrain
           );
 
         // ----------------------------------------------------
-        // الكولداون
+        // ما زال في الكولداون
         // ----------------------------------------------------
 
         if (
           remaining > 0
         ) {
-
-          const minutes =
-            Math.floor(
-              remaining /
-              60000
-            );
-
-          const seconds =
-            Math.floor(
-              (
-                remaining %
-                60000
-              ) /
-              1000
-            );
 
           return api.sendMessage(
 
@@ -1879,21 +1896,14 @@ async function ({
 
             "❌ حيوانك يحتاج إلى الراحة.\n\n" +
 
-            `⏳ الوقت المتبقي: ${minutes} دقيقة و ${seconds} ثانية\n\n` +
+            `⏳ الوقت المتبقي: ${formatTime(remaining)}\n\n` +
 
-            "يمكنك تدريبه مرة أخرى بعد انتهاء الكولداون.",
+            "يمكنك تدريبه بعد انتهاء الكولداون.",
 
             threadID,
             messageID
           );
         }
-
-        // ----------------------------------------------------
-        // تحديث وقت التدريب
-        // ----------------------------------------------------
-
-        global.petTrainCooldown[userKey] =
-          now;
 
         // ----------------------------------------------------
         // البيانات
@@ -1928,7 +1938,7 @@ async function ({
           0;
 
         // ----------------------------------------------------
-        // حساب المستوى
+        // حساب المستويات
         // ----------------------------------------------------
 
         while (
@@ -1948,7 +1958,7 @@ async function ({
         }
 
         // ----------------------------------------------------
-        // التدريب يؤثر على الشبع
+        // الشبع
         // ----------------------------------------------------
 
         const oldHunger =
@@ -1991,7 +2001,10 @@ async function ({
           hunger:
             newHunger,
 
-          status
+          status,
+
+          lastTrain:
+            new Date()
         });
 
         removeReply(
@@ -2125,6 +2138,21 @@ async function ({
         getSellPrice(
           data
         );
+
+      const Currencies =
+        getModel(
+          models,
+          "Currencies"
+        );
+
+      if (!Currencies) {
+
+        return api.sendMessage(
+          "❌ مودل العملات غير محمّل.",
+          threadID,
+          messageID
+        );
+      }
 
       const currency =
         await Currencies.findOne({
