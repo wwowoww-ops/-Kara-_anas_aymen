@@ -16,9 +16,7 @@ module.exports = function (input) {
 
     const PetCurrency =
         require("./models/PetCurrency")(input);
-
-    const Nicknames =
-        require("./models/Nicknames")(input);
+        
 
 
     // مزامنة الجداول
@@ -33,8 +31,6 @@ module.exports = function (input) {
 
     PetCurrency.sync({ force });
 
-    Nicknames.sync({ force });
-
 
     return {
 
@@ -43,8 +39,7 @@ module.exports = function (input) {
             Threads,
             Currencies,
             Pets,
-            PetCurrency,
-            Nicknames
+            PetCurrency 
         },
 
         use: function (modelName) {
