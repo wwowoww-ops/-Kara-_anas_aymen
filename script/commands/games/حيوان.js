@@ -2316,29 +2316,51 @@ if (
 );
     }
 
-    // ========================================================
-    // التصدر
-    // ========================================================
+// ========================================================
+// التصدر
+// ========================================================
 
-    if (
-      lower === "تصدر" ||
-      lower === "تصدّر" ||
-      lower === "leaderboard"
-    ) {
-      const text =
-  await getLeaderboard(
-    api,
-    Pets,
-    PetCurrency,
-    Users
-  );
+if (
+  lower === "تصدر" ||
+  lower === "تصدّر" ||
+  lower === "leaderboard"
+) {
+  const text =
+    await getLeaderboard(
+      api,
+      Pets,
+      PetCurrency,
+      Users
+    );
 
-      return api.sendMessage(
-        text,
-        threadID,
-        messageID
-      );
-    }
+  const sent =
+    await sendReply(
+      api,
+      text,
+      threadID,
+      messageID
+    );
+
+  if (
+    sent?.messageID
+  ) {
+    addReply({
+      name:
+        module.exports.config.name,
+
+      messageID:
+        sent.messageID,
+
+      author:
+        String(senderID),
+
+      type:
+        "leaderboard_choice"
+    });
+  }
+
+  return;
+}
 
     // ========================================================
     // متجر
