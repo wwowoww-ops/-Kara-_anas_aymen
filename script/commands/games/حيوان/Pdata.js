@@ -92,6 +92,22 @@ async function createPet(Pets, userID, petData = {}) {
     throw new Error("USER_ALREADY_HAS_PET");
   }
 
+  const level = Number.isFinite(Number(petData.level))
+    ? Number(petData.level)
+    : 0;
+
+  const stars = Number.isFinite(Number(petData.stars))
+    ? Number(petData.stars)
+    : 0;
+
+  if (level < 0 || level > 60) {
+    throw new Error("INVALID_LEVEL");
+  }
+
+  if (stars < 0 || stars > 5) {
+    throw new Error("INVALID_STARS");
+  }
+
   return await Pets.create({
     userID: id,
 
@@ -103,9 +119,9 @@ async function createPet(Pets, userID, petData = {}) {
       ? Number(petData.power)
       : 5,
 
-    level: Number.isFinite(Number(petData.level))
-      ? Number(petData.level)
-      : 1,
+    level,
+
+    stars,
 
     exp: Number.isFinite(Number(petData.exp))
       ? Number(petData.exp)
@@ -139,6 +155,7 @@ async function updatePet(pet, changes = {}) {
     "rarity",
     "power",
     "level",
+    "stars",
     "exp",
     "health",
     "hunger",
@@ -152,6 +169,50 @@ async function updatePet(pet, changes = {}) {
     if (Object.prototype.hasOwnProperty.call(changes, field)) {
       safeChanges[field] = changes[field];
     }
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(safeChanges, "level")
+  ) {
+    const level = Number(safeChanges.level);
+
+    if (
+      !Number.isFinite(level) ||
+      level < 0 ||
+      level > 60
+    ) {
+      throw new Error("INVALID_LEVEL");
+    }
+
+    safeChanges.level = level;
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(safeChanges, "stars")
+  ) {
+    const stars = Number(safeChanges.stars);
+
+    if (
+      !Number.isFinite(stars) ||
+      stars < 0 ||
+      stars > 5
+    ) {
+      throw new Error("INVALID_STARS");
+    }
+
+    safeChanges.stars = stars;
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(safeChanges, "exp")
+  ) {
+    const exp = Number(safeChanges.exp);
+
+    if (!Number.isFinite(exp) || exp < 0) {
+      throw new Error("INVALID_EXP");
+    }
+
+    safeChanges.exp = exp;
   }
 
   if (Object.keys(safeChanges).length > 0) {
