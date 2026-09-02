@@ -727,8 +727,9 @@ function getPetBag(data) {
 
     "1. طعام الحيوان\n" +
     "2. دواء الحيوان\n" +
-    "3. درع الحماية\n" +
-    "4. بطاقة الاستثمار"
+    "3. درع الحماية\n\n" +
+
+    "بطاقة الاستثمار تُفعّل تلقائيًا عند الشراء."
   );
 }
 
@@ -3196,6 +3197,224 @@ if (
     messageID
   );
 }    
+
+// ========================================================
+// إجراءات الحقيبة
+// ========================================================
+
+if (
+  handleReply.type ===
+  "pet_bag"
+) {
+  const pet =
+    await Pets.findOne({
+      where: {
+        userID:
+          String(senderID)
+      }
+    });
+
+  if (!pet) {
+    removeReply(handleReply);
+
+    return api.sendMessage(
+      "❌ لا تملك حيوانًا.",
+      threadID,
+      messageID
+    );
+  }
+
+  const currency =
+    await getPetCurrency(
+      PetCurrency,
+      senderID
+    );
+
+  const data =
+    getCurrencyData(
+      currency
+    );
+
+  const choice =
+    Number(input);
+
+  // ======================================================
+  // الطعام
+  // ======================================================
+
+  if (
+    choice === 1
+  ) {
+    const food =
+      Number(
+        data.food || 0
+      );
+
+    if (
+      food <= 0
+    ) {
+      return api.sendMessage(
+        "❌ لا تملك طعامًا للحيوان.",
+        threadID,
+        messageID
+      );
+    }
+
+    const currentHunger =
+      Number(
+        pet.hunger ?? 100
+      );
+
+    const newHunger =
+      Math.min(
+        100,
+        currentHunger + 30
+      );
+
+    const newFood =
+      food - 1;
+
+    await pet.update({
+      hunger:
+        newHunger,
+
+      status:
+        calculatePetState(
+          Number(
+            pet.health ?? 100
+          ),
+          newHunger
+        )
+    });
+
+    await updateCurrencyData(
+      currency,
+      {
+        food:
+          newFood
+      }
+    );
+
+    removeReply(handleReply);
+
+    return api.sendMessage(
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+
+      `🍖 تم إطعام ${pet.name}\n\n` +
+
+      `🍖 الشبع: ${newHunger}/100\n` +
+      `🍖 الطعام المتبقي: ${newFood}`,
+
+      threadID,
+      messageID
+    );
+  }
+
+  // ======================================================
+  // الدواء
+  // ======================================================
+
+  if (
+    choice === 2
+  ) {
+    const medicine =
+      Number(
+        data.medicine || 0
+      );
+
+    if (
+      medicine <= 0
+    ) {
+      return api.sendMessage(
+        "❌ لا تملك دواءً للحيوان.",
+        threadID,
+        messageID
+      );
+    }
+
+    const currentHealth =
+      Number(
+        pet.health ?? 100
+      );
+
+    const newHealth =
+      Math.min(
+        100,
+        currentHealth + 30
+      );
+
+    const newMedicine =
+      medicine - 1;
+
+    await pet.update({
+      health:
+        newHealth,
+
+      status:
+        calculatePetState(
+          newHealth,
+          Number(
+            pet.hunger ?? 100
+          )
+        )
+    });
+
+    await updateCurrencyData(
+      currency,
+      {
+        medicine:
+          newMedicine
+      }
+    );
+
+    removeReply(handleReply);
+
+    return api.sendMessage(
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+
+      `💊 تم علاج ${pet.name}\n\n` +
+
+      `💊 الصحة: ${newHealth}/100\n` +
+      `💊 الدواء المتبقي: ${newMedicine}`,
+
+      threadID,
+      messageID
+    );
+  }
+
+  // ======================================================
+  // درع الحماية
+  // ======================================================
+
+  if (
+    choice === 3
+  ) {
+    removeReply(handleReply);
+
+    return useShield(
+      api,
+      threadID,
+      messageID,
+      PetCurrency,
+      senderID
+    );
+  }
+
+  // ======================================================
+  // اختيار غير صحيح
+  // ======================================================
+
+  return api.sendMessage(
+    "❌ الاختيار غير صحيح.\n\n" +
+
+    "1. طعام الحيوان\n" +
+    "2. دواء الحيوان\n" +
+    "3. درع الحماية",
+
+    threadID,
+    messageID
+  );
+}
 
 // ========================================================
     // تأكيد البيع
