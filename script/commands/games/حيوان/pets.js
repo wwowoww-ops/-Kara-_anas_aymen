@@ -16,9 +16,14 @@
  * - XP = 0
  * - القوة لا تعود للصفر
  * - الصحة لا تعود للصفر
- * - باقي الإحصائيات لا تعود للصفر
+ * - الشبع لا يعود للصفر
+ * - الإحصائيات تستمر بالتطور
  *
- * 5★ Level 60 = ختم اللعبة
+ * Level 60:
+ * - يحصل الحيوان على صورته الخاصة
+ *
+ * 5★ Level 60:
+ * - ختم اللعبة
  *
  * ============================================================
  */
@@ -60,18 +65,93 @@ const RARITY_ORDER = [
 
 const MAX_LEVEL = 60;
 const MAX_STARS = 5;
-const SPECIAL_IMAGE_LEVEL = 30;
+
+/*
+ * الصورة الخاصة تظهر عند Level 60
+ */
+const SPECIAL_IMAGE_LEVEL = 60;
+
+
+/* ============================================================
+ * الشبع حسب الندرة
+ * ============================================================
+ *
+ * base:
+ * الحد الأساسي للشبع عند Level 0
+ *
+ * growth:
+ * مقدار زيادة الحد الأقصى للشبع
+ * مع كل مستوى فعلي
+ *
+ * المستوى الفعلي:
+ *
+ * 0★ Lv0  = 0
+ * 0★ Lv60 = 60
+ * 1★ Lv0  = 60
+ * 1★ Lv60 = 120
+ * 2★ Lv60 = 180
+ * 3★ Lv60 = 240
+ * 4★ Lv60 = 300
+ * 5★ Lv60 = 360
+ *
+ * ============================================================
+ */
+
+const HUNGER_BY_RARITY = {
+
+  [RARITIES.COMMON]: {
+    base: 100,
+    growth: 2
+  },
+
+  [RARITIES.UNCOMMON]: {
+    base: 115,
+    growth: 2.5
+  },
+
+  [RARITIES.RARE]: {
+    base: 130,
+    growth: 3
+  },
+
+  [RARITIES.EPIC]: {
+    base: 150,
+    growth: 3.5
+  },
+
+  [RARITIES.LEGENDARY]: {
+    base: 175,
+    growth: 4
+  },
+
+  [RARITIES.MYTHICAL]: {
+    base: 205,
+    growth: 5
+  },
+
+  [RARITIES.CELESTIAL]: {
+    base: 240,
+    growth: 6
+  }
+
+};
 
 
 /* ============================================================
  * بيانات الحيوانات
  * ============================================================
  *
- * basePower  = القوة عند Level 0
- * baseHealth = الصحة عند Level 0
+ * basePower:
+ * القوة عند Level 0
  *
- * growth.power  = زيادة القوة لكل مستوى
- * growth.health = زيادة الصحة لكل مستوى
+ * baseHealth:
+ * الصحة عند Level 0
+ *
+ * growth.power:
+ * زيادة القوة لكل مستوى
+ *
+ * growth.health:
+ * زيادة الصحة لكل مستوى
  *
  * ============================================================
  */
@@ -97,10 +177,7 @@ const PETS = [
       health: 20
     },
 
-    emoji: "🐱",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🐱"
   },
 
   {
@@ -118,10 +195,7 @@ const PETS = [
       health: 22
     },
 
-    emoji: "🐶",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🐶"
   },
 
   {
@@ -139,10 +213,7 @@ const PETS = [
       health: 19
     },
 
-    emoji: "🐰",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🐰"
   },
 
   {
@@ -160,10 +231,7 @@ const PETS = [
       health: 18
     },
 
-    emoji: "🐹",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🐹"
   },
 
   {
@@ -181,10 +249,7 @@ const PETS = [
       health: 20
     },
 
-    emoji: "🐿️",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🐿️"
   },
 
   {
@@ -202,10 +267,7 @@ const PETS = [
       health: 16
     },
 
-    emoji: "🦋",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🦋"
   },
 
   {
@@ -223,10 +285,7 @@ const PETS = [
       health: 25
     },
 
-    emoji: "🐌",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🐌"
   },
 
   {
@@ -244,10 +303,7 @@ const PETS = [
       health: 18
     },
 
-    emoji: "🐟",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🐟"
   },
 
   {
@@ -265,10 +321,7 @@ const PETS = [
       health: 26
     },
 
-    emoji: "🦔",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🦔"
   },
 
 
@@ -291,10 +344,7 @@ const PETS = [
       health: 30
     },
 
-    emoji: "🦊",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🦊"
   },
 
   {
@@ -312,10 +362,7 @@ const PETS = [
       health: 38
     },
 
-    emoji: "🐼",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🐼"
   },
 
   {
@@ -333,10 +380,7 @@ const PETS = [
       health: 32
     },
 
-    emoji: "🦜",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🦜"
   },
 
   {
@@ -354,10 +398,7 @@ const PETS = [
       health: 46
     },
 
-    emoji: "🐢",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🐢"
   },
 
   {
@@ -375,10 +416,7 @@ const PETS = [
       health: 34
     },
 
-    emoji: "🐧",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🐧"
   },
 
   {
@@ -396,10 +434,7 @@ const PETS = [
       health: 36
     },
 
-    emoji: "🐨",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🐨"
   },
 
   {
@@ -417,10 +452,7 @@ const PETS = [
       health: 33
     },
 
-    emoji: "🐦‍⬛",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🐦‍⬛"
   },
 
 
@@ -443,10 +475,7 @@ const PETS = [
       health: 44
     },
 
-    emoji: "🐺",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🐺"
   },
 
   {
@@ -464,10 +493,7 @@ const PETS = [
       health: 56
     },
 
-    emoji: "🐴",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🐴"
   },
 
   {
@@ -485,10 +511,7 @@ const PETS = [
       health: 52
     },
 
-    emoji: "🐯",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🐯"
   },
 
   {
@@ -506,10 +529,7 @@ const PETS = [
       health: 60
     },
 
-    emoji: "🦁",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🦁"
   },
 
   {
@@ -527,10 +547,7 @@ const PETS = [
       health: 70
     },
 
-    emoji: "🐻",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🐻"
   },
 
 
@@ -553,10 +570,7 @@ const PETS = [
       health: 52
     },
 
-    emoji: "🦌",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🦌"
   },
 
   {
@@ -574,10 +588,7 @@ const PETS = [
       health: 60
     },
 
-    emoji: "🦅",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🦅"
   },
 
   {
@@ -595,10 +606,7 @@ const PETS = [
       health: 58
     },
 
-    emoji: "🦉",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🦉"
   },
 
   {
@@ -616,10 +624,7 @@ const PETS = [
       health: 86
     },
 
-    emoji: "🦍",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🦍"
   },
 
   {
@@ -637,10 +642,7 @@ const PETS = [
       health: 72
     },
 
-    emoji: "🐆",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🐆"
   },
 
   {
@@ -658,10 +660,7 @@ const PETS = [
       health: 90
     },
 
-    emoji: "🐊",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🐊"
   },
 
   {
@@ -679,10 +678,7 @@ const PETS = [
       health: 84
     },
 
-    emoji: "🦈",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🦈"
   },
 
   {
@@ -700,10 +696,7 @@ const PETS = [
       health: 120
     },
 
-    emoji: "🐋",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🐋"
   },
 
   {
@@ -721,10 +714,7 @@ const PETS = [
       health: 76
     },
 
-    emoji: "🦒",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🦒"
   },
 
   {
@@ -742,10 +732,7 @@ const PETS = [
       health: 60
     },
 
-    emoji: "🐒",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🐒"
   },
 
 
@@ -768,10 +755,7 @@ const PETS = [
       health: 130
     },
 
-    emoji: "🦏",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🦏"
   },
 
   {
@@ -789,10 +773,7 @@ const PETS = [
       health: 160
     },
 
-    emoji: "🐘",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🐘"
   },
 
   {
@@ -810,10 +791,7 @@ const PETS = [
       health: 90
     },
 
-    emoji: "🦅",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🦅"
   },
 
   {
@@ -831,10 +809,7 @@ const PETS = [
       health: 180
     },
 
-    emoji: "👹",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "👹"
   },
 
 
@@ -857,10 +832,7 @@ const PETS = [
       health: 170
     },
 
-    emoji: "🦄",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🦄"
   },
 
   {
@@ -878,10 +850,7 @@ const PETS = [
       health: 240
     },
 
-    emoji: "🐙",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🐙"
   },
 
 
@@ -904,10 +873,7 @@ const PETS = [
       health: 350
     },
 
-    emoji: "🐉",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🐉"
   },
 
   {
@@ -925,27 +891,96 @@ const PETS = [
       health: 400
     },
 
-    emoji: "🔥",
-
-    maxLevel: MAX_LEVEL,
-    specialImageLevel: SPECIAL_IMAGE_LEVEL
+    emoji: "🔥"
   }
 
 ];
 
 
 /* ============================================================
- * البحث عن الحيوانات
- * ============================================================ */
+ * تجهيز بيانات الحيوانات
+ * ============================================================
+ *
+ * يتم هنا إضافة الإعدادات المشتركة لجميع الحيوانات:
+ *
+ * maxLevel
+ * maxStars
+ * specialImageLevel
+ * baseHunger
+ * growth.hunger
+ *
+ * ============================================================
+ */
 
-function getPetByID(id) {
-  return PETS.find(
-    pet => pet.id === Number(id)
-  );
+for (const pet of PETS) {
+
+  /* المستوى الأقصى */
+  pet.maxLevel = MAX_LEVEL;
+
+  /* النجوم القصوى */
+  pet.maxStars = MAX_STARS;
+
+  /* مستوى الصورة الخاصة */
+  pet.specialImageLevel =
+    SPECIAL_IMAGE_LEVEL;
+
+
+  /* --------------------------------
+   * بيانات الشبع حسب الندرة
+   * -------------------------------- */
+
+  const hungerData =
+    HUNGER_BY_RARITY[
+      pet.rarity
+    ] ||
+    HUNGER_BY_RARITY[
+      RARITIES.COMMON
+    ];
+
+
+  /*
+   * الشبع الأساسي
+   */
+
+  pet.baseHunger =
+    hungerData.base;
+
+
+  /*
+   * زيادة الشبع مع كل مستوى فعلي
+   */
+
+  if (!pet.growth) {
+    pet.growth = {};
+  }
+
+  pet.growth.hunger =
+    hungerData.growth;
 }
 
 
+/* ============================================================
+ * البحث عن حيوان بواسطة ID
+ * ============================================================ */
+
+function getPetByID(id) {
+
+  const numericID =
+    Number(id);
+
+  return PETS.find(
+    pet =>
+      pet.id === numericID
+  ) || null;
+}
+
+
+/* ============================================================
+ * البحث عن حيوان بواسطة النوع
+ * ============================================================ */
+
 function getPetByType(type) {
+
   if (!type) {
     return null;
   }
@@ -957,36 +992,53 @@ function getPetByType(type) {
     pet =>
       pet.type === search ||
       pet.name === search
-  );
+  ) || null;
 }
 
 
+/* ============================================================
+ * جلب الحيوانات حسب الندرة
+ * ============================================================ */
+
 function getPetsByRarity(rarity) {
+
   return PETS.filter(
-    pet => pet.rarity === rarity
+    pet =>
+      pet.rarity === rarity
   );
 }
 
 
 /* ============================================================
- * نظام الندرات
+ * مستوى الندرة
  * ============================================================ */
 
 function getRarityLevel(rarity) {
+
   return RARITY_ORDER.indexOf(
     rarity
   );
 }
 
 
+/* ============================================================
+ * التحقق من الندرة
+ * ============================================================ */
+
 function isValidRarity(rarity) {
+
   return RARITY_ORDER.includes(
     rarity
   );
 }
 
 
+/* ============================================================
+ * أعلى ندرة
+ * ============================================================ */
+
 function getHighestRarity() {
+
   return RARITY_ORDER[
     RARITY_ORDER.length - 1
   ];
@@ -997,14 +1049,24 @@ function getHighestRarity() {
  * حساب القوة
  * ============================================================
  *
- * Level 0:
- * basePower
+ * مهم:
  *
- * Level 1:
- * basePower + growth.power
+ * لا يوجد حد 360 هنا.
  *
- * Level 60:
- * basePower + 60 × growth.power
+ * leveling.js هو المسؤول عن تحويل:
+ *
+ * النجمة + المستوى
+ *
+ * إلى المستوى الفعلي.
+ *
+ * لذلك:
+ *
+ * 0★ Lv60 = 60
+ * 1★ Lv60 = 120
+ * 2★ Lv60 = 180
+ * 3★ Lv60 = 240
+ * 4★ Lv60 = 300
+ * 5★ Lv60 = 360
  *
  * ============================================================
  */
@@ -1013,26 +1075,24 @@ function calculatePower(
   pet,
   level = 0
 ) {
+
   if (!pet) {
     return 0;
   }
 
-  level = Number(level);
+  level =
+    Number(level);
 
   if (!Number.isFinite(level)) {
     level = 0;
   }
 
-  const maxEffectiveLevel =
-    MAX_LEVEL * MAX_STARS;
+  level =
+    Math.max(
+      0,
+      level
+    );
 
-  level = Math.max(
-    0,
-    Math.min(
-      level,
-      maxEffectiveLevel
-    )
-  );
 
   const basePower =
     Number(pet.basePower) || 0;
@@ -1041,6 +1101,7 @@ function calculatePower(
     Number(
       pet.growth?.power
     ) || 0;
+
 
   return Math.floor(
     basePower +
@@ -1060,26 +1121,24 @@ function calculateHealth(
   pet,
   level = 0
 ) {
+
   if (!pet) {
     return 0;
   }
 
-  level = Number(level);
+  level =
+    Number(level);
 
   if (!Number.isFinite(level)) {
     level = 0;
   }
 
-  const maxEffectiveLevel =
-    MAX_LEVEL * MAX_STARS;
+  level =
+    Math.max(
+      0,
+      level
+    );
 
-  level = Math.max(
-    0,
-    Math.min(
-      level,
-      maxEffectiveLevel
-    )
-  );
 
   const baseHealth =
     Number(pet.baseHealth) || 0;
@@ -1088,6 +1147,7 @@ function calculateHealth(
     Number(
       pet.growth?.health
     ) || 0;
+
 
   return Math.floor(
     baseHealth +
@@ -1100,13 +1160,135 @@ function calculateHealth(
 
 
 /* ============================================================
- * الصورة الخاصة
+ * حساب الحد الأقصى للشبع
+ * ============================================================
+ *
+ * الشبع يتطور مع:
+ *
+ * 1. ندرة الحيوان
+ * 2. المستوى الفعلي
+ * 3. النجوم من خلال المستوى الفعلي
+ *
+ * ============================================================
+ */
+
+function calculateMaxHunger(
+  pet,
+  level = 0
+) {
+
+  if (!pet) {
+    return 0;
+  }
+
+  level =
+    Number(level);
+
+  if (!Number.isFinite(level)) {
+    level = 0;
+  }
+
+  level =
+    Math.max(
+      0,
+      level
+    );
+
+
+  const rarityData =
+    HUNGER_BY_RARITY[
+      pet.rarity
+    ] ||
+    HUNGER_BY_RARITY[
+      RARITIES.COMMON
+    ];
+
+
+  const baseHunger =
+    Number.isFinite(
+      Number(pet.baseHunger)
+    )
+      ? Number(pet.baseHunger)
+      : rarityData.base;
+
+
+  const growth =
+    Number.isFinite(
+      Number(pet.growth?.hunger)
+    )
+      ? Number(pet.growth.hunger)
+      : rarityData.growth;
+
+
+  return Math.floor(
+    baseHunger +
+    (
+      level *
+      growth
+    )
+  );
+}
+
+
+/* ============================================================
+ * حساب مستوى الشبع بالنسبة المئوية
  * ============================================================ */
+
+function calculateHungerPercentage(
+  pet,
+  hunger,
+  level = 0
+) {
+
+  const maxHunger =
+    calculateMaxHunger(
+      pet,
+      level
+    );
+
+  if (maxHunger <= 0) {
+    return 0;
+  }
+
+  hunger =
+    Number(hunger);
+
+  if (!Number.isFinite(hunger)) {
+    hunger = 0;
+  }
+
+  hunger =
+    Math.max(
+      0,
+      Math.min(
+        hunger,
+        maxHunger
+      )
+    );
+
+  return Math.floor(
+    (
+      hunger /
+      maxHunger
+    ) * 100
+  );
+}
+
+
+/* ============================================================
+ * الصورة الخاصة
+ * ============================================================
+ *
+ * الصورة تظهر عند Level 60.
+ *
+ * ============================================================
+ */
 
 function hasSpecialImage(
   pet,
   level = 0
 ) {
+
   if (!pet) {
     return false;
   }
@@ -1116,9 +1298,50 @@ function hasSpecialImage(
       pet.specialImageLevel
     ) || SPECIAL_IMAGE_LEVEL;
 
+
   return (
     Number(level) >=
     specialLevel
+  );
+}
+
+
+/* ============================================================
+ * هل الحيوان في أقصى مستوى؟
+ * ============================================================ */
+
+function isMaxLevel(level) {
+
+  level =
+    Number(level);
+
+  if (!Number.isFinite(level)) {
+    return false;
+  }
+
+  return (
+    level >=
+    MAX_LEVEL
+  );
+}
+
+
+/* ============================================================
+ * هل وصلت النجوم للحد الأقصى؟
+ * ============================================================ */
+
+function isMaxStars(stars) {
+
+  stars =
+    Number(stars);
+
+  if (!Number.isFinite(stars)) {
+    return false;
+  }
+
+  return (
+    stars >=
+    MAX_STARS
   );
 }
 
@@ -1141,6 +1364,8 @@ module.exports = {
 
   SPECIAL_IMAGE_LEVEL,
 
+  HUNGER_BY_RARITY,
+
   getPetByID,
 
   getPetByType,
@@ -1157,5 +1382,14 @@ module.exports = {
 
   calculateHealth,
 
-  hasSpecialImage
+  calculateMaxHunger,
+
+  calculateHungerPercentage,
+
+  hasSpecialImage,
+
+  isMaxLevel,
+
+  isMaxStars
+
 };
