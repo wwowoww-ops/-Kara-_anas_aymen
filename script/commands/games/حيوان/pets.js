@@ -3,24 +3,17 @@
  * نظام الحيوانات - بيانات الحيوانات
  * ============================================================
  *
- * هذا الملف يحتوي على بيانات الحيوانات فقط.
- *
- * لا يحتوي على:
- * - قاعدة البيانات
- * - XP
- * - النجوم الخاصة باللاعب
- * - أوامر اللعبة
- *
  * نظام التطوير:
  *
  * Level 0 → Level 60
- * عند Level 60 يمكن ترقية الحيوان إلى نجمة جديدة
+ *
+ * عند Level 60 يمكن ترقية الحيوان:
  *
  * 0★ → 1★ → 2★ → 3★ → 4★ → 5★
  *
  * عند الترقية:
- * - Level يعود إلى 0
- * - XP يعود إلى 0
+ * - Level = 0
+ * - XP = 0
  * - القوة لا تعود للصفر
  * - الصحة لا تعود للصفر
  * - باقي الإحصائيات لا تعود للصفر
@@ -66,9 +59,7 @@ const RARITY_ORDER = [
  * ============================================================ */
 
 const MAX_LEVEL = 60;
-
 const MAX_STARS = 5;
-
 const SPECIAL_IMAGE_LEVEL = 30;
 
 
@@ -76,17 +67,11 @@ const SPECIAL_IMAGE_LEVEL = 30;
  * بيانات الحيوانات
  * ============================================================
  *
- * basePower:
- * القوة عند Level 0
+ * basePower  = القوة عند Level 0
+ * baseHealth = الصحة عند Level 0
  *
- * baseHealth:
- * الصحة عند Level 0
- *
- * growth.power:
- * مقدار زيادة القوة في كل مستوى
- *
- * growth.health:
- * مقدار زيادة الصحة في كل مستوى
+ * growth.power  = زيادة القوة لكل مستوى
+ * growth.health = زيادة الصحة لكل مستوى
  *
  * ============================================================
  */
@@ -270,7 +255,7 @@ const PETS = [
     type: "قنفذ",
     name: "قنفذ",
     rarity: RARITIES.COMMON,
-    price: 1200,
+    price: 2500,
 
     basePower: 18,
     baseHealth: 130,
@@ -296,7 +281,7 @@ const PETS = [
     type: "ثعلب",
     name: "ثعلب",
     rarity: RARITIES.UNCOMMON,
-    price: 5000,
+    price: 8000,
 
     basePower: 25,
     baseHealth: 150,
@@ -317,7 +302,7 @@ const PETS = [
     type: "باندا",
     name: "باندا",
     rarity: RARITIES.UNCOMMON,
-    price: 7000,
+    price: 11000,
 
     basePower: 30,
     baseHealth: 190,
@@ -338,7 +323,7 @@ const PETS = [
     type: "ببغاء",
     name: "ببغاء",
     rarity: RARITIES.UNCOMMON,
-    price: 8500,
+    price: 13000,
 
     basePower: 32,
     baseHealth: 160,
@@ -359,7 +344,7 @@ const PETS = [
     type: "سلحفاة",
     name: "سلحفاة",
     rarity: RARITIES.UNCOMMON,
-    price: 7500,
+    price: 12000,
 
     basePower: 28,
     baseHealth: 230,
@@ -380,7 +365,7 @@ const PETS = [
     type: "بطريق",
     name: "بطريق",
     rarity: RARITIES.UNCOMMON,
-    price: 6500,
+    price: 10000,
 
     basePower: 25,
     baseHealth: 170,
@@ -401,7 +386,7 @@ const PETS = [
     type: "كوالا",
     name: "كوالا",
     rarity: RARITIES.UNCOMMON,
-    price: 8000,
+    price: 12000,
 
     basePower: 27,
     baseHealth: 180,
@@ -422,7 +407,7 @@ const PETS = [
     type: "غراب",
     name: "غراب",
     rarity: RARITIES.UNCOMMON,
-    price: 9000,
+    price: 15000,
 
     basePower: 35,
     baseHealth: 165,
@@ -448,7 +433,7 @@ const PETS = [
     type: "ذئب",
     name: "ذئب",
     rarity: RARITIES.RARE,
-    price: 15000,
+    price: 22000,
 
     basePower: 35,
     baseHealth: 220,
@@ -469,7 +454,7 @@ const PETS = [
     type: "حصان",
     name: "حصان",
     rarity: RARITIES.RARE,
-    price: 20000,
+    price: 30000,
 
     basePower: 55,
     baseHealth: 280,
@@ -490,7 +475,7 @@ const PETS = [
     type: "نمر",
     name: "نمر",
     rarity: RARITIES.RARE,
-    price: 22000,
+    price: 34000,
 
     basePower: 50,
     baseHealth: 260,
@@ -511,7 +496,7 @@ const PETS = [
     type: "أسد",
     name: "أسد",
     rarity: RARITIES.RARE,
-    price: 25000,
+    price: 40000,
 
     basePower: 60,
     baseHealth: 300,
@@ -532,7 +517,7 @@ const PETS = [
     type: "دب",
     name: "دب",
     rarity: RARITIES.RARE,
-    price: 28000,
+    price: 45000,
 
     basePower: 65,
     baseHealth: 350,
@@ -558,7 +543,7 @@ const PETS = [
     type: "غزال",
     name: "غزال",
     rarity: RARITIES.EPIC,
-    price: 35000,
+    price: 60000,
 
     basePower: 45,
     baseHealth: 260,
@@ -579,7 +564,7 @@ const PETS = [
     type: "نسر",
     name: "نسر",
     rarity: RARITIES.EPIC,
-    price: 45000,
+    price: 75000,
 
     basePower: 70,
     baseHealth: 300,
@@ -600,7 +585,7 @@ const PETS = [
     type: "بومة",
     name: "بومة",
     rarity: RARITIES.EPIC,
-    price: 42000,
+    price: 70000,
 
     basePower: 58,
     baseHealth: 290,
@@ -621,7 +606,7 @@ const PETS = [
     type: "غوريلا",
     name: "غوريلا",
     rarity: RARITIES.EPIC,
-    price: 55000,
+    price: 95000,
 
     basePower: 85,
     baseHealth: 430,
@@ -642,7 +627,7 @@ const PETS = [
     type: "فهد",
     name: "فهد",
     rarity: RARITIES.EPIC,
-    price: 60000,
+    price: 105000,
 
     basePower: 88,
     baseHealth: 360,
@@ -663,7 +648,7 @@ const PETS = [
     type: "تمساح",
     name: "تمساح",
     rarity: RARITIES.EPIC,
-    price: 58000,
+    price: 100000,
 
     basePower: 78,
     baseHealth: 450,
@@ -684,7 +669,7 @@ const PETS = [
     type: "قرش",
     name: "قرش",
     rarity: RARITIES.EPIC,
-    price: 65000,
+    price: 115000,
 
     basePower: 82,
     baseHealth: 420,
@@ -705,7 +690,7 @@ const PETS = [
     type: "حوت",
     name: "حوت",
     rarity: RARITIES.EPIC,
-    price: 75000,
+    price: 140000,
 
     basePower: 90,
     baseHealth: 600,
@@ -726,7 +711,7 @@ const PETS = [
     type: "زرافة",
     name: "زرافة",
     rarity: RARITIES.EPIC,
-    price: 52000,
+    price: 90000,
 
     basePower: 65,
     baseHealth: 380,
@@ -747,7 +732,7 @@ const PETS = [
     type: "شمبانزي",
     name: "شمبانزي",
     rarity: RARITIES.EPIC,
-    price: 40000,
+    price: 65000,
 
     basePower: 55,
     baseHealth: 300,
@@ -773,7 +758,7 @@ const PETS = [
     type: "وحيد القرن",
     name: "وحيد القرن",
     rarity: RARITIES.LEGENDARY,
-    price: 100000,
+    price: 180000,
 
     basePower: 105,
     baseHealth: 650,
@@ -794,7 +779,7 @@ const PETS = [
     type: "فيل",
     name: "فيل",
     rarity: RARITIES.LEGENDARY,
-    price: 120000,
+    price: 220000,
 
     basePower: 110,
     baseHealth: 800,
@@ -815,7 +800,7 @@ const PETS = [
     type: "صقر",
     name: "صقر",
     rarity: RARITIES.LEGENDARY,
-    price: 95000,
+    price: 170000,
 
     basePower: 95,
     baseHealth: 450,
@@ -836,7 +821,7 @@ const PETS = [
     type: "وحش أسطوري",
     name: "وحش أسطوري",
     rarity: RARITIES.LEGENDARY,
-    price: 180000,
+    price: 350000,
 
     basePower: 150,
     baseHealth: 900,
@@ -862,7 +847,7 @@ const PETS = [
     type: "يونيكورن",
     name: "يونيكورن",
     rarity: RARITIES.MYTHICAL,
-    price: 300000,
+    price: 550000,
 
     basePower: 140,
     baseHealth: 850,
@@ -883,7 +868,7 @@ const PETS = [
     type: "كراكن",
     name: "كراكن",
     rarity: RARITIES.MYTHICAL,
-    price: 450000,
+    price: 850000,
 
     basePower: 180,
     baseHealth: 1200,
@@ -909,7 +894,7 @@ const PETS = [
     type: "تنين",
     name: "تنين",
     rarity: RARITIES.CELESTIAL,
-    price: 1000000000,
+    price: 2500000,
 
     basePower: 250,
     baseHealth: 1800,
@@ -930,7 +915,7 @@ const PETS = [
     type: "عنقاء",
     name: "عنقاء",
     rarity: RARITIES.CELESTIAL,
-    price: 10000000000,
+    price: 5000000,
 
     basePower: 300,
     baseHealth: 2000,
@@ -961,9 +946,12 @@ function getPetByID(id) {
 
 
 function getPetByType(type) {
-  if (!type) return null;
+  if (!type) {
+    return null;
+  }
 
-  const search = String(type).trim();
+  const search =
+    String(type).trim();
 
   return PETS.find(
     pet =>
@@ -985,12 +973,16 @@ function getPetsByRarity(rarity) {
  * ============================================================ */
 
 function getRarityLevel(rarity) {
-  return RARITY_ORDER.indexOf(rarity);
+  return RARITY_ORDER.indexOf(
+    rarity
+  );
 }
 
 
 function isValidRarity(rarity) {
-  return RARITY_ORDER.includes(rarity);
+  return RARITY_ORDER.includes(
+    rarity
+  );
 }
 
 
@@ -1003,10 +995,27 @@ function getHighestRarity() {
 
 /* ============================================================
  * حساب القوة
- * ============================================================ */
+ * ============================================================
+ *
+ * Level 0:
+ * basePower
+ *
+ * Level 1:
+ * basePower + growth.power
+ *
+ * Level 60:
+ * basePower + 60 × growth.power
+ *
+ * ============================================================
+ */
 
-function calculatePower(pet, level = 0) {
-  if (!pet) return 0;
+function calculatePower(
+  pet,
+  level = 0
+) {
+  if (!pet) {
+    return 0;
+  }
 
   level = Number(level);
 
@@ -1014,14 +1023,31 @@ function calculatePower(pet, level = 0) {
     level = 0;
   }
 
+  const maxEffectiveLevel =
+    MAX_LEVEL * MAX_STARS;
+
   level = Math.max(
     0,
-    Math.min(level, pet.maxLevel)
+    Math.min(
+      level,
+      maxEffectiveLevel
+    )
   );
 
+  const basePower =
+    Number(pet.basePower) || 0;
+
+  const growth =
+    Number(
+      pet.growth?.power
+    ) || 0;
+
   return Math.floor(
-    pet.basePower +
-    (level * pet.growth.power)
+    basePower +
+    (
+      level *
+      growth
+    )
   );
 }
 
@@ -1030,8 +1056,13 @@ function calculatePower(pet, level = 0) {
  * حساب الصحة
  * ============================================================ */
 
-function calculateHealth(pet, level = 0) {
-  if (!pet) return 0;
+function calculateHealth(
+  pet,
+  level = 0
+) {
+  if (!pet) {
+    return 0;
+  }
 
   level = Number(level);
 
@@ -1039,14 +1070,31 @@ function calculateHealth(pet, level = 0) {
     level = 0;
   }
 
+  const maxEffectiveLevel =
+    MAX_LEVEL * MAX_STARS;
+
   level = Math.max(
     0,
-    Math.min(level, pet.maxLevel)
+    Math.min(
+      level,
+      maxEffectiveLevel
+    )
   );
 
+  const baseHealth =
+    Number(pet.baseHealth) || 0;
+
+  const growth =
+    Number(
+      pet.growth?.health
+    ) || 0;
+
   return Math.floor(
-    pet.baseHealth +
-    (level * pet.growth.health)
+    baseHealth +
+    (
+      level *
+      growth
+    )
   );
 }
 
@@ -1055,12 +1103,22 @@ function calculateHealth(pet, level = 0) {
  * الصورة الخاصة
  * ============================================================ */
 
-function hasSpecialImage(pet, level = 0) {
-  if (!pet) return false;
+function hasSpecialImage(
+  pet,
+  level = 0
+) {
+  if (!pet) {
+    return false;
+  }
+
+  const specialLevel =
+    Number(
+      pet.specialImageLevel
+    ) || SPECIAL_IMAGE_LEVEL;
 
   return (
     Number(level) >=
-    pet.specialImageLevel
+    specialLevel
   );
 }
 
@@ -1070,24 +1128,34 @@ function hasSpecialImage(pet, level = 0) {
  * ============================================================ */
 
 module.exports = {
+
   PETS,
 
   RARITIES,
+
   RARITY_ORDER,
 
   MAX_LEVEL,
+
   MAX_STARS,
+
   SPECIAL_IMAGE_LEVEL,
 
   getPetByID,
+
   getPetByType,
+
   getPetsByRarity,
 
   getRarityLevel,
+
   isValidRarity,
+
   getHighestRarity,
 
   calculatePower,
+
   calculateHealth,
+
   hasSpecialImage
 };
