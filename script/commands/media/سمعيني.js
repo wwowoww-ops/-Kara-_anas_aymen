@@ -1,59 +1,48 @@
-const axios = require("axios");
-const yts = require("yt-search");
-const fs = require("fs");
+const fs = require("fs-extra");
 const path = require("path");
-
-const HEADER = 
-`╭─── 𓆩 𝐀𝐍𝐀𝐒 𝐗 𝐒𝐎𝐌𝐈 𓆪 ───╮
-│ 🇾🇪 Dev: Anas Al-Sarouri
-│ 📍 Yemen - Mukalla
-╰──────────────────╯
-`;
+const yts = require("yt-search");
+const ytdl = require("@ybd-project/ytdl-core");
 
 module.exports.config = {
-  name: "سماعة",
-  aliases: ["اغنية","sing"],
-  version: "2.0-YE-FIX",
+  name: "صوت",
+  aliases: ["سماعة", "samaa", "play", "غنية"],
+  version: "1.0.6",
   hasPermssion: 0,
-  credits: "Anas Al-Sarouri",
-  description: "تحميل اغاني",
+  credits: "Anas fix",
+  description: "تشغيل اغنية",
   commandCategory: "media",
-  usages: "سماعة اسم الاغنية",
+  usages: "[اسم الاغنية]",
   cooldowns: 5
 };
 
 module.exports.run = async function({ api, event, args }) {
   const { threadID, messageID } = event;
-  const query = args.join(" ").trim();
-  if (!query) return api.sendMessage(HEADER + "\n❌ اكتب اسم الاغنية", threadID, messageID);
-
-  const cacheDir = path.join(__dirname, "cache");
-  if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
-  const filePath = path.join(cacheDir, `anas_${Date.now()}.mp3`);
+  if (!args[0]) return api.sendMessage("🎧 اكتب: صوت حمودي يا ناسي", threadID, messageID);
 
   try {
-    api.setMessageReaction("⏳", messageID, () => {}, true);
-    
-    const search = await yts(query);
+    api.sendMessage(`🔍 ابحث عن: ${args.join(" ")}`, threadID, messageID);
+
+    const search = await yts(args.join(" "));
     const video = search.videos[0];
-    if (!video) throw new Error("ما لقيت نتيجة");
+    if (!video) return api.sendMessage("❌ ما لقيت", threadID, messageID);
 
-    // API
-    const apiUrl = `https://ytdl-api-xdi.onrender.com/api/dl?link=${encodeURIComponent(video.url)}&format=mp3`;
-    const res = await axios.get(apiUrl, { timeout: 60000 });
-    if (!res.data.downloadUrl) throw new Error(res.data.error || "API مات");
+    const cacheDir = path.join(__dirname, "cache");
+    if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir, { recursive: true });
 
-    const dl = await axios.get(res.data.downloadUrl, { responseType: "stream", timeout: 120000 });
-    const writer = fs.createWriteStream(filePath);
-    dl.data.pipe(writer);
+    const filePath = path.join(cacheDir, `play_${Date.now()}.mp3`);
+
+    const stream = ytdl(video.url, { filter: "audioonly", quality: "highestaudio" });
+
     await new Promise((resolve, reject) => {
+      const writer = fs.createWriteStream(filePath);
+      stream.pipe(writer);
       writer.on("finish", resolve);
       writer.on("error", reject);
+      stream.on("error", reject);
     });
 
-    api.setMessageReaction("✅", messageID, () => {}, true);
     return api.sendMessage({
-      body: HEADER + `\n🎶 ${video.title}\n🕒 ${video.timestamp}`,
+      body: `🎵 ${video.title}\n⏱️ ${video.timestamp}`,
       attachment: fs.createReadStream(filePath)
     }, threadID, () => {
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
@@ -61,8 +50,6 @@ module.exports.run = async function({ api, event, args }) {
 
   } catch (e) {
     console.log(e);
-    api.setMessageReaction("❌", messageID, () => {}, true);
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    return api.sendMessage(HEADER + "\n❌ فشل: " + e.message, threadID, messageID);
+    return api.sendMessage(`❌ خطأ: ${e.message}`, threadID, messageID);
   }
 };
