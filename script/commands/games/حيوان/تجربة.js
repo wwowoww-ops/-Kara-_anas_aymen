@@ -20,6 +20,7 @@ module.exports.run = async function ({ api, event, args, models }) {
   const subCommand = String(args[0] || "").toLowerCase();
 
   try {
+
     /*
      * ==========================================
      * القائمة الرئيسية
@@ -44,6 +45,7 @@ module.exports.run = async function ({ api, event, args, models }) {
       );
     }
 
+
     /*
      * ==========================================
      * اختبار pets.js
@@ -67,16 +69,22 @@ module.exports.run = async function ({ api, event, args, models }) {
         `الحيوان 38 : ${hedgehog.name}`,
         `الندرة : ${hedgehog.rarity}`,
         `السعر : ${hedgehog.price}`,
-        `الصحة الأساسية : ${hedgehog.stats.health}`,
-        `القوة الأساسية : ${hedgehog.stats.power}`,
-        `الجوع الأقصى : ${hedgehog.stats.maxHunger}`,
+        `الصحة الأساسية : ${hedgehog.baseHealth}`,
+        `القوة الأساسية : ${hedgehog.basePower}`,
+        `زيادة الصحة : ${hedgehog.growth.health}`,
+        `زيادة القوة : ${hedgehog.growth.power}`,
+        `المستوى الأقصى : ${hedgehog.maxLevel}`,
+        `الصورة الخاصة : لفل ${hedgehog.specialImageLevel}`,
         "",
         `الحيوان 39 : ${phoenix.name}`,
         `الندرة : ${phoenix.rarity}`,
         `السعر : ${phoenix.price}`,
-        `الصحة الأساسية : ${phoenix.stats.health}`,
-        `القوة الأساسية : ${phoenix.stats.power}`,
-        `الجوع الأقصى : ${phoenix.stats.maxHunger}`,
+        `الصحة الأساسية : ${phoenix.baseHealth}`,
+        `القوة الأساسية : ${phoenix.basePower}`,
+        `زيادة الصحة : ${phoenix.growth.health}`,
+        `زيادة القوة : ${phoenix.growth.power}`,
+        `المستوى الأقصى : ${phoenix.maxLevel}`,
+        `الصورة الخاصة : لفل ${phoenix.specialImageLevel}`,
         "",
         hedgehog.id === 38 && phoenix.id === 39
           ? "✓ اختبار بيانات الحيوانات ناجح"
@@ -91,6 +99,7 @@ module.exports.run = async function ({ api, event, args, models }) {
       );
     }
 
+
     /*
      * ==========================================
      * اختبار leveling.js
@@ -100,6 +109,15 @@ module.exports.run = async function ({ api, event, args, models }) {
     if (subCommand === "مستوى") {
       const levels = [1, 2, 10, 29, 30, 50, 100];
 
+      const hedgehog = pets.getPetByID(38);
+
+      if (!hedgehog) {
+        return api.sendMessage(
+          "فشل اختبار نظام المستويات\nلم يتم العثور على القنفذ",
+          event.threadID
+        );
+      }
+
       const lines = [
         "╭───〔 اختبار نظام المستويات 〕───╮",
         "",
@@ -108,7 +126,10 @@ module.exports.run = async function ({ api, event, args, models }) {
       ];
 
       for (const level of levels) {
-        const stats = leveling.getPetStats(38, level);
+        const stats = leveling.getPetStats(
+          hedgehog,
+          level
+        );
 
         lines.push(
           `لفل ${level}`,
@@ -119,13 +140,23 @@ module.exports.run = async function ({ api, event, args, models }) {
         );
       }
 
+      /*
+       * اختبار الصورة الخاصة
+       *
+       * يجب تمرير الحيوان + المستوى
+       */
+
       lines.push(
         "اختبار الصورة الخاصة:",
         `لفل 29 : ${
-          leveling.checkSpecialImage(29) ? "متاحة" : "غير متاحة"
+          leveling.checkSpecialImage(hedgehog, 29)
+            ? "متاحة"
+            : "غير متاحة"
         }`,
         `لفل 30 : ${
-          leveling.checkSpecialImage(30) ? "متاحة" : "غير متاحة"
+          leveling.checkSpecialImage(hedgehog, 30)
+            ? "متاحة"
+            : "غير متاحة"
         }`,
         "",
         "╰────────────────────╯"
@@ -136,6 +167,7 @@ module.exports.run = async function ({ api, event, args, models }) {
         event.threadID
       );
     }
+
 
     /*
      * ==========================================
@@ -192,12 +224,12 @@ module.exports.run = async function ({ api, event, args, models }) {
       );
     }
 
+
     /*
      * ==========================================
      * اختبار قاعدة البيانات
      * ==========================================
      *
-     * مهم:
      * هذا الاختبار يقرأ البيانات فقط.
      * لا يغير الحيوان ولا المال ولا الحقيبة.
      */
@@ -255,6 +287,7 @@ module.exports.run = async function ({ api, event, args, models }) {
         event.threadID
       );
     }
+
 
     /*
      * ==========================================
