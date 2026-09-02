@@ -624,9 +624,9 @@ function getShopList() {
   return text;
 }
 
-// ============================================================
-// معلومات الحيوان
-// ============================================================
+ // ============================================================
+ // معلومات الحيوان
+ // ============================================================
 
 function getPetInfo(pet) {
   const found =
@@ -648,16 +648,24 @@ function getPetInfo(pet) {
     );
 
   const level =
-    Number(pet.level || 1);
+    Number(
+      pet.level || 1
+    );
 
   const exp =
-    Number(pet.exp || 0);
+    Number(
+      pet.exp || 0
+    );
 
   const health =
-    Number(pet.health ?? 100);
+    Number(
+      pet.health ?? 100
+    );
 
   const hunger =
-    Number(pet.hunger ?? 100);
+    Number(
+      pet.hunger ?? 100
+    );
 
   const status =
     pet.status ||
@@ -683,9 +691,8 @@ function getPetInfo(pet) {
     "اختر العملية بالرد برقم:\n\n" +
 
     "1. بيع الحيوان\n" +
-"2. إطعام الحيوان\n" +
-"3. تدريب الحيوان\n" +
-"4. علاج الحيوان"
+    "2. تدريب الحيوان\n" +
+    "3. الحقيبة"
   );
 }
 
