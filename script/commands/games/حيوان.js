@@ -701,10 +701,10 @@ function getPetBag(data) {
     Number(data?.medicine || 0);
 
   const shield =
-    Number(data?.shield || 0);
+    Number(data?.shields || 0);
 
   const investmentCard =
-    Number(data?.investment_card || 0);
+    Number(data?.investmentCards || 0);
 
   return (
     "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗕𝗔𝗚 ━━ ⌬\n\n" +
