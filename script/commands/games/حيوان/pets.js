@@ -4,30 +4,35 @@
  * ============================================================
  *
  * هذا الملف يحتوي على بيانات الحيوانات فقط.
- * لا يحتوي على قاعدة بيانات ولا منطق الأوامر.
  *
- * تصميم البيانات هنا يسمح بإضافة:
- * - نظام المستويات
- * - الخبرة
- * - زيادة الصحة والقوة
- * - التطور
- * - المهارات
- * - الصور الخاصة
- * - الندرات الجديدة
+ * لا يحتوي على:
+ * - قاعدة البيانات
+ * - XP
+ * - النجوم الخاصة باللاعب
+ * - أوامر اللعبة
  *
- * لاحقًا يمكن لـ leveling.js استخدام:
- *   pet.baseHealth
- *   pet.basePower
- *   pet.growth
- *   pet.rarity
+ * نظام التطوير:
  *
- * بدون الحاجة لتعديل بيانات الحيوانات.
+ * Level 0 → Level 60
+ * عند Level 60 يمكن ترقية الحيوان إلى نجمة جديدة
+ *
+ * 0★ → 1★ → 2★ → 3★ → 4★ → 5★
+ *
+ * عند الترقية:
+ * - Level يعود إلى 0
+ * - XP يعود إلى 0
+ * - القوة لا تعود للصفر
+ * - الصحة لا تعود للصفر
+ * - باقي الإحصائيات لا تعود للصفر
+ *
+ * 5★ Level 60 = ختم اللعبة
+ *
  * ============================================================
  */
 
 
 /* ============================================================
- * ترتيب الندرات
+ * الندرات
  * ============================================================ */
 
 const RARITIES = {
@@ -42,7 +47,7 @@ const RARITIES = {
 
 
 /* ============================================================
- * ترتيب الندرات من الأضعف إلى الأقوى
+ * ترتيب الندرات
  * ============================================================ */
 
 const RARITY_ORDER = [
@@ -57,50 +62,40 @@ const RARITY_ORDER = [
 
 
 /* ============================================================
+ * إعدادات النظام
+ * ============================================================ */
+
+const MAX_LEVEL = 60;
+
+const MAX_STARS = 5;
+
+const SPECIAL_IMAGE_LEVEL = 30;
+
+
+/* ============================================================
  * بيانات الحيوانات
  * ============================================================
  *
- * id:
- * رقم ثابت للحيوان
- *
- * type:
- * الاسم الذي يستخدمه النظام للتعرف على الحيوان
- *
- * name:
- * الاسم الظاهر للمستخدم
- *
- * rarity:
- * ندرة الحيوان
- *
- * price:
- * سعر الشراء
- *
  * basePower:
- * القوة الأساسية عند المستوى 1
+ * القوة عند Level 0
  *
  * baseHealth:
- * الصحة الأساسية عند المستوى 1
+ * الصحة عند Level 0
  *
- * growth:
- * مقدار النمو الذي سيستخدمه نظام المستويات لاحقًا
+ * growth.power:
+ * مقدار زيادة القوة في كل مستوى
  *
- * emoji:
- * الإيموجي الافتراضي للحيوان
- *
- * maxLevel:
- * أعلى مستوى يمكن أن يصل إليه الحيوان
- *
- * specialImageLevel:
- * المستوى الذي يحصل فيه الحيوان على الصورة الخاصة
+ * growth.health:
+ * مقدار زيادة الصحة في كل مستوى
  *
  * ============================================================
  */
 
 const PETS = [
 
-  /* =========================
+  /* ==========================================================
    * شائع
-   * ========================= */
+   * ========================================================== */
 
   {
     id: 1,
@@ -119,8 +114,8 @@ const PETS = [
 
     emoji: "🐱",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
   {
@@ -140,56 +135,14 @@ const PETS = [
 
     emoji: "🐶",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
   {
     id: 3,
     type: "أرنب",
     name: "أرنب",
-    rarity: RARITIES.COMMON,
-    price: 0,
-
-    basePower: 8,
-    baseHealth: 90,
-
-    growth: {
-      power: 5,
-      health: 18
-    },
-
-    emoji: "🐰",
-
-    maxLevel: 100,
-    specialImageLevel: 30
-  },
-
-  {
-    id: 4,
-    type: "هامستر",
-    name: "هامستر",
-    rarity: RARITIES.COMMON,
-    price: 0,
-
-    basePower: 7,
-    baseHealth: 85,
-
-    growth: {
-      power: 4,
-      health: 17
-    },
-
-    emoji: "🐹",
-
-    maxLevel: 100,
-    specialImageLevel: 30
-  },
-
-  {
-    id: 5,
-    type: "سنجاب",
-    name: "سنجاب",
     rarity: RARITIES.COMMON,
     price: 0,
 
@@ -201,10 +154,52 @@ const PETS = [
       health: 19
     },
 
+    emoji: "🐰",
+
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
+  },
+
+  {
+    id: 4,
+    type: "هامستر",
+    name: "هامستر",
+    rarity: RARITIES.COMMON,
+    price: 0,
+
+    basePower: 8,
+    baseHealth: 90,
+
+    growth: {
+      power: 4,
+      health: 18
+    },
+
+    emoji: "🐹",
+
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
+  },
+
+  {
+    id: 5,
+    type: "سنجاب",
+    name: "سنجاب",
+    rarity: RARITIES.COMMON,
+    price: 0,
+
+    basePower: 10,
+    baseHealth: 100,
+
+    growth: {
+      power: 5,
+      health: 20
+    },
+
     emoji: "🐿️",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
   {
@@ -214,18 +209,18 @@ const PETS = [
     rarity: RARITIES.COMMON,
     price: 0,
 
-    basePower: 6,
-    baseHealth: 75,
+    basePower: 7,
+    baseHealth: 80,
 
     growth: {
       power: 4,
-      health: 15
+      health: 16
     },
 
     emoji: "🦋",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
   {
@@ -235,8 +230,8 @@ const PETS = [
     rarity: RARITIES.COMMON,
     price: 0,
 
-    basePower: 5,
-    baseHealth: 120,
+    basePower: 6,
+    baseHealth: 125,
 
     growth: {
       power: 4,
@@ -245,8 +240,8 @@ const PETS = [
 
     emoji: "🐌",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
   {
@@ -256,18 +251,18 @@ const PETS = [
     rarity: RARITIES.COMMON,
     price: 0,
 
-    basePower: 7,
-    baseHealth: 85,
+    basePower: 8,
+    baseHealth: 90,
 
     growth: {
       power: 4,
-      health: 17
+      health: 18
     },
 
     emoji: "🐟",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
   {
@@ -275,7 +270,7 @@ const PETS = [
     type: "قنفذ",
     name: "قنفذ",
     rarity: RARITIES.COMMON,
-    price: 1800,
+    price: 1200,
 
     basePower: 18,
     baseHealth: 130,
@@ -287,21 +282,21 @@ const PETS = [
 
     emoji: "🦔",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
 
-  /* =========================
+  /* ==========================================================
    * غير شائع
-   * ========================= */
+   * ========================================================== */
 
   {
     id: 9,
     type: "ثعلب",
     name: "ثعلب",
     rarity: RARITIES.UNCOMMON,
-    price: 500,
+    price: 5000,
 
     basePower: 25,
     baseHealth: 150,
@@ -313,8 +308,8 @@ const PETS = [
 
     emoji: "🦊",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
   {
@@ -322,7 +317,7 @@ const PETS = [
     type: "باندا",
     name: "باندا",
     rarity: RARITIES.UNCOMMON,
-    price: 1500,
+    price: 7000,
 
     basePower: 30,
     baseHealth: 190,
@@ -334,8 +329,8 @@ const PETS = [
 
     emoji: "🐼",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
   {
@@ -343,7 +338,7 @@ const PETS = [
     type: "ببغاء",
     name: "ببغاء",
     rarity: RARITIES.UNCOMMON,
-    price: 2500,
+    price: 8500,
 
     basePower: 32,
     baseHealth: 160,
@@ -355,8 +350,8 @@ const PETS = [
 
     emoji: "🦜",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
   {
@@ -364,7 +359,7 @@ const PETS = [
     type: "سلحفاة",
     name: "سلحفاة",
     rarity: RARITIES.UNCOMMON,
-    price: 1800,
+    price: 7500,
 
     basePower: 28,
     baseHealth: 230,
@@ -376,8 +371,8 @@ const PETS = [
 
     emoji: "🐢",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
   {
@@ -385,7 +380,7 @@ const PETS = [
     type: "بطريق",
     name: "بطريق",
     rarity: RARITIES.UNCOMMON,
-    price: 2200,
+    price: 6500,
 
     basePower: 25,
     baseHealth: 170,
@@ -397,8 +392,8 @@ const PETS = [
 
     emoji: "🐧",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
   {
@@ -406,7 +401,7 @@ const PETS = [
     type: "كوالا",
     name: "كوالا",
     rarity: RARITIES.UNCOMMON,
-    price: 2800,
+    price: 8000,
 
     basePower: 27,
     baseHealth: 180,
@@ -418,8 +413,8 @@ const PETS = [
 
     emoji: "🐨",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
   {
@@ -427,7 +422,7 @@ const PETS = [
     type: "غراب",
     name: "غراب",
     rarity: RARITIES.UNCOMMON,
-    price: 3000,
+    price: 9000,
 
     basePower: 35,
     baseHealth: 165,
@@ -439,21 +434,21 @@ const PETS = [
 
     emoji: "🐦‍⬛",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
 
-  /* =========================
+  /* ==========================================================
    * نادر
-   * ========================= */
+   * ========================================================== */
 
   {
     id: 16,
     type: "ذئب",
     name: "ذئب",
     rarity: RARITIES.RARE,
-    price: 4000,
+    price: 15000,
 
     basePower: 35,
     baseHealth: 220,
@@ -465,8 +460,8 @@ const PETS = [
 
     emoji: "🐺",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
   {
@@ -474,7 +469,7 @@ const PETS = [
     type: "حصان",
     name: "حصان",
     rarity: RARITIES.RARE,
-    price: 5000,
+    price: 20000,
 
     basePower: 55,
     baseHealth: 280,
@@ -486,8 +481,8 @@ const PETS = [
 
     emoji: "🐴",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
   {
@@ -495,7 +490,7 @@ const PETS = [
     type: "نمر",
     name: "نمر",
     rarity: RARITIES.RARE,
-    price: 6000,
+    price: 22000,
 
     basePower: 50,
     baseHealth: 260,
@@ -507,8 +502,8 @@ const PETS = [
 
     emoji: "🐯",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
   {
@@ -516,7 +511,7 @@ const PETS = [
     type: "أسد",
     name: "أسد",
     rarity: RARITIES.RARE,
-    price: 7000,
+    price: 25000,
 
     basePower: 60,
     baseHealth: 300,
@@ -528,8 +523,8 @@ const PETS = [
 
     emoji: "🦁",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
   {
@@ -537,7 +532,7 @@ const PETS = [
     type: "دب",
     name: "دب",
     rarity: RARITIES.RARE,
-    price: 7500,
+    price: 28000,
 
     basePower: 65,
     baseHealth: 350,
@@ -549,21 +544,21 @@ const PETS = [
 
     emoji: "🐻",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
 
-  /* =========================
+  /* ==========================================================
    * ملحمي
-   * ========================= */
+   * ========================================================== */
 
   {
     id: 21,
     type: "غزال",
     name: "غزال",
     rarity: RARITIES.EPIC,
-    price: 8000,
+    price: 35000,
 
     basePower: 45,
     baseHealth: 260,
@@ -575,8 +570,8 @@ const PETS = [
 
     emoji: "🦌",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
   {
@@ -584,7 +579,7 @@ const PETS = [
     type: "نسر",
     name: "نسر",
     rarity: RARITIES.EPIC,
-    price: 9000,
+    price: 45000,
 
     basePower: 70,
     baseHealth: 300,
@@ -596,8 +591,8 @@ const PETS = [
 
     emoji: "🦅",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
   {
@@ -605,7 +600,7 @@ const PETS = [
     type: "بومة",
     name: "بومة",
     rarity: RARITIES.EPIC,
-    price: 9500,
+    price: 42000,
 
     basePower: 58,
     baseHealth: 290,
@@ -617,8 +612,8 @@ const PETS = [
 
     emoji: "🦉",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
   {
@@ -626,7 +621,7 @@ const PETS = [
     type: "غوريلا",
     name: "غوريلا",
     rarity: RARITIES.EPIC,
-    price: 10000,
+    price: 55000,
 
     basePower: 85,
     baseHealth: 430,
@@ -638,8 +633,8 @@ const PETS = [
 
     emoji: "🦍",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
   {
@@ -647,7 +642,7 @@ const PETS = [
     type: "فهد",
     name: "فهد",
     rarity: RARITIES.EPIC,
-    price: 11000,
+    price: 60000,
 
     basePower: 88,
     baseHealth: 360,
@@ -659,8 +654,8 @@ const PETS = [
 
     emoji: "🐆",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
   {
@@ -668,7 +663,7 @@ const PETS = [
     type: "تمساح",
     name: "تمساح",
     rarity: RARITIES.EPIC,
-    price: 10500,
+    price: 58000,
 
     basePower: 78,
     baseHealth: 450,
@@ -680,8 +675,8 @@ const PETS = [
 
     emoji: "🐊",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
   {
@@ -689,7 +684,7 @@ const PETS = [
     type: "قرش",
     name: "قرش",
     rarity: RARITIES.EPIC,
-    price: 12000,
+    price: 65000,
 
     basePower: 82,
     baseHealth: 420,
@@ -701,8 +696,8 @@ const PETS = [
 
     emoji: "🦈",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
   {
@@ -710,7 +705,7 @@ const PETS = [
     type: "حوت",
     name: "حوت",
     rarity: RARITIES.EPIC,
-    price: 13000,
+    price: 75000,
 
     basePower: 90,
     baseHealth: 600,
@@ -722,8 +717,8 @@ const PETS = [
 
     emoji: "🐋",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
   {
@@ -731,7 +726,7 @@ const PETS = [
     type: "زرافة",
     name: "زرافة",
     rarity: RARITIES.EPIC,
-    price: 11500,
+    price: 52000,
 
     basePower: 65,
     baseHealth: 380,
@@ -743,8 +738,8 @@ const PETS = [
 
     emoji: "🦒",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
   {
@@ -752,7 +747,7 @@ const PETS = [
     type: "شمبانزي",
     name: "شمبانزي",
     rarity: RARITIES.EPIC,
-    price: 8500,
+    price: 40000,
 
     basePower: 55,
     baseHealth: 300,
@@ -764,21 +759,21 @@ const PETS = [
 
     emoji: "🐒",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
 
-  /* =========================
+  /* ==========================================================
    * أسطوري
-   * ========================= */
+   * ========================================================== */
 
   {
     id: 31,
     type: "وحيد القرن",
     name: "وحيد القرن",
     rarity: RARITIES.LEGENDARY,
-    price: 15000,
+    price: 100000,
 
     basePower: 105,
     baseHealth: 650,
@@ -790,8 +785,8 @@ const PETS = [
 
     emoji: "🦏",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
   {
@@ -799,7 +794,7 @@ const PETS = [
     type: "فيل",
     name: "فيل",
     rarity: RARITIES.LEGENDARY,
-    price: 16000,
+    price: 120000,
 
     basePower: 110,
     baseHealth: 800,
@@ -811,8 +806,8 @@ const PETS = [
 
     emoji: "🐘",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
   {
@@ -820,7 +815,7 @@ const PETS = [
     type: "صقر",
     name: "صقر",
     rarity: RARITIES.LEGENDARY,
-    price: 14000,
+    price: 95000,
 
     basePower: 95,
     baseHealth: 450,
@@ -832,8 +827,8 @@ const PETS = [
 
     emoji: "🦅",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
   {
@@ -841,7 +836,7 @@ const PETS = [
     type: "وحش أسطوري",
     name: "وحش أسطوري",
     rarity: RARITIES.LEGENDARY,
-    price: 20000,
+    price: 180000,
 
     basePower: 150,
     baseHealth: 900,
@@ -853,42 +848,21 @@ const PETS = [
 
     emoji: "👹",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
 
-  /* =========================
+  /* ==========================================================
    * خرافي
-   * ========================= */
-
-  {
-    id: 35,
-    type: "تنين",
-    name: "تنين",
-    rarity: RARITIES.MYTHICAL,
-    price: 30000,
-
-    basePower: 150,
-    baseHealth: 1000,
-
-    growth: {
-      power: 38,
-      health: 200
-    },
-
-    emoji: "🐉",
-
-    maxLevel: 100,
-    specialImageLevel: 30
-  },
+   * ========================================================== */
 
   {
     id: 36,
     type: "يونيكورن",
     name: "يونيكورن",
     rarity: RARITIES.MYTHICAL,
-    price: 25000,
+    price: 300000,
 
     basePower: 140,
     baseHealth: 850,
@@ -900,8 +874,8 @@ const PETS = [
 
     emoji: "🦄",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
   {
@@ -909,7 +883,7 @@ const PETS = [
     type: "كراكن",
     name: "كراكن",
     rarity: RARITIES.MYTHICAL,
-    price: 40000,
+    price: 450000,
 
     basePower: 180,
     baseHealth: 1200,
@@ -921,21 +895,42 @@ const PETS = [
 
     emoji: "🐙",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   },
 
 
-  /* =========================
+  /* ==========================================================
    * سماوية
-   * ========================= */
+   * ========================================================== */
+
+  {
+    id: 35,
+    type: "تنين",
+    name: "تنين",
+    rarity: RARITIES.CELESTIAL,
+    price: 1000000000,
+
+    basePower: 250,
+    baseHealth: 1800,
+
+    growth: {
+      power: 65,
+      health: 350
+    },
+
+    emoji: "🐉",
+
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
+  },
 
   {
     id: 39,
     type: "عنقاء",
     name: "عنقاء",
     rarity: RARITIES.CELESTIAL,
-    price: 10000000000000,
+    price: 10000000000,
 
     basePower: 300,
     baseHealth: 2000,
@@ -947,20 +942,17 @@ const PETS = [
 
     emoji: "🔥",
 
-    maxLevel: 100,
-    specialImageLevel: 30
+    maxLevel: MAX_LEVEL,
+    specialImageLevel: SPECIAL_IMAGE_LEVEL
   }
 
 ];
 
 
 /* ============================================================
- * دوال الوصول إلى البيانات
+ * البحث عن الحيوانات
  * ============================================================ */
 
-/**
- * الحصول على حيوان بواسطة ID
- */
 function getPetByID(id) {
   return PETS.find(
     pet => pet.id === Number(id)
@@ -968,9 +960,6 @@ function getPetByID(id) {
 }
 
 
-/**
- * الحصول على حيوان بواسطة النوع
- */
 function getPetByType(type) {
   if (!type) return null;
 
@@ -984,9 +973,6 @@ function getPetByType(type) {
 }
 
 
-/**
- * الحصول على جميع الحيوانات حسب الندرة
- */
 function getPetsByRarity(rarity) {
   return PETS.filter(
     pet => pet.rarity === rarity
@@ -994,81 +980,88 @@ function getPetsByRarity(rarity) {
 }
 
 
-/**
- * الحصول على رقم الندرة
- *
- * مثال:
- * شائع = 0
- * غير شائع = 1
- * ...
- * سماوية = 6
- */
+/* ============================================================
+ * نظام الندرات
+ * ============================================================ */
+
 function getRarityLevel(rarity) {
   return RARITY_ORDER.indexOf(rarity);
 }
 
 
-/**
- * التحقق من وجود ندرة
- */
 function isValidRarity(rarity) {
   return RARITY_ORDER.includes(rarity);
 }
 
 
-/**
- * الحصول على أعلى ندرة
- */
 function getHighestRarity() {
-  return RARITY_ORDER[RARITY_ORDER.length - 1];
+  return RARITY_ORDER[
+    RARITY_ORDER.length - 1
+  ];
 }
 
 
-/**
- * حساب القوة الأساسية حسب المستوى
- *
- * هذه الدالة مخصصة لاستخدام leveling.js لاحقًا.
- *
- * المستوى 1 = القوة الأساسية
- * كل مستوى بعده يضيف growth.power
- */
-function calculatePower(pet, level = 1) {
+/* ============================================================
+ * حساب القوة
+ * ============================================================ */
+
+function calculatePower(pet, level = 0) {
   if (!pet) return 0;
 
-  level = Math.max(1, Number(level));
+  level = Number(level);
+
+  if (!Number.isFinite(level)) {
+    level = 0;
+  }
+
+  level = Math.max(
+    0,
+    Math.min(level, pet.maxLevel)
+  );
 
   return Math.floor(
     pet.basePower +
-    ((level - 1) * pet.growth.power)
+    (level * pet.growth.power)
   );
 }
 
 
-/**
- * حساب الصحة الأساسية حسب المستوى
- *
- * المستوى 1 = الصحة الأساسية
- * كل مستوى بعده يضيف growth.health
- */
-function calculateHealth(pet, level = 1) {
+/* ============================================================
+ * حساب الصحة
+ * ============================================================ */
+
+function calculateHealth(pet, level = 0) {
   if (!pet) return 0;
 
-  level = Math.max(1, Number(level));
+  level = Number(level);
+
+  if (!Number.isFinite(level)) {
+    level = 0;
+  }
+
+  level = Math.max(
+    0,
+    Math.min(level, pet.maxLevel)
+  );
 
   return Math.floor(
     pet.baseHealth +
-    ((level - 1) * pet.growth.health)
+    (level * pet.growth.health)
   );
 }
 
 
-/**
- * معرفة هل الحيوان وصل لمستوى الصورة الخاصة
- */
-function hasSpecialImage(pet, level = 1) {
+/* ============================================================
+ * الصورة الخاصة
+ * ============================================================ */
+
+function hasSpecialImage(pet, level = 0) {
   if (!pet) return false;
 
-  return Number(level) >= pet.specialImageLevel;
+  return (
+    Number(level) >=
+    pet.specialImageLevel
+  );
 }
 
 
@@ -1081,6 +1074,10 @@ module.exports = {
 
   RARITIES,
   RARITY_ORDER,
+
+  MAX_LEVEL,
+  MAX_STARS,
+  SPECIAL_IMAGE_LEVEL,
 
   getPetByID,
   getPetByType,
