@@ -1,3 +1,4 @@
+
 module.exports.config = {
   name: "حيوان",
   version: "12.0.0",
@@ -3151,12 +3152,113 @@ async function ({
           messageID
         );
       }
+      
+            // ======================================================
+//     العلاج 
+      // ======================================================
 
-      return api.sendMessage(
+      if (
+        choice === 4
+      ) {
+        const currency =
+          await getPetCurrency(
+            PetCurrency,
+            senderID
+          );
+
+        const data =
+          getCurrencyData(
+            currency
+          );
+
+        const medicine =
+          Number(
+            data.medicine || 0
+          );
+
+        const health =
+          Number(
+            pet.health ?? 100
+          );
+
+        if (
+          health >= 100
+        ) {
+          return api.sendMessage(
+            "❌ صحة الحيوان ممتلئة بالفعل.",
+            threadID,
+            messageID
+          );
+        }
+
+        if (
+          medicine <= 0
+        ) {
+          return api.sendMessage(
+            "❌ لا تملك دواءً.\n\n" +
+            "يمكنك شراء الدواء من متجر الحيوانات.",
+            threadID,
+            messageID
+          );
+        }
+
+        const newHealth =
+          Math.min(
+            100,
+            health + 30
+          );
+
+        const hunger =
+          Number(
+            pet.hunger ?? 100
+          );
+
+        const status =
+          calculatePetState(
+            newHealth,
+            hunger
+          );
+
+        await pet.update({
+          health:
+            newHealth,
+
+          status
+        });
+
+        data.medicine =
+          medicine - 1;
+
+        await updateCurrencyData(
+          currency,
+          {
+            medicine:
+              data.medicine
+          }
+        );
+
+        removeReply(
+          handleReply
+        );
+
+        return api.sendMessage(
+          "💊 تم علاج الحيوان\n\n" +
+          `🐾 الحيوان: ${pet.name}\n` +
+          `❤️ الصحة: ${newHealth}/100\n` +
+          `🍖 الشبع: ${hunger}/100\n` +
+          `📦 الدواء المتبقي: ${data.medicine}\n` +
+          `الحالة: ${status}`,
+          threadID,
+          messageID
+        );
+      }
+
+            return api.sendMessage(
         "❌ الاختيار غير صحيح.\n\n" +
         "1. بيع الحيوان\n" +
         "2. إطعام الحيوان\n" +
-        "3. تدريب الحيوان",
+        "3. تدريب الحيوان\n" +
+        "4. علاج الحيوان",
         threadID,
         messageID
       );
