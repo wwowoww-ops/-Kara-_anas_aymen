@@ -3612,10 +3612,26 @@ if (
   ) {
     return api.sendMessage(
       "❌ الاختيار غير صحيح.\n\n" +
-
       "1. تصدر القوة والمستوى\n" +
       "2. تصدر العملات",
+      threadID,
+      messageID
+    );
+  }
 
+  // ======================================================
+  // جلب Users
+  // ======================================================
+
+  const Users =
+    getModel(
+      models,
+      "Users"
+    );
+
+  if (!Users) {
+    return api.sendMessage(
+      "❌ تعذر الوصول إلى بيانات المستخدمين.",
       threadID,
       messageID
     );
