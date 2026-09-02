@@ -2108,6 +2108,32 @@ const Users =
     const lower =
       rawArgs.toLowerCase();
 
+// ========================================================
+// الحقيبة
+// ========================================================
+
+if (
+  lower === "حقيبة" ||
+  lower === "bag"
+) {
+  const currency =
+    await getPetCurrency(
+      PetCurrency,
+      senderID
+    );
+
+  const data =
+    getCurrencyData(
+      currency
+    );
+
+  return api.sendMessage(
+    getPetBag(data),
+    threadID,
+    messageID
+  );
+}
+
     // ========================================================
     // الرصيد
     // ========================================================
