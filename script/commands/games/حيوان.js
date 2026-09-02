@@ -2896,438 +2896,301 @@ async function ({
     );
   }
 }
-    // ========================================================
-    // إجراءات الحيوان
-    // ========================================================
+ // ========================================================
+// إجراءات الحيوان
+// ========================================================
+
+if (
+  handleReply.type ===
+  "pet_actions"
+) {
+  let pet =
+    await Pets.findOne({
+      where: {
+        userID:
+          String(senderID)
+      }
+    });
+
+  if (!pet) {
+    removeReply(handleReply);
+
+    return api.sendMessage(
+      "❌ لا تملك حيوانًا.",
+      threadID,
+      messageID
+    );
+  }
+
+  pet =
+    await updatePetOverTime(
+      pet
+    );
+
+  const choice =
+    Number(input);
+
+  // ======================================================
+  // البيع
+  // ======================================================
+
+  if (
+    choice === 1
+  ) {
+    const data =
+      pet.toJSON();
+
+    const sellPrice =
+      getSellPrice(
+        data
+      );
+
+    const found =
+      getPetByType(
+        data.type
+      );
+
+    const sent =
+      await sendReply(
+        api,
+
+        "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+
+        `${found?.emoji || "🐾"} ${data.name}\n\n` +
+
+        `القوة: ${data.power}\n` +
+        `المستوى: ${data.level}\n` +
+        `قيمة البيع: ${sellPrice} عملة\n\n` +
+
+        "هل تريد بيع حيوانك؟\n\n" +
+
+        "نعم\n" +
+        "لا",
+
+        threadID,
+        messageID
+      );
+
+    if (sent?.messageID) {
+      removeReply(handleReply);
+
+      addReply({
+        name:
+          module.exports.config.name,
+
+        messageID:
+          sent.messageID,
+
+        author:
+          String(senderID),
+
+        type:
+          "pet_sell_confirm"
+      });
+    }
+
+    return;
+  }
+
+  // ======================================================
+  // التدريب
+  // ======================================================
+
+  if (
+    choice === 2
+  ) {
+    const remaining =
+      getRemainingCooldown(
+        pet.lastTrain,
+        TRAIN_COOLDOWN
+      );
 
     if (
-      handleReply.type ===
-      "pet_actions"
+      remaining > 0
     ) {
-      let pet =
-        await Pets.findOne({
-          where: {
-            userID:
-              String(senderID)
-          }
-        });
-
-      if (!pet) {
-        removeReply(handleReply);
-
-        return api.sendMessage(
-          "❌ لا تملك حيوانًا.",
-          threadID,
-          messageID
-        );
-      }
-
-      pet =
-        await updatePetOverTime(
-          pet
-        );
-
-      const choice =
-        Number(input);
-
-      // ======================================================
-      // البيع
-      // ======================================================
-
-      if (
-        choice === 1
-      ) {
-        const data =
-          pet.toJSON();
-
-        const sellPrice =
-          getSellPrice(
-            data
-          );
-
-        const found =
-          getPetByType(
-            data.type
-          );
-
-        const sent =
-          await sendReply(
-            api,
-
-            "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
-
-            `${found?.emoji || "🐾"} ${data.name}\n\n` +
-
-            `القوة: ${data.power}\n` +
-            `المستوى: ${data.level}\n` +
-            `قيمة البيع: ${sellPrice} عملة\n\n` +
-
-            "هل تريد بيع حيوانك؟\n\n" +
-
-            "نعم\n" +
-            "لا",
-
-            threadID,
-            messageID
-          );
-
-        if (sent?.messageID) {
-          removeReply(handleReply);
-
-          addReply({
-            name:
-              module.exports.config.name,
-
-            messageID:
-              sent.messageID,
-
-            author:
-              String(senderID),
-
-            type:
-              "pet_sell_confirm"
-          });
-        }
-
-        return;
-      }
-
-      // ======================================================
-      // الإطعام
-      // ======================================================
-
-      if (
-        choice === 2
-      ) {
-        const currency =
-          await getPetCurrency(
-            PetCurrency,
-            senderID
-          );
-
-        const data =
-          getCurrencyData(
-            currency
-          );
-
-        const food =
-          Number(
-            data.food || 0
-          );
-
-        if (food <= 0) {
-          return api.sendMessage(
-            "❌ لا تملك طعامًا.\n\n" +
-            "يمكنك شراء الطعام من حيوان متجر.",
-            threadID,
-            messageID
-          );
-        }
-
-        const hunger =
-          Number(
-            pet.hunger ?? 100
-          );
-
-        const newHunger =
-          Math.min(
-            100,
-            hunger + 30
-          );
-
-        const health =
-          Number(
-            pet.health ?? 100
-          );
-
-        const status =
-          calculatePetState(
-            health,
-            newHunger
-          );
-
-        await pet.update({
-          hunger:
-            newHunger,
-          status
-        });
-
-        data.food =
-          food - 1;
-
-        await updateCurrencyData(
-          currency,
-          {
-            food:
-              data.food
-          }
-        );
-
-        removeReply(handleReply);
-
-        return api.sendMessage(
-          "🍖 تم إطعام الحيوان\n\n" +
-
-          `🐾 الحيوان: ${pet.name}\n` +
-          `🍖 الشبع: ${newHunger}/100\n` +
-          `❤️ الصحة: ${health}/100\n` +
-          `📦 الطعام المتبقي: ${data.food}\n` +
-          `الحالة: ${status}`,
-
-          threadID,
-          messageID
-        );
-      }
-
-      // ======================================================
-      // التدريب
-      // ======================================================
-
-      if (
-        choice === 3
-      ) {
-        const remaining =
-          getRemainingCooldown(
-            pet.lastTrain,
-            TRAIN_COOLDOWN
-          );
-
-        if (
-          remaining > 0
-        ) {
-          return api.sendMessage(
-            "❌ حيوانك يحتاج إلى الراحة.\n\n" +
-            `⏳ الوقت المتبقي: ${
-              formatTime(remaining)
-            }`,
-            threadID,
-            messageID
-          );
-        }
-
-        const currentLevel =
-          Number(
-            pet.level || 1
-          );
-
-        const currentExp =
-          Number(
-            pet.exp || 0
-          );
-
-        const currentPower =
-          Number(
-            pet.power || 0
-          );
-
-        let newLevel =
-          currentLevel;
-
-        let newExp =
-          currentExp + TRAIN_XP;
-
-        let newPower =
-          currentPower;
-
-        let levelsGained = 0;
-
-        while (
-          newExp >=
-          newLevel * 100
-        ) {
-          newExp -=
-            newLevel * 100;
-
-          newLevel++;
-
-          levelsGained++;
-
-          newPower +=
-            POWER_PER_LEVEL;
-        }
-
-        const newHunger =
-          Math.max(
-            0,
-            Number(
-              pet.hunger ?? 100
-            ) - 10
-          );
-
-        const health =
-          Number(
-            pet.health ?? 100
-          );
-
-        const status =
-          calculatePetState(
-            health,
-            newHunger
-          );
-
-        await pet.update({
-          exp:
-            newExp,
-
-          level:
-            newLevel,
-
-          power:
-            newPower,
-
-          hunger:
-            newHunger,
-
-          status,
-
-          lastTrain:
-            new Date()
-        });
-
-        removeReply(handleReply);
-
-        let message =
-          "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
-
-          `تم تدريب ${pet.name}\n\n` +
-
-          `+${TRAIN_XP} XP\n` +
-          `XP: ${newExp}/${newLevel * 100}\n` +
-          `المستوى: ${newLevel}\n` +
-          `القوة: ${newPower}\n` +
-          `الشبع: ${newHunger}/100\n` +
-          `الحالة: ${status}\n\n` +
-
-          "⏳ التدريب القادم بعد 30 دقيقة.";
-
-        if (
-          levelsGained > 0
-        ) {
-          message +=
-            "\n\n" +
-            `ارتفع المستوى إلى ${newLevel}!\n` +
-            `+${levelsGained * POWER_PER_LEVEL} قوة`;
-        }
-
-        return api.sendMessage(
-          message,
-          threadID,
-          messageID
-        );
-      }
-      
-            // ======================================================
-//     العلاج 
-      // ======================================================
-
-      if (
-        choice === 4
-      ) {
-        const currency =
-          await getPetCurrency(
-            PetCurrency,
-            senderID
-          );
-
-        const data =
-          getCurrencyData(
-            currency
-          );
-
-        const medicine =
-          Number(
-            data.medicine || 0
-          );
-
-        const health =
-          Number(
-            pet.health ?? 100
-          );
-
-        if (
-          health >= 100
-        ) {
-          return api.sendMessage(
-            "❌ صحة الحيوان ممتلئة بالفعل.",
-            threadID,
-            messageID
-          );
-        }
-
-        if (
-          medicine <= 0
-        ) {
-          return api.sendMessage(
-            "❌ لا تملك دواءً.\n\n" +
-            "يمكنك شراء الدواء من متجر الحيوانات.",
-            threadID,
-            messageID
-          );
-        }
-
-        const newHealth =
-          Math.min(
-            100,
-            health + 30
-          );
-
-        const hunger =
-          Number(
-            pet.hunger ?? 100
-          );
-
-        const status =
-          calculatePetState(
-            newHealth,
-            hunger
-          );
-
-        await pet.update({
-          health:
-            newHealth,
-
-          status
-        });
-
-        data.medicine =
-          medicine - 1;
-
-        await updateCurrencyData(
-          currency,
-          {
-            medicine:
-              data.medicine
-          }
-        );
-
-        removeReply(
-          handleReply
-        );
-
-        return api.sendMessage(
-          "💊 تم علاج الحيوان\n\n" +
-          `🐾 الحيوان: ${pet.name}\n` +
-          `❤️ الصحة: ${newHealth}/100\n` +
-          `🍖 الشبع: ${hunger}/100\n` +
-          `📦 الدواء المتبقي: ${data.medicine}\n` +
-          `الحالة: ${status}`,
-          threadID,
-          messageID
-        );
-      }
-
-            return api.sendMessage(
-        "❌ الاختيار غير صحيح.\n\n" +
-        "1. بيع الحيوان\n" +
-        "2. إطعام الحيوان\n" +
-        "3. تدريب الحيوان\n" +
-        "4. علاج الحيوان",
+      return api.sendMessage(
+        "❌ حيوانك يحتاج إلى الراحة.\n\n" +
+        `⏳ الوقت المتبقي: ${
+          formatTime(remaining)
+        }`,
         threadID,
         messageID
       );
     }
 
-    // ========================================================
+    const currentLevel =
+      Number(
+        pet.level || 1
+      );
+
+    const currentExp =
+      Number(
+        pet.exp || 0
+      );
+
+    const currentPower =
+      Number(
+        pet.power || 0
+      );
+
+    let newLevel =
+      currentLevel;
+
+    let newExp =
+      currentExp + TRAIN_XP;
+
+    let newPower =
+      currentPower;
+
+    let levelsGained = 0;
+
+    while (
+      newExp >=
+      newLevel * 100
+    ) {
+      newExp -=
+        newLevel * 100;
+
+      newLevel++;
+
+      levelsGained++;
+
+      newPower +=
+        POWER_PER_LEVEL;
+    }
+
+    const newHunger =
+      Math.max(
+        0,
+        Number(
+          pet.hunger ?? 100
+        ) - 10
+      );
+
+    const health =
+      Number(
+        pet.health ?? 100
+      );
+
+    const status =
+      calculatePetState(
+        health,
+        newHunger
+      );
+
+    await pet.update({
+      exp:
+        newExp,
+
+      level:
+        newLevel,
+
+      power:
+        newPower,
+
+      hunger:
+        newHunger,
+
+      status,
+
+      lastTrain:
+        new Date()
+    });
+
+    removeReply(handleReply);
+
+    let message =
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+
+      `تم تدريب ${pet.name}\n\n` +
+
+      `+${TRAIN_XP} XP\n` +
+      `XP: ${newExp}/${newLevel * 100}\n` +
+      `المستوى: ${newLevel}\n` +
+      `القوة: ${newPower}\n` +
+      `الشبع: ${newHunger}/100\n` +
+      `الحالة: ${status}\n\n` +
+
+      "⏳ التدريب القادم بعد 30 دقيقة.";
+
+    if (
+      levelsGained > 0
+    ) {
+      message +=
+        "\n\n" +
+        `ارتفع المستوى إلى ${newLevel}!\n` +
+        `+${levelsGained * POWER_PER_LEVEL} قوة`;
+    }
+
+    return api.sendMessage(
+      message,
+      threadID,
+      messageID
+    );
+  }
+
+  // ======================================================
+  // الحقيبة
+  // ======================================================
+
+  if (
+    choice === 3
+  ) {
+    const currency =
+      await getPetCurrency(
+        PetCurrency,
+        senderID
+      );
+
+    const data =
+      getCurrencyData(
+        currency
+      );
+
+    removeReply(handleReply);
+
+    const sent =
+      await sendReply(
+        api,
+        getPetBag(data),
+        threadID,
+        messageID
+      );
+
+    if (sent?.messageID) {
+      addReply({
+        name:
+          module.exports.config.name,
+
+        messageID:
+          sent.messageID,
+
+        author:
+          String(senderID),
+
+        type:
+          "pet_bag"
+      });
+    }
+
+    return;
+  }
+
+  // ======================================================
+  // اختيار غير صحيح
+  // ======================================================
+
+  return api.sendMessage(
+    "❌ الاختيار غير صحيح.\n\n" +
+    "1. بيع الحيوان\n" +
+    "2. تدريب الحيوان\n" +
+    "3. الحقيبة",
+    threadID,
+    messageID
+  );
+}    
+
+// ========================================================
     // تأكيد البيع
     // ========================================================
 
