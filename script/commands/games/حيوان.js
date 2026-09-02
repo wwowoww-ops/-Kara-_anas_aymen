@@ -1929,59 +1929,180 @@ async function getLeaderboard(
   api,
   Pets,
   PetCurrency,
-  Users
+  Users,
+  type = null
 ) {
-  const pets =
-    await Pets.findAll({
-      order: [
-        ["level", "DESC"],
-        ["power", "DESC"]
-      ]
-    });
 
-  /*
-   * المطور مستبعد بالكامل من ترتيب أعلى 10
-   */
+  // ==========================================================
+  // قائمة اختيار نوع التصدر
+  // ==========================================================
+
+  if (!type) {
+    return (
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
+
+      "🏆 تصدر الحيوانات\n\n" +
+
+      "اختر نوع التصدر بالرد برقم:\n\n" +
+
+      "1. تصدر القوة والمستوى\n" +
+      "2. تصدر العملات"
+    );
+  }
+
+  // ==========================================================
+  // جلب الحيوانات
+  // ==========================================================
+
+  const pets =
+    await Pets.findAll();
+
+  // ==========================================================
+  // استبعاد المطور من الترتيب
+  // ==========================================================
 
   const normalPets =
     pets.filter(
       pet =>
         String(pet.userID) !==
-        DEVELOPER_ID
+        String(DEVELOPER_ID)
     );
 
-  const top10 =
-    normalPets.slice(0, 10);
+  let top10 = [];
+
+  // ==========================================================
+  // تصدر القوة والمستوى
+  // ==========================================================
+
+  if (
+    type === "power"
+  ) {
+    top10 =
+      normalPets
+        .sort(
+          (a, b) => {
+
+            const powerA =
+              Number(a.power || 0);
+
+            const powerB =
+              Number(b.power || 0);
+
+            if (
+              powerB !== powerA
+            ) {
+              return powerB - powerA;
+            }
+
+            const levelA =
+              Number(a.level || 1);
+
+            const levelB =
+              Number(b.level || 1);
+
+            return levelB - levelA;
+          }
+        )
+        .slice(0, 10);
+  }
+
+  // ==========================================================
+  // تصدر العملات
+  // ==========================================================
+
+  if (
+    type === "money"
+  ) {
+    const currencies =
+      await PetCurrency.findAll();
+
+    const moneyMap =
+      new Map();
+
+    for (
+      const currency of currencies
+    ) {
+      moneyMap.set(
+        String(currency.userID),
+        Number(currency.money || 0)
+      );
+    }
+
+    top10 =
+      normalPets
+        .map(
+          pet => ({
+            pet,
+            money:
+              moneyMap.get(
+                String(pet.userID)
+              ) || 0
+          })
+        )
+        .sort(
+          (a, b) =>
+            b.money - a.money
+        )
+        .slice(0, 10);
+  }
+
+  // ==========================================================
+  // بداية الرسالة
+  // ==========================================================
 
   let text =
     "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n";
 
-  text +=
-    "🏆 أعلى 10 متصدرين\n\n";
+  if (
+    type === "power"
+  ) {
+    text +=
+      "🏆 تصدر القوة والمستوى\n\n";
+  }
 
-  if (!top10.length) {
+  if (
+    type === "money"
+  ) {
+    text +=
+      "💰 تصدر العملات\n\n";
+  }
+
+  // ==========================================================
+  // لا توجد بيانات
+  // ==========================================================
+
+  if (
+    !top10.length
+  ) {
     text +=
       "لا توجد بيانات حتى الآن.\n";
   }
+
+  // ==========================================================
+  // المتصدرون
+  // ==========================================================
 
   for (
     let i = 0;
     i < top10.length;
     i++
   ) {
-    const pet =
-      top10[i];
 
-    const currency =
-      await getPetCurrency(
-        PetCurrency,
-        pet.userID
-      );
+    let pet;
+    let money = 0;
 
-    const money =
-      Number(
-        currency.money || 0
-      );
+    if (
+      type === "money"
+    ) {
+      pet =
+        top10[i].pet;
+
+      money =
+        top10[i].money;
+    } else {
+      pet =
+        top10[i];
+    }
 
     const name =
       await getUserName(
@@ -1997,9 +2118,22 @@ async function getLeaderboard(
 
     text +=
       `${i + 1}. ${name}\n` +
-      `   الحيوان: ${found?.emoji || "🐾"} ${pet.name}\n` +
-      `   المستوى: ${Number(pet.level || 1)}\n` +
-      `   الرصيد: ${money} عملة\n\n`;
+      `   الحيوان: ${found?.emoji || "🐾"} ${pet.name}\n`;
+
+    if (
+      type === "power"
+    ) {
+      text +=
+        `   القوة: ${Number(pet.power || 0)}\n` +
+        `   المستوى: ${Number(pet.level || 1)}\n\n`;
+    }
+
+    if (
+      type === "money"
+    ) {
+      text +=
+        `   الرصيد: ${money} عملة\n\n`;
+    }
   }
 
   // ==========================================================
@@ -2010,7 +2144,7 @@ async function getLeaderboard(
     await Pets.findOne({
       where: {
         userID:
-          DEVELOPER_ID
+          String(DEVELOPER_ID)
       }
     });
 
@@ -2026,7 +2160,10 @@ async function getLeaderboard(
       DEVELOPER_ID
     );
 
-  if (developerPet) {
+  if (
+    developerPet
+  ) {
+
     const developerCurrency =
       await getPetCurrency(
         PetCurrency,
@@ -2045,10 +2182,25 @@ async function getLeaderboard(
 
     text +=
       `${developerName}\n` +
-      `الحيوان: ${developerFound?.emoji || "🐾"} ${developerPet.name}\n` +
-      `المستوى: ${Number(developerPet.level || 1)}\n` +
-      `الرصيد: ${developerMoney} عملة`;
+      `الحيوان: ${developerFound?.emoji || "🐾"} ${developerPet.name}\n`;
+
+    if (
+      type === "power"
+    ) {
+      text +=
+        `القوة: ${Number(developerPet.power || 0)}\n` +
+        `المستوى: ${Number(developerPet.level || 1)}`;
+    }
+
+    if (
+      type === "money"
+    ) {
+      text +=
+        `الرصيد: ${developerMoney} عملة`;
+    }
+
   } else {
+
     text +=
       `${developerName}\n` +
       "لا يملك حيوانًا حاليًا.";
@@ -3411,6 +3563,70 @@ if (
     "2. دواء الحيوان\n" +
     "3. درع الحماية",
 
+    threadID,
+    messageID
+  );
+}
+
+// ========================================================
+// اختيار نوع التصدر
+// ========================================================
+
+if (
+  handleReply.type ===
+  "leaderboard_choice"
+) {
+
+  const choice =
+    Number(input);
+
+  // ======================================================
+  // التحقق من الاختيار
+  // ======================================================
+
+  if (
+    choice !== 1 &&
+    choice !== 2
+  ) {
+    return api.sendMessage(
+      "❌ الاختيار غير صحيح.\n\n" +
+
+      "1. تصدر القوة والمستوى\n" +
+      "2. تصدر العملات",
+
+      threadID,
+      messageID
+    );
+  }
+
+  // ======================================================
+  // الحصول على نوع التصدر
+  // ======================================================
+
+  const leaderboardType =
+    choice === 1
+      ? "power"
+      : "money";
+
+  // ======================================================
+  // جلب التصدر
+  // ======================================================
+
+  const leaderboard =
+    await getLeaderboard(
+      api,
+      Pets,
+      PetCurrency,
+      Users,
+      leaderboardType
+    );
+
+  removeReply(
+    handleReply
+  );
+
+  return api.sendMessage(
+    leaderboard,
     threadID,
     messageID
   );
