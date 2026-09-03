@@ -1108,98 +1108,6 @@ function onBot({ models: botModel }) {
                             return;
                         }
 
-                        // ═══════════════════════════════════════════════
-// MENTION DEBUG - SAFE
-// ═══════════════════════════════════════════════
-
-try {
-
-    const botID =
-        String(
-            loginApiData.getCurrentUserID()
-        );
-
-    const senderID =
-        String(
-            message.senderID || ""
-        );
-
-    const body =
-        String(
-            message.body || ""
-        );
-
-    // نختبر فقط أمر زواج
-    // ونمنع رسائل البوت من الدخول في الاختبار
-    if (
-        senderID !== botID &&
-        body.startsWith(".زواج") &&
-        body.includes("@") &&
-        message.threadID
-    ) {
-
-        const mentions =
-            message.mentions || {};
-
-        const mentionIDs =
-            Object.keys(
-                mentions
-            );
-
-        let mentionList =
-            "لا يوجد منشن في event.mentions";
-
-        if (
-            mentionIDs.length > 0
-        ) {
-
-            mentionList =
-                mentionIDs
-                    .map(
-                        id =>
-                            `${id} => ${mentions[id]}`
-                    )
-                    .join("\n");
-
-        }
-
-        const debugMessage =
-`╭───〔 HINA MENTION DEBUG 〕───╮
-
-📝 الرسالة:
-${body}
-
-📌 النوع:
-${message.type || "غير معروف"}
-
-👤 المرسل:
-${senderID}
-
-🎯 event.mentions:
-${mentionList}
-
-🔢 عدد المنشن:
-${mentionIDs.length}
-
-🧩 المفاتيح الموجودة:
-${Object.keys(message).join(", ")}
-
-╰──────────────────────────────╯`;
-
-        await loginApiData.sendMessage(
-            debugMessage,
-            message.threadID
-        );
-    }
-
-} catch (debugError) {
-
-    console.error(
-        "❌ MENTION DEBUG ERROR:",
-        debugError
-    );
-
-}
                         // ═══════════════════════════
                         // HINA LISTENER
                         // ═══════════════════════════
@@ -1218,34 +1126,6 @@ ${Object.keys(message).join(", ")}
                                 ),
                                 listenerError
                             );
-
-                            try {
-
-                                if (
-                                    message.threadID
-                                ) {
-
-                                    await loginApiData.sendMessage(
-`╭───〔 HINA LISTENER ERROR 〕───╮
-
-❌ حدث خطأ أثناء معالجة الرسالة
-
-${listenerError.message || String(listenerError)}
-
-╰───────────────────────────────╯`,
-                                        message.threadID
-                                    );
-
-                                }
-
-                            } catch (sendError) {
-
-                                console.error(
-                                    "❌ LISTENER ERROR SEND FAILED:",
-                                    sendError
-                                );
-
-                            }
 
                         }
 
