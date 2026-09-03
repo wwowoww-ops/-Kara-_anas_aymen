@@ -3,11 +3,12 @@
 const pets = require("./pets");
 const leveling = require("./leveling");
 const stats = require("./stats");
+const stars = require("./stars");
 const Pdata = require("./Pdata");
 
 module.exports.config = {
   name: "تجربة",
-  version: "4.0.0",
+  version: "5.0.0",
   credits: "أبو هريرة",
   description: "اختبار نظام الحيوانات الجديد",
   commandCategory: "Games",
@@ -38,7 +39,7 @@ module.exports.run = async function ({ api, event, models }) {
     );
 
     /* =========================
-       1. بيانات الحيوانات
+       1. اختبار بيانات الحيوانات
     ========================= */
 
     lines.push(
@@ -67,7 +68,10 @@ module.exports.run = async function ({ api, event, models }) {
       `المستوى الأقصى : ${phoenix.maxLevel}`,
       `النجوم القصوى : ${phoenix.maxStars}`,
       `الصورة الخاصة : لفل ${phoenix.specialImageLevel}`,
-      "",
+      ""
+    );
+
+    const petsTest =
       hedgehog.id === 38 &&
       phoenix.id === 39 &&
       hedgehog.maxLevel === 60 &&
@@ -75,7 +79,12 @@ module.exports.run = async function ({ api, event, models }) {
       hedgehog.maxStars === 5 &&
       phoenix.maxStars === 5 &&
       hedgehog.specialImageLevel === 60 &&
-      phoenix.specialImageLevel === 60
+      phoenix.specialImageLevel === 60 &&
+      hedgehog.growth.hunger > 0 &&
+      phoenix.growth.hunger > 0;
+
+    lines.push(
+      petsTest
         ? "✓ بيانات الحيوانات صحيحة"
         : "✗ خطأ في بيانات الحيوانات",
       ""
@@ -92,18 +101,27 @@ module.exports.run = async function ({ api, event, models }) {
       ""
     );
 
-    const levels = [0, 1, 10, 29, 30, 59, 60];
+    const levels = [
+      0,
+      1,
+      10,
+      29,
+      30,
+      59,
+      60
+    ];
 
     let previousPower = -1;
     let previousHealth = -1;
     let increasing = true;
 
     for (const level of levels) {
-      const levelStats = leveling.getPetStats(
-        hedgehog,
-        level,
-        0
-      );
+      const levelStats =
+        leveling.getPetStats(
+          hedgehog,
+          level,
+          0
+        );
 
       if (
         levelStats.power <= previousPower ||
@@ -130,26 +148,41 @@ module.exports.run = async function ({ api, event, models }) {
     }
 
     const image59 =
-      leveling.checkSpecialImage(hedgehog, 59);
+      leveling.checkSpecialImage(
+        hedgehog,
+        59
+      );
 
     const image60 =
-      leveling.checkSpecialImage(hedgehog, 60);
+      leveling.checkSpecialImage(
+        hedgehog,
+        60
+      );
+
+    const imageTest =
+      !image59 && image60;
 
     lines.push(
       `زيادة القوة والصحة : ${
-        increasing ? "✓ صحيحة" : "✗ خطأ"
+        increasing
+          ? "✓ صحيحة"
+          : "✗ خطأ"
       }`,
       "",
       "اختبار الصورة الخاصة:",
       `لفل 59 : ${
-        image59 ? "متاحة" : "غير متاحة"
+        image59
+          ? "متاحة"
+          : "غير متاحة"
       }`,
       `لفل 60 : ${
-        image60 ? "متاحة" : "غير متاحة"
+        image60
+          ? "متاحة"
+          : "غير متاحة"
       }`,
-      image59 || !image60
-        ? "✗ خطأ في مستوى الصورة الخاصة"
-        : "✓ الصورة الخاصة تظهر في لفل 60",
+      imageTest
+        ? "✓ الصورة الخاصة تظهر في لفل 60"
+        : "✗ خطأ في مستوى الصورة الخاصة",
       ""
     );
 
@@ -163,31 +196,53 @@ module.exports.run = async function ({ api, event, models }) {
     );
 
     const statLevels = [
-      { level: 0, stars: 0 },
-      { level: 30, stars: 0 },
-      { level: 60, stars: 0 },
-      { level: 0, stars: 1 },
-      { level: 60, stars: 1 },
-      { level: 60, stars: 5 }
+      {
+        level: 0,
+        stars: 0
+      },
+      {
+        level: 30,
+        stars: 0
+      },
+      {
+        level: 60,
+        stars: 0
+      },
+      {
+        level: 0,
+        stars: 1
+      },
+      {
+        level: 60,
+        stars: 1
+      },
+      {
+        level: 60,
+        stars: 5
+      }
     ];
 
     let statsTest = true;
 
     for (const test of statLevels) {
-      const result = stats.getStats(
-        hedgehog,
-        test.level,
-        test.stars
-      );
+      const result =
+        stats.getStats(
+          hedgehog,
+          test.level,
+          test.stars
+        );
 
       const expectedEffective =
-        test.stars * 60 + test.level;
+        test.stars * 60 +
+        test.level;
 
       if (
+        !result ||
         result.effectiveLevel !== expectedEffective ||
         result.power <= 0 ||
         result.maxHealth <= 0 ||
-        result.maxHunger <= 0
+        result.maxHunger <= 0 ||
+        result.hungerPercentage !== 100
       ) {
         statsTest = false;
       }
@@ -205,20 +260,32 @@ module.exports.run = async function ({ api, event, models }) {
       );
     }
 
-    const gain = stats.getNextLevelGain(
-      hedgehog,
-      0,
-      0
-    );
+    const gain =
+      stats.getNextLevelGain(
+        hedgehog,
+        0,
+        0
+      );
+
+    const gainTest =
+      gain &&
+      gain.power === hedgehog.growth.power &&
+      gain.health === hedgehog.growth.health &&
+      gain.hunger === hedgehog.growth.hunger &&
+      gain.available === true;
 
     lines.push(
       "زيادة المستوى التالي:",
       `القوة : +${gain.power}`,
       `الصحة : +${gain.health}`,
       `الجوع : +${gain.hunger}`,
-      `متاح : ${gain.available ? "نعم" : "لا"}`,
+      `متاح : ${
+        gain.available
+          ? "نعم"
+          : "لا"
+      }`,
       "",
-      statsTest
+      statsTest && gainTest
         ? "✓ stats.js يعمل بشكل صحيح"
         : "✗ يوجد خطأ في stats.js",
       ""
@@ -234,8 +301,17 @@ module.exports.run = async function ({ api, event, models }) {
     );
 
     const xpLevels = [
-      0, 1, 2, 5, 10,
-      20, 30, 40, 50, 59, 60
+      0,
+      1,
+      2,
+      5,
+      10,
+      20,
+      30,
+      40,
+      50,
+      59,
+      60
     ];
 
     let xpIncreasing = true;
@@ -251,7 +327,9 @@ module.exports.run = async function ({ api, event, models }) {
       }
 
       const required =
-        leveling.getRequiredXP(level);
+        leveling.getRequiredXP(
+          level
+        );
 
       if (required <= previousXP) {
         xpIncreasing = false;
@@ -273,45 +351,60 @@ module.exports.run = async function ({ api, event, models }) {
     );
 
     /* =========================
-       5. اختبار النجوم
+       5. اختبار stars.js
     ========================= */
 
     lines.push(
-      "5. اختبار النجوم",
+      "5. اختبار stars.js",
       ""
     );
 
     let starsTest = true;
 
-    for (let stars = 0; stars <= 5; stars++) {
-      const starStats = leveling.getPetStats(
-        hedgehog,
-        60,
-        stars
-      );
+    for (let currentStars = 0; currentStars <= 5; currentStars++) {
+      const info =
+        stars.getStarInfo(
+          60,
+          currentStars
+        );
 
       const expectedEffective =
-        60 + (stars * 60);
+        currentStars * 60 +
+        60;
+
+      const expectedCanPromote =
+        currentStars < 5;
+
+      const expectedCompleted =
+        currentStars === 5;
 
       if (
-        starStats.effectiveLevel !== expectedEffective ||
-        starStats.power <= 0 ||
-        starStats.health <= 0
+        info.effectiveLevel !== expectedEffective ||
+        info.stars !== currentStars ||
+        info.level !== 60 ||
+        info.canPromote !== expectedCanPromote ||
+        info.isGameCompleted !== expectedCompleted
       ) {
         starsTest = false;
       }
 
       lines.push(
-        `${stars}★ - لفل 60`,
-        `المستوى الفعلي : ${starStats.effectiveLevel}`,
-        `القوة : ${starStats.power}`,
-        `الصحة : ${starStats.health}`,
-        `الجوع : ${starStats.maxHunger}`,
+        `${currentStars}★ - لفل 60`,
+        `المستوى الفعلي : ${info.effectiveLevel}`,
         `يمكن الترقية : ${
-          starStats.canPromote ? "نعم" : "لا"
+          info.canPromote
+            ? "نعم"
+            : "لا"
         }`,
         `ختم اللعبة : ${
-          starStats.isGameCompleted ? "نعم" : "لا"
+          info.isGameCompleted
+            ? "نعم"
+            : "لا"
+        }`,
+        `النجمة التالية : ${
+          info.nextStars === null
+            ? "لا يوجد"
+            : info.nextStars + "★"
         }`,
         ""
       );
@@ -321,8 +414,8 @@ module.exports.run = async function ({ api, event, models }) {
       "التسلسل:",
       "0★ → 1★ → 2★ → 3★ → 4★ → 5★",
       starsTest
-        ? "✓ تم اختبار النجوم"
-        : "✗ يوجد خطأ في النجوم",
+        ? "✓ stars.js يعمل بشكل صحيح"
+        : "✗ يوجد خطأ في stars.js",
       ""
     );
 
@@ -335,32 +428,40 @@ module.exports.run = async function ({ api, event, models }) {
       ""
     );
 
-    const before = leveling.getPetStats(
-      hedgehog,
-      60,
-      0
-    );
+    const before =
+      stats.getStats(
+        hedgehog,
+        60,
+        0
+      );
 
-    const promotion = leveling.promotePet(
-      60,
-      0,
-      999999,
-      hedgehog
-    );
+    const promotion =
+      stars.promotePet(
+        60,
+        0,
+        999999
+      );
 
-    const after = leveling.getPetStats(
-      hedgehog,
-      promotion.level,
-      promotion.stars
-    );
+    const after =
+      stats.getStats(
+        hedgehog,
+        promotion.level,
+        promotion.stars
+      );
 
     const promotionTest =
-      promotion.success &&
+      promotion.success === true &&
+      promotion.reason === "PROMOTED" &&
       promotion.level === 0 &&
       promotion.stars === 1 &&
       promotion.xp === 0 &&
-      after.power >= before.power &&
-      after.health >= before.health;
+      promotion.previousLevel === 60 &&
+      promotion.previousStars === 0 &&
+      promotion.previousXP === 999999 &&
+      promotion.previousEffectiveLevel === 60 &&
+      promotion.effectiveLevel === 60 &&
+      after.power === before.power &&
+      after.health === before.health;
 
     lines.push(
       "قبل الترقية:",
@@ -373,27 +474,47 @@ module.exports.run = async function ({ api, event, models }) {
       `النجوم : ${after.stars}★`,
       `المستوى : ${after.level}`,
       `XP : ${promotion.xp}`,
+      `المستوى الفعلي : ${after.effectiveLevel}`,
       `القوة : ${after.power}`,
       `الصحة : ${after.health}`,
       "",
       `الترقية : ${
-        promotion.success ? "✓ نجحت" : "✗ فشلت"
+        promotion.success
+          ? "✓ نجحت"
+          : "✗ فشلت"
       }`,
       `النجمة زادت : ${
-        promotion.stars === 1 ? "✓" : "✗"
+        promotion.stars === 1
+          ? "✓"
+          : "✗"
       }`,
       `المستوى عاد إلى 0 : ${
-        promotion.level === 0 ? "✓" : "✗"
+        promotion.level === 0
+          ? "✓"
+          : "✗"
       }`,
       `XP عاد إلى 0 : ${
-        promotion.xp === 0 ? "✓" : "✗"
+        promotion.xp === 0
+          ? "✓"
+          : "✗"
       }`,
       `القوة لم تنقص : ${
-        after.power >= before.power ? "✓" : "✗"
+        after.power >= before.power
+          ? "✓"
+          : "✗"
       }`,
       `الصحة لم تنقص : ${
-        after.health >= before.health ? "✓" : "✗"
+        after.health >= before.health
+          ? "✓"
+          : "✗"
       }`,
+      `المستوى الفعلي محفوظ : ${
+        after.effectiveLevel ===
+        before.effectiveLevel
+          ? "✓"
+          : "✗"
+      }`,
+      "",
       promotionTest
         ? "✓ نظام الترقية يعمل بشكل صحيح"
         : "✗ يوجد خطأ في نظام الترقية",
@@ -401,18 +522,79 @@ module.exports.run = async function ({ api, event, models }) {
     );
 
     /* =========================
-       7. اختبار قاعدة البيانات
+       7. اختبار الحالات الممنوعة
     ========================= */
 
     lines.push(
-      "7. اختبار قاعدة البيانات",
+      "7. اختبار حالات الترقية الممنوعة",
       ""
     );
 
-    const data = await Pdata.getPlayerData(
-      models,
-      userID
+    const earlyPromotion =
+      stars.promotePet(
+        59,
+        0,
+        500
+      );
+
+    const maxStarPromotion =
+      stars.promotePet(
+        60,
+        5,
+        500
+      );
+
+    const completedPromotion =
+      stars.promotePet(
+        60,
+        5,
+        0
+      );
+
+    const invalidTest =
+      earlyPromotion.success === false &&
+      earlyPromotion.reason === "LEVEL_NOT_MAX" &&
+      maxStarPromotion.success === false &&
+      maxStarPromotion.reason === "GAME_COMPLETED" &&
+      completedPromotion.success === false &&
+      completedPromotion.reason === "GAME_COMPLETED";
+
+    lines.push(
+      "الترقية في لفل 59:",
+      earlyPromotion.success
+        ? "✗ تم السماح بالترقية"
+        : `✓ مرفوضة - ${earlyPromotion.reason}`,
+      "",
+      "الترقية عند 5★:",
+      maxStarPromotion.success
+        ? "✗ تم السماح بالترقية"
+        : `✓ مرفوضة - ${maxStarPromotion.reason}`,
+      "",
+      "5★ Lv60:",
+      completedPromotion.success
+        ? "✗ تم السماح بالترقية"
+        : `✓ اللعبة مكتملة - ${completedPromotion.reason}`,
+      "",
+      invalidTest
+        ? "✓ الحالات الممنوعة تعمل بشكل صحيح"
+        : "✗ يوجد خطأ في الحالات الممنوعة",
+      ""
     );
+
+    /* =========================
+       8. اختبار قاعدة البيانات
+    ========================= */
+
+    lines.push(
+      "8. اختبار قاعدة البيانات",
+      ""
+    );
+
+    const data =
+      await Pdata.getPlayerData(
+        models,
+        userID
+      );
 
     if (data.pet) {
       lines.push(
@@ -457,7 +639,10 @@ module.exports.run = async function ({ api, event, models }) {
     );
 
   } catch (error) {
-    console.error("[حيوان/تجربة]", error);
+    console.error(
+      "[حيوان/تجربة]",
+      error
+    );
 
     return api.sendMessage(
       `✗ فشل الاختبار\n${error.message}`,
