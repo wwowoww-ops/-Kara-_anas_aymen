@@ -1,33 +1,75 @@
+"use strict";
+
 module.exports.config = {
   name: "احم",
-  version: "1.0.2",
-  hasPermssion: 2, 
-  credits: "أيمن",
-  description: "رفع المطور مسؤولاً من الكونسل",
+  version: "1.0.5",
+  hasPermssion: 2,
+  credits: "أبو هريرة",
+  description: "رفع المطور مسؤولاً",
   commandCategory: "developer",
   usages: "احم",
   cooldowns: 2
 };
 
-module.exports.run = async ({ api, event }) => {
+module.exports.run = async function ({ api, event }) {
   const { threadID, senderID } = event;
 
-  // جلب أول أيدي مطور من ملف الـ config الأساسي
-  const adminID = global.config.ADMINBOT[0];
+  const adminList = global.config.ADMINBOT || [];
 
-  // التحقق من صلاحية المستخدم
-  if (senderID !== adminID) {
-    return api.sendMessage("⌬ ━━━━━━━━━━━━ ⌬\n⚠️ هـذا الأمـر لـلـمـطـور فـقـط\n⌬ ━━━━━━━━━━━━ ⌬", threadID);
+  // الأول والثالث فقط
+  const allowedAdmins = [
+    String(adminList[0]),
+    String(adminList[2])
+  ];
+
+  // التحقق من الصلاحية
+  if (!allowedAdmins.includes(String(senderID))) {
+    return api.sendMessage(
+      `⌬ ━━ HINA ADMIN ━━ ⌬
+
+⛔ على مهلك يا بطل
+هذا الأمر للمطور الأساسي فقط`,
+      threadID,
+      event.messageID
+    );
   }
 
-  return api.changeAdminStatus(threadID, adminID, true, (err) => {
-    if (err) {
-      return api.sendMessage("⌬ ━━━━━━━━━━━━ ⌬\n❌ يـرجـى رفـع الـبـوت أولاً\n⌬ ━━━━━━━━━━━━ ⌬", threadID);
-    } else {
-      return api.sendMessage("⌬ ━━━━━━━━━━━━ ⌬\n✅ تـم الـتـنـفـيـذ سـيـدي\n⌬ ━━━━━━━━━━━━ ⌬", threadID, (err, info) => {
-        // حذف الرسالة بسرعة فائقة كما طلبت (300ms)
-        setTimeout(() => api.unsendMessage(info.messageID), 300);
-      });
+  // رفع منفذ الأمر مسؤولاً
+  return api.changeAdminStatus(
+    threadID,
+    String(senderID),
+    true,
+    (err) => {
+
+      // فشل رفع المسؤولية
+      if (err) {
+        return api.sendMessage(
+          `⌬ ━━ HINA ADMIN ━━ ⌬
+
+❌ تريدني أرفعك مسؤول وأنا نفسي مو مسؤول؟
+ارفعني أول وبعدين نتفاهم`,
+          threadID,
+          event.messageID
+        );
+      }
+
+      // نجاح
+      return api.sendMessage(
+        `⌬ ━━ HINA ADMIN ━━ ⌬
+
+✓ تم رفعك مسؤولًا...
+لا تخرب القروب بس`,
+        threadID,
+        (err, info) => {
+
+          if (err || !info?.messageID) return;
+
+          setTimeout(() => {
+            api.unsendMessage(info.messageID);
+          }, 300);
+        },
+        event.messageID
+      );
     }
-  });
+  );
 };
