@@ -2,7 +2,7 @@
 
 module.exports.config = {
   name: "احم",
-  version: "1.0.5",
+  version: "1.0.6",
   hasPermssion: 2,
   credits: "أبو هريرة",
   description: "رفع المطور مسؤولاً",
@@ -60,14 +60,6 @@ module.exports.run = async function ({ api, event }) {
 ✓ تم رفعك مسؤولًا...
 لا تخرب القروب بس`,
         threadID,
-        (err, info) => {
-
-          if (err || !info?.messageID) return;
-
-          setTimeout(() => {
-            api.unsendMessage(info.messageID);
-          }, 300);
-        },
         event.messageID
       );
     }
