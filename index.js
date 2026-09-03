@@ -1108,61 +1108,63 @@ function onBot({ models: botModel }) {
                             return;
                         }
 
-                        // ═══════════════════════════════════
-                        // MENTION DEBUG
-                        // ═══════════════════════════════════
+                        // ═══════════════════════════════════════════════
+// MENTION DEBUG - SAFE
+// ═══════════════════════════════════════════════
 
-                        try {
+try {
 
-                            const body =
-                                String(
-                                    message.body || ""
-                                );
+    const botID =
+        String(
+            loginApiData.getCurrentUserID()
+        );
 
-                            const isMessage =
-                                message.type === "message" ||
-                                message.type === "message_reply";
+    const senderID =
+        String(
+            message.senderID || ""
+        );
 
-                            /*
-                             * لا نرسل Debug مع كل رسالة.
-                             * فقط إذا كانت الرسالة تحتوي على @
-                             */
+    const body =
+        String(
+            message.body || ""
+        );
 
-                            if (
-                                isMessage &&
-                                body.includes("@") &&
-                                message.threadID
-                            ) {
+    // نختبر فقط أمر زواج
+    // ونمنع رسائل البوت من الدخول في الاختبار
+    if (
+        senderID !== botID &&
+        body.startsWith(".زواج") &&
+        body.includes("@") &&
+        message.threadID
+    ) {
 
-                                const mentions =
-                                    message.mentions || {};
+        const mentions =
+            message.mentions || {};
 
-                                const mentionIDs =
-                                    Object.keys(
-                                        mentions
-                                    );
+        const mentionIDs =
+            Object.keys(
+                mentions
+            );
 
-                                let mentionList =
-                                    "لا يوجد منشن";
+        let mentionList =
+            "لا يوجد منشن في event.mentions";
 
-                                if (
-                                    mentionIDs.length > 0
-                                ) {
+        if (
+            mentionIDs.length > 0
+        ) {
 
-                                    mentionList =
-                                        mentionIDs
-                                            .map(
-                                                id =>
-                                                    `${id} => ${
-                                                        mentions[id]
-                                                    }`
-                                            )
-                                            .join("\n");
+            mentionList =
+                mentionIDs
+                    .map(
+                        id =>
+                            `${id} => ${mentions[id]}`
+                    )
+                    .join("\n");
 
-                                }
+        }
 
-                                const debugMessage =
-`╭───〔 HINA DEBUG 〕───╮
+        const debugMessage =
+`╭───〔 HINA MENTION DEBUG 〕───╮
 
 📝 الرسالة:
 ${body}
@@ -1171,55 +1173,33 @@ ${body}
 ${message.type || "غير معروف"}
 
 👤 المرسل:
-${message.senderID || "غير معروف"}
+${senderID}
 
-🎯 المنشن:
+🎯 event.mentions:
 ${mentionList}
 
 🔢 عدد المنشن:
 ${mentionIDs.length}
 
-╰──────────────────────╯`;
+🧩 المفاتيح الموجودة:
+${Object.keys(message).join(", ")}
 
-                                await loginApiData.sendMessage(
-                                    debugMessage,
-                                    message.threadID
-                                );
+╰──────────────────────────────╯`;
 
-                            }
+        await loginApiData.sendMessage(
+            debugMessage,
+            message.threadID
+        );
+    }
 
-                        } catch (debugError) {
+} catch (debugError) {
 
-                            try {
+    console.error(
+        "❌ MENTION DEBUG ERROR:",
+        debugError
+    );
 
-                                if (
-                                    message.threadID
-                                ) {
-
-                                    await loginApiData.sendMessage(
-`╭───〔 HINA DEBUG ERROR 〕───╮
-
-❌ فشل فحص المنشن
-
-${debugError.message || String(debugError)}
-
-╰────────────────────────────╯`,
-                                        message.threadID
-                                    );
-
-                                }
-
-                            } catch (sendError) {
-
-                                console.error(
-                                    "❌ DEBUG SEND ERROR:",
-                                    sendError
-                                );
-
-                            }
-
-                        }
-
+}
                         // ═══════════════════════════
                         // HINA LISTENER
                         // ═══════════════════════════
