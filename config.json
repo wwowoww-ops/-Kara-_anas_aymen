@@ -1,74 +1,74 @@
 {
-    "language": "ar",
-    "DeveloperMode": false,
-    "autoCreateDB": true,
-    "MODEL_API_KEY": "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", 
+  "language": "ar",
+  "DeveloperMode": false,
+  "autoCreateDB": true,
+  "MODEL_API_KEY": "ضع_المفتاح_الجديد_هنا",
 
-    "iconUnsend": {
-        "status": true,
-        "icon": "😡"
-    },
+  "iconUnsend": {
+    "status": true,
+    "icon": "😡"
+  },
 
-    "notiGroup": true,
-    "NOTIFICATION": true,
-    "allowInbox": true,
+  "notiGroup": true,
+  "NOTIFICATION": true,
+  "allowInbox": true,
 
-    "commandDisabled": [],
-    "eventDisabled": [],
+  "commandDisabled": [],
+  "eventDisabled": [],
 
-    "BOTNAME": "زنجوبة",
-    "PREFIX": ".",
+  "BOTNAME": "زنجوبة",
+  "PREFIX": ".",
 
-    "ADMINBOT": [
-        "61578581225040",
-        "61590924093066", 
-        "61592700121061",
-    ],
+  "ADMINBOT": [
+    "61578581225040",
+    "61590924093066",
+    "61592700121061"
+  ],
 
-    "DATABASE": {
-        "sqlite": {
-            "storage": "data.sqlite"
-        }
-    },
-
-    "APPSTATEPATH": "appstate.json",
-
-    "FCAOption": {
-        "forceLogin": true,
-        "listenEvents": true,
-        "pauseLog": false,
-        "logLevel": "error",
-        "selfListen": true,
-        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"
-    },
-
-    "version": "1.0.0",
-
-    "menu": {
-        "autoUnsend": {
-            "status": true,
-            "timeOut": 60
-        },
-        "sendAttachments": {
-            "status": true,
-            "random": true,
-            "url": "https://i.imgur.com/LKkw8SL.jpg"
-        }
-    },
-
-    "autoAction": {
-        "status": true,
-        "keywords": {
-            "حضن": "حضن",
-            "شنق": "شنق",
-            "مطلوب": "مطلوب"
-        }
-    },
-
-    "KIRA_CONF": {
-        "dev": "61578581225040",
-        "personality": "بوتة متواضعة",
-        "ayman_msg": "حبيبي أبو هريرة! 💖 تحت أمرك يا تاج رأسي",
-        "other_msg": "سؤالك يثبت أن العقل زينة لم تُرزق بها 😏"
+  "DATABASE": {
+    "sqlite": {
+      "storage": "data.sqlite"
     }
+  },
+
+  "APPSTATEPATH": "appstate.json",
+
+  "FCAOption": {
+    "forceLogin": true,
+    "listenEvents": true,
+    "pauseLog": false,
+    "logLevel": "error",
+    "selfListen": true,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"
+  },
+
+  "version": "1.0.0",
+
+  "menu": {
+    "autoUnsend": {
+      "status": true,
+      "timeOut": 60
+    },
+    "sendAttachments": {
+      "status": true,
+      "random": true,
+      "url": "https://i.imgur.com/LKkw8SL.jpg"
+    }
+  },
+
+  "autoAction": {
+    "status": true,
+    "keywords": {
+      "حضن": "حضن",
+      "شنق": "شنق",
+      "مطلوب": "مطلوب"
+    }
+  },
+
+  "KIRA_CONF": {
+    "dev": "61578581225040",
+    "personality": "بوتة متواضعة",
+    "ayman_msg": "حبيبي أبو هريرة! 💖 تحت أمرك يا تاج رأسي",
+    "other_msg": "سؤالك يثبت أن العقل زينة لم تُرزق بها 😏"
+  }
 }
