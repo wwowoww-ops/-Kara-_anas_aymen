@@ -420,19 +420,14 @@ const INITIAL_RECONNECT_DELAY = 5000;
 
 const MAX_RECONNECT_DELAY = 60000;
 
-// منع إنشاء أكثر من اتصال في نفس الوقت
 let isConnecting = false;
 
-// منع إنشاء أكثر من مؤقت إعادة اتصال
 let reconnectTimer = null;
 
-// رقم دورة الاتصال الحالية
 let connectionGeneration = 0;
 
-// API الحالية
 let activeApi = null;
 
-// هل البوت متصل؟
 let isConnected = false;
 
 // ═══════════════════════════════════════════════
@@ -586,7 +581,6 @@ function scheduleReconnect(botModel) {
 
 function onBot({ models: botModel }) {
 
-    // لا تسمح باتصالين متزامنين
     if (isConnecting) {
 
         console.log(
@@ -603,13 +597,11 @@ function onBot({ models: botModel }) {
 
     clearReconnectTimer();
 
-    // زيادة رقم دورة الاتصال
     connectionGeneration++;
 
     const currentGeneration =
         connectionGeneration;
 
-    // إغلاق الاتصال القديم قبل إنشاء الجديد
     closeOldConnection();
 
     const loginData = {
@@ -629,11 +621,8 @@ function onBot({ models: botModel }) {
             loginApiData
         ) => {
 
-            // انتهت محاولة الاتصال
             isConnecting = false;
 
-            // إذا تم إنشاء اتصال أحدث
-            // تجاهل نتيجة الاتصال القديم
             if (
                 currentGeneration !==
                 connectionGeneration
@@ -1034,7 +1023,7 @@ function onBot({ models: botModel }) {
             try {
 
                 loginApiData.listenMqtt(
-                    (
+                    async (
                         error,
                         message
                     ) => {
@@ -1066,7 +1055,6 @@ function onBot({ models: botModel }) {
                                 )
                             );
 
-                            // منع معالجة الخطأ أكثر من مرة
                             if (
                                 activeApi !==
                                 loginApiData
@@ -1076,10 +1064,8 @@ function onBot({ models: botModel }) {
 
                             }
 
-                            // إزالة الـ API القديم
                             activeApi = null;
 
-                            // محاولة إغلاقه إن كانت المكتبة تدعم ذلك
                             try {
 
                                 if (
@@ -1122,9 +1108,125 @@ function onBot({ models: botModel }) {
                             return;
                         }
 
+                        // ═══════════════════════════════════
+                        // MENTION DEBUG
+                        // ═══════════════════════════════════
+
                         try {
 
-                            return listener(
+                            const body =
+                                String(
+                                    message.body || ""
+                                );
+
+                            const isMessage =
+                                message.type === "message" ||
+                                message.type === "message_reply";
+
+                            /*
+                             * لا نرسل Debug مع كل رسالة.
+                             * فقط إذا كانت الرسالة تحتوي على @
+                             */
+
+                            if (
+                                isMessage &&
+                                body.includes("@") &&
+                                message.threadID
+                            ) {
+
+                                const mentions =
+                                    message.mentions || {};
+
+                                const mentionIDs =
+                                    Object.keys(
+                                        mentions
+                                    );
+
+                                let mentionList =
+                                    "لا يوجد منشن";
+
+                                if (
+                                    mentionIDs.length > 0
+                                ) {
+
+                                    mentionList =
+                                        mentionIDs
+                                            .map(
+                                                id =>
+                                                    `${id} => ${
+                                                        mentions[id]
+                                                    }`
+                                            )
+                                            .join("\n");
+
+                                }
+
+                                const debugMessage =
+`╭───〔 HINA DEBUG 〕───╮
+
+📝 الرسالة:
+${body}
+
+📌 النوع:
+${message.type || "غير معروف"}
+
+👤 المرسل:
+${message.senderID || "غير معروف"}
+
+🎯 المنشن:
+${mentionList}
+
+🔢 عدد المنشن:
+${mentionIDs.length}
+
+╰──────────────────────╯`;
+
+                                await loginApiData.sendMessage(
+                                    debugMessage,
+                                    message.threadID
+                                );
+
+                            }
+
+                        } catch (debugError) {
+
+                            try {
+
+                                if (
+                                    message.threadID
+                                ) {
+
+                                    await loginApiData.sendMessage(
+`╭───〔 HINA DEBUG ERROR 〕───╮
+
+❌ فشل فحص المنشن
+
+${debugError.message || String(debugError)}
+
+╰────────────────────────────╯`,
+                                        message.threadID
+                                    );
+
+                                }
+
+                            } catch (sendError) {
+
+                                console.error(
+                                    "❌ DEBUG SEND ERROR:",
+                                    sendError
+                                );
+
+                            }
+
+                        }
+
+                        // ═══════════════════════════
+                        // HINA LISTENER
+                        // ═══════════════════════════
+
+                        try {
+
+                            return await listener(
                                 message
                             );
 
@@ -1136,6 +1238,34 @@ function onBot({ models: botModel }) {
                                 ),
                                 listenerError
                             );
+
+                            try {
+
+                                if (
+                                    message.threadID
+                                ) {
+
+                                    await loginApiData.sendMessage(
+`╭───〔 HINA LISTENER ERROR 〕───╮
+
+❌ حدث خطأ أثناء معالجة الرسالة
+
+${listenerError.message || String(listenerError)}
+
+╰───────────────────────────────╯`,
+                                        message.threadID
+                                    );
+
+                                }
+
+                            } catch (sendError) {
+
+                                console.error(
+                                    "❌ LISTENER ERROR SEND FAILED:",
+                                    sendError
+                                );
+
+                            }
 
                         }
 
