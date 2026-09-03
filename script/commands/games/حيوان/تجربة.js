@@ -2,11 +2,12 @@
 
 const pets = require("./pets");
 const leveling = require("./leveling");
+const stats = require("./stats");
 const Pdata = require("./Pdata");
 
 module.exports.config = {
   name: "تجربة",
-  version: "3.0.0",
+  version: "4.0.0",
   credits: "أبو هريرة",
   description: "اختبار نظام الحيوانات الجديد",
   commandCategory: "Games",
@@ -37,7 +38,7 @@ module.exports.run = async function ({ api, event, models }) {
     );
 
     /* =========================
-       بيانات الحيوانات
+       1. بيانات الحيوانات
     ========================= */
 
     lines.push(
@@ -50,6 +51,7 @@ module.exports.run = async function ({ api, event, models }) {
       `القوة الأساسية : ${hedgehog.basePower}`,
       `زيادة الصحة : ${hedgehog.growth.health}`,
       `زيادة القوة : ${hedgehog.growth.power}`,
+      `زيادة الجوع : ${hedgehog.growth.hunger}`,
       `المستوى الأقصى : ${hedgehog.maxLevel}`,
       `النجوم القصوى : ${hedgehog.maxStars}`,
       `الصورة الخاصة : لفل ${hedgehog.specialImageLevel}`,
@@ -61,18 +63,26 @@ module.exports.run = async function ({ api, event, models }) {
       `القوة الأساسية : ${phoenix.basePower}`,
       `زيادة الصحة : ${phoenix.growth.health}`,
       `زيادة القوة : ${phoenix.growth.power}`,
+      `زيادة الجوع : ${phoenix.growth.hunger}`,
       `المستوى الأقصى : ${phoenix.maxLevel}`,
       `النجوم القصوى : ${phoenix.maxStars}`,
       `الصورة الخاصة : لفل ${phoenix.specialImageLevel}`,
       "",
-      hedgehog.id === 38 && phoenix.id === 39
+      hedgehog.id === 38 &&
+      phoenix.id === 39 &&
+      hedgehog.maxLevel === 60 &&
+      phoenix.maxLevel === 60 &&
+      hedgehog.maxStars === 5 &&
+      phoenix.maxStars === 5 &&
+      hedgehog.specialImageLevel === 60 &&
+      phoenix.specialImageLevel === 60
         ? "✓ بيانات الحيوانات صحيحة"
         : "✗ خطأ في بيانات الحيوانات",
       ""
     );
 
     /* =========================
-       اختبار المستويات
+       2. اختبار المستويات
     ========================= */
 
     lines.push(
@@ -89,27 +99,27 @@ module.exports.run = async function ({ api, event, models }) {
     let increasing = true;
 
     for (const level of levels) {
-      const stats = leveling.getPetStats(
+      const levelStats = leveling.getPetStats(
         hedgehog,
         level,
         0
       );
 
       if (
-        stats.power <= previousPower ||
-        stats.health <= previousHealth
+        levelStats.power <= previousPower ||
+        levelStats.health <= previousHealth
       ) {
         increasing = false;
       }
 
-      previousPower = stats.power;
-      previousHealth = stats.health;
+      previousPower = levelStats.power;
+      previousHealth = levelStats.health;
 
       lines.push(
         `لفل ${level}`,
-        `القوة : ${stats.power}`,
-        `الصحة : ${stats.health}`,
-        `الجوع : ${stats.maxHunger}`,
+        `القوة : ${levelStats.power}`,
+        `الصحة : ${levelStats.health}`,
+        `الجوع : ${levelStats.maxHunger}`,
         `XP للفل التالي : ${
           level < 60
             ? leveling.getRequiredXP(level)
@@ -131,8 +141,12 @@ module.exports.run = async function ({ api, event, models }) {
       }`,
       "",
       "اختبار الصورة الخاصة:",
-      `لفل 59 : ${image59 ? "متاحة" : "غير متاحة"}`,
-      `لفل 60 : ${image60 ? "متاحة" : "غير متاحة"}`,
+      `لفل 59 : ${
+        image59 ? "متاحة" : "غير متاحة"
+      }`,
+      `لفل 60 : ${
+        image60 ? "متاحة" : "غير متاحة"
+      }`,
       image59 || !image60
         ? "✗ خطأ في مستوى الصورة الخاصة"
         : "✓ الصورة الخاصة تظهر في لفل 60",
@@ -140,11 +154,82 @@ module.exports.run = async function ({ api, event, models }) {
     );
 
     /* =========================
-       اختبار XP
+       3. اختبار stats.js
     ========================= */
 
     lines.push(
-      "3. اختبار XP",
+      "3. اختبار الإحصائيات",
+      ""
+    );
+
+    const statLevels = [
+      { level: 0, stars: 0 },
+      { level: 30, stars: 0 },
+      { level: 60, stars: 0 },
+      { level: 0, stars: 1 },
+      { level: 60, stars: 1 },
+      { level: 60, stars: 5 }
+    ];
+
+    let statsTest = true;
+
+    for (const test of statLevels) {
+      const result = stats.getStats(
+        hedgehog,
+        test.level,
+        test.stars
+      );
+
+      const expectedEffective =
+        test.stars * 60 + test.level;
+
+      if (
+        result.effectiveLevel !== expectedEffective ||
+        result.power <= 0 ||
+        result.maxHealth <= 0 ||
+        result.maxHunger <= 0
+      ) {
+        statsTest = false;
+      }
+
+      lines.push(
+        `${test.stars}★ Lv${test.level}`,
+        `المستوى الفعلي : ${result.effectiveLevel}`,
+        `القوة : ${result.power}`,
+        `الصحة : ${result.health}`,
+        `الصحة القصوى : ${result.maxHealth}`,
+        `الجوع : ${result.hunger}`,
+        `الجوع الأقصى : ${result.maxHunger}`,
+        `نسبة الجوع : ${result.hungerPercentage}%`,
+        ""
+      );
+    }
+
+    const gain = stats.getNextLevelGain(
+      hedgehog,
+      0,
+      0
+    );
+
+    lines.push(
+      "زيادة المستوى التالي:",
+      `القوة : +${gain.power}`,
+      `الصحة : +${gain.health}`,
+      `الجوع : +${gain.hunger}`,
+      `متاح : ${gain.available ? "نعم" : "لا"}`,
+      "",
+      statsTest
+        ? "✓ stats.js يعمل بشكل صحيح"
+        : "✗ يوجد خطأ في stats.js",
+      ""
+    );
+
+    /* =========================
+       4. اختبار XP
+    ========================= */
+
+    lines.push(
+      "4. اختبار XP",
       ""
     );
 
@@ -188,32 +273,45 @@ module.exports.run = async function ({ api, event, models }) {
     );
 
     /* =========================
-       اختبار النجوم
+       5. اختبار النجوم
     ========================= */
 
     lines.push(
-      "4. اختبار النجوم",
+      "5. اختبار النجوم",
       ""
     );
 
+    let starsTest = true;
+
     for (let stars = 0; stars <= 5; stars++) {
-      const stats = leveling.getPetStats(
+      const starStats = leveling.getPetStats(
         hedgehog,
         60,
         stars
       );
 
+      const expectedEffective =
+        60 + (stars * 60);
+
+      if (
+        starStats.effectiveLevel !== expectedEffective ||
+        starStats.power <= 0 ||
+        starStats.health <= 0
+      ) {
+        starsTest = false;
+      }
+
       lines.push(
         `${stars}★ - لفل 60`,
-        `المستوى الفعلي : ${stats.effectiveLevel}`,
-        `القوة : ${stats.power}`,
-        `الصحة : ${stats.health}`,
-        `الجوع : ${stats.maxHunger}`,
+        `المستوى الفعلي : ${starStats.effectiveLevel}`,
+        `القوة : ${starStats.power}`,
+        `الصحة : ${starStats.health}`,
+        `الجوع : ${starStats.maxHunger}`,
         `يمكن الترقية : ${
-          stats.canPromote ? "نعم" : "لا"
+          starStats.canPromote ? "نعم" : "لا"
         }`,
         `ختم اللعبة : ${
-          stats.isGameCompleted ? "نعم" : "لا"
+          starStats.isGameCompleted ? "نعم" : "لا"
         }`,
         ""
       );
@@ -222,16 +320,18 @@ module.exports.run = async function ({ api, event, models }) {
     lines.push(
       "التسلسل:",
       "0★ → 1★ → 2★ → 3★ → 4★ → 5★",
-      "✓ تم اختبار النجوم",
+      starsTest
+        ? "✓ تم اختبار النجوم"
+        : "✗ يوجد خطأ في النجوم",
       ""
     );
 
     /* =========================
-       اختبار الترقية
+       6. اختبار الترقية
     ========================= */
 
     lines.push(
-      "5. اختبار الترقية",
+      "6. اختبار الترقية",
       ""
     );
 
@@ -253,6 +353,14 @@ module.exports.run = async function ({ api, event, models }) {
       promotion.level,
       promotion.stars
     );
+
+    const promotionTest =
+      promotion.success &&
+      promotion.level === 0 &&
+      promotion.stars === 1 &&
+      promotion.xp === 0 &&
+      after.power >= before.power &&
+      after.health >= before.health;
 
     lines.push(
       "قبل الترقية:",
@@ -286,15 +394,18 @@ module.exports.run = async function ({ api, event, models }) {
       `الصحة لم تنقص : ${
         after.health >= before.health ? "✓" : "✗"
       }`,
+      promotionTest
+        ? "✓ نظام الترقية يعمل بشكل صحيح"
+        : "✗ يوجد خطأ في نظام الترقية",
       ""
     );
 
     /* =========================
-       اختبار قاعدة البيانات
+       7. اختبار قاعدة البيانات
     ========================= */
 
     lines.push(
-      "6. اختبار قاعدة البيانات",
+      "7. اختبار قاعدة البيانات",
       ""
     );
 
