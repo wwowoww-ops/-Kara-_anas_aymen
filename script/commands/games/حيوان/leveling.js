@@ -15,7 +15,7 @@
  * نظام النجوم والترقية موجود في:
  *   stars.js
  *
- * الإحصائيات العامة موجودة في:
+ * الإحصائيات المتقدمة موجودة في:
  *   stats.js
  *
  * ============================================================
@@ -265,19 +265,12 @@ function getLevelProgress(
   ) {
 
     return {
-
       level,
-
       xp: 0,
-
       requiredXP: 0,
-
       remainingXP: 0,
-
       percentage: 100,
-
       isMaxLevel: true
-
     };
   }
 
@@ -294,11 +287,8 @@ function getLevelProgress(
     );
 
   return {
-
     level,
-
     xp,
-
     requiredXP,
 
     remainingXP:
@@ -308,26 +298,14 @@ function getLevelProgress(
       ),
 
     percentage,
-
     isMaxLevel: false
-
   };
 }
 
 
 /* ============================================================
  * حساب القوة
- * ============================================================
- *
- * هنا نستخدم المستوى المحلي فقط.
- *
- * إذا احتجنا المستوى الفعلي
- * بعد احتساب النجوم:
- *
- * stars.js / stats.js
- * هما المسؤولان عن ذلك.
- * ============================================================
- */
+ * ============================================================ */
 
 function getPetPower(
   pet,
@@ -413,6 +391,91 @@ function getPetMaxHunger(
 
 
 /* ============================================================
+ * إحصائيات الحيوان
+ * ============================================================
+ *
+ * هذه الدالة موجودة للتوافق مع الاختبارات
+ * والأوامر القديمة التي تستعمل leveling.getPetStats().
+ *
+ * لا تحتوي على النجوم.
+ * ============================================================ */
+
+function getPetStats(
+  pet,
+  level = DEFAULT_LEVEL
+) {
+
+  const resolvedPet =
+    resolvePet(pet);
+
+  if (!resolvedPet) {
+    return null;
+  }
+
+  level =
+    normalizeLevel(
+      level,
+      resolvedPet
+    );
+
+  const power =
+    getPetPower(
+      resolvedPet,
+      level
+    );
+
+  const health =
+    getPetHealth(
+      resolvedPet,
+      level
+    );
+
+  const maxHunger =
+    getPetMaxHunger(
+      resolvedPet,
+      level
+    );
+
+  return {
+    level,
+
+    power,
+
+    health,
+
+    maxHealth:
+      health,
+
+    hunger:
+      maxHunger,
+
+    maxHunger,
+
+    powerGain:
+      getPowerGain(
+        resolvedPet
+      ),
+
+    healthGain:
+      getHealthGain(
+        resolvedPet
+      ),
+
+    hungerGain:
+      getHungerGain(
+        resolvedPet
+      ),
+
+    hasSpecialImage:
+      hasSpecialImage(
+        resolvedPet,
+        level
+      )
+  };
+}
+
+
+/* ============================================================
  * مقدار زيادة القوة
  * ============================================================ */
 
@@ -480,18 +543,6 @@ function getHungerGain(pet) {
 
 /* ============================================================
  * إضافة XP
- * ============================================================
- *
- * مهم:
- *
- * لا يوجد أي تعامل مع النجوم هنا.
- *
- * الوصول إلى Level 60 يعني فقط:
- *
- * Level 60
- *
- * وبعدها نظام stars.js يقرر
- * هل الحيوان يستطيع الترقية أم لا.
  * ============================================================ */
 
 function addXP(
@@ -551,24 +602,14 @@ function addXP(
     levelsGained++;
   }
 
-  /*
-   * عند Level 60:
-   *
-   * لا توجد ترقية تلقائية.
-   *
-   * النجوم مسؤولية stars.js.
-   */
-
   if (
     currentLevel >=
     maxLevel
   ) {
-
     currentXP = 0;
   }
 
   return {
-
     level:
       currentLevel,
 
@@ -603,7 +644,6 @@ function addXP(
         resolvedPet,
         currentLevel
       )
-
   };
 }
 
@@ -638,7 +678,6 @@ function getLevelInfo(
     );
 
   return {
-
     id:
       resolvedPet.id,
 
@@ -715,7 +754,6 @@ function getLevelInfo(
       ),
 
     progress
-
   };
 }
 
@@ -752,6 +790,7 @@ module.exports = {
   getPetPower,
   getPetHealth,
   getPetMaxHunger,
+  getPetStats,
 
   /* النمو */
   getPowerGain,
