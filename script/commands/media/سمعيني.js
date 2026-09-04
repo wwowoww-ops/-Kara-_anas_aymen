@@ -4,7 +4,7 @@ const ytSearch = require("yt-search");
 
 module.exports.config = {
   name: "سمعيني",
-  version: "1.0.0",
+  version: "1.1.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
   description: "البحث عن الأغاني وتحميل الصوت فقط من YouTube",
@@ -14,7 +14,6 @@ module.exports.config = {
 };
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
-
 const CACHE_DIR = path.join(__dirname, "cache");
 
 let youtube = null;
@@ -34,13 +33,11 @@ async function getYouTube() {
 
   youtubeLoading = (async () => {
     try {
-      /*
-       * youtubei.js الحديثة ESM
-       * لذلك نستعمل import داخل CommonJS
-       */
       const module = await import("youtubei.js");
 
-      const Innertube = module.Innertube || module.default?.Innertube;
+      const Innertube =
+        module.Innertube ||
+        module.default?.Innertube;
 
       if (!Innertube) {
         throw new Error(
@@ -72,17 +69,11 @@ async function getYouTube() {
 ========================= */
 
 function formatError(error) {
-  if (!error) {
-    return "خطأ غير معروف";
-  }
+  if (!error) return "خطأ غير معروف";
 
-  if (error.stack) {
-    return error.stack;
-  }
+  if (error.stack) return error.stack;
 
-  if (error.message) {
-    return error.message;
-  }
+  if (error.message) return error.message;
 
   return String(error);
 }
@@ -90,47 +81,54 @@ function formatError(error) {
 
 async function sendError(api, event, error, extra = "") {
   let text =
-`╭───〔 𓆩 𝐇𝐈𝐍𝐀 𓆪 〕───╮
-│ ❌ حدث خطأ في أمر سمعيني
-╰────────────────────╯
+`⌬ ━━ 𝗛𝗜𝗡𝗔 MEDIA ━━ ⌬
+
+❌ حدث خطأ في أمر سمعيني
 
 ${extra ? extra + "\n\n" : ""}الخطأ:
 
-${formatError(error)}`;
+${formatError(error)}
 
-  /*
-   * حتى لا تصبح رسالة الخطأ ضخمة جدًا
-   */
+⌬ ━━━━━━━━━━━━━━━ ⌬`;
+
   if (text.length > 5000) {
-    text = text.slice(0, 4900) + "\n\n[تم اختصار الخطأ]";
+    text =
+      text.slice(0, 4900) +
+      "\n\n[تم اختصار الخطأ]";
   }
 
-  return api.sendMessage(text, event.threadID);
+  return api.sendMessage(
+    text,
+    event.threadID
+  );
 }
 
 
 /* =========================
-   تنظيف الملفات
+   تنظيف الـ Cache
 ========================= */
 
 async function cleanCache() {
   try {
     await fs.ensureDir(CACHE_DIR);
 
-    const files = await fs.readdir(CACHE_DIR);
+    const files =
+      await fs.readdir(CACHE_DIR);
 
     const now = Date.now();
 
     for (const file of files) {
-      const filePath = path.join(CACHE_DIR, file);
+      const filePath =
+        path.join(CACHE_DIR, file);
 
       try {
-        const stat = await fs.stat(filePath);
+        const stat =
+          await fs.stat(filePath);
 
-        /*
-         * حذف الملفات الأقدم من 30 دقيقة
-         */
-        if (now - stat.mtimeMs > 30 * 60 * 1000) {
+        if (
+          now - stat.mtimeMs >
+          30 * 60 * 1000
+        ) {
           await fs.remove(filePath);
         }
 
@@ -155,11 +153,17 @@ function extractVideoId(url) {
       parsed.hostname.includes("youtube.com") ||
       parsed.hostname.includes("youtube-nocookie.com")
     ) {
-      if (parsed.searchParams.get("v")) {
-        return parsed.searchParams.get("v");
+      const videoId =
+        parsed.searchParams.get("v");
+
+      if (videoId) {
+        return videoId;
       }
 
-      const parts = parsed.pathname.split("/").filter(Boolean);
+      const parts =
+        parsed.pathname
+          .split("/")
+          .filter(Boolean);
 
       if (
         parts[0] === "shorts" ||
@@ -174,15 +178,19 @@ function extractVideoId(url) {
       parsed.hostname === "youtu.be" ||
       parsed.hostname.endsWith(".youtu.be")
     ) {
-      return parsed.pathname.split("/").filter(Boolean)[0] || null;
+      return (
+        parsed.pathname
+          .split("/")
+          .filter(Boolean)[0] ||
+        null
+      );
     }
 
   } catch (_) {}
 
-  /*
-   * في حالة إرسال ID مباشرة
-   */
-  if (/^[a-zA-Z0-9_-]{11}$/.test(url)) {
+  if (
+    /^[a-zA-Z0-9_-]{11}$/.test(url)
+  ) {
     return url;
   }
 
@@ -208,12 +216,15 @@ function isYouTubeUrl(text) {
 
 
 /* =========================
-   تنظيف اسم الملف
+   اسم ملف آمن
 ========================= */
 
 function safeFileName(name) {
   return String(name || "audio")
-    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "")
+    .replace(
+      /[<>:"/\\|?*\x00-\x1F]/g,
+      ""
+    )
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 100) || "audio";
@@ -221,19 +232,20 @@ function safeFileName(name) {
 
 
 /* =========================
-   تحويل Stream إلى File
+   حفظ الـ Stream
 ========================= */
 
-async function saveStreamToFile(stream, filePath, maxSize) {
-  const writer = fs.createWriteStream(filePath);
+async function saveStreamToFile(
+  stream,
+  filePath,
+  maxSize
+) {
+  const writer =
+    fs.createWriteStream(filePath);
 
   let total = 0;
 
   try {
-    /*
-     * youtubei.js يعيد Web ReadableStream
-     * لذلك نتعامل معه عن طريق async iterator
-     */
     for await (const chunk of stream) {
       let buffer;
 
@@ -250,10 +262,14 @@ async function saveStreamToFile(stream, filePath, maxSize) {
       if (total > maxSize) {
         writer.destroy();
 
-        await fs.remove(filePath).catch(() => {});
+        await fs
+          .remove(filePath)
+          .catch(() => {});
 
         throw new Error(
-          `حجم الصوت تجاوز الحد المسموح وهو ${Math.round(maxSize / 1024 / 1024)}MB`
+          `حجم الصوت تجاوز الحد المسموح وهو ${Math.round(
+            maxSize / 1024 / 1024
+          )}MB`
         );
       }
 
@@ -267,8 +283,15 @@ async function saveStreamToFile(stream, filePath, maxSize) {
     await new Promise((resolve, reject) => {
       writer.end();
 
-      writer.once("finish", resolve);
-      writer.once("error", reject);
+      writer.once(
+        "finish",
+        resolve
+      );
+
+      writer.once(
+        "error",
+        reject
+      );
     });
 
     return total;
@@ -276,7 +299,9 @@ async function saveStreamToFile(stream, filePath, maxSize) {
   } catch (error) {
     writer.destroy();
 
-    await fs.remove(filePath).catch(() => {});
+    await fs
+      .remove(filePath)
+      .catch(() => {});
 
     throw error;
   }
@@ -284,42 +309,48 @@ async function saveStreamToFile(stream, filePath, maxSize) {
 
 
 /* =========================
-   تحميل الصوت
+   تحميل الصوت فقط
 ========================= */
 
-async function downloadAudio(videoId, title) {
-  const yt = await getYouTube();
+async function downloadAudio(
+  videoId,
+  title
+) {
+  const yt =
+    await getYouTube();
 
-  await fs.ensureDir(CACHE_DIR);
+  await fs.ensureDir(
+    CACHE_DIR
+  );
 
-  const cleanTitle = safeFileName(title);
+  const cleanTitle =
+    safeFileName(title);
 
-  const random = `${Date.now()}_${Math.random()
-    .toString(36)
-    .slice(2, 8)}`;
+  const random =
+    `${Date.now()}_${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
 
-  /*
-   * youtubei.js قد يرجع WebM أو M4A
-   * لذلك نبدأ بامتداد webm
-   * ثم نغيره حسب الـ Content-Type إذا أمكن
-   */
   let extension = "webm";
 
-  const filePath = path.join(
-    CACHE_DIR,
-    `${random}.${extension}`
-  );
+  const filePath =
+    path.join(
+      CACHE_DIR,
+      `${random}.${extension}`
+    );
 
   /*
    * طلب Audio Only مباشرة
-   *
-   * لا يوجد video + audio
-   * ولا يوجد FFmpeg
+   * بدون فيديو وبدون FFmpeg
    */
-  const stream = await yt.download(videoId, {
-    type: "audio",
-    quality: "best"
-  });
+  const stream =
+    await yt.download(
+      videoId,
+      {
+        type: "audio",
+        quality: "best"
+      }
+    );
 
   if (!stream) {
     throw new Error(
@@ -327,58 +358,75 @@ async function downloadAudio(videoId, title) {
     );
   }
 
-  /*
-   * الحفظ
-   */
-  const size = await saveStreamToFile(
-    stream,
-    filePath,
-    MAX_FILE_SIZE
-  );
+  const size =
+    await saveStreamToFile(
+      stream,
+      filePath,
+      MAX_FILE_SIZE
+    );
 
   /*
-   * محاولة معرفة الامتداد الحقيقي
+   * محاولة تحديد الامتداد
    */
   try {
-    const info = await yt.getBasicInfo(videoId);
+    const info =
+      await yt.getBasicInfo(
+        videoId
+      );
 
     const formats = [
       ...(info.streaming_data?.formats || []),
       ...(info.streaming_data?.adaptive_formats || [])
     ];
 
-    const audioFormats = formats.filter(format => {
-      const mime = String(format.mime_type || format.mimeType || "");
+    const audioFormats =
+      formats.filter(format => {
+        const mime =
+          String(
+            format.mime_type ||
+            format.mimeType ||
+            ""
+          );
 
-      return (
-        mime.startsWith("audio/") &&
-        !format.has_video &&
-        !format.hasVideo
-      );
-    });
+        return (
+          mime.startsWith("audio/") &&
+          !format.has_video &&
+          !format.hasVideo
+        );
+      });
 
     if (audioFormats.length) {
-      const mime = String(
-        audioFormats[0].mime_type ||
-        audioFormats[0].mimeType ||
-        ""
-      );
+      const mime =
+        String(
+          audioFormats[0].mime_type ||
+          audioFormats[0].mimeType ||
+          ""
+        );
 
       if (mime.includes("mp4")) {
         extension = "m4a";
-      } else if (mime.includes("webm")) {
+      } else if (
+        mime.includes("webm")
+      ) {
         extension = "webm";
       }
 
-      const newPath = path.join(
-        CACHE_DIR,
-        `${random}.${extension}`
-      );
+      const newPath =
+        path.join(
+          CACHE_DIR,
+          `${random}.${extension}`
+        );
 
-      if (newPath !== filePath) {
-        await fs.move(filePath, newPath, {
-          overwrite: true
-        });
+      if (
+        newPath !== filePath
+      ) {
+        await fs.move(
+          filePath,
+          newPath,
+          {
+            overwrite: true
+          }
+        );
 
         return {
           filePath: newPath,
@@ -389,11 +437,7 @@ async function downloadAudio(videoId, title) {
       }
     }
 
-  } catch (_) {
-    /*
-     * عدم معرفة الامتداد لا يمنع إرسال الملف
-     */
-  }
+  } catch (_) {}
 
   return {
     filePath,
@@ -408,10 +452,16 @@ async function downloadAudio(videoId, title) {
    معلومات الفيديو
 ========================= */
 
-async function getVideoInfo(videoId) {
-  const yt = await getYouTube();
+async function getVideoInfo(
+  videoId
+) {
+  const yt =
+    await getYouTube();
 
-  const info = await yt.getBasicInfo(videoId);
+  const info =
+    await yt.getBasicInfo(
+      videoId
+    );
 
   if (
     info.playability_status &&
@@ -419,22 +469,33 @@ async function getVideoInfo(videoId) {
     info.playability_status.status !== "OK"
   ) {
     throw new Error(
-      `الفيديو غير قابل للتشغيل\nالحالة: ${
-        info.playability_status.status
-      }\n${
-        info.playability_status.reason || "لا يوجد سبب محدد"
-      }`
+      `الفيديو غير قابل للتشغيل
+
+الحالة:
+${info.playability_status.status}
+
+${
+  info.playability_status.reason ||
+  "لا يوجد سبب محدد"
+}`
     );
   }
 
-  const basic = info.basic_info || {};
+  const basic =
+    info.basic_info || {};
 
   return {
     id: videoId,
-    title: basic.title || "صوت بدون عنوان",
-    author: basic.author || "غير معروف",
-    duration: basic.duration || 0,
-    viewCount: basic.view_count || 0
+    title:
+      basic.title ||
+      "صوت بدون عنوان",
+    author:
+      basic.author ||
+      "غير معروف",
+    duration:
+      basic.duration || 0,
+    viewCount:
+      basic.view_count || 0
   };
 }
 
@@ -443,14 +504,25 @@ async function getVideoInfo(videoId) {
    إرسال الصوت
 ========================= */
 
-async function sendAudio(api, event, data) {
-  if (!await fs.pathExists(data.filePath)) {
+async function sendAudio(
+  api,
+  event,
+  data
+) {
+  if (
+    !await fs.pathExists(
+      data.filePath
+    )
+  ) {
     throw new Error(
       "تم تحميل الصوت لكن الملف المؤقت غير موجود"
     );
   }
 
-  const stat = await fs.stat(data.filePath);
+  const stat =
+    await fs.stat(
+      data.filePath
+    );
 
   if (stat.size <= 0) {
     throw new Error(
@@ -458,49 +530,61 @@ async function sendAudio(api, event, data) {
     );
   }
 
-  if (stat.size > MAX_FILE_SIZE) {
+  if (
+    stat.size >
+    MAX_FILE_SIZE
+  ) {
     throw new Error(
-      `حجم الملف ${Math.round(stat.size / 1024 / 1024)}MB وهو أكبر من الحد المسموح`
+      `حجم الملف ${Math.round(
+        stat.size / 1024 / 1024
+      )}MB وهو أكبر من الحد المسموح`
     );
   }
 
-  /*
-   * نرسل الملف كـ attachment
-   * وهذا يتجنب الحاجة لتحويل WebM/M4A إلى MP3
-   */
   await api.sendMessage(
     {
       body:
-`🎵 ${data.title}
+`⌬ ━━ 𝗛𝗜𝗡𝗔 MEDIA ━━ ⌬
+
+🎵 ${data.title}
 
 ╰─❖ تم تحميل الصوت بنجاح`,
-      attachment: fs.createReadStream(data.filePath)
+      attachment:
+        fs.createReadStream(
+          data.filePath
+        )
     },
     event.threadID,
     event.messageID
   );
 
-  /*
-   * حذف الملف بعد الإرسال
-   */
   setTimeout(() => {
-    fs.remove(data.filePath).catch(() => {});
+    fs.remove(
+      data.filePath
+    ).catch(() => {});
   }, 5000);
 }
 
 
 /* =========================
-   تحميل مباشر
+   معالجة الرابط المباشر
 ========================= */
 
-async function processUrl(api, event, url) {
-  const videoId = extractVideoId(url);
+async function processUrl(
+  api,
+  event,
+  url
+) {
+  const videoId =
+    extractVideoId(url);
 
   if (!videoId) {
     return sendError(
       api,
       event,
-      new Error("تعذر استخراج Video ID من الرابط"),
+      new Error(
+        "تعذر استخراج Video ID من الرابط"
+      ),
       `الرابط:\n${url}`
     );
   }
@@ -508,24 +592,31 @@ async function processUrl(api, event, url) {
   let loadingMessage = null;
 
   try {
-    loadingMessage = await api.sendMessage(
-      "⌬ جاري جلب معلومات الصوت...",
-      event.threadID
-    );
+    loadingMessage =
+      await api.sendMessage(
+        "⌬ جاري جلب معلومات الصوت...",
+        event.threadID
+      );
 
-    const info = await getVideoInfo(videoId);
+    const info =
+      await getVideoInfo(
+        videoId
+      );
 
     if (loadingMessage) {
       await api.editMessage(
-        `⌬ جاري تحميل الصوت...\n\n🎵 ${info.title}`,
+        `⌬ جاري تحميل الصوت...
+
+🎵 ${info.title}`,
         loadingMessage.messageID
       ).catch(() => {});
     }
 
-    const audio = await downloadAudio(
-      videoId,
-      info.title
-    );
+    const audio =
+      await downloadAudio(
+        videoId,
+        info.title
+      );
 
     if (loadingMessage) {
       await api.unsendMessage(
@@ -533,7 +624,11 @@ async function processUrl(api, event, url) {
       ).catch(() => {});
     }
 
-    await sendAudio(api, event, audio);
+    await sendAudio(
+      api,
+      event,
+      audio
+    );
 
   } catch (error) {
     if (loadingMessage) {
@@ -556,10 +651,17 @@ async function processUrl(api, event, url) {
    البحث
 ========================= */
 
-async function searchYouTube(query) {
-  const result = await ytSearch(query);
+async function searchYouTube(
+  query
+) {
+  const result =
+    await ytSearch(query);
 
-  if (!result || !result.videos || !result.videos.length) {
+  if (
+    !result ||
+    !result.videos ||
+    !result.videos.length
+  ) {
     throw new Error(
       "لم يتم العثور على نتائج"
     );
@@ -570,8 +672,11 @@ async function searchYouTube(query) {
     .map(video => ({
       id: video.videoId,
       title: video.title,
-      duration: video.timestamp || "غير معروف",
-      views: video.views || 0,
+      duration:
+        video.timestamp ||
+        "غير معروف",
+      views:
+        video.views || 0,
       author:
         video.author?.name ||
         "غير معروف",
@@ -583,46 +688,57 @@ async function searchYouTube(query) {
 
 
 /* =========================
-   عرض نتائج البحث
+   قائمة النتائج
 ========================= */
 
-async function showSearchResults(api, event, results) {
+async function showSearchResults(
+  api,
+  event,
+  results
+) {
   let message =
-`╭───〔 𓆩 𝐒𝐎𝐌𝐈 𓆪 〕───╮
-│ 🎵 نتائج البحث
-╰────────────────────╯
+`⌬ ━━ 𝗛𝗜𝗡𝗔 MEDIA ━━ ⌬
+
+🎵 نتائج البحث عن الصوت
 
 `;
 
-  results.forEach((video, index) => {
-    message +=
-`${index + 1} ┃ ${video.title}
+  results.forEach(
+    (video, index) => {
+      message +=
+`${index + 1} ─ ${video.title}
    ├ المدة: ${video.duration}
    └ القناة: ${video.author}
 
 `;
-  });
-
-  message +=
-`╰─❖ أرسل رقم الأغنية لتحميل الصوت`;
-
-  const sent = await api.sendMessage(
-    message,
-    event.threadID
+    }
   );
 
-  /*
-   * نفس نظام handleReply الموجود في أوامر البوت
-   */
-  if (!global.client.handleReply) {
+  message +=
+`⌬ ━━━━━━━━━━━━━━━ ⌬
+↳ أرسل رقم الأغنية لتحميلها`;
+
+  const sent =
+    await api.sendMessage(
+      message,
+      event.threadID
+    );
+
+  if (
+    !global.client.handleReply
+  ) {
     global.client.handleReply = [];
   }
 
   global.client.handleReply.push({
-    name: module.exports.config.name,
-    messageID: sent.messageID,
-    author: event.senderID,
-    links: results
+    name:
+      module.exports.config.name,
+    messageID:
+      sent.messageID,
+    author:
+      event.senderID,
+    links:
+      results
   });
 
   return sent;
@@ -633,28 +749,29 @@ async function showSearchResults(api, event, results) {
    الأمر الرئيسي
 ========================= */
 
-module.exports.run = async function ({
+module.exports.run =
+async function ({
   api,
   event,
   args
 }) {
   try {
-    await fs.ensureDir(CACHE_DIR);
+    await fs.ensureDir(
+      CACHE_DIR
+    );
 
-    /*
-     * تنظيف الملفات القديمة
-     */
-    cleanCache().catch(() => {});
+    cleanCache().catch(
+      () => {}
+    );
 
-    const input = args
-      .join(" ")
-      .trim();
+    const input =
+      args.join(" ").trim();
 
     if (!input) {
       return api.sendMessage(
-`╭───〔 𓆩 𝐒𝐎𝐌𝐈 𓆪 〕───╮
-│ 🎵 أمر سمعيني
-╰────────────────────╯
+`⌬ ━━ 𝗛𝗜𝗡𝗔 MEDIA ━━ ⌬
+
+🎵 أمر سمعيني
 
 الاستخدام:
 
@@ -673,10 +790,9 @@ module.exports.run = async function ({
       );
     }
 
-    /*
-     * رابط مباشر
-     */
-    if (isYouTubeUrl(input)) {
+    if (
+      isYouTubeUrl(input)
+    ) {
       return processUrl(
         api,
         event,
@@ -684,16 +800,17 @@ module.exports.run = async function ({
       );
     }
 
-    /*
-     * البحث
-     */
-    const loading = await api.sendMessage(
-      "⌬ جاري البحث عن الأغنية...",
-      event.threadID
-    );
+    const loading =
+      await api.sendMessage(
+        "⌬ جاري البحث عن الأغنية...",
+        event.threadID
+      );
 
     try {
-      const results = await searchYouTube(input);
+      const results =
+        await searchYouTube(
+          input
+        );
 
       await api.unsendMessage(
         loading.messageID
@@ -729,10 +846,11 @@ module.exports.run = async function ({
 
 
 /* =========================
-   اختيار نتيجة البحث
+   اختيار نتيجة
 ========================= */
 
-module.exports.handleReply = async function ({
+module.exports.handleReply =
+async function ({
   api,
   event,
   handleReply
@@ -740,29 +858,36 @@ module.exports.handleReply = async function ({
   let filePath = null;
 
   try {
-    /*
-     * حماية من الرد من شخص آخر
-     */
     if (
       handleReply.author &&
-      String(handleReply.author) !== String(event.senderID)
+      String(
+        handleReply.author
+      ) !==
+      String(
+        event.senderID
+      )
     ) {
       return;
     }
 
-    const input = String(
-      event.body || ""
-    ).trim();
+    const input =
+      String(
+        event.body || ""
+      ).trim();
 
-    const number = parseInt(
-      input,
-      10
-    );
+    const number =
+      parseInt(
+        input,
+        10
+      );
 
     if (
-      !Number.isInteger(number) ||
+      !Number.isInteger(
+        number
+      ) ||
       number < 1 ||
-      number > handleReply.links.length
+      number >
+        handleReply.links.length
     ) {
       return api.sendMessage(
         `❌ اختر رقمًا من 1 إلى ${handleReply.links.length}`,
@@ -772,33 +897,41 @@ module.exports.handleReply = async function ({
     }
 
     const selected =
-      handleReply.links[number - 1];
+      handleReply.links[
+        number - 1
+      ];
 
-    /*
-     * حذف رسالة النتائج
-     */
-    if (handleReply.messageID) {
+    if (
+      handleReply.messageID
+    ) {
       await api.unsendMessage(
         handleReply.messageID
       ).catch(() => {});
     }
 
-    const loading = await api.sendMessage(
-      `⌬ جاري تحميل الصوت...\n\n🎵 ${selected.title}`,
-      event.threadID
-    );
+    const loading =
+      await api.sendMessage(
+        `⌬ جاري تحميل الصوت...
+
+🎵 ${selected.title}`,
+        event.threadID
+      );
 
     try {
-      const info = await getVideoInfo(
-        selected.id
-      );
+      const info =
+        await getVideoInfo(
+          selected.id
+        );
 
-      const audio = await downloadAudio(
-        selected.id,
-        info.title || selected.title
-      );
+      const audio =
+        await downloadAudio(
+          selected.id,
+          info.title ||
+            selected.title
+        );
 
-      filePath = audio.filePath;
+      filePath =
+        audio.filePath;
 
       await api.unsendMessage(
         loading.messageID
@@ -822,16 +955,16 @@ module.exports.handleReply = async function ({
 
   } catch (error) {
     if (filePath) {
-      await fs.remove(filePath).catch(() => {});
+      await fs.remove(
+        filePath
+      ).catch(() => {});
     }
 
     return sendError(
       api,
       event,
       error,
-      `الأغنية المختارة:\n${
-        handleReply?.links?.[0]?.title || "غير معروف"
-      }`
+      "تعذر تحميل الأغنية المختارة"
     );
   }
 };
@@ -841,16 +974,22 @@ module.exports.handleReply = async function ({
    حماية إضافية
 ========================= */
 
-process.on("unhandledRejection", error => {
-  console.error(
-    "[سمعيني] UNHANDLED REJECTION:",
-    error
-  );
-});
+process.on(
+  "unhandledRejection",
+  error => {
+    console.error(
+      "[سمعيني] UNHANDLED REJECTION:",
+      error
+    );
+  }
+);
 
-process.on("uncaughtException", error => {
-  console.error(
-    "[سمعيني] UNCAUGHT EXCEPTION:",
-    error
-  );
-});
+process.on(
+  "uncaughtException",
+  error => {
+    console.error(
+      "[سمعيني] UNCAUGHT EXCEPTION:",
+      error
+    );
+  }
+);
