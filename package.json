@@ -62,6 +62,7 @@
 "to-zalgo": "^1.0.1",
 "totp-generator": "^0.0.14",
 "yt-search": "^2.13.1",
+"youtubei.js": "^18.0.0", 
 "@ybd-project/ytdl-core": "^6.0.8",
 "tesseract.js": "^4.1.1",
 "hut-chat-api": "^1.0.5",
