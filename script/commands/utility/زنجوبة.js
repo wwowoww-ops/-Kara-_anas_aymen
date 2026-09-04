@@ -7,7 +7,7 @@ const conversationHistory = new Map();
 
 module.exports.config = {
   name: "زنجوبة",
-  version: "19.0.0",
+  version: "20.0.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
   description: "زنجوبة — ذكاء اصطناعي تونسي للدردشة",
@@ -23,17 +23,21 @@ const CONFIG_PATH = path.join(
   "config.json"
 );
 
-const OPENROUTER_URL =
-  "https://openrouter.ai/api/v1/chat/completions";
+const GROQ_URL =
+  "https://api.groq.com/openai/v1/chat/completions";
 
-const MODEL = "openrouter/free";
+/*
+ * موديل Groq
+ */
+const MODEL =
+  "llama-3.3-70b-versatile";
 
 
 /* =========================
-   قراءة مفتاح OpenRouter
+   قراءة مفتاح Groq
 ========================= */
 
-function getOpenRouterKey() {
+function getGroqKey() {
   try {
     if (!fs.existsSync(CONFIG_PATH)) {
       return null;
@@ -46,7 +50,8 @@ function getOpenRouterKey() {
       )
     );
 
-    const key = config.MODEL_API_KEY;
+    const key =
+      config.MODEL_API_KEY;
 
     if (
       !key ||
@@ -88,24 +93,24 @@ function getOpenRouterKey() {
 
 
 /* =========================
-   إرسال الطلب إلى OpenRouter
+   إرسال الطلب إلى Groq
 ========================= */
 
-async function askOpenRouter(
+async function askGroq(
   messages,
   maxTokens
 ) {
   const apiKey =
-    getOpenRouterKey();
+    getGroqKey();
 
   if (!apiKey) {
     const error =
       new Error(
-        "OPENROUTER_KEY_MISSING"
+        "GROQ_KEY_MISSING"
       );
 
     error.code =
-      "OPENROUTER_KEY_MISSING";
+      "GROQ_KEY_MISSING";
 
     throw error;
   }
@@ -113,7 +118,7 @@ async function askOpenRouter(
   try {
     const response =
       await axios.post(
-        OPENROUTER_URL,
+        GROQ_URL,
         {
           model: MODEL,
           messages,
@@ -128,13 +133,7 @@ async function askOpenRouter(
               `Bearer ${apiKey}`,
 
             "Content-Type":
-              "application/json",
-
-            "HTTP-Referer":
-              "https://openrouter.ai/",
-
-            "X-Title":
-              "HINA - Zanjooba"
+              "application/json"
           },
 
           timeout: 60000
@@ -153,16 +152,12 @@ async function askOpenRouter(
     ) {
       const error =
         new Error(
-          "EMPTY_OPENROUTER_RESPONSE"
+          "EMPTY_GROQ_RESPONSE"
         );
 
       error.code =
-        "EMPTY_OPENROUTER_RESPONSE";
+        "EMPTY_GROQ_RESPONSE";
 
-      /*
-       * الاحتفاظ برد OpenRouter
-       * إذا كان موجودًا حتى نعرضه لاحقًا
-       */
       error.responseData =
         response?.data;
 
@@ -175,7 +170,7 @@ async function askOpenRouter(
 
     if (error.response) {
       console.error(
-        "[ZANJOUBA] OpenRouter Error:",
+        "[ZANJOUBA] Groq Error:",
         error.response.status,
         error.response.data
       );
@@ -519,7 +514,7 @@ async function generateReply(
   ];
 
   const answer =
-    await askOpenRouter(
+    await askGroq(
       messages,
       maxTokens
     );
@@ -552,10 +547,10 @@ async function generateReply(
 
 
 /* =========================
-   تحويل الخطأ إلى نص
+   تحويل خطأ Groq إلى نص
 ========================= */
 
-function formatOpenRouterError(
+function formatGroqError(
   error
 ) {
   const status =
@@ -568,7 +563,7 @@ function formatOpenRouterError(
   let errorText = "";
 
   /*
-   * خطأ JSON من OpenRouter
+   * بيانات Groq الأصلية
    */
   if (data) {
     try {
@@ -585,7 +580,7 @@ function formatOpenRouterError(
   }
 
   /*
-   * إذا لم يكن هناك JSON
+   * إذا لم يرجع Groq بيانات
    */
   if (!errorText) {
     errorText =
@@ -595,24 +590,27 @@ function formatOpenRouterError(
   }
 
   /*
-   * أخطاء معروفة
+   * مفتاح مفقود
    */
   if (
     error?.code ===
-    "OPENROUTER_KEY_MISSING"
+    "GROQ_KEY_MISSING"
   ) {
     errorText =
-      "OPENROUTER_KEY_MISSING\n\n" +
-      "مفتاح OpenRouter غير موجود أو غير صالح في config.json";
+      "GROQ_KEY_MISSING\n\n" +
+      "مفتاح Groq غير موجود أو غير صالح في config.json";
   }
 
+  /*
+   * إجابة فارغة
+   */
   else if (
     error?.code ===
-    "EMPTY_OPENROUTER_RESPONSE"
+    "EMPTY_GROQ_RESPONSE"
   ) {
     errorText =
-      "EMPTY_OPENROUTER_RESPONSE\n\n" +
-      "OpenRouter لم يرجع محتوى داخل choices[0].message.content\n\n" +
+      "EMPTY_GROQ_RESPONSE\n\n" +
+      "Groq لم يرجع محتوى داخل choices[0].message.content\n\n" +
       (
         data
           ? JSON.stringify(
@@ -634,7 +632,7 @@ function formatOpenRouterError(
   }
 
   /*
-   * منع الرسالة من أن تكون ضخمة جدًا
+   * اختصار الخطأ إذا كان ضخمًا
    */
   if (errorText.length > 3500) {
     errorText =
@@ -650,26 +648,26 @@ function formatOpenRouterError(
 
 
 /* =========================
-   إرسال خطأ OpenRouter
+   إرسال خطأ Groq
 ========================= */
 
-function sendOpenRouterError(
+function sendGroqError(
   api,
   event,
   error
 ) {
   const errorText =
-    formatOpenRouterError(
+    formatGroqError(
       error
     );
 
   console.error(
-    "[ZANJOUBA] FINAL ERROR:",
+    "[ZANJOUBA] FINAL GROQ ERROR:",
     errorText
   );
 
   const message =
-    `🐿️ خطأ OpenRouter 🌰\n\n` +
+    `🐿️ خطأ Groq 🌰\n\n` +
     `${errorText}`;
 
   try {
@@ -965,7 +963,7 @@ module.exports.run =
       );
 
     } catch (error) {
-      sendOpenRouterError(
+      sendGroqError(
         api,
         event,
         error
@@ -1058,7 +1056,7 @@ module.exports.handleReply =
       );
 
     } catch (error) {
-      sendOpenRouterError(
+      sendGroqError(
         api,
         event,
         error
