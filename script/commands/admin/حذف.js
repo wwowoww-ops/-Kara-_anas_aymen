@@ -2,7 +2,7 @@ const fs = require("fs-extra");
 
 module.exports.config = {
   name: "حذف",
-  version: "2.0.0",
+  version: "2.1.0",
   hasPermssion: 1,
   credits: "أبو هريرة",
   description: "حذف رسالة معينة أو عدد من الرسائل",
@@ -12,23 +12,59 @@ module.exports.config = {
 };
 
 // ======================================================
-// جلب ID المطور
+// جلب IDs المطورين
 // ======================================================
 
-function getDeveloperID() {
+function getDeveloperIDs() {
+  const ids = [];
+
+  try {
+    if (Array.isArray(global.config?.ADMINBOT)) {
+      for (const id of global.config.ADMINBOT) {
+        if (id) {
+          ids.push(String(id));
+        }
+      }
+    }
+  } catch (e) {}
+
+  try {
+    const dev = global.config?.KIRA_CONF?.dev;
+
+    if (dev) {
+      ids.push(String(dev));
+    }
+  } catch (e) {}
+
   try {
     const config = JSON.parse(
       fs.readFileSync("./config.json", "utf8")
     );
 
-    return String(
-      config.KIRA_CONF?.dev ||
-      config.ADMINBOT?.[0] ||
-      ""
-    );
-  } catch (e) {
-    return "";
-  }
+    if (Array.isArray(config.ADMINBOT)) {
+      for (const id of config.ADMINBOT) {
+        if (id) {
+          ids.push(String(id));
+        }
+      }
+    }
+
+    if (config.KIRA_CONF?.dev) {
+      ids.push(String(config.KIRA_CONF.dev));
+    }
+  } catch (e) {}
+
+  return [...new Set(ids)];
+}
+
+// ======================================================
+// التحقق من المطور
+// ======================================================
+
+function isDeveloper(userID) {
+  return getDeveloperIDs().includes(
+    String(userID)
+  );
 }
 
 // ======================================================
@@ -47,29 +83,154 @@ function isAdmin(threadInfo, userID) {
     return threadInfo.adminIDs.some(admin => {
       const id =
         typeof admin === "object"
-          ? admin.id
+          ? admin?.id
           : admin;
 
-      return String(id) === String(userID);
+      return (
+        String(id || "") ===
+        String(userID)
+      );
     });
+
   } catch (e) {
     return false;
   }
 }
 
 // ======================================================
-// تنفيذ حذف رسالة
+// جلب معلومات المجموعة
 // ======================================================
 
-async function deleteMessage(api, messageID) {
-  try {
-    if (!messageID) return false;
+async function getThreadInfo(
+  api,
+  Threads,
+  threadID
+) {
+  let threadInfo = null;
 
-    await api.unsendMessage(messageID);
+  // المصدر الأول: Threads.getInfo
+  try {
+    if (
+      Threads &&
+      typeof Threads.getInfo === "function"
+    ) {
+      threadInfo =
+        await Threads.getInfo(threadID);
+    }
+  } catch (e) {
+    threadInfo = null;
+  }
+
+  // المصدر الثاني: api.getThreadInfo
+  if (!threadInfo) {
+    try {
+      if (
+        api &&
+        typeof api.getThreadInfo === "function"
+      ) {
+        threadInfo =
+          await api.getThreadInfo(threadID);
+      }
+    } catch (e) {
+      threadInfo = null;
+    }
+  }
+
+  return threadInfo;
+}
+
+// ======================================================
+// حذف رسالة
+// ======================================================
+
+async function deleteMessage(
+  api,
+  messageID
+) {
+  try {
+    if (
+      !api ||
+      !messageID ||
+      typeof api.unsendMessage !== "function"
+    ) {
+      return false;
+    }
+
+    await api.unsendMessage(
+      messageID
+    );
 
     return true;
+
   } catch (e) {
     return false;
+  }
+}
+
+// ======================================================
+// إرسال رسالة آمن
+// ======================================================
+
+async function sendMessage(
+  api,
+  message,
+  threadID,
+  messageID
+) {
+  try {
+    if (
+      !api ||
+      typeof api.sendMessage !== "function"
+    ) {
+      return;
+    }
+
+    return await new Promise(resolve => {
+
+      let finished = false;
+
+      const done = (
+        error,
+        info
+      ) => {
+
+        if (finished) {
+          return;
+        }
+
+        finished = true;
+
+        if (error) {
+          console.error(
+            "[حذف SEND ERROR]",
+            error
+          );
+        }
+
+        resolve(info);
+      };
+
+      try {
+
+        api.sendMessage(
+          message,
+          threadID,
+          done,
+          messageID
+        );
+
+      } catch (error) {
+
+        done(error);
+      }
+    });
+
+  } catch (error) {
+
+    console.error(
+      "[حذف SEND ERROR]",
+      error.message
+    );
   }
 }
 
@@ -80,7 +241,8 @@ async function deleteMessage(api, messageID) {
 module.exports.run = async function({
   api,
   event,
-  args
+  args,
+  Threads
 }) {
 
   const {
@@ -90,68 +252,79 @@ module.exports.run = async function({
     messageReply
   } = event;
 
-  const header = `⌬ ━━ HINA ━━ ⌬`;
+  const header =
+    "⌬ ━━ HINA ━━ ⌬";
 
   try {
+
+    // ==================================================
+    // التحقق من المطور
+    // ==================================================
+
+    const developer =
+      isDeveloper(senderID);
 
     // ==================================================
     // جلب معلومات المجموعة
     // ==================================================
 
-    let threadInfo;
-
-    try {
-      threadInfo =
-        await api.getThreadInfo(threadID);
-    } catch (e) {
-      threadInfo = null;
-    }
+    const threadInfo =
+      await getThreadInfo(
+        api,
+        Threads,
+        threadID
+      );
 
     // ==================================================
-    // المطور
+    // التحقق من أدمن المجموعة
     // ==================================================
 
-    const devID = getDeveloperID();
-
-    const isDeveloper =
-      devID &&
-      String(senderID) === String(devID);
-
-    // ==================================================
-    // أدمن المجموعة
-    // ==================================================
-
-    const isGroupAdmin =
+    const groupAdmin =
       isAdmin(
         threadInfo,
         senderID
       );
 
     // ==================================================
-    // الصلاحية:
-    // المطور أو أدمن المجموعة
+    // الصلاحية
     // ==================================================
 
     if (
-      !isDeveloper &&
-      !isGroupAdmin
+      !developer &&
+      !groupAdmin
     ) {
-      return api.sendMessage(
-        `${header}\n\n⛔ هذا الأمر للأدمن أو المطور فقط!`,
+
+      return sendMessage(
+        api,
+        `${header}
+
+⛔ هذا الأمر للأدمن أو المطور فقط!`,
         threadID,
         messageID
       );
     }
 
     // ==================================================
-    // الحالة 1:
-    // حذف رسالة محددة بالرد عليها
+    // الحالة 1
+    // حذف رسالة بالرد عليها
     // ==================================================
 
     if (messageReply) {
 
       const targetMessageID =
         messageReply.messageID;
+
+      if (!targetMessageID) {
+
+        return sendMessage(
+          api,
+          `${header}
+
+❌ لم أتمكن من تحديد الرسالة المراد حذفها.`,
+          threadID,
+          messageID
+        );
+      }
 
       const deleted =
         await deleteMessage(
@@ -160,28 +333,35 @@ module.exports.run = async function({
         );
 
       if (!deleted) {
-        return api.sendMessage(
-          `${header}\n\n❌ حدث خطأ أثناء حذف الرسالة المحددة.`,
+
+        return sendMessage(
+          api,
+          `${header}
+
+❌ حدث خطأ أثناء حذف الرسالة المحددة.`,
           threadID,
           messageID
         );
       }
 
-      return api.sendMessage(
-        `${header}\n\n✅ تم حذف الرسالة المحددة.`,
+      return sendMessage(
+        api,
+        `${header}
+
+✅ تم حذف الرسالة المحددة.`,
         threadID,
         messageID
       );
     }
 
     // ==================================================
-    // الحالة 2:
+    // الحالة 2
     // حذف عدد من الرسائل
     // ==================================================
 
     const num =
       parseInt(
-        args && args[0],
+        args?.[0],
         10
       );
 
@@ -191,9 +371,16 @@ module.exports.run = async function({
     ) {
 
       const count =
-        Math.min(num, 50);
+        Math.min(
+          num,
+          50
+        );
 
       let messages;
+
+      // ==================================================
+      // جلب سجل الرسائل
+      // ==================================================
 
       try {
 
@@ -203,10 +390,15 @@ module.exports.run = async function({
             count + 1
           );
 
-      } catch (e) {
+      } catch (error) {
 
-        return api.sendMessage(
-          `${header}\n\n❌ حدث خطأ أثناء جلب الرسائل:\n${e.message}`,
+        return sendMessage(
+          api,
+          `${header}
+
+❌ حدث خطأ أثناء جلب الرسائل
+
+${error.message}`,
           threadID,
           messageID
         );
@@ -217,32 +409,48 @@ module.exports.run = async function({
         messages.length === 0
       ) {
 
-        return api.sendMessage(
-          `${header}\n\n⚠️ لم يتم العثور على رسائل للحذف.`,
+        return sendMessage(
+          api,
+          `${header}
+
+⚠️ لم يتم العثور على رسائل للحذف.`,
           threadID,
           messageID
         );
       }
 
-      // ------------------------------------------------
-      // استخراج IDs مع استثناء رسالة الأمر
-      // ------------------------------------------------
+      // ==================================================
+      // استخراج الرسائل
+      // ==================================================
 
       const msgIDs =
         messages
-          .filter(msg =>
-            msg &&
-            msg.messageID &&
-            String(msg.messageID) !==
+          .filter(msg => {
+
+            if (
+              !msg ||
+              !msg.messageID
+            ) {
+              return false;
+            }
+
+            return (
+              String(msg.messageID) !==
               String(messageID)
+            );
+          })
+          .map(
+            msg =>
+              msg.messageID
           )
-          .map(msg =>
-            msg.messageID
+          .slice(
+            0,
+            count
           );
 
-      // ------------------------------------------------
+      // ==================================================
       // حذف الرسائل
-      // ------------------------------------------------
+      // ==================================================
 
       let deletedCount = 0;
 
@@ -252,15 +460,17 @@ module.exports.run = async function({
 
         try {
 
-          await api.unsendMessage(id);
+          await api.unsendMessage(
+            id
+          );
 
           deletedCount++;
 
-        } catch (e) {
-          // تجاهل الرسائل التي تعذر حذفها
+        } catch (error) {
+
+          // تجاهل الرسائل التي لا يمكن حذفها
         }
 
-        // تأخير بسيط بين عمليات الحذف
         await new Promise(
           resolve =>
             setTimeout(
@@ -270,33 +480,59 @@ module.exports.run = async function({
         );
       }
 
-      // ------------------------------------------------
+      // ==================================================
       // النتيجة
-      // ------------------------------------------------
+      // ==================================================
 
-      return api.sendMessage(
-        `${header}\n\n✅ تم حذف ${deletedCount} رسالة.`,
+      return sendMessage(
+        api,
+        `${header}
+
+✅ تم حذف ${deletedCount} رسالة.`,
         threadID,
         messageID
       );
     }
 
     // ==================================================
-    // لا يوجد رقم أو رد
+    // الاستخدام
     // ==================================================
 
-    return api.sendMessage(
-      `${header}\n\n📝 الاستخدام:\n• حذف [عدد] (لحذف عدد من الرسائل)\n• حذف (رداً على رسالة) لحذفها\n• الحد الأقصى: 50 رسالة`,
+    return sendMessage(
+      api,
+      `${header}
+
+📝 الاستخدام:
+
+• حذف [عدد]
+لحذف عدد من الرسائل
+
+• حذف
+بالرد على رسالة لحذفها
+
+• الحد الأقصى: 50 رسالة`,
       threadID,
       messageID
     );
 
   } catch (error) {
 
-    return api.sendMessage(
-      `${header}\n\n❌ حدث خطأ: ${error.message}`,
+    console.error(
+      "[حذف ERROR]",
+      error
+    );
+
+    return sendMessage(
+      api,
+      `${header}
+
+❌ حدث خطأ أثناء تنفيذ الأمر
+
+${error.message}`,
       threadID,
       messageID
     );
   }
 };
+
+هذا الإصدار يحافظ على صلاحية المطور أو أدمن المجموعة ويجعل جلب "adminIDs" أكثر تحملًا للمشكلة التي ظهرت عندك مع "getThreadInfo()".
