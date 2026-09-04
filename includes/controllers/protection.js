@@ -5,13 +5,7 @@ module.exports = function ({ models }) {
         models.model &&
         models.model.Threads;
 
-
-    // ============================================================
-    // الإعدادات الافتراضية
-    // ============================================================
-
     const DEFAULT_PROTECTION = {
-
         enabled: {
             groupName: false,
             nicknames: false,
@@ -22,46 +16,27 @@ module.exports = function ({ models }) {
         },
 
         saved: {
-
             name: null,
-
             theme: null,
-
             emoji: null,
-
             description: null,
-
             nicknames: {},
-
             image: null
-
         }
-
     };
 
 
-    // ============================================================
-    // نسخ الإعدادات الافتراضية
-    // ============================================================
-
     function createDefault() {
-
         return JSON.parse(
             JSON.stringify(DEFAULT_PROTECTION)
         );
-
     }
 
-
-    // ============================================================
-    // دمج الإعدادات
-    // ============================================================
 
     function mergeProtection(data) {
 
         const result =
             createDefault();
-
 
         if (
             data &&
@@ -80,7 +55,6 @@ module.exports = function ({ models }) {
 
             }
 
-
             if (
                 data.saved &&
                 typeof data.saved === "object"
@@ -95,21 +69,14 @@ module.exports = function ({ models }) {
 
         }
 
-
         return result;
-
     }
 
-
-    // ============================================================
-    // جلب إعدادات الحماية
-    // ============================================================
 
     async function getProtection(threadID) {
 
         threadID =
             String(threadID);
-
 
         try {
 
@@ -123,16 +90,12 @@ module.exports = function ({ models }) {
 
             }
 
-
             const row =
                 await Threads.findOne({
-
                     where: {
                         threadID
                     }
-
                 });
-
 
             if (!row) {
 
@@ -140,13 +103,11 @@ module.exports = function ({ models }) {
 
             }
 
-
             const data =
                 row.data &&
                 typeof row.data === "object"
                     ? row.data
                     : {};
-
 
             return mergeProtection(
                 data.protection
@@ -166,10 +127,6 @@ module.exports = function ({ models }) {
     }
 
 
-    // ============================================================
-    // حفظ إعدادات الحماية
-    // ============================================================
-
     async function saveProtection(
         threadID,
         protection
@@ -177,7 +134,6 @@ module.exports = function ({ models }) {
 
         threadID =
             String(threadID);
-
 
         try {
 
@@ -191,53 +147,32 @@ module.exports = function ({ models }) {
 
             }
 
-
             const cleanProtection =
                 mergeProtection(
                     protection
                 );
 
-
             let row =
                 await Threads.findOne({
-
                     where: {
                         threadID
                     }
-
                 });
-
-
-            // ----------------------------------------------------
-            // إنشاء المجموعة إذا لم تكن موجودة
-            // ----------------------------------------------------
 
             if (!row) {
 
                 await Threads.create({
-
                     threadID,
-
                     threadInfo: {},
-
                     data: {
-
                         protection:
                             cleanProtection
-
                     }
-
                 });
-
 
                 return true;
 
             }
-
-
-            // ----------------------------------------------------
-            // البيانات الحالية
-            // ----------------------------------------------------
 
             const currentData =
                 row.data &&
@@ -245,27 +180,15 @@ module.exports = function ({ models }) {
                     ? row.data
                     : {};
 
-
-            // ----------------------------------------------------
-            // تحديث الحماية فقط
-            // ----------------------------------------------------
-
             const newData = {
-
                 ...currentData,
-
                 protection:
                     cleanProtection
-
             };
 
-
             await row.update({
-
                 data: newData
-
             });
-
 
             return true;
 
@@ -283,10 +206,6 @@ module.exports = function ({ models }) {
     }
 
 
-    // ============================================================
-    // تعديل حماية واحدة
-    // ============================================================
-
     async function toggle(
         threadID,
         protectionName
@@ -296,7 +215,6 @@ module.exports = function ({ models }) {
             await getProtection(
                 threadID
             );
-
 
         if (
             !Object.prototype.hasOwnProperty.call(
@@ -309,7 +227,6 @@ module.exports = function ({ models }) {
 
         }
 
-
         protection.enabled[
             protectionName
         ] =
@@ -317,15 +234,10 @@ module.exports = function ({ models }) {
                 protectionName
             ];
 
-
         return protection;
 
     }
 
-
-    // ============================================================
-    // تفعيل جميع الحمايات
-    // ============================================================
 
     async function enableAll(
         threadID
@@ -336,10 +248,9 @@ module.exports = function ({ models }) {
                 threadID
             );
 
-
         for (
-            const key
-            of Object.keys(
+            const key of
+            Object.keys(
                 protection.enabled
             )
         ) {
@@ -349,15 +260,10 @@ module.exports = function ({ models }) {
 
         }
 
-
         return protection;
 
     }
 
-
-    // ============================================================
-    // تعطيل جميع الحمايات
-    // ============================================================
 
     async function disableAll(
         threadID
@@ -368,10 +274,9 @@ module.exports = function ({ models }) {
                 threadID
             );
 
-
         for (
-            const key
-            of Object.keys(
+            const key of
+            Object.keys(
                 protection.enabled
             )
         ) {
@@ -381,15 +286,10 @@ module.exports = function ({ models }) {
 
         }
 
-
         return protection;
 
     }
 
-
-    // ============================================================
-    // حفظ قيمة محمية
-    // ============================================================
 
     async function saveValue(
         threadID,
@@ -402,7 +302,6 @@ module.exports = function ({ models }) {
                 threadID
             );
 
-
         if (
             !Object.prototype.hasOwnProperty.call(
                 protection.saved,
@@ -414,10 +313,8 @@ module.exports = function ({ models }) {
 
         }
 
-
         protection.saved[type] =
             value;
-
 
         return saveProtection(
             threadID,
@@ -427,24 +324,13 @@ module.exports = function ({ models }) {
     }
 
 
-    // ============================================================
-    // إرجاع الدوال
-    // ============================================================
-
     return {
-
         getProtection,
-
         saveProtection,
-
         toggle,
-
         enableAll,
-
         disableAll,
-
         saveValue
-
     };
 
 };
