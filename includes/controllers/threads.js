@@ -1,19 +1,17 @@
-const path = require("path");
-
 module.exports = function ({ models, api }) {
 
-    const mongodb = require(
-        path.join(
-            process.cwd(),
-            "includes",
-            "mongodb.js"
-        )
-    );
+    // ============================================================
+    // موديل Threads من Sequelize / Neon
+    // ============================================================
+
+    const Threads =
+        models &&
+        models.model &&
+        models.model.Threads;
 
 
     // ============================================================
-    // جلب معلومات المجموعة
-    // يدعم FCA التي تستخدم Callback
+    // جلب معلومات المجموعة من Facebook
     // ============================================================
 
     async function getInfo(threadID) {
@@ -38,7 +36,6 @@ module.exports = function ({ models, api }) {
 
                 }
 
-
                 api.getThreadInfo(
                     threadID,
                     (error, info) => {
@@ -55,7 +52,6 @@ module.exports = function ({ models, api }) {
 
                         }
 
-
                         if (
                             !info ||
                             typeof info !== "object"
@@ -69,7 +65,6 @@ module.exports = function ({ models, api }) {
                             return;
 
                         }
-
 
                         resolve(info);
 
@@ -93,28 +88,29 @@ module.exports = function ({ models, api }) {
 
 
     // ============================================================
-    // جلب جميع المجموعات من MongoDB
+    // جلب جميع المجموعات من Neon
     // ============================================================
 
     async function getAll() {
 
         try {
 
-            if (
-                !mongodb ||
-                typeof mongodb.getAllThreads !== "function"
-            ) {
+            if (!Threads) {
+
+                console.error(
+                    "❌ [Threads] موديل Threads غير موجود"
+                );
 
                 return [];
 
             }
 
-            const threads =
-                await mongodb.getAllThreads();
+            const rows =
+                await Threads.findAll();
 
-            return Array.isArray(threads)
-                ? threads
-                : [];
+            return rows.map(
+                row => row.toJSON()
+            );
 
         } catch (error) {
 
@@ -131,7 +127,7 @@ module.exports = function ({ models, api }) {
 
 
     // ============================================================
-    // جلب بيانات المجموعة من MongoDB
+    // جلب بيانات المجموعة من Neon
     // ============================================================
 
     async function getData(threadID) {
@@ -140,14 +136,29 @@ module.exports = function ({ models, api }) {
 
         try {
 
-            if (
-                !mongodb ||
-                typeof mongodb.getThreadData !== "function"
-            ) {
+            if (!Threads) {
+
+                console.error(
+                    "❌ [Threads] موديل Threads غير موجود"
+                );
+
+                return false;
+
+            }
+
+            const row =
+                await Threads.findOne({
+                    where: {
+                        threadID
+                    }
+                });
+
+
+            if (!row) {
 
                 return {
                     threadID,
-                    threadName: "KIRA Group",
+                    threadName: "HINA Group",
                     settings: {}
                 };
 
@@ -155,23 +166,16 @@ module.exports = function ({ models, api }) {
 
 
             const data =
-                await mongodb.getThreadData(
-                    threadID
-                );
+                row.data &&
+                typeof row.data === "object"
+                    ? row.data
+                    : {};
 
 
-            if (!data) {
-
-                return {
-                    threadID,
-                    threadName: "KIRA Group",
-                    settings: {}
-                };
-
-            }
-
-
-            return data;
+            return {
+                threadID,
+                ...data
+            };
 
         } catch (error) {
 
@@ -188,7 +192,7 @@ module.exports = function ({ models, api }) {
 
 
     // ============================================================
-    // تحديث بيانات المجموعة
+    // تحديث بيانات المجموعة في Neon
     // ============================================================
 
     async function setData(
@@ -200,13 +204,10 @@ module.exports = function ({ models, api }) {
 
         try {
 
-            if (
-                !mongodb ||
-                typeof mongodb.updateThreadData !== "function"
-            ) {
+            if (!Threads) {
 
                 console.error(
-                    "❌ [Threads] mongodb.updateThreadData غير موجود"
+                    "❌ [Threads] موديل Threads غير موجود"
                 );
 
                 return false;
@@ -224,10 +225,64 @@ module.exports = function ({ models, api }) {
             }
 
 
-            await mongodb.updateThreadData(
-                threadID,
-                options
-            );
+            let row =
+                await Threads.findOne({
+                    where: {
+                        threadID
+                    }
+                });
+
+
+            // ----------------------------------------------------
+            // إذا لم تكن المجموعة موجودة ننشئها
+            // ----------------------------------------------------
+
+            if (!row) {
+
+                await Threads.create({
+
+                    threadID,
+
+                    threadInfo: {},
+
+                    data: options
+
+                });
+
+                return true;
+
+            }
+
+
+            // ----------------------------------------------------
+            // البيانات الحالية
+            // ----------------------------------------------------
+
+            const currentData =
+                row.data &&
+                typeof row.data === "object"
+                    ? row.data
+                    : {};
+
+
+            // ----------------------------------------------------
+            // دمج البيانات الجديدة
+            // ----------------------------------------------------
+
+            const newData = {
+
+                ...currentData,
+
+                ...options
+
+            };
+
+
+            await row.update({
+
+                data: newData
+
+            });
 
 
             return true;
@@ -259,13 +314,10 @@ module.exports = function ({ models, api }) {
 
         try {
 
-            if (
-                !mongodb ||
-                typeof mongodb.createThread !== "function"
-            ) {
+            if (!Threads) {
 
                 console.error(
-                    "❌ [Threads] mongodb.createThread غير موجود"
+                    "❌ [Threads] موديل Threads غير موجود"
                 );
 
                 return false;
@@ -283,10 +335,30 @@ module.exports = function ({ models, api }) {
             }
 
 
-            await mongodb.createThread(
+            const exists =
+                await Threads.findOne({
+                    where: {
+                        threadID
+                    }
+                });
+
+
+            if (exists) {
+
+                return true;
+
+            }
+
+
+            await Threads.create({
+
                 threadID,
-                defaults
-            );
+
+                threadInfo: {},
+
+                data: defaults
+
+            });
 
 
             return true;
@@ -315,13 +387,10 @@ module.exports = function ({ models, api }) {
 
         try {
 
-            if (
-                !mongodb ||
-                typeof mongodb.deleteThread !== "function"
-            ) {
+            if (!Threads) {
 
                 console.error(
-                    "❌ [Threads] mongodb.deleteThread غير موجود"
+                    "❌ [Threads] موديل Threads غير موجود"
                 );
 
                 return false;
@@ -329,9 +398,13 @@ module.exports = function ({ models, api }) {
             }
 
 
-            await mongodb.deleteThread(
-                threadID
-            );
+            await Threads.destroy({
+
+                where: {
+                    threadID
+                }
+
+            });
 
 
             return true;
@@ -339,7 +412,7 @@ module.exports = function ({ models, api }) {
         } catch (error) {
 
             console.error(
-                `❌ [Threads] فشل حذف المجموعة ${threadID}:`,
+                `❌ [Threads] فشل حذف بيانات المجموعة ${threadID}:`,
                 error
             );
 
@@ -364,9 +437,9 @@ module.exports = function ({ models, api }) {
 
         setData,
 
-        delData,
+        createData,
 
-        createData
+        delData
 
     };
 
