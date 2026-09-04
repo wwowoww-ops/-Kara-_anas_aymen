@@ -231,7 +231,7 @@ function levenshtein(a, b) {
       if (b[i - 1] === a[j - 1]) {
 
         matrix[i][j] =
-          matrix[i - 1][j - 1];
+          matrix[i - 1][j];
 
       } else {
 
@@ -658,6 +658,187 @@ async function sendMessage(
 }
 
 // ============================================================
+// GET THREAD INFO
+// ============================================================
+
+async function getThreadInfoSafe(
+  api,
+  Threads,
+  threadInfo,
+  threadID
+) {
+
+  // ==========================================================
+  // 1 ـ الذاكرة
+  // ==========================================================
+
+  try {
+
+    const cached =
+      threadInfo.get(
+        String(threadID)
+      );
+
+    if (
+      cached &&
+      Array.isArray(cached.adminIDs)
+    ) {
+      return cached;
+    }
+
+  } catch (e) {}
+
+  // ==========================================================
+  // 2 ـ Threads Controller
+  // ==========================================================
+
+  if (
+    Threads &&
+    typeof Threads.getInfo ===
+      "function"
+  ) {
+
+    try {
+
+      const info =
+        await Threads.getInfo(
+          String(threadID)
+        );
+
+      if (info) {
+
+        try {
+          threadInfo.set(
+            String(threadID),
+            info
+          );
+        } catch (e) {}
+
+        return info;
+      }
+
+    } catch (error) {
+
+      console.error(
+        "[THREAD INFO ERROR]",
+        error.message
+      );
+    }
+  }
+
+  // ==========================================================
+  // 3 ـ API
+  // ==========================================================
+
+  if (
+    api &&
+    typeof api.getThreadInfo ===
+      "function"
+  ) {
+
+    try {
+
+      const info =
+        await new Promise(resolve => {
+
+          let finished = false;
+
+          const done = (
+            error,
+            result
+          ) => {
+
+            if (finished) {
+              return;
+            }
+
+            finished = true;
+
+            if (error) {
+              resolve(null);
+              return;
+            }
+
+            resolve(result || null);
+          };
+
+          try {
+
+            const result =
+              api.getThreadInfo(
+                String(threadID),
+                done
+              );
+
+            // بعض نسخ الـAPI ترجع Promise
+            if (
+              result &&
+              typeof result.then ===
+                "function"
+            ) {
+
+              result
+                .then(
+                  data => done(
+                    null,
+                    data
+                  )
+                )
+                .catch(
+                  () => done(
+                    true,
+                    null
+                  )
+                );
+            }
+
+          } catch (error) {
+
+            done(
+              error,
+              null
+            );
+          }
+
+          // حماية من التعليق
+          setTimeout(
+            () => {
+
+              if (!finished) {
+                finished = true;
+                resolve(null);
+              }
+
+            },
+            5000
+          );
+        });
+
+      if (info) {
+
+        try {
+          threadInfo.set(
+            String(threadID),
+            info
+          );
+        } catch (e) {}
+
+        return info;
+      }
+
+    } catch (error) {
+
+      console.error(
+        "[API THREAD INFO ERROR]",
+        error.message
+      );
+    }
+  }
+
+  return null;
+}
+
+// ============================================================
 // MAIN HANDLER
 // ============================================================
 
@@ -892,41 +1073,13 @@ module.exports = function ({
       // GROUP ADMIN
       // ======================================================
 
-      let info =
-        threadInfo.get(
+      const info =
+        await getThreadInfoSafe(
+          api,
+          Threads,
+          threadInfo,
           threadID
         );
-
-      if (
-        !info &&
-        Threads &&
-        typeof Threads.getInfo ===
-          "function"
-      ) {
-
-        try {
-
-          info =
-            await Threads.getInfo(
-              threadID
-            );
-
-          if (info) {
-
-            threadInfo.set(
-              threadID,
-              info
-            );
-          }
-
-        } catch (error) {
-
-          console.error(
-            "[THREAD INFO ERROR]",
-            error.message
-          );
-        }
-      }
 
       const admins =
         Array.isArray(
@@ -997,17 +1150,6 @@ module.exports = function ({
       // ======================================================
       // RESTRICTED GROUP
       // ======================================================
-
-      /*
-       * إذا كانت المجموعة مقيدة:
-       *
-       * المطور      = يستطيع استخدام الأوامر
-       * أدمن المجموعة = يستطيع استخدام الأوامر
-       * العضو العادي = ممنوع
-       *
-       * أمر "تقييد" نفسه سيعمل للأدمن والمطور
-       * لأن فحص التقييد يستثنيهم.
-       */
 
       if (
         isGroupRestricted(
