@@ -1,9 +1,9 @@
 module.exports.config = {
   name: "كنية",
-  version: "4.1.0",
+  version: "4.3.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
-  description: "تغيير كنية عضو عن طريق الرد على رسالته",
+  description: "عرض أو تغيير كنية عضو عن طريق الرد على رسالته",
   commandCategory: "admin",
   usages: "كنية <الكنية> (رد على رسالة العضو)",
   cooldowns: 3
@@ -49,8 +49,7 @@ module.exports.run = async function ({
     }
 
     // ======================================================
-    // التحقق من الأدمن
-    // أو المطور
+    // التحقق من الأدمن أو المطور
     // ======================================================
 
     const isDeveloper =
@@ -91,27 +90,9 @@ module.exports.run = async function ({
         "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬\n\n" +
         "📝 الاستخدام:\n\n" +
         "قم بالرد على رسالة العضو ثم اكتب:\n\n" +
+        "كنية\n" +
+        "أو\n" +
         "كنية <الكنية>",
-        threadID,
-        messageID
-      );
-    }
-
-    // ======================================================
-    // استخراج الكنية الجديدة
-    // ======================================================
-
-    const nickname =
-      Array.isArray(args)
-        ? args.join(" ").trim()
-        : "";
-
-    if (!nickname) {
-      return api.sendMessage(
-        "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬\n\n" +
-        "❌ لم تحدد الكنية الجديدة.\n\n" +
-        "📝 مثال:\n" +
-        "كنية Ⓜ︎ - ●【 جــنــديـة - غـــيـمـــــة 】●",
         threadID,
         messageID
       );
@@ -127,7 +108,7 @@ module.exports.run = async function ({
       );
 
     // ======================================================
-    // منع تغيير كنية البوت
+    // منع التعامل مع البوت
     // ======================================================
 
     const botID =
@@ -147,12 +128,55 @@ module.exports.run = async function ({
     }
 
     // ======================================================
-    // الحصول على الكنية القديمة
+    // الحصول على الكنية الحالية
     // ======================================================
 
-    const oldNickname =
+    const currentNickname =
       threadInfo.nicknames?.[targetID] ||
-      "لا توجد كنية";
+      "";
+
+    // ======================================================
+    // إذا لم يتم كتابة كنية
+    // يعرض الكنية الحالية
+    // ======================================================
+
+    const nickname =
+      Array.isArray(args)
+        ? args.join(" ").trim()
+        : "";
+
+    if (!nickname) {
+
+      return api.sendMessage(
+        "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬\n\n" +
+        "🏷️ الكنية الحالية:\n\n" +
+        (
+          currentNickname
+            ? currentNickname
+            : "لا توجد كنية"
+        ),
+        threadID,
+        messageID
+      );
+
+    }
+
+    // ======================================================
+    // 🤖 تسجيل التغيير كـ تغيير صادر من البوت
+    // ======================================================
+
+    if (
+      typeof global.HINA_MARK_BOT_CHANGE ===
+      "function"
+    ) {
+
+      global.HINA_MARK_BOT_CHANGE(
+        "nickname",
+        String(threadID),
+        String(targetID)
+      );
+
+    }
 
     // ======================================================
     // تغيير الكنية
@@ -171,7 +195,11 @@ module.exports.run = async function ({
     return api.sendMessage(
       "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬\n\n" +
       "✅ تم تغيير الكنية بنجاح!\n\n" +
-      `🏷️ الكنية القديمة:\n${oldNickname}\n\n` +
+      `🏷️ الكنية القديمة:\n${
+        currentNickname
+          ? currentNickname
+          : "لا توجد كنية"
+      }\n\n` +
       `🏷️ الكنية الجديدة:\n${nickname}`,
       threadID,
       messageID
@@ -191,5 +219,7 @@ module.exports.run = async function ({
       threadID,
       messageID
     );
+
   }
+
 };
