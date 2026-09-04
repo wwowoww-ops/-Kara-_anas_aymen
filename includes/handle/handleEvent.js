@@ -9,23 +9,38 @@ module.exports = function ({
     Currencies
 }) {
 
-    const logger = require("../../utils/log.js");
+    const logger =
+        require("../../utils/log.js");
+
+    // ==================================================
+    // 🛡️ Controller الحماية
+    // ==================================================
+
+    const Protection =
+        require("../controllers/protection")({
+            models
+        });
 
     // ==================================================
     // 📊 إعدادات نشاط الأعضاء
     // ==================================================
 
-    const ACTIVITY_DIR = path.join(
-        process.cwd(),
-        "data",
-        "groupActivity"
-    );
+    const ACTIVITY_DIR =
+        path.join(
+            process.cwd(),
+            "data",
+            "groupActivity"
+        );
 
     const MAX_ACTIVITY_MEMBERS = 5000;
 
     try {
 
-        if (!fs.existsSync(ACTIVITY_DIR)) {
+        if (
+            !fs.existsSync(
+                ACTIVITY_DIR
+            )
+        ) {
 
             fs.mkdirSync(
                 ACTIVITY_DIR,
@@ -65,12 +80,18 @@ module.exports = function ({
     function loadActivity(threadID) {
 
         const file =
-            getActivityFile(threadID);
+            getActivityFile(
+                threadID
+            );
 
         try {
 
-            if (!fs.existsSync(file)) {
+            if (
+                !fs.existsSync(file)
+            ) {
+
                 return {};
+
             }
 
             const content =
@@ -79,12 +100,18 @@ module.exports = function ({
                     "utf8"
                 );
 
-            if (!content.trim()) {
+            if (
+                !content.trim()
+            ) {
+
                 return {};
+
             }
 
             const data =
-                JSON.parse(content);
+                JSON.parse(
+                    content
+                );
 
             if (
                 !data ||
@@ -106,7 +133,9 @@ module.exports = function ({
             );
 
             return {};
+
         }
+
     }
 
     // ==================================================
@@ -121,7 +150,9 @@ module.exports = function ({
         try {
 
             const file =
-                getActivityFile(threadID);
+                getActivityFile(
+                    threadID
+                );
 
             fs.writeFileSync(
                 file,
@@ -141,6 +172,7 @@ module.exports = function ({
             );
 
         }
+
     }
 
     // ==================================================
@@ -158,6 +190,7 @@ module.exports = function ({
         ) {
 
             return;
+
         }
 
         // عدم تسجيل الخاص
@@ -167,17 +200,22 @@ module.exports = function ({
         ) {
 
             return;
+
         }
 
         try {
 
             const activity =
-                loadActivity(threadID);
+                loadActivity(
+                    threadID
+                );
 
             const uid =
                 String(senderID);
 
-            if (!activity[uid]) {
+            if (
+                !activity[uid]
+            ) {
 
                 activity[uid] = {
 
@@ -191,7 +229,8 @@ module.exports = function ({
 
             activity[uid].messages =
                 Number(
-                    activity[uid].messages || 0
+                    activity[uid].messages ||
+                    0
                 ) + 1;
 
             activity[uid].lastMessage =
@@ -202,28 +241,34 @@ module.exports = function ({
             // ==================================================
 
             const users =
-                Object.keys(activity);
+                Object.keys(
+                    activity
+                );
 
             if (
                 users.length >
                 MAX_ACTIVITY_MEMBERS
             ) {
 
-                users.sort((a, b) => {
+                users.sort(
+                    (a, b) => {
 
-                    const countA =
-                        Number(
-                            activity[a]?.messages || 0
-                        );
+                        const countA =
+                            Number(
+                                activity[a]?.messages ||
+                                0
+                            );
 
-                    const countB =
-                        Number(
-                            activity[b]?.messages || 0
-                        );
+                        const countB =
+                            Number(
+                                activity[b]?.messages ||
+                                0
+                            );
 
-                    return countB - countA;
+                        return countB - countA;
 
-                });
+                    }
+                );
 
                 const keep =
                     users.slice(
@@ -248,6 +293,7 @@ module.exports = function ({
                 );
 
                 return;
+
             }
 
             saveActivity(
@@ -263,6 +309,424 @@ module.exports = function ({
             );
 
         }
+
+    }
+
+    // ==================================================
+    // 🛡️ Promise لـ API
+    // ==================================================
+
+    function apiCall(
+        method,
+        ...args
+    ) {
+
+        return new Promise(
+            resolve => {
+
+                try {
+
+                    const callback =
+                        function (
+                            error,
+                            result
+                        ) {
+
+                            resolve({
+                                error,
+                                result
+                            });
+
+                        };
+
+                    api[method](
+                        ...args,
+                        callback
+                    );
+
+                } catch (error) {
+
+                    resolve({
+                        error,
+                        result: null
+                    });
+
+                }
+
+            }
+        );
+
+    }
+
+    // ==================================================
+    // 🛡️ حماية اسم المجموعة
+    // ==================================================
+
+    async function protectGroupName(
+        event,
+        protection
+    ) {
+
+        if (
+            !protection.enabled.groupName
+        ) {
+
+            return;
+
+        }
+
+        const savedName =
+            protection.saved.name;
+
+        if (
+            !savedName
+        ) {
+
+            return;
+
+        }
+
+        if (
+            event.logMessageType !==
+            "log:thread-name"
+        ) {
+
+            return;
+
+        }
+
+        const data =
+            event.logMessageData ||
+            {};
+
+        const newName =
+            data.name ||
+            data.threadName ||
+            event.logMessageBody ||
+            "";
+
+        if (
+            String(newName) ===
+            String(savedName)
+        ) {
+
+            return;
+
+        }
+
+        try {
+
+            await apiCall(
+                "setTitle",
+                String(savedName),
+                String(event.threadID)
+            );
+
+            console.log(
+                `[PROTECTION] تم استرجاع اسم المجموعة ${event.threadID}`
+            );
+
+        } catch (error) {
+
+            console.error(
+                "[PROTECTION NAME ERROR]",
+                error
+            );
+
+        }
+
+    }
+
+    // ==================================================
+    // 🛡️ حماية السمة
+    // ==================================================
+
+    async function protectTheme(
+        event,
+        protection
+    ) {
+
+        if (
+            !protection.enabled.theme
+        ) {
+
+            return;
+
+        }
+
+        const savedTheme =
+            protection.saved.theme;
+
+        if (
+            !savedTheme
+        ) {
+
+            return;
+
+        }
+
+        if (
+            event.logMessageType !==
+            "log:thread-color"
+        ) {
+
+            return;
+
+        }
+
+        try {
+
+            await apiCall(
+                "changeThreadColor",
+                String(savedTheme),
+                String(event.threadID)
+            );
+
+            console.log(
+                `[PROTECTION] تم استرجاع سمة المجموعة ${event.threadID}`
+            );
+
+        } catch (error) {
+
+            console.error(
+                "[PROTECTION THEME ERROR]",
+                error
+            );
+
+        }
+
+    }
+
+    // ==================================================
+    // 🛡️ حماية الإيموجي
+    // ==================================================
+
+    async function protectEmoji(
+        event,
+        protection
+    ) {
+
+        if (
+            !protection.enabled.emoji
+        ) {
+
+            return;
+
+        }
+
+        const savedEmoji =
+            protection.saved.emoji;
+
+        if (
+            !savedEmoji
+        ) {
+
+            return;
+
+        }
+
+        if (
+            event.logMessageType !==
+            "log:thread-icon"
+        ) {
+
+            return;
+
+        }
+
+        try {
+
+            await apiCall(
+                "changeThreadEmoji",
+                String(savedEmoji),
+                String(event.threadID)
+            );
+
+            console.log(
+                `[PROTECTION] تم استرجاع إيموجي المجموعة ${event.threadID}`
+            );
+
+        } catch (error) {
+
+            console.error(
+                "[PROTECTION EMOJI ERROR]",
+                error
+            );
+
+        }
+
+    }
+
+    // ==================================================
+    // 🛡️ حماية الكنيات
+    // ==================================================
+
+    async function protectNickname(
+        event,
+        protection
+    ) {
+
+        if (
+            !protection.enabled.nicknames
+        ) {
+
+            return;
+
+        }
+
+        if (
+            event.logMessageType !==
+            "log:user-nickname"
+        ) {
+
+            return;
+
+        }
+
+        const data =
+            event.logMessageData ||
+            {};
+
+        const userID =
+            String(
+                data.participant_id ||
+                data.participantID ||
+                data.user_id ||
+                data.userID ||
+                data.userFbId ||
+                data.uid ||
+                ""
+            );
+
+        if (
+            !userID
+        ) {
+
+            return;
+
+        }
+
+        const nicknames =
+            protection.saved.nicknames ||
+            {};
+
+        if (
+            !Object.prototype.hasOwnProperty.call(
+                nicknames,
+                userID
+            )
+        ) {
+
+            return;
+
+        }
+
+        const savedNickname =
+            nicknames[userID] || "";
+
+        try {
+
+            await apiCall(
+                "changeNickname",
+                savedNickname,
+                String(event.threadID),
+                userID
+            );
+
+            console.log(
+                `[PROTECTION] تم استرجاع كنية ${userID}`
+            );
+
+        } catch (error) {
+
+            console.error(
+                "[PROTECTION NICKNAME ERROR]",
+                error
+            );
+
+        }
+
+    }
+
+    // ==================================================
+    // 🛡️ حماية المجموعة
+    // ==================================================
+
+    async function handleProtection(
+        event
+    ) {
+
+        if (
+            !event ||
+            !event.threadID
+        ) {
+
+            return;
+
+        }
+
+        // لا نحاول حماية الرسائل العادية
+        if (
+            event.type === "message" &&
+            !event.logMessageType
+        ) {
+
+            return;
+
+        }
+
+        const protection =
+            await Protection.getProtection(
+                String(
+                    event.threadID
+                )
+            );
+
+        if (
+            !protection ||
+            !protection.enabled
+        ) {
+
+            return;
+
+        }
+
+        // ==================================================
+        // اسم المجموعة
+        // ==================================================
+
+        await protectGroupName(
+            event,
+            protection
+        );
+
+        // ==================================================
+        // السمة
+        // ==================================================
+
+        await protectTheme(
+            event,
+            protection
+        );
+
+        // ==================================================
+        // الإيموجي
+        // ==================================================
+
+        await protectEmoji(
+            event,
+            protection
+        );
+
+        // ==================================================
+        // الكنيات
+        // ==================================================
+
+        await protectNickname(
+            event,
+            protection
+        );
+
     }
 
     // ==================================================
@@ -280,7 +744,28 @@ module.exports = function ({
             // ==================================================
 
             if (!event) {
+
                 return;
+
+            }
+
+            // ==================================================
+            // 🛡️ نظام حماية المجموعة
+            // ==================================================
+
+            try {
+
+                await handleProtection(
+                    event
+                );
+
+            } catch (error) {
+
+                console.error(
+                    "[PROTECTION ERROR]",
+                    error
+                );
+
             }
 
             // ==================================================
@@ -294,9 +779,11 @@ module.exports = function ({
             ) {
 
                 const text =
-                    String(event.body)
-                        .toLowerCase()
-                        .trim();
+                    String(
+                        event.body
+                    )
+                    .toLowerCase()
+                    .trim();
 
                 let reaction = null;
 
@@ -305,13 +792,9 @@ module.exports = function ({
                 // ==================================================
 
                 const monkeyWords = [
-
                     "يوتا",
-
                     "شفق",
-
                     "الشفق"
-
                 ];
 
                 // ==================================================
@@ -319,13 +802,9 @@ module.exports = function ({
                 // ==================================================
 
                 const catWords = [
-
                     "هريرة",
-
                     "ابو هريرة",
-
                     "أبو هريرة"
-
                 ];
 
                 // ==================================================
@@ -333,11 +812,8 @@ module.exports = function ({
                 // ==================================================
 
                 const gorillaWords = [
-
                     "اياتو",
-
                     "اياطو"
-
                 ];
 
                 // ==================================================
@@ -345,11 +821,8 @@ module.exports = function ({
                 // ==================================================
 
                 const foxWords = [
-
                     "رؤى",
-
                     "ࢪؤى"
-
                 ];
 
                 // ==================================================
@@ -357,11 +830,8 @@ module.exports = function ({
                 // ==================================================
 
                 const butterflyWords = [
-
                     "فريال",
-
                     "فࢪيال"
-
                 ];
 
                 // ==================================================
@@ -369,15 +839,10 @@ module.exports = function ({
                 // ==================================================
 
                 const alienWords = [
-
                     "كايزر",
-
                     "كايزࢪ",
-
                     "ڪايزر",
-
                     "ڪايزࢪ"
-
                 ];
 
                 // ==================================================
@@ -385,32 +850,25 @@ module.exports = function ({
                 // ==================================================
 
                 const deerWords = [
-
                     "نرجس",
-
                     "نࢪجس"
-
                 ];
 
-// ==================================================
-// 🐧 كلمات جود
-// ==================================================
+                // ==================================================
+                // 🐧 كلمات جود
+                // ==================================================
 
-const penguinWords = [
+                const penguinWords = [
+                    "جود"
+                ];
 
-    "جود"
+                // ==================================================
+                // 🦔 كلمات يزن
+                // ==================================================
 
-];
-
-// ==================================================
-// 🦔 كلمات يزن
-// ==================================================
-
-const hedgehogWords = [
-
-    "يزن"
-
-];
+                const hedgehogWords = [
+                    "يزن"
+                ];
 
                 // ==================================================
                 // البحث عن 🦧
@@ -429,7 +887,9 @@ const hedgehogWords = [
                         reaction = "🦧";
 
                         break;
+
                     }
+
                 }
 
                 // ==================================================
@@ -451,8 +911,11 @@ const hedgehogWords = [
                             reaction = "🐈‍⬛";
 
                             break;
+
                         }
+
                     }
+
                 }
 
                 // ==================================================
@@ -474,8 +937,11 @@ const hedgehogWords = [
                             reaction = "🦍";
 
                             break;
+
                         }
+
                     }
+
                 }
 
                 // ==================================================
@@ -497,8 +963,11 @@ const hedgehogWords = [
                             reaction = "🦊";
 
                             break;
+
                         }
+
                     }
+
                 }
 
                 // ==================================================
@@ -520,8 +989,11 @@ const hedgehogWords = [
                             reaction = "🦋";
 
                             break;
+
                         }
+
                     }
+
                 }
 
                 // ==================================================
@@ -543,8 +1015,11 @@ const hedgehogWords = [
                             reaction = "👽";
 
                             break;
+
                         }
+
                     }
+
                 }
 
                 // ==================================================
@@ -566,58 +1041,67 @@ const hedgehogWords = [
                             reaction = "🦌";
 
                             break;
+
                         }
+
                     }
+
                 }
 
-// ==================================================
-// البحث عن 🐧
-// ==================================================
+                // ==================================================
+                // البحث عن 🐧
+                // ==================================================
 
-if (!reaction) {
+                if (!reaction) {
 
-    for (
-        const word of penguinWords
-    ) {
+                    for (
+                        const word of penguinWords
+                    ) {
 
-        if (
-            text.includes(
-                word.toLowerCase()
-            )
-        ) {
+                        if (
+                            text.includes(
+                                word.toLowerCase()
+                            )
+                        ) {
 
-            reaction = "🐧";
+                            reaction = "🐧";
 
-            break;
-        }
-    }
-}
+                            break;
 
-// ==================================================
-// البحث عن 🦔
-// ==================================================
+                        }
 
-if (!reaction) {
+                    }
 
-    for (
-        const word of hedgehogWords
-    ) {
-
-        if (
-            text.includes(
-                word.toLowerCase()
-            )
-        ) {
-
-            reaction = "🦔";
-
-            break;
-        }
-    }
-}
+                }
 
                 // ==================================================
-                // 🚀 تنفيذ التفاعل مباشرة
+                // البحث عن 🦔
+                // ==================================================
+
+                if (!reaction) {
+
+                    for (
+                        const word of hedgehogWords
+                    ) {
+
+                        if (
+                            text.includes(
+                                word.toLowerCase()
+                            )
+                        ) {
+
+                            reaction = "🦔";
+
+                            break;
+
+                        }
+
+                    }
+
+                }
+
+                // ==================================================
+                // 🚀 تنفيذ التفاعل
                 // ==================================================
 
                 if (reaction) {
@@ -699,12 +1183,14 @@ if (!reaction) {
 
             const senderID =
                 String(
-                    event.senderID || ""
+                    event.senderID ||
+                    ""
                 );
 
             const threadID =
                 String(
-                    event.threadID || ""
+                    event.threadID ||
+                    ""
                 );
 
             // ==================================================
@@ -719,6 +1205,7 @@ if (!reaction) {
             ) {
 
                 return;
+
             }
 
             // ==================================================
@@ -733,6 +1220,7 @@ if (!reaction) {
             ) {
 
                 return;
+
             }
 
             // ==================================================
@@ -745,6 +1233,7 @@ if (!reaction) {
             ) {
 
                 return;
+
             }
 
             // ==================================================
@@ -840,6 +1329,7 @@ if (!reaction) {
                 }
 
                 return;
+
             }
 
             // ==================================================
@@ -855,7 +1345,9 @@ if (!reaction) {
             ) {
 
                 if (!eventModule) {
+
                     continue;
+
                 }
 
                 // ==================================================
@@ -868,6 +1360,7 @@ if (!reaction) {
                 ) {
 
                     continue;
+
                 }
 
                 // ==================================================
@@ -902,7 +1395,9 @@ if (!reaction) {
                                     ];
 
                                 if (!languageData) {
+
                                     return "";
+
                                 }
 
                                 let text =
@@ -937,6 +1432,7 @@ if (!reaction) {
                             } catch (error) {
 
                                 return "";
+
                             }
 
                         };
