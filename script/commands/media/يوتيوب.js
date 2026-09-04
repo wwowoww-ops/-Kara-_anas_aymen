@@ -1,12 +1,8 @@
 "use strict";
 
-/*
- * إصلاح مشكلة:
- * ReferenceError: File is not defined
- *
- * يجب أن يكون هذا الجزء قبل أي require
- * لمكتبات قد تستعمل cheerio / undici
- */
+/* =========================
+   إصلاح File لـ Node 18
+========================= */
 
 try {
   const { Blob, File } = require("buffer");
@@ -19,7 +15,6 @@ try {
     globalThis.File = File;
   }
 
-  // دعم إضافي لبعض إصدارات undici على Node 18
   const { toUSVString } = require("util");
 
   if (typeof String.prototype.toWellFormed !== "function") {
@@ -37,6 +32,19 @@ try {
 } catch (err) {
   console.error("[يوتيوب] فشل تجهيز توافق Node.js:", err);
 }
+
+
+/* =========================
+   حماية البوت من الانهيار
+========================= */
+
+process.on("unhandledRejection", (reason) => {
+  console.error("❌ [يوتيوب] UNHANDLED REJECTION:", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("❌ [يوتيوب] UNCAUGHT EXCEPTION:", error);
+});
 
 
 /* =========================
@@ -59,16 +67,14 @@ try {
 
   if (!YtdlCore || !toPipeableStream) {
     throw new Error(
-      "لم يتم العثور على YtdlCore أو toPipeableStream داخل @ybd-project/ytdl-core"
+      "لم يتم العثور على YtdlCore أو toPipeableStream"
     );
   }
 
   ytdl = new YtdlCore();
 
 } catch (error) {
-  console.error("[يوتيوب] فشل تحميل @ybd-project/ytdl-core");
-  console.error(error);
-
+  console.error("[يوتيوب] فشل تحميل المكتبة:", error);
   ytdl = null;
 }
 
@@ -81,7 +87,7 @@ const MAX_FILE_SIZE = 25 * 1024 * 1024;
 
 module.exports.config = {
   name: "يوتيوب",
-  version: "2.2.0",
+  version: "2.3.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
   description: "البحث وتحميل فيديوهات YouTube",
@@ -100,34 +106,34 @@ const cacheDir = path.join(__dirname, "cache");
 try {
   fs.ensureDirSync(cacheDir);
 } catch (error) {
-  console.error("[يوتيوب] فشل إنشاء مجلد الكاش:", error);
+  console.error("[يوتيوب] فشل إنشاء الكاش:", error);
 }
 
 
 /* =========================
-   إرسال الأخطاء للمجموعة
+   إرسال الخطأ
 ========================= */
 
 async function sendError(api, event, error, extra = "") {
-  let message = "";
+  const message =
+    error instanceof Error
+      ? error.stack || error.message
+      : String(error);
 
-  if (error instanceof Error) {
-    message = error.stack || error.message;
-  } else {
-    message = String(error);
-  }
+  console.error("[يوتيوب ERROR]", message);
 
   const text =
     `❌ حدث خطأ في أمر يوتيوب\n\n` +
     `${extra ? extra + "\n\n" : ""}` +
     `الخطأ:\n${message}`;
 
-  console.error("[يوتيوب ERROR]", message);
-
   try {
     await api.sendMessage(text, event.threadID);
   } catch (sendErr) {
-    console.error("[يوتيوب] تعذر إرسال الخطأ للمجموعة:", sendErr);
+    console.error(
+      "[يوتيوب] فشل إرسال الخطأ:",
+      sendErr
+    );
   }
 }
 
@@ -167,9 +173,68 @@ function extractVideoId(url) {
 
     return match ? match[1] : null;
 
-  } catch (error) {
+  } catch {
     return null;
   }
+}
+
+
+/* =========================
+   اختيار أفضل Format
+========================= */
+
+function choosePlayableFormat(formats) {
+  if (!Array.isArray(formats)) {
+    throw new Error("لم يتم العثور على قائمة الصيغ");
+  }
+
+  /*
+   * نريد صيغة واحدة تحتوي:
+   * فيديو + صوت
+   *
+   * ويفضل MP4
+   */
+
+  const playable = formats.filter(format => {
+    return (
+      format &&
+      format.url &&
+      format.hasVideo === true &&
+      format.hasAudio === true
+    );
+  });
+
+  if (!playable.length) {
+    throw new Error(
+      "YouTube لم يوفر أي صيغة تحتوي على فيديو وصوت معًا"
+    );
+  }
+
+  const mp4 = playable.filter(format => {
+    return String(format.container || "").toLowerCase() === "mp4";
+  });
+
+  const candidates = mp4.length ? mp4 : playable;
+
+  /*
+   * ترتيب حسب الجودة
+   */
+
+  candidates.sort((a, b) => {
+    const heightA = Number(a.height || 0);
+    const heightB = Number(b.height || 0);
+
+    if (heightB !== heightA) {
+      return heightB - heightA;
+    }
+
+    const bitrateA = Number(a.bitrate || 0);
+    const bitrateB = Number(b.bitrate || 0);
+
+    return bitrateB - bitrateA;
+  });
+
+  return candidates[0];
 }
 
 
@@ -180,65 +245,207 @@ function extractVideoId(url) {
 async function downloadVideo(url, outputPath) {
   if (!ytdl || !toPipeableStream) {
     throw new Error(
-      "مكتبة @ybd-project/ytdl-core لم يتم تحميلها بشكل صحيح"
+      "مكتبة @ybd-project/ytdl-core غير متاحة"
     );
   }
 
-  const stream = await ytdl.download(url);
+  console.log("[يوتيوب] الحصول على معلومات الفيديو...");
+
+  let info;
+
+  try {
+    info = await ytdl.getBasicInfo(url);
+  } catch (error) {
+    throw new Error(
+      `فشل الحصول على معلومات الفيديو:\n${
+        error?.stack || error?.message || error
+      }`
+    );
+  }
+
+  if (!info) {
+    throw new Error(
+      "YouTube لم يُرجع معلومات الفيديو"
+    );
+  }
+
+  const formats = info.formats || [];
+
+  console.log(
+    `[يوتيوب] عدد الصيغ المستلمة: ${formats.length}`
+  );
+
+  if (!formats.length) {
+    throw new Error(
+      "لم يتم العثور على أي صيغة قابلة للتحميل"
+    );
+  }
+
+  let format;
+
+  try {
+    format = choosePlayableFormat(formats);
+  } catch (error) {
+
+    /*
+     * طباعة الصيغ الموجودة للمساعدة في التشخيص
+     */
+
+    console.error(
+      "[يوتيوب] الصيغ المتوفرة:"
+    );
+
+    for (const f of formats.slice(0, 20)) {
+      console.error({
+        itag: f.itag,
+        container: f.container,
+        quality: f.qualityLabel,
+        width: f.width,
+        height: f.height,
+        hasVideo: f.hasVideo,
+        hasAudio: f.hasAudio
+      });
+    }
+
+    throw error;
+  }
+
+  console.log(
+    "[يوتيوب] الصيغة المختارة:",
+    {
+      itag: format.itag,
+      container: format.container,
+      quality: format.qualityLabel,
+      height: format.height,
+      hasVideo: format.hasVideo,
+      hasAudio: format.hasAudio
+    }
+  );
+
+  /*
+   * نمرر الـ format مباشرة
+   *
+   * وهذا يمنع المكتبة من محاولة:
+   *
+   * quality: "highest"
+   */
+
+  let stream;
+
+  try {
+    stream = await ytdl.download(url, {
+      format
+    });
+  } catch (error) {
+    throw new Error(
+      `فشل بدء تحميل الصيغة ${format.itag || "unknown"}:\n${
+        error?.stack || error?.message || error
+      }`
+    );
+  }
 
   if (!stream) {
-    throw new Error("المكتبة لم تُرجع Stream للفيديو");
+    throw new Error(
+      "المكتبة لم تُرجع Stream"
+    );
   }
 
-  const pipeableStream = toPipeableStream(stream);
+  let pipeableStream;
+
+  try {
+    pipeableStream = toPipeableStream(stream);
+  } catch (error) {
+    throw new Error(
+      `فشل تحويل Stream:\n${
+        error?.stack || error?.message || error
+      }`
+    );
+  }
 
   if (!pipeableStream) {
-    throw new Error("تعذر تحويل Stream الفيديو");
+    throw new Error(
+      "تعذر تحويل Stream الفيديو"
+    );
   }
+
+
+  /* =========================
+     الكتابة إلى الملف
+  ========================= */
 
   await new Promise((resolve, reject) => {
     const writeStream = fs.createWriteStream(outputPath);
 
-    let finished = false;
+    let settled = false;
 
-    const cleanup = () => {
-      if (finished) return;
-      finished = true;
+    const finish = () => {
+      if (settled) return;
+
+      settled = true;
+      resolve();
     };
 
-    writeStream.on("finish", () => {
-      cleanup();
-      resolve();
-    });
+    const fail = error => {
+      if (settled) return;
 
-    writeStream.on("error", (error) => {
-      cleanup();
+      settled = true;
+
+      try {
+        writeStream.destroy();
+      } catch {}
+
       reject(error);
-    });
+    };
 
-    pipeableStream.on?.("error", (error) => {
-      cleanup();
-      reject(error);
-    });
 
-    pipeableStream.pipe(writeStream);
+    writeStream.once("finish", finish);
+
+    writeStream.once("error", fail);
+
+
+    if (typeof pipeableStream.once === "function") {
+      pipeableStream.once("error", fail);
+    }
+
+
+    try {
+      pipeableStream.pipe(writeStream);
+    } catch (error) {
+      fail(error);
+    }
   });
 
+
+  /* =========================
+     فحص الملف
+  ========================= */
+
   if (!fs.existsSync(outputPath)) {
-    throw new Error("لم يتم إنشاء ملف الفيديو");
+    throw new Error(
+      "لم يتم إنشاء ملف الفيديو"
+    );
   }
 
   const stats = await fs.stat(outputPath);
 
+  console.log(
+    `[يوتيوب] تم التحميل: ${(stats.size / 1024 / 1024).toFixed(2)}MB`
+  );
+
   if (!stats.size) {
-    throw new Error("ملف الفيديو فارغ");
+    await fs.remove(outputPath).catch(() => {});
+
+    throw new Error(
+      "ملف الفيديو فارغ"
+    );
   }
 
   if (stats.size > MAX_FILE_SIZE) {
     await fs.remove(outputPath).catch(() => {});
 
     throw new Error(
-      `حجم الفيديو أكبر من الحد المسموح به (${MAX_FILE_SIZE / 1024 / 1024}MB)`
+      `حجم الفيديو ${(stats.size / 1024 / 1024).toFixed(2)}MB ` +
+      `ويتجاوز الحد ${MAX_FILE_SIZE / 1024 / 1024}MB`
     );
   }
 
@@ -250,18 +457,25 @@ async function downloadVideo(url, outputPath) {
    إرسال الفيديو
 ========================= */
 
-async function sendVideo(api, event, filePath, title = "YouTube") {
+async function sendVideo(
+  api,
+  event,
+  filePath,
+  title = "YouTube"
+) {
   try {
     if (!fs.existsSync(filePath)) {
-      throw new Error("ملف الفيديو غير موجود بعد التحميل");
+      throw new Error(
+        "ملف الفيديو غير موجود"
+      );
     }
 
     const stats = await fs.stat(filePath);
 
     if (stats.size > MAX_FILE_SIZE) {
       throw new Error(
-        `حجم الفيديو ${(stats.size / 1024 / 1024).toFixed(2)}MB ` +
-        `ويتجاوز الحد ${MAX_FILE_SIZE / 1024 / 1024}MB`
+        `حجم الفيديو كبير جدًا: ` +
+        `${(stats.size / 1024 / 1024).toFixed(2)}MB`
       );
     }
 
@@ -289,7 +503,7 @@ module.exports.handleReply = async function ({
   handleReply
 }) {
   try {
-    if (!handleReply || !handleReply.links) {
+    if (!handleReply?.links?.length) {
       return;
     }
 
@@ -325,17 +539,21 @@ module.exports.handleReply = async function ({
         "⏳ جاري تحميل الفيديو...",
         event.threadID
       );
-    } catch (_) {}
+    } catch {}
 
     const fileName =
       `youtube_${Date.now()}_${Math.random()
         .toString(36)
         .slice(2)}.mp4`;
 
-    const filePath = path.join(cacheDir, fileName);
+    const filePath =
+      path.join(cacheDir, fileName);
 
     try {
-      await downloadVideo(url, filePath);
+      await downloadVideo(
+        url,
+        filePath
+      );
 
       await sendVideo(
         api,
@@ -345,25 +563,33 @@ module.exports.handleReply = async function ({
       );
 
     } catch (error) {
+
       await fs.remove(filePath).catch(() => {});
 
       await sendError(
         api,
         event,
         error,
-        `الرابط المختار: ${url}`
+        `الرابط المختار:\n${url}`
       );
 
     } finally {
+
       if (loadingMessage?.messageID) {
         try {
-          await api.unsendMessage(loadingMessage.messageID);
-        } catch (_) {}
+          await api.unsendMessage(
+            loadingMessage.messageID
+          );
+        } catch {}
       }
     }
 
   } catch (error) {
-    await sendError(api, event, error);
+    await sendError(
+      api,
+      event,
+      error
+    );
   }
 };
 
@@ -378,7 +604,9 @@ module.exports.run = async function ({
   args
 }) {
   try {
-    const input = String(args?.join(" ") || "").trim();
+
+    const input =
+      String(args?.join(" ") || "").trim();
 
     if (!input) {
       return api.sendMessage(
@@ -393,7 +621,9 @@ module.exports.run = async function ({
     ========================= */
 
     if (isYouTubeUrl(input)) {
-      const videoId = extractVideoId(input);
+
+      const videoId =
+        extractVideoId(input);
 
       if (!videoId) {
         return api.sendMessage(
@@ -405,21 +635,27 @@ module.exports.run = async function ({
       let loadingMessage;
 
       try {
-        loadingMessage = await api.sendMessage(
-          "⏳ جاري تجهيز الفيديو...",
-          event.threadID
-        );
-      } catch (_) {}
+        loadingMessage =
+          await api.sendMessage(
+            "⏳ جاري تحميل الفيديو...",
+            event.threadID
+          );
+      } catch {}
 
       const fileName =
         `youtube_${Date.now()}_${Math.random()
           .toString(36)
           .slice(2)}.mp4`;
 
-      const filePath = path.join(cacheDir, fileName);
+      const filePath =
+        path.join(cacheDir, fileName);
 
       try {
-        await downloadVideo(input, filePath);
+
+        await downloadVideo(
+          input,
+          filePath
+        );
 
         await sendVideo(
           api,
@@ -429,20 +665,25 @@ module.exports.run = async function ({
         );
 
       } catch (error) {
-        await fs.remove(filePath).catch(() => {});
+
+        await fs.remove(filePath)
+          .catch(() => {});
 
         await sendError(
           api,
           event,
           error,
-          `الرابط: ${input}\nVideo ID: ${videoId}`
+          `الرابط:\n${input}\nVideo ID: ${videoId}`
         );
 
       } finally {
+
         if (loadingMessage?.messageID) {
           try {
-            await api.unsendMessage(loadingMessage.messageID);
-          } catch (_) {}
+            await api.unsendMessage(
+              loadingMessage.messageID
+            );
+          } catch {}
         }
       }
 
@@ -457,15 +698,20 @@ module.exports.run = async function ({
     let search;
 
     try {
-      search = await ytSearch(input);
+
+      search =
+        await ytSearch(input);
+
     } catch (error) {
+
       return sendError(
         api,
         event,
         error,
-        `فشل البحث عن: ${input}`
+        `فشل البحث عن:\n${input}`
       );
     }
+
 
     if (!search?.videos?.length) {
       return api.sendMessage(
@@ -474,38 +720,67 @@ module.exports.run = async function ({
       );
     }
 
-    const results = search.videos.slice(0, 5);
 
-    let message = "⌬ ━━ 𝗬𝗼𝘂𝗧𝘂𝗯𝗲 ━━ ⌬\n\n";
+    const results =
+      search.videos.slice(0, 5);
 
-    results.forEach((video, index) => {
-      message +=
-        `${index + 1}. ${video.title}\n` +
-        `المدة: ${video.timestamp || "غير معروفة"}\n` +
-        `القناة: ${video.author?.name || "غير معروفة"}\n\n`;
-    });
+
+    let message =
+      "⌬ ━━ 𝗬𝗼𝘂𝗧𝘂𝗯𝗲 ━━ ⌬\n\n";
+
+
+    results.forEach(
+      (video, index) => {
+
+        message +=
+          `${index + 1}. ${video.title}\n` +
+          `المدة: ${video.timestamp || "غير معروفة"}\n` +
+          `القناة: ${video.author?.name || "غير معروفة"}\n\n`;
+      }
+    );
+
 
     message +=
       "أرسل رقم الفيديو الذي تريد تحميله";
 
-    const sent = await api.sendMessage(
-      message,
-      event.threadID
-    );
+
+    const sent =
+      await api.sendMessage(
+        message,
+        event.threadID
+      );
+
 
     if (!global.client.handleReply) {
       global.client.handleReply = [];
     }
 
+
     global.client.handleReply.push({
-      name: module.exports.config.name,
-      messageID: sent.messageID,
-      author: event.senderID,
-      links: results.map(video => video.url),
-      titles: results.map(video => video.title)
+
+      name:
+        module.exports.config.name,
+
+      messageID:
+        sent.messageID,
+
+      author:
+        event.senderID,
+
+      links:
+        results.map(video => video.url),
+
+      titles:
+        results.map(video => video.title)
+
     });
 
   } catch (error) {
-    await sendError(api, event, error);
+
+    await sendError(
+      api,
+      event,
+      error
+    );
   }
 };
