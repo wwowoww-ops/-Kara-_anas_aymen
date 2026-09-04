@@ -1,49 +1,87 @@
+"use strict";
+
+/*
+ * إصلاح مشكلة:
+ * ReferenceError: File is not defined
+ *
+ * يجب أن يكون هذا الجزء قبل أي require
+ * لمكتبات قد تستعمل cheerio / undici
+ */
+
+try {
+  const { Blob, File } = require("buffer");
+
+  if (typeof globalThis.Blob === "undefined" && Blob) {
+    globalThis.Blob = Blob;
+  }
+
+  if (typeof globalThis.File === "undefined" && File) {
+    globalThis.File = File;
+  }
+
+  // دعم إضافي لبعض إصدارات undici على Node 18
+  const { toUSVString } = require("util");
+
+  if (typeof String.prototype.toWellFormed !== "function") {
+    String.prototype.toWellFormed = function () {
+      return toUSVString(this);
+    };
+  }
+
+  if (typeof String.prototype.isWellFormed !== "function") {
+    String.prototype.isWellFormed = function () {
+      return toUSVString(this) === this;
+    };
+  }
+
+} catch (err) {
+  console.error("[يوتيوب] فشل تجهيز توافق Node.js:", err);
+}
+
+
+/* =========================
+   المكتبات
+========================= */
+
 const fs = require("fs-extra");
 const path = require("path");
 const ytSearch = require("yt-search");
 
 let YtdlCore;
 let toPipeableStream;
+let ytdl;
 
 try {
-  const ytdlModule = require("@ybd-project/ytdl-core");
+  const ytdlCore = require("@ybd-project/ytdl-core");
 
-  YtdlCore = ytdlModule.YtdlCore;
-  toPipeableStream = ytdlModule.toPipeableStream;
+  YtdlCore = ytdlCore.YtdlCore;
+  toPipeableStream = ytdlCore.toPipeableStream;
 
-} catch (error) {
-
-  console.error(
-    "[YOUTUBE MODULE ERROR]",
-    error
-  );
-
-  // لا نخلي الملف ينهار أثناء تحميل الأوامر
-  // حتى يظهر الخطأ للمستخدم بدل اختفاء الأمر
-}
-
-let ytdl = null;
-
-if (YtdlCore) {
-  try {
-    ytdl = new YtdlCore();
-  } catch (error) {
-    console.error(
-      "[YOUTUBE INIT ERROR]",
-      error
+  if (!YtdlCore || !toPipeableStream) {
+    throw new Error(
+      "لم يتم العثور على YtdlCore أو toPipeableStream داخل @ybd-project/ytdl-core"
     );
   }
+
+  ytdl = new YtdlCore();
+
+} catch (error) {
+  console.error("[يوتيوب] فشل تحميل @ybd-project/ytdl-core");
+  console.error(error);
+
+  ytdl = null;
 }
+
+
+/* =========================
+   الإعدادات
+========================= */
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
 
-// ============================================================
-// CONFIG
-// ============================================================
-
 module.exports.config = {
   name: "يوتيوب",
-  version: "2.1.0",
+  version: "2.2.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
   description: "البحث وتحميل فيديوهات YouTube",
@@ -52,908 +90,422 @@ module.exports.config = {
   cooldowns: 10
 };
 
-// ============================================================
-// ERROR FORMAT
-// ============================================================
 
-function getErrorMessage(error) {
+/* =========================
+   مجلد الكاش
+========================= */
 
-  if (!error) {
-    return "خطأ غير معروف";
-  }
+const cacheDir = path.join(__dirname, "cache");
 
-  let message =
-    error.message ||
-    String(error);
-
-  if (error.code) {
-    message += `\n\nCode: ${error.code}`;
-  }
-
-  if (error.statusCode) {
-    message += `\n\nHTTP Status: ${error.statusCode}`;
-  }
-
-  if (error.status) {
-    message += `\n\nStatus: ${error.status}`;
-  }
-
-  if (error.response?.status) {
-    message +=
-      `\n\nHTTP Status: ${error.response.status}`;
-  }
-
-  if (error.response?.data) {
-
-    try {
-
-      message +=
-        `\n\nResponse:\n${
-          typeof error.response.data === "string"
-            ? error.response.data
-            : JSON.stringify(
-                error.response.data,
-                null,
-                2
-              )
-        }`;
-
-    } catch (e) {}
-  }
-
-  return message;
+try {
+  fs.ensureDirSync(cacheDir);
+} catch (error) {
+  console.error("[يوتيوب] فشل إنشاء مجلد الكاش:", error);
 }
 
-// ============================================================
-// SEND ERROR
-// ============================================================
 
-async function sendError(
-  api,
-  event,
-  title,
-  error
-) {
+/* =========================
+   إرسال الأخطاء للمجموعة
+========================= */
 
-  const errorMessage =
-    getErrorMessage(error);
+async function sendError(api, event, error, extra = "") {
+  let message = "";
 
-  console.error(
-    `[YOUTUBE ${title}]`,
-    error
-  );
-
-  const message =
-`⌬ ━━ HINA MEDIA ━━ ⌬
-
-❌ ${title}
-
-━━━━━━━━━━━━━━━━━━
-
-${errorMessage}
-
-━━━━━━━━━━━━━━━━━━`;
-
-  try {
-
-    return await api.sendMessage(
-      message,
-      event.threadID,
-      event.messageID
-    );
-
-  } catch (sendError) {
-
-    console.error(
-      "[YOUTUBE SEND ERROR]",
-      sendError
-    );
+  if (error instanceof Error) {
+    message = error.stack || error.message;
+  } else {
+    message = String(error);
   }
-}
-
-// ============================================================
-// CACHE
-// ============================================================
-
-function getCacheDir() {
-
-  const dir =
-    path.join(
-      __dirname,
-      "cache"
-    );
-
-  fs.ensureDirSync(dir);
-
-  return dir;
-}
-
-// ============================================================
-// SAFE FILE NAME
-// ============================================================
-
-function getSafeFileName(name) {
-
-  return String(
-    name || "youtube"
-  )
-    .replace(
-      /[<>:"/\\|?*\x00-\x1F]/g,
-      "_"
-    )
-    .replace(
-      /\s+/g,
-      "_"
-    )
-    .slice(
-      0,
-      80
-    );
-}
-
-// ============================================================
-// YOUTUBE URL
-// ============================================================
-
-function isYouTubeUrl(text) {
-
-  return /^(https?:\/\/)?(www\.)?(m\.)?(youtube\.com\/(watch\?v=|shorts\/|embed\/)|youtu\.be\/)[\w-]+/i.test(
-    String(text || "").trim()
-  );
-}
-
-// ============================================================
-// VIDEO ID
-// ============================================================
-
-function extractVideoId(url) {
 
   const text =
-    String(url || "").trim();
+    `❌ حدث خطأ في أمر يوتيوب\n\n` +
+    `${extra ? extra + "\n\n" : ""}` +
+    `الخطأ:\n${message}`;
 
-  const match =
-    text.match(
-      /(?:v=|youtu\.be\/|youtube\.com\/shorts\/|youtube\.com\/embed\/)([\w-]{6,})/i
-    );
-
-  return match
-    ? match[1]
-    : null;
-}
-
-// ============================================================
-// REMOVE FILE
-// ============================================================
-
-async function removeFile(filePath) {
+  console.error("[يوتيوب ERROR]", message);
 
   try {
-
-    if (
-      filePath &&
-      await fs.pathExists(filePath)
-    ) {
-
-      await fs.remove(
-        filePath
-      );
-    }
-
-  } catch (error) {
-
-    console.log(
-      "[YOUTUBE CACHE REMOVE ERROR]",
-      error.message
-    );
+    await api.sendMessage(text, event.threadID);
+  } catch (sendErr) {
+    console.error("[يوتيوب] تعذر إرسال الخطأ للمجموعة:", sendErr);
   }
 }
 
-// ============================================================
-// SEND VIDEO
-// ============================================================
 
-async function sendVideo(
-  api,
-  event,
-  filePath,
-  title
-) {
+/* =========================
+   فحص رابط يوتيوب
+========================= */
 
+function isYouTubeUrl(input) {
+  if (!input) return false;
+
+  return /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//i.test(
+    input.trim()
+  );
+}
+
+
+/* =========================
+   استخراج Video ID
+========================= */
+
+function extractVideoId(url) {
   try {
+    const parsed = new URL(url);
 
-    const stat =
-      await fs.stat(
-        filePath
-      );
-
-    if (
-      stat.size >
-      MAX_FILE_SIZE
-    ) {
-
-      await removeFile(
-        filePath
-      );
-
-      return api.sendMessage(
-`⌬ ━━ HINA MEDIA ━━ ⌬
-
-❌ لا يمكن إرسال الفيديو
-
-📦 حجم الملف:
-${(
-  stat.size /
-  1024 /
-  1024
-).toFixed(2)} MB
-
-⚠️ الحد المسموح للإرسال هو 25 MB`,
-        event.threadID,
-        event.messageID
-      );
+    if (parsed.hostname.includes("youtu.be")) {
+      return parsed.pathname.slice(1);
     }
 
-    const stream =
-      fs.createReadStream(
-        filePath
-      );
+    if (parsed.searchParams.get("v")) {
+      return parsed.searchParams.get("v");
+    }
 
-    return api.sendMessage(
-      {
-        body:
-`⌬ ━━ HINA MEDIA ━━ ⌬
-
-🎬 ${title || "YouTube"}
-
-✓ تم تحميل الفيديو بنجاح`,
-
-        attachment:
-          stream
-      },
-
-      event.threadID,
-
-      async error => {
-
-        await removeFile(
-          filePath
-        );
-
-        if (error) {
-
-          console.log(
-            "[YOUTUBE SEND ERROR]",
-            error
-          );
-        }
-      },
-
-      event.messageID
+    const match = parsed.pathname.match(
+      /\/(?:shorts|embed|live)\/([^/?]+)/
     );
+
+    return match ? match[1] : null;
 
   } catch (error) {
-
-    await removeFile(
-      filePath
-    );
-
-    return sendError(
-      api,
-      event,
-      "حدث خطأ أثناء إرسال الفيديو",
-      error
-    );
+    return null;
   }
 }
 
-// ============================================================
-// DOWNLOAD VIDEO
-// ============================================================
 
-async function downloadVideo(
-  url,
-  outputPath
-) {
+/* =========================
+   تحميل الفيديو
+========================= */
 
-  if (!YtdlCore) {
-
+async function downloadVideo(url, outputPath) {
+  if (!ytdl || !toPipeableStream) {
     throw new Error(
-      "مكتبة @ybd-project/ytdl-core لم يتم تحميلها"
+      "مكتبة @ybd-project/ytdl-core لم يتم تحميلها بشكل صحيح"
     );
   }
 
-  if (!toPipeableStream) {
-
-    throw new Error(
-      "الدالة toPipeableStream غير موجودة في @ybd-project/ytdl-core"
-    );
-  }
-
-  if (!ytdl) {
-
-    ytdl =
-      new YtdlCore();
-  }
-
-  const downloadStream =
-    await ytdl.download(
-      url
-    );
-
-  if (!downloadStream) {
-
-    throw new Error(
-      "YouTube لم يُرجع Stream للتحميل"
-    );
-  }
-
-  const stream =
-    toPipeableStream(
-      downloadStream
-    );
+  const stream = await ytdl.download(url);
 
   if (!stream) {
+    throw new Error("المكتبة لم تُرجع Stream للفيديو");
+  }
+
+  const pipeableStream = toPipeableStream(stream);
+
+  if (!pipeableStream) {
+    throw new Error("تعذر تحويل Stream الفيديو");
+  }
+
+  await new Promise((resolve, reject) => {
+    const writeStream = fs.createWriteStream(outputPath);
+
+    let finished = false;
+
+    const cleanup = () => {
+      if (finished) return;
+      finished = true;
+    };
+
+    writeStream.on("finish", () => {
+      cleanup();
+      resolve();
+    });
+
+    writeStream.on("error", (error) => {
+      cleanup();
+      reject(error);
+    });
+
+    pipeableStream.on?.("error", (error) => {
+      cleanup();
+      reject(error);
+    });
+
+    pipeableStream.pipe(writeStream);
+  });
+
+  if (!fs.existsSync(outputPath)) {
+    throw new Error("لم يتم إنشاء ملف الفيديو");
+  }
+
+  const stats = await fs.stat(outputPath);
+
+  if (!stats.size) {
+    throw new Error("ملف الفيديو فارغ");
+  }
+
+  if (stats.size > MAX_FILE_SIZE) {
+    await fs.remove(outputPath).catch(() => {});
 
     throw new Error(
-      "فشل تحويل YouTube Stream"
+      `حجم الفيديو أكبر من الحد المسموح به (${MAX_FILE_SIZE / 1024 / 1024}MB)`
     );
   }
 
-  await new Promise(
-    (
-      resolve,
-      reject
-    ) => {
+  return outputPath;
+}
 
-      const output =
-        fs.createWriteStream(
-          outputPath
-        );
 
-      let settled =
-        false;
+/* =========================
+   إرسال الفيديو
+========================= */
 
-      function finish(error) {
-
-        if (settled) {
-          return;
-        }
-
-        settled = true;
-
-        if (error) {
-
-          try {
-            output.destroy();
-          } catch (e) {}
-
-          reject(
-            error
-          );
-
-        } else {
-
-          resolve();
-        }
-      }
-
-      output.once(
-        "finish",
-        () => finish()
-      );
-
-      output.once(
-        "error",
-        finish
-      );
-
-      stream.once(
-        "error",
-        finish
-      );
-
-      try {
-
-        stream.pipe(
-          output
-        );
-
-      } catch (error) {
-
-        finish(
-          error
-        );
-      }
+async function sendVideo(api, event, filePath, title = "YouTube") {
+  try {
+    if (!fs.existsSync(filePath)) {
+      throw new Error("ملف الفيديو غير موجود بعد التحميل");
     }
-  );
 
-  const exists =
-    await fs.pathExists(
-      outputPath
+    const stats = await fs.stat(filePath);
+
+    if (stats.size > MAX_FILE_SIZE) {
+      throw new Error(
+        `حجم الفيديو ${(stats.size / 1024 / 1024).toFixed(2)}MB ` +
+        `ويتجاوز الحد ${MAX_FILE_SIZE / 1024 / 1024}MB`
+      );
+    }
+
+    await api.sendMessage(
+      {
+        body: `🎬 ${title}`,
+        attachment: fs.createReadStream(filePath)
+      },
+      event.threadID
     );
 
-  if (!exists) {
-
-    throw new Error(
-      "تم انتهاء التحميل لكن الملف غير موجود"
-    );
-  }
-
-  const stat =
-    await fs.stat(
-      outputPath
-    );
-
-  if (!stat.size) {
-
-    throw new Error(
-      "تم إنشاء الملف لكنه فارغ"
-    );
+  } finally {
+    await fs.remove(filePath).catch(() => {});
   }
 }
 
-// ============================================================
-// HANDLE REPLY
-// ============================================================
 
-module.exports.handleReply =
-async function ({
+/* =========================
+   Handle Reply
+========================= */
+
+module.exports.handleReply = async function ({
   api,
   event,
   handleReply
 }) {
-
   try {
-
-    if (
-      !handleReply ||
-      !Array.isArray(
-        handleReply.links
-      )
-    ) {
+    if (!handleReply || !handleReply.links) {
       return;
     }
 
     if (
-      String(event.senderID) !==
-      String(handleReply.author)
+      handleReply.author &&
+      String(event.senderID) !== String(handleReply.author)
     ) {
       return;
     }
 
-    const input =
-      String(
-        event.body || ""
-      ).trim();
-
-    const index =
-      Number(input) - 1;
+    const choice = parseInt(
+      String(event.body || "").trim(),
+      10
+    );
 
     if (
-      !Number.isInteger(index) ||
-      index < 0 ||
-      index >=
-        handleReply.links.length
+      Number.isNaN(choice) ||
+      choice < 1 ||
+      choice > handleReply.links.length
     ) {
-
       return api.sendMessage(
-`⌬ ━━ HINA MEDIA ━━ ⌬
-
-⚠️ اختر رقمًا صحيحًا من القائمة
-
-مثال:
-1
-2
-3`,
-        event.threadID,
-        event.messageID
+        `❌ اختر رقمًا من 1 إلى ${handleReply.links.length}`,
+        event.threadID
       );
     }
 
-    const selected =
-      handleReply.links[index];
+    const url = handleReply.links[choice - 1];
 
-    const url =
-      selected.url;
-
-    const title =
-      selected.title ||
-      "YouTube";
-
-    if (!url) {
-
-      return sendError(
-        api,
-        event,
-        "الرابط المحدد غير موجود",
-        new Error(
-          "selected.url is empty"
-        )
-      );
-    }
-
-    const videoId =
-      extractVideoId(
-        url
-      ) ||
-      Date.now().toString();
-
-    const fileName =
-      `youtube_${getSafeFileName(videoId)}_${Date.now()}.mp4`;
-
-    const filePath =
-      path.join(
-        getCacheDir(),
-        fileName
-      );
+    let loadingMessage;
 
     try {
-
-      if (
-        handleReply.messageID &&
-        typeof api.unsendMessage ===
-          "function"
-      ) {
-
-        try {
-
-          await api.unsendMessage(
-            handleReply.messageID
-          );
-
-        } catch (e) {}
-      }
-
-      if (
-        typeof api.setMessageReaction ===
-          "function"
-      ) {
-
-        try {
-
-          await new Promise(
-            resolve => {
-
-              api.setMessageReaction(
-                "⏳",
-                event.messageID,
-                () => resolve(),
-                true
-              );
-
-            }
-          );
-
-        } catch (e) {}
-      }
-
-      await api.sendMessage(
-`⌬ ━━ HINA MEDIA ━━ ⌬
-
-⏳ جاري تحميل:
-
-${title}
-
-انتظر قليلًا...`,
-        event.threadID,
-        event.messageID
+      loadingMessage = await api.sendMessage(
+        "⏳ جاري تحميل الفيديو...",
+        event.threadID
       );
+    } catch (_) {}
 
-      await downloadVideo(
-        url,
-        filePath
-      );
+    const fileName =
+      `youtube_${Date.now()}_${Math.random()
+        .toString(36)
+        .slice(2)}.mp4`;
 
-      return sendVideo(
+    const filePath = path.join(cacheDir, fileName);
+
+    try {
+      await downloadVideo(url, filePath);
+
+      await sendVideo(
         api,
         event,
         filePath,
-        title
+        handleReply.titles?.[choice - 1] || "YouTube"
       );
 
     } catch (error) {
+      await fs.remove(filePath).catch(() => {});
 
-      await removeFile(
-        filePath
-      );
-
-      return sendError(
+      await sendError(
         api,
         event,
-        "حدث خطأ أثناء تحميل الفيديو",
-        error
+        error,
+        `الرابط المختار: ${url}`
       );
+
+    } finally {
+      if (loadingMessage?.messageID) {
+        try {
+          await api.unsendMessage(loadingMessage.messageID);
+        } catch (_) {}
+      }
     }
 
   } catch (error) {
-
-    return sendError(
-      api,
-      event,
-      "حدث خطأ في معالجة الرد",
-      error
-    );
+    await sendError(api, event, error);
   }
 };
 
-// ============================================================
-// MAIN COMMAND
-// ============================================================
 
-module.exports.run =
-async function ({
+/* =========================
+   الأمر الرئيسي
+========================= */
+
+module.exports.run = async function ({
   api,
   event,
   args
 }) {
-
   try {
-
-    const input =
-      String(
-        args?.join(" ") || ""
-      ).trim();
+    const input = String(args?.join(" ") || "").trim();
 
     if (!input) {
-
       return api.sendMessage(
-`⌬ ━━ HINA MEDIA ━━ ⌬
-
-⚠️ اكتب اسم الفيديو أو ضع رابط YouTube
-
-مثال:
-
-.يوتيوب اسم الفيديو`,
-        event.threadID,
-        event.messageID
+        "❌ استخدم الأمر هكذا:\n.يوتيوب اسم الفيديو",
+        event.threadID
       );
     }
 
-    // ========================================================
-    // DIRECT URL
-    // ========================================================
 
-    if (
-      isYouTubeUrl(input)
-    ) {
+    /* =========================
+       رابط مباشر
+    ========================= */
 
-      const videoId =
-        extractVideoId(
-          input
-        );
+    if (isYouTubeUrl(input)) {
+      const videoId = extractVideoId(input);
 
       if (!videoId) {
-
         return api.sendMessage(
-`⌬ ━━ HINA MEDIA ━━ ⌬
-
-❌ لم أستطع استخراج رابط الفيديو`,
-          event.threadID,
-          event.messageID
+          "❌ لم أستطع استخراج معرف الفيديو من الرابط",
+          event.threadID
         );
       }
 
-      const filePath =
-        path.join(
-          getCacheDir(),
-          `youtube_${getSafeFileName(videoId)}_${Date.now()}.mp4`
-        );
+      let loadingMessage;
 
       try {
-
-        await api.sendMessage(
-`⌬ ━━ HINA MEDIA ━━ ⌬
-
-⏳ جاري تحميل الفيديو...`,
-          event.threadID,
-          event.messageID
+        loadingMessage = await api.sendMessage(
+          "⏳ جاري تجهيز الفيديو...",
+          event.threadID
         );
+      } catch (_) {}
 
-        let title =
-          "YouTube";
+      const fileName =
+        `youtube_${Date.now()}_${Math.random()
+          .toString(36)
+          .slice(2)}.mp4`;
 
-        try {
+      const filePath = path.join(cacheDir, fileName);
 
-          if (!ytdl) {
+      try {
+        await downloadVideo(input, filePath);
 
-            throw new Error(
-              "مكتبة ytdl-core غير مهيأة"
-            );
-          }
-
-          const info =
-            await ytdl.getBasicInfo(
-              input
-            );
-
-          title =
-            info?.videoDetails?.title ||
-            title;
-
-        } catch (infoError) {
-
-          console.log(
-            "[YOUTUBE INFO ERROR]",
-            infoError
-          );
-
-          // لا نوقف التحميل بسبب فشل جلب العنوان
-        }
-
-        await downloadVideo(
-          input,
-          filePath
-        );
-
-        return sendVideo(
+        await sendVideo(
           api,
           event,
           filePath,
-          title
+          "YouTube"
         );
 
       } catch (error) {
+        await fs.remove(filePath).catch(() => {});
 
-        await removeFile(
-          filePath
-        );
-
-        return sendError(
+        await sendError(
           api,
           event,
-          "حدث خطأ أثناء تحميل الفيديو",
-          error
+          error,
+          `الرابط: ${input}\nVideo ID: ${videoId}`
         );
+
+      } finally {
+        if (loadingMessage?.messageID) {
+          try {
+            await api.unsendMessage(loadingMessage.messageID);
+          } catch (_) {}
+        }
       }
+
+      return;
     }
 
-    // ========================================================
-    // SEARCH
-    // ========================================================
+
+    /* =========================
+       البحث
+    ========================= */
+
+    let search;
 
     try {
-
-      const result =
-        await ytSearch(
-          input
-        );
-
-      if (
-        !result ||
-        !Array.isArray(
-          result.videos
-        ) ||
-        !result.videos.length
-      ) {
-
-        return api.sendMessage(
-`⌬ ━━ HINA MEDIA ━━ ⌬
-
-❌ لم أجد نتائج لهذا البحث`,
-          event.threadID,
-          event.messageID
-        );
-      }
-
-      const videos =
-        result.videos.slice(
-          0,
-          5
-        );
-
-      let message =
-`⌬ ━━ HINA MEDIA ━━ ⌬
-
-🔎 نتائج البحث عن:
-${input}
-
-`;
-
-      videos.forEach(
-        (
-          video,
-          index
-        ) => {
-
-          message +=
-`${index + 1} ┃ ${video.title}
-   ⏱️ ${video.timestamp || "غير معروف"}
-   👤 ${video.author?.name || "غير معروف"}
-
-`;
-        }
-      );
-
-      message +=
-`━━━━━━━━━━━━━━━━━━
-↪️ أرسل رقم الفيديو لتحميله`;
-
-      const links =
-        videos.map(
-          video => ({
-            url:
-              video.url,
-
-            title:
-              video.title
-          })
-        );
-
-      return api.sendMessage(
-        message,
-        event.threadID,
-        (
-          error,
-          info
-        ) => {
-
-          if (error) {
-
-            console.error(
-              "[YOUTUBE SEARCH MESSAGE ERROR]",
-              error
-            );
-
-            return;
-          }
-
-          if (!info) {
-
-            console.error(
-              "[YOUTUBE SEARCH] No message info"
-            );
-
-            return;
-          }
-
-          if (
-            !global.client ||
-            !Array.isArray(
-              global.client.handleReply
-            )
-          ) {
-
-            console.error(
-              "[YOUTUBE HANDLE REPLY ERROR] global.client.handleReply is not available"
-            );
-
-            return;
-          }
-
-          global.client.handleReply.push({
-            name:
-              module.exports.config.name,
-
-            messageID:
-              info.messageID,
-
-            author:
-              event.senderID,
-
-            links
-          });
-
-        },
-        event.messageID
-      );
-
+      search = await ytSearch(input);
     } catch (error) {
-
       return sendError(
         api,
         event,
-        "حدث خطأ أثناء البحث في YouTube",
-        error
+        error,
+        `فشل البحث عن: ${input}`
       );
     }
 
-  } catch (error) {
+    if (!search?.videos?.length) {
+      return api.sendMessage(
+        "❌ لم يتم العثور على نتائج",
+        event.threadID
+      );
+    }
 
-    return sendError(
-      api,
-      event,
-      "حدث خطأ في أمر يوتيوب",
-      error
+    const results = search.videos.slice(0, 5);
+
+    let message = "⌬ ━━ 𝗬𝗼𝘂𝗧𝘂𝗯𝗲 ━━ ⌬\n\n";
+
+    results.forEach((video, index) => {
+      message +=
+        `${index + 1}. ${video.title}\n` +
+        `المدة: ${video.timestamp || "غير معروفة"}\n` +
+        `القناة: ${video.author?.name || "غير معروفة"}\n\n`;
+    });
+
+    message +=
+      "أرسل رقم الفيديو الذي تريد تحميله";
+
+    const sent = await api.sendMessage(
+      message,
+      event.threadID
     );
+
+    if (!global.client.handleReply) {
+      global.client.handleReply = [];
+    }
+
+    global.client.handleReply.push({
+      name: module.exports.config.name,
+      messageID: sent.messageID,
+      author: event.senderID,
+      links: results.map(video => video.url),
+      titles: results.map(video => video.title)
+    });
+
+  } catch (error) {
+    await sendError(api, event, error);
   }
 };
