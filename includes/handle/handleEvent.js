@@ -138,6 +138,151 @@ module.exports = function ({
     }
 
     // ==================================================
+    // 🤖 تغييرات البوت المسموح بها
+    // ==================================================
+
+    /*
+     * الأوامر التي ينفذها البوت لتغيير:
+     *
+     * nickname
+     * groupName
+     * image
+     * theme
+     * emoji
+     *
+     * تسجل التغيير هنا قبل تنفيذه
+     *
+     * مثال:
+     *
+     * global.HINA_MARK_BOT_CHANGE(
+     *     "nickname",
+     *     threadID,
+     *     userID
+     * );
+     *
+     */
+
+    const botChanges =
+        new Map();
+
+    const BOT_CHANGE_TIMEOUT =
+        15000;
+
+    function makeBotChangeKey(
+        type,
+        threadID,
+        userID = ""
+    ) {
+
+        return (
+            `${type}:${String(threadID)}:${String(userID)}`
+        );
+
+    }
+
+    function markBotChange(
+        type,
+        threadID,
+        userID = ""
+    ) {
+
+        if (!type || !threadID) {
+            return;
+        }
+
+        const key =
+            makeBotChangeKey(
+                type,
+                threadID,
+                userID
+            );
+
+        botChanges.set(
+            key,
+            Date.now()
+        );
+
+        setTimeout(
+            () => {
+
+                const time =
+                    botChanges.get(
+                        key
+                    );
+
+                if (
+                    time &&
+                    Date.now() - time >=
+                    BOT_CHANGE_TIMEOUT
+                ) {
+
+                    botChanges.delete(
+                        key
+                    );
+
+                }
+
+            },
+            BOT_CHANGE_TIMEOUT + 1000
+        );
+
+    }
+
+    function isBotChange(
+        type,
+        threadID,
+        userID = ""
+    ) {
+
+        if (!type || !threadID) {
+            return false;
+        }
+
+        const key =
+            makeBotChangeKey(
+                type,
+                threadID,
+                userID
+            );
+
+        const time =
+            botChanges.get(
+                key
+            );
+
+        if (!time) {
+            return false;
+        }
+
+        if (
+            Date.now() - time >
+            BOT_CHANGE_TIMEOUT
+        ) {
+
+            botChanges.delete(
+                key
+            );
+
+            return false;
+
+        }
+
+        botChanges.delete(
+            key
+        );
+
+        return true;
+
+    }
+
+    /*
+     * نجعل الدالة متاحة لجميع أوامر البوت
+     */
+
+    global.HINA_MARK_BOT_CHANGE =
+        markBotChange;
+
+    // ==================================================
     // 📊 إعدادات نشاط الأعضاء
     // ==================================================
 
@@ -401,6 +546,18 @@ module.exports = function ({
         if (
             String(threadID) ===
             String(senderID)
+        ) {
+
+            return;
+
+        }
+
+        /*
+         * لا نسجل البوت كنشاط عضو
+         */
+
+        if (
+            isBotUser(senderID)
         ) {
 
             return;
@@ -881,6 +1038,22 @@ module.exports = function ({
         const threadID =
             String(event.threadID);
 
+        /*
+         * إذا كان التغيير بأمر من البوت
+         * لا نرجعه
+         */
+
+        if (
+            isBotChange(
+                "groupName",
+                threadID
+            )
+        ) {
+
+            return;
+
+        }
+
         const data =
             event.logMessageData ||
             {};
@@ -1016,6 +1189,21 @@ module.exports = function ({
         const threadID =
             String(event.threadID);
 
+        /*
+         * تغيير السمة بأمر من البوت
+         */
+
+        if (
+            isBotChange(
+                "theme",
+                threadID
+            )
+        ) {
+
+            return;
+
+        }
+
         if (
             isProtectionLocked(
                 threadID,
@@ -1127,6 +1315,21 @@ module.exports = function ({
 
         const threadID =
             String(event.threadID);
+
+        /*
+         * تغيير الإيموجي بأمر من البوت
+         */
+
+        if (
+            isBotChange(
+                "emoji",
+                threadID
+            )
+        ) {
+
+            return;
+
+        }
 
         if (
             isProtectionLocked(
@@ -1286,6 +1489,26 @@ module.exports = function ({
 
         }
 
+        const threadID =
+            String(event.threadID);
+
+        /*
+         * إذا كان البوت هو من غيّر كنية العضو
+         * لا تقم الحماية بإرجاعها
+         */
+
+        if (
+            isBotChange(
+                "nickname",
+                threadID,
+                userID
+            )
+        ) {
+
+            return;
+
+        }
+
         if (
             !protection.saved
         ) {
@@ -1360,9 +1583,6 @@ module.exports = function ({
         const savedNickname =
             nicknames[userID] ||
             "";
-
-        const threadID =
-            String(event.threadID);
 
         if (
             isProtectionLocked(
@@ -1646,6 +1866,22 @@ module.exports = function ({
 
         const threadID =
             String(event.threadID);
+
+        /*
+         * إذا كانت الصورة تغيّرت بأمر من البوت
+         * لا تقم الحماية بإرجاعها
+         */
+
+        if (
+            isBotChange(
+                "image",
+                threadID
+            )
+        ) {
+
+            return;
+
+        }
 
         if (
             isProtectionLocked(
@@ -1986,14 +2222,11 @@ module.exports = function ({
 
         }
 
-        if (
-            event.type === "message" &&
-            !event.logMessageType
-        ) {
-
-            return;
-
-        }
+        /*
+         * لا نوقف فحص الرسائل العادية
+         * حتى نستطيع اكتشاف تغييرات السمة والإيموجي
+         * التي قد تصل بدون logMessageType
+         */
 
         const threadID =
             String(
@@ -2008,6 +2241,19 @@ module.exports = function ({
         if (
             !protection ||
             !protection.enabled
+        ) {
+
+            return;
+
+        }
+
+        /*
+         * إذا كان الحدث من البوت نفسه
+         * لا نشغّل الحماية عليه
+         */
+
+        if (
+            isBotEvent(event)
         ) {
 
             return;
@@ -2088,7 +2334,8 @@ module.exports = function ({
             if (
                 event.type === "message" &&
                 event.body &&
-                event.messageID
+                event.messageID &&
+                !isBotUser(event.senderID)
             ) {
 
                 const text =
@@ -2481,7 +2728,8 @@ module.exports = function ({
             if (
                 event.type === "message" &&
                 event.threadID &&
-                event.senderID
+                event.senderID &&
+                !isBotUser(event.senderID)
             ) {
 
                 registerActivity(
