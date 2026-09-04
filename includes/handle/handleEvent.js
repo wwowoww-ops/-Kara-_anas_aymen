@@ -141,27 +141,6 @@ module.exports = function ({
     // 🤖 تغييرات البوت المسموح بها
     // ==================================================
 
-    /*
-     * الأوامر التي ينفذها البوت لتغيير:
-     *
-     * nickname
-     * groupName
-     * image
-     * theme
-     * emoji
-     *
-     * تسجل التغيير هنا قبل تنفيذه
-     *
-     * مثال:
-     *
-     * global.HINA_MARK_BOT_CHANGE(
-     *     "nickname",
-     *     threadID,
-     *     userID
-     * );
-     *
-     */
-
     const botChanges =
         new Map();
 
@@ -274,10 +253,6 @@ module.exports = function ({
         return true;
 
     }
-
-    /*
-     * نجعل الدالة متاحة لجميع أوامر البوت
-     */
 
     global.HINA_MARK_BOT_CHANGE =
         markBotChange;
@@ -551,10 +526,6 @@ module.exports = function ({
             return;
 
         }
-
-        /*
-         * لا نسجل البوت كنشاط عضو
-         */
 
         if (
             isBotUser(senderID)
@@ -1038,11 +1009,6 @@ module.exports = function ({
         const threadID =
             String(event.threadID);
 
-        /*
-         * إذا كان التغيير بأمر من البوت
-         * لا نرجعه
-         */
-
         if (
             isBotChange(
                 "groupName",
@@ -1189,10 +1155,6 @@ module.exports = function ({
         const threadID =
             String(event.threadID);
 
-        /*
-         * تغيير السمة بأمر من البوت
-         */
-
         if (
             isBotChange(
                 "theme",
@@ -1316,10 +1278,6 @@ module.exports = function ({
         const threadID =
             String(event.threadID);
 
-        /*
-         * تغيير الإيموجي بأمر من البوت
-         */
-
         if (
             isBotChange(
                 "emoji",
@@ -1389,19 +1347,12 @@ module.exports = function ({
         const possibleIDs = [
 
             data.participant_id,
-
             data.participantID,
-
             data.userFbId,
-
             data.userID,
-
             data.user_id,
-
             data.uid,
-
             data.target_id,
-
             data.changed_user_id
 
         ];
@@ -1477,10 +1428,6 @@ module.exports = function ({
 
         }
 
-        // ==================================================
-        // 🤖 البوت مستثنى من حماية الكنيات
-        // ==================================================
-
         if (
             isBotUser(userID)
         ) {
@@ -1491,11 +1438,6 @@ module.exports = function ({
 
         const threadID =
             String(event.threadID);
-
-        /*
-         * إذا كان البوت هو من غيّر كنية العضو
-         * لا تقم الحماية بإرجاعها
-         */
 
         if (
             isBotChange(
@@ -1867,11 +1809,6 @@ module.exports = function ({
         const threadID =
             String(event.threadID);
 
-        /*
-         * إذا كانت الصورة تغيّرت بأمر من البوت
-         * لا تقم الحماية بإرجاعها
-         */
-
         if (
             isBotChange(
                 "image",
@@ -2222,12 +2159,6 @@ module.exports = function ({
 
         }
 
-        /*
-         * لا نوقف فحص الرسائل العادية
-         * حتى نستطيع اكتشاف تغييرات السمة والإيموجي
-         * التي قد تصل بدون logMessageType
-         */
-
         const threadID =
             String(
                 event.threadID
@@ -2246,11 +2177,6 @@ module.exports = function ({
             return;
 
         }
-
-        /*
-         * إذا كان الحدث من البوت نفسه
-         * لا نشغّل الحماية عليه
-         */
 
         if (
             isBotEvent(event)
@@ -2368,14 +2294,15 @@ module.exports = function ({
                     "أبو هريرة"
                 ];
 
-// ==================================================
+                // ==================================================
                 // 🐇 كلمات الأرنب
                 // ==================================================
 
-                const monkeyWords = [
-                    "أسماء,
+                const rabbitWords = [
+                    "أسماء",
+                    "اسماء",
                     "فردوس",
-                    "اسماء"
+                    "أسماء فردوس"
                 ];
 
                 // ==================================================
@@ -2493,24 +2420,30 @@ module.exports = function ({
 
                 }
 
-// ==================================================
+                // ==================================================
                 // البحث عن 🐇
                 // ==================================================
 
-                for (
-                    const word of monkeyWords
+                if (
+                    !reaction
                 ) {
 
-                    if (
-                        text.includes(
-                            word.toLowerCase()
-                        )
+                    for (
+                        const word of rabbitWords
                     ) {
 
-                        reaction =
-                            "🐇";
+                        if (
+                            text.includes(
+                                word.toLowerCase()
+                            )
+                        ) {
 
-                        break;
+                            reaction =
+                                "🐇";
+
+                            break;
+
+                        }
 
                     }
 
