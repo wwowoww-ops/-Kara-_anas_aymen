@@ -24,55 +24,31 @@ module.exports = function ({
         });
 
     // ==================================================
-    // 🤖 ID البوت
+    // 🤖 ID البوت واستثناء البوت من جميع الحمايات
     // ==================================================
 
     let botIDCache = null;
 
-    async function getBotID() {
-
-        if (botIDCache) {
-            return botIDCache;
-        }
+    function getBotID() {
 
         try {
 
+            if (botIDCache) {
+                return botIDCache;
+            }
+
             if (
                 api &&
-                typeof api.getCurrentUserID ===
-                "function"
+                typeof api.getCurrentUserID === "function"
             ) {
 
                 const result =
-                    await new Promise(resolve => {
+                    api.getCurrentUserID();
 
-                        try {
-
-                            api.getCurrentUserID(
-                                (error, id) => {
-
-                                    if (error) {
-                                        return resolve("");
-                                    }
-
-                                    resolve(
-                                        id
-                                            ? String(id)
-                                            : ""
-                                    );
-
-                                }
-                            );
-
-                        } catch (error) {
-
-                            resolve("");
-
-                        }
-
-                    });
-
-                if (result) {
+                if (
+                    result &&
+                    typeof result !== "object"
+                ) {
 
                     botIDCache =
                         String(result);
@@ -86,27 +62,45 @@ module.exports = function ({
         } catch (error) {
 
             console.error(
-                "[PROTECTION] getCurrentUserID:",
+                "[PROTECTION] فشل الحصول على ID البوت:",
                 error.message || error
             );
 
         }
 
         return "";
+
     }
 
-    // ==================================================
-    // 🤖 التحقق هل الحدث صادر من البوت
-    // ==================================================
+    function isBotUser(userID) {
 
-    async function isBotEvent(event) {
+        const botID =
+            getBotID();
+
+        if (
+            !botID ||
+            !userID
+        ) {
+
+            return false;
+
+        }
+
+        return (
+            String(userID) ===
+            botID
+        );
+
+    }
+
+    function isBotEvent(event) {
 
         if (!event) {
             return false;
         }
 
         const botID =
-            await getBotID();
+            getBotID();
 
         if (!botID) {
             return false;
@@ -119,78 +113,28 @@ module.exports = function ({
         const possibleIDs = [
 
             event.senderID,
-
             event.authorID,
-
             event.authorId,
-
             event.actorID,
-
             event.actorId,
 
-            event.userID,
-
-            event.userId,
-
             data.author_id,
-
             data.authorID,
-
             data.authorId,
 
             data.actor_id,
-
             data.actorID,
-
-            data.actorId,
-
-            data.senderID,
-
-            data.sender_id,
-
-            data.userID,
-
-            data.user_id
+            data.actorId
 
         ];
 
-        for (
-            const id of possibleIDs
-        ) {
-
-            if (
+        return possibleIDs.some(
+            id =>
                 id !== undefined &&
                 id !== null &&
                 String(id) === botID
-            ) {
-
-                return true;
-
-            }
-
-        }
-
-        return false;
-    }
-
-    // ==================================================
-    // 🤖 هل العضو المستهدف هو البوت
-    // ==================================================
-
-    async function isBotUser(userID) {
-
-        if (!userID) {
-            return false;
-        }
-
-        const botID =
-            await getBotID();
-
-        return (
-            Boolean(botID) &&
-            String(userID) ===
-            String(botID)
         );
+
     }
 
     // ==================================================
@@ -273,7 +217,8 @@ module.exports = function ({
     // 🔒 منع الحماية من الدخول في Loop
     // ==================================================
 
-    const protectionLocks = new Map();
+    const protectionLocks =
+        new Map();
 
     function isProtectionLocked(
         threadID,
@@ -283,7 +228,9 @@ module.exports = function ({
         const key =
             `${String(threadID)}:${type}`;
 
-        return protectionLocks.has(key);
+        return protectionLocks.has(
+            key
+        );
 
     }
 
@@ -819,10 +766,9 @@ module.exports = function ({
                                     () => {
 
                                         file.close(
-                                            () =>
-                                                resolve(
-                                                    destination
-                                                )
+                                            () => resolve(
+                                                destination
+                                            )
                                         );
 
                                     }
@@ -873,6 +819,591 @@ module.exports = function ({
                 }
 
             }
+        );
+
+    }
+
+    // ==================================================
+    // 🛡️ حماية اسم المجموعة
+    // ==================================================
+
+    async function protectGroupName(
+        event,
+        protection
+    ) {
+
+        if (
+            isBotEvent(event)
+        ) {
+
+            return;
+
+        }
+
+        if (
+            !protection.enabled.groupName
+        ) {
+
+            return;
+
+        }
+
+        const eventType =
+            String(
+                event.logMessageType ||
+                event.eventType ||
+                ""
+            );
+
+        if (
+            eventType !==
+                "log:thread-name" &&
+            eventType !==
+                "change_thread_name"
+        ) {
+
+            return;
+
+        }
+
+        const savedName =
+            protection.saved.name;
+
+        if (
+            savedName === null ||
+            savedName === undefined
+        ) {
+
+            return;
+
+        }
+
+        const threadID =
+            String(event.threadID);
+
+        const data =
+            event.logMessageData ||
+            {};
+
+        const newName =
+            data.name ||
+            data.threadName ||
+            data.thread_name ||
+            event.threadName ||
+            event.newName ||
+            event.name ||
+            event.logMessageBody ||
+            "";
+
+        if (
+            String(newName) ===
+            String(savedName)
+        ) {
+
+            return;
+
+        }
+
+        if (
+            isProtectionLocked(
+                threadID,
+                "groupName"
+            )
+        ) {
+
+            return;
+
+        }
+
+        lockProtection(
+            threadID,
+            "groupName"
+        );
+
+        const result =
+            await apiCall(
+                "setTitle",
+                String(savedName),
+                threadID
+            );
+
+        if (
+            result.error
+        ) {
+
+            console.error(
+                "[PROTECTION NAME ERROR]",
+                result.error.message ||
+                result.error
+            );
+
+            return;
+
+        }
+
+        console.log(
+            `[PROTECTION] تم استرجاع اسم المجموعة ${threadID}`
+        );
+
+    }
+
+    // ==================================================
+    // 🛡️ حماية السمة
+    // ==================================================
+
+    async function protectTheme(
+        event,
+        protection
+    ) {
+
+        if (
+            isBotEvent(event)
+        ) {
+
+            return;
+
+        }
+
+        if (
+            !protection.enabled.theme
+        ) {
+
+            return;
+
+        }
+
+        const eventType =
+            String(
+                event.logMessageType ||
+                event.eventType ||
+                event.type ||
+                ""
+            );
+
+        const isThemeEvent =
+            eventType ===
+                "log:thread-color" ||
+            eventType ===
+                "change_thread_color" ||
+            eventType ===
+                "change_thread_theme" ||
+            eventType ===
+                "thread_color" ||
+            eventType ===
+                "thread_theme";
+
+        if (
+            !isThemeEvent
+        ) {
+
+            return;
+
+        }
+
+        const savedTheme =
+            protection.saved.theme;
+
+        if (
+            savedTheme === null ||
+            savedTheme === undefined ||
+            String(savedTheme).trim() === ""
+        ) {
+
+            return;
+
+        }
+
+        const threadID =
+            String(event.threadID);
+
+        if (
+            isProtectionLocked(
+                threadID,
+                "theme"
+            )
+        ) {
+
+            return;
+
+        }
+
+        lockProtection(
+            threadID,
+            "theme"
+        );
+
+        const result =
+            await apiCall(
+                "changeThreadColor",
+                String(savedTheme),
+                threadID
+            );
+
+        if (
+            result.error
+        ) {
+
+            console.error(
+                "[PROTECTION THEME ERROR]",
+                result.error.message ||
+                result.error
+            );
+
+            return;
+
+        }
+
+        console.log(
+            `[PROTECTION] تم استرجاع سمة المجموعة ${threadID}`
+        );
+
+    }
+
+    // ==================================================
+    // 🛡️ حماية الإيموجي
+    // ==================================================
+
+    async function protectEmoji(
+        event,
+        protection
+    ) {
+
+        if (
+            isBotEvent(event)
+        ) {
+
+            return;
+
+        }
+
+        if (
+            !protection.enabled.emoji
+        ) {
+
+            return;
+
+        }
+
+        const eventType =
+            String(
+                event.logMessageType ||
+                event.eventType ||
+                event.type ||
+                ""
+            );
+
+        const isEmojiEvent =
+            eventType ===
+                "log:thread-icon" ||
+            eventType ===
+                "change_thread_icon" ||
+            eventType ===
+                "change_thread_emoji" ||
+            eventType ===
+                "thread_icon" ||
+            eventType ===
+                "thread_emoji";
+
+        if (
+            !isEmojiEvent
+        ) {
+
+            return;
+
+        }
+
+        const savedEmoji =
+            protection.saved.emoji;
+
+        if (
+            savedEmoji === null ||
+            savedEmoji === undefined ||
+            String(savedEmoji).trim() === ""
+        ) {
+
+            return;
+
+        }
+
+        const threadID =
+            String(event.threadID);
+
+        if (
+            isProtectionLocked(
+                threadID,
+                "emoji"
+            )
+        ) {
+
+            return;
+
+        }
+
+        lockProtection(
+            threadID,
+            "emoji"
+        );
+
+        const result =
+            await apiCall(
+                "changeThreadEmoji",
+                String(savedEmoji),
+                threadID
+            );
+
+        if (
+            result.error
+        ) {
+
+            console.error(
+                "[PROTECTION EMOJI ERROR]",
+                result.error.message ||
+                result.error
+            );
+
+            return;
+
+        }
+
+        console.log(
+            `[PROTECTION] تم استرجاع إيموجي المجموعة ${threadID}`
+        );
+
+    }
+
+    // ==================================================
+    // 🛡️ استخراج ID العضو
+    // ==================================================
+
+    function extractNicknameUserID(
+        event
+    ) {
+
+        const data =
+            event.logMessageData ||
+            {};
+
+        const possibleIDs = [
+
+            data.participant_id,
+
+            data.participantID,
+
+            data.userFbId,
+
+            data.userID,
+
+            data.user_id,
+
+            data.uid,
+
+            data.target_id,
+
+            data.changed_user_id
+
+        ];
+
+        for (
+            const id of possibleIDs
+        ) {
+
+            if (
+                id !== undefined &&
+                id !== null &&
+                String(id).trim()
+            ) {
+
+                return String(id);
+
+            }
+
+        }
+
+        return "";
+
+    }
+
+    // ==================================================
+    // 🛡️ حماية الكنيات
+    // ==================================================
+
+    async function protectNickname(
+        event,
+        protection
+    ) {
+
+        if (
+            isBotEvent(event)
+        ) {
+
+            return;
+
+        }
+
+        if (
+            !protection.enabled.nicknames
+        ) {
+
+            return;
+
+        }
+
+        if (
+            event.logMessageType !==
+            "log:user-nickname"
+        ) {
+
+            return;
+
+        }
+
+        const userID =
+            extractNicknameUserID(
+                event
+            );
+
+        if (
+            !userID
+        ) {
+
+            console.log(
+                "[PROTECTION NICKNAME] لم يتم العثور على ID العضو"
+            );
+
+            return;
+
+        }
+
+        // ==================================================
+        // 🤖 البوت مستثنى من حماية الكنيات
+        // ==================================================
+
+        if (
+            isBotUser(userID)
+        ) {
+
+            return;
+
+        }
+
+        if (
+            !protection.saved
+        ) {
+
+            return;
+
+        }
+
+        if (
+            !protection.saved.nicknames ||
+            typeof protection.saved.nicknames !==
+            "object"
+        ) {
+
+            return;
+
+        }
+
+        const nicknames =
+            protection.saved.nicknames;
+
+        if (
+            !Object.prototype.hasOwnProperty.call(
+                nicknames,
+                userID
+            )
+        ) {
+
+            const info =
+                await getThreadInfo(
+                    event.threadID
+                );
+
+            if (!info) return;
+
+            const currentNicknames =
+                extractNicknames(
+                    info
+                );
+
+            if (
+                !Object.prototype.hasOwnProperty.call(
+                    currentNicknames,
+                    userID
+                )
+            ) {
+
+                return;
+
+            }
+
+            nicknames[userID] =
+                currentNicknames[userID] ||
+                "";
+
+            protection.saved.nicknames =
+                nicknames;
+
+            await Protection.saveProtection(
+                String(event.threadID),
+                protection
+            );
+
+            console.log(
+                `[PROTECTION] تم تسجيل كنية العضو الجديد ${userID}`
+            );
+
+            return;
+
+        }
+
+        const savedNickname =
+            nicknames[userID] ||
+            "";
+
+        const threadID =
+            String(event.threadID);
+
+        if (
+            isProtectionLocked(
+                threadID,
+                `nickname:${userID}`
+            )
+        ) {
+
+            return;
+
+        }
+
+        lockProtection(
+            threadID,
+            `nickname:${userID}`
+        );
+
+        const result =
+            await apiCall(
+                "changeNickname",
+                String(savedNickname),
+                threadID,
+                userID
+            );
+
+        if (
+            result.error
+        ) {
+
+            console.error(
+                "[PROTECTION NICKNAME ERROR]",
+                result.error.message ||
+                result.error
+            );
+
+            return;
+
+        }
+
+        console.log(
+            `[PROTECTION] تم استرجاع كنية ${userID}`
         );
 
     }
@@ -1006,44 +1537,12 @@ module.exports = function ({
 
         if (!info) return null;
 
-        const possibleValues = [
-
-            info.color,
-
-            info.threadColor,
-
-            info.thread_color,
-
-            info.theme,
-
-            info.themeColor,
-
-            info.theme_color,
-
-            info.colorValue,
-
-            info.color_value
-
-        ];
-
-        for (
-            const value
-            of possibleValues
-        ) {
-
-            if (
-                value !== undefined &&
-                value !== null &&
-                String(value).trim()
-            ) {
-
-                return String(value);
-
-            }
-
-        }
-
-        return null;
+        return (
+            info.color ||
+            info.threadColor ||
+            info.thread_color ||
+            null
+        );
 
     }
 
@@ -1063,1063 +1562,39 @@ module.exports = function ({
             "object"
         ) {
 
-            const possibleValues = [
-
-                info.emoji.emoji,
-
-                info.emoji.value,
-
-                info.emoji.threadEmoji,
-
-                info.emoji.thread_emoji,
-
-                info.emoji.icon
-
-            ];
-
-            for (
-                const value
-                of possibleValues
-            ) {
-
-                if (
-                    value !== undefined &&
-                    value !== null &&
-                    String(value).trim()
-                ) {
-
-                    return String(value);
-
-                }
-
-            }
-
-        }
-
-        const possibleValues = [
-
-            info.emoji,
-
-            info.threadEmoji,
-
-            info.thread_emoji,
-
-            info.threadIcon,
-
-            info.thread_icon,
-
-            info.icon
-
-        ];
-
-        for (
-            const value
-            of possibleValues
-        ) {
-
-            if (
-                value !== undefined &&
-                value !== null &&
-                String(value).trim()
-            ) {
-
-                return String(value);
-
-            }
-
-        }
-
-        return null;
-
-    }
-
-    // ==================================================
-    // 🛡️ استخراج السمة من Event
-    // ==================================================
-
-    function extractThemeFromEvent(
-        event
-    ) {
-
-        const data =
-            event.logMessageData ||
-            {};
-
-        const possibleValues = [
-
-            data.color,
-
-            data.threadColor,
-
-            data.thread_color,
-
-            data.theme,
-
-            data.themeColor,
-
-            data.theme_color,
-
-            data.colorValue,
-
-            data.color_value,
-
-            event.color,
-
-            event.threadColor,
-
-            event.thread_color,
-
-            event.theme,
-
-            event.themeColor,
-
-            event.theme_color
-
-        ];
-
-        for (
-            const value
-            of possibleValues
-        ) {
-
-            if (
-                value !== undefined &&
-                value !== null &&
-                String(value).trim()
-            ) {
-
-                return String(value);
-
-            }
-
-        }
-
-        return null;
-
-    }
-
-    // ==================================================
-    // 🛡️ استخراج الإيموجي من Event
-    // ==================================================
-
-    function extractEmojiFromEvent(
-        event
-    ) {
-
-        const data =
-            event.logMessageData ||
-            {};
-
-        const possibleValues = [
-
-            data.emoji,
-
-            data.threadEmoji,
-
-            data.thread_emoji,
-
-            data.threadIcon,
-
-            data.thread_icon,
-
-            data.icon,
-
-            data.value,
-
-            data.newEmoji,
-
-            data.new_emoji,
-
-            event.emoji,
-
-            event.threadEmoji,
-
-            event.thread_emoji,
-
-            event.threadIcon,
-
-            event.thread_icon
-
-        ];
-
-        for (
-            const value
-            of possibleValues
-        ) {
-
-            if (
-                value !== undefined &&
-                value !== null
-            ) {
-
-                if (
-                    typeof value ===
-                    "object"
-                ) {
-
-                    const nested =
-
-                        value.emoji ||
-                        value.value ||
-                        value.icon ||
-                        value.threadEmoji ||
-                        value.thread_emoji ||
-                        null;
-
-                    if (
-                        nested
-                    ) {
-
-                        return String(
-                            nested
-                        );
-
-                    }
-
-                } else if (
-                    String(value).trim()
-                ) {
-
-                    return String(
-                        value
-                    );
-
-                }
-
-            }
-
-        }
-
-        return null;
-
-    }
-
-    // ==================================================
-    // 🛡️ حماية اسم المجموعة
-    // ==================================================
-
-    async function protectGroupName(
-        event,
-        protection
-    ) {
-
-        if (
-            !protection.enabled.groupName
-        ) {
-
-            return;
-
-        }
-
-        if (
-            await isBotEvent(event)
-        ) {
-
-            return;
-
-        }
-
-        const eventType =
-            String(
-                event.logMessageType ||
-                event.eventType ||
-                event.type ||
-                ""
+            return (
+                info.emoji.emoji ||
+                info.emoji.value ||
+                null
             );
 
-        const isNameEvent =
-            eventType ===
-                "log:thread-name" ||
-            eventType ===
-                "change_thread_name";
-
-        if (
-            !isNameEvent
-        ) {
-
-            return;
-
         }
 
-        const savedName =
-            protection.saved.name;
-
-        if (
-            savedName === null ||
-            savedName === undefined
-        ) {
-
-            return;
-
-        }
-
-        const threadID =
-            String(event.threadID);
-
-        const data =
-            event.logMessageData ||
-            {};
-
-        const newName =
-            data.name ||
-            data.threadName ||
-            data.newName ||
-            data.new_name ||
-            event.logMessageBody ||
-            "";
-
-        if (
-            String(newName) ===
-            String(savedName)
-        ) {
-
-            return;
-
-        }
-
-        if (
-            isProtectionLocked(
-                threadID,
-                "groupName"
-            )
-        ) {
-
-            return;
-
-        }
-
-        lockProtection(
-            threadID,
-            "groupName"
-        );
-
-        const result =
-            await apiCall(
-                "setTitle",
-                String(savedName),
-                threadID
-            );
-
-        if (
-            result.error
-        ) {
-
-            console.error(
-                "[PROTECTION NAME ERROR]",
-                result.error.message ||
-                result.error
-            );
-
-            return;
-
-        }
-
-        console.log(
-            `[PROTECTION] تم استرجاع اسم المجموعة ${threadID}`
+        return (
+            info.emoji ||
+            info.threadEmoji ||
+            info.thread_emoji ||
+            null
         );
 
     }
 
     // ==================================================
-    // 🛡️ حماية السمة
-    // ==================================================
-
-    async function protectTheme(
-        event,
-        protection
-    ) {
-
-        if (
-            !protection.enabled.theme
-        ) {
-
-            return;
-
-        }
-
-        if (
-            await isBotEvent(event)
-        ) {
-
-            return;
-
-        }
-
-        const eventType =
-            String(
-                event.logMessageType ||
-                event.eventType ||
-                event.type ||
-                ""
-            );
-
-        const isThemeEvent =
-            eventType ===
-                "log:thread-color" ||
-            eventType ===
-                "change_thread_color" ||
-            eventType ===
-                "change_thread_theme" ||
-            eventType ===
-                "thread_color" ||
-            eventType ===
-                "thread_theme";
-
-        if (
-            !isThemeEvent
-        ) {
-
-            return;
-
-        }
-
-        let savedTheme =
-            protection.saved.theme;
-
-        if (
-            savedTheme === null ||
-            savedTheme === undefined ||
-            String(savedTheme).trim() === ""
-        ) {
-
-            return;
-
-        }
-
-        savedTheme =
-            String(savedTheme);
-
-        const threadID =
-            String(event.threadID);
-
-        if (
-            isProtectionLocked(
-                threadID,
-                "theme"
-            )
-        ) {
-
-            return;
-
-        }
-
-        lockProtection(
-            threadID,
-            "theme"
-        );
-
-        const result =
-            await apiCall(
-                "changeThreadColor",
-                savedTheme,
-                threadID
-            );
-
-        if (
-            result.error
-        ) {
-
-            console.error(
-                "[PROTECTION THEME ERROR]",
-                result.error.message ||
-                result.error
-            );
-
-            return;
-
-        }
-
-        console.log(
-            `[PROTECTION] تم استرجاع سمة المجموعة ${threadID}`
-        );
-
-    }
-
-    // ==================================================
-    // 🛡️ حماية الإيموجي
-    // ==================================================
-
-    async function protectEmoji(
-        event,
-        protection
-    ) {
-
-        if (
-            !protection.enabled.emoji
-        ) {
-
-            return;
-
-        }
-
-        if (
-            await isBotEvent(event)
-        ) {
-
-            return;
-
-        }
-
-        const eventType =
-            String(
-                event.logMessageType ||
-                event.eventType ||
-                event.type ||
-                ""
-            );
-
-        const isEmojiEvent =
-            eventType ===
-                "log:thread-icon" ||
-            eventType ===
-                "change_thread_icon" ||
-            eventType ===
-                "change_thread_emoji" ||
-            eventType ===
-                "thread_icon" ||
-            eventType ===
-                "thread_emoji";
-
-        if (
-            !isEmojiEvent
-        ) {
-
-            return;
-
-        }
-
-        let savedEmoji =
-            protection.saved.emoji;
-
-        if (
-            savedEmoji === null ||
-            savedEmoji === undefined ||
-            String(savedEmoji).trim() === ""
-        ) {
-
-            return;
-
-        }
-
-        savedEmoji =
-            String(savedEmoji);
-
-        const threadID =
-            String(event.threadID);
-
-        if (
-            isProtectionLocked(
-                threadID,
-                "emoji"
-            )
-        ) {
-
-            return;
-
-        }
-
-        lockProtection(
-            threadID,
-            "emoji"
-        );
-
-        const result =
-            await apiCall(
-                "changeThreadEmoji",
-                savedEmoji,
-                threadID
-            );
-
-        if (
-            result.error
-        ) {
-
-            console.error(
-                "[PROTECTION EMOJI ERROR]",
-                result.error.message ||
-                result.error
-            );
-
-            return;
-
-        }
-
-        console.log(
-            `[PROTECTION] تم استرجاع إيموجي المجموعة ${threadID}`
-        );
-
-    }
-
-    // ==================================================
-    // 🛡️ استخراج ID العضو
-    // ==================================================
-
-    function extractNicknameUserID(
-        event
-    ) {
-
-        const data =
-            event.logMessageData ||
-            {};
-
-        const possibleIDs = [
-
-            data.participant_id,
-
-            data.participantID,
-
-            data.userFbId,
-
-            data.userID,
-
-            data.user_id,
-
-            data.userid,
-
-            data.uid,
-
-            data.target_id,
-
-            data.targetID,
-
-            data.changed_user_id,
-
-            data.changedUserID
-
-        ];
-
-        for (
-            const id of possibleIDs
-        ) {
-
-            if (
-                id !== undefined &&
-                id !== null &&
-                String(id).trim()
-            ) {
-
-                return String(id);
-
-            }
-
-        }
-
-        return "";
-
-    }
-
-    // ==================================================
-    // 🛡️ حماية الكنيات
-    // ==================================================
-
-    async function protectNickname(
-        event,
-        protection
-    ) {
-
-        if (
-            !protection.enabled.nicknames
-        ) {
-
-            return;
-
-        }
-
-        if (
-            event.logMessageType !==
-            "log:user-nickname"
-        ) {
-
-            return;
-
-        }
-
-        const userID =
-            extractNicknameUserID(
-                event
-            );
-
-        if (
-            !userID
-        ) {
-
-            console.log(
-                "[PROTECTION NICKNAME] لم يتم العثور على ID العضو"
-            );
-
-            return;
-
-        }
-
-        // ==================================================
-        // 🤖 لا تحمي كنية البوت نفسه
-        // ==================================================
-
-        if (
-            await isBotUser(userID)
-        ) {
-
-            return;
-
-        }
-
-        // ==================================================
-        // 🤖 لا تعالج تغيير كنية صادر من البوت
-        // ==================================================
-
-        if (
-            await isBotEvent(event)
-        ) {
-
-            return;
-
-        }
-
-        if (
-            !protection.saved
-        ) {
-
-            return;
-
-        }
-
-        if (
-            !protection.saved.nicknames ||
-            typeof protection.saved.nicknames !==
-            "object"
-        ) {
-
-            return;
-
-        }
-
-        const nicknames =
-            protection.saved.nicknames;
-
-        if (
-            !Object.prototype.hasOwnProperty.call(
-                nicknames,
-                userID
-            )
-        ) {
-
-            const info =
-                await getThreadInfo(
-                    event.threadID
-                );
-
-            if (!info) return;
-
-            const currentNicknames =
-                extractNicknames(
-                    info
-                );
-
-            if (
-                !Object.prototype.hasOwnProperty.call(
-                    currentNicknames,
-                    userID
-                )
-            ) {
-
-                return;
-
-            }
-
-            nicknames[userID] =
-                currentNicknames[userID] ||
-                "";
-
-            protection.saved.nicknames =
-                nicknames;
-
-            await Protection.saveProtection(
-                String(event.threadID),
-                protection
-            );
-
-            console.log(
-                `[PROTECTION] تم تسجيل كنية العضو الجديد ${userID}`
-            );
-
-            return;
-
-        }
-
-        const savedNickname =
-            nicknames[userID] || "";
-
-        const threadID =
-            String(event.threadID);
-
-        if (
-            isProtectionLocked(
-                threadID,
-                `nickname:${userID}`
-            )
-        ) {
-
-            return;
-
-        }
-
-        lockProtection(
-            threadID,
-            `nickname:${userID}`
-        );
-
-        const result =
-            await apiCall(
-                "changeNickname",
-                String(savedNickname),
-                threadID,
-                userID
-            );
-
-        if (
-            result.error
-        ) {
-
-            console.error(
-                "[PROTECTION NICKNAME ERROR]",
-                result.error.message ||
-                result.error
-            );
-
-            return;
-
-        }
-
-        console.log(
-            `[PROTECTION] تم استرجاع كنية ${userID}`
-        );
-
-    }
-
-    // ==================================================
-    // 🛡️ تسجيل كنية عضو جديد
-    // ==================================================
-
-    async function registerNewMemberNickname(
-        event,
-        protection
-    ) {
-
-        if (
-            !protection.enabled.nicknames
-        ) {
-
-            return;
-
-        }
-
-        if (
-            event.logMessageType !==
-            "log:subscribe"
-        ) {
-
-            return;
-
-        }
-
-        const data =
-            event.logMessageData ||
-            {};
-
-        const userIDs = [];
-
-        if (
-            Array.isArray(
-                data.addedParticipants
-            )
-        ) {
-
-            for (
-                const participant
-                of data.addedParticipants
-            ) {
-
-                if (
-                    !participant
-                ) {
-
-                    continue;
-
-                }
-
-                const uid =
-                    participant.userFbId ||
-                    participant.userID ||
-                    participant.userid ||
-                    participant.id;
-
-                if (
-                    uid
-                ) {
-
-                    userIDs.push(
-                        String(uid)
-                    );
-
-                }
-
-            }
-
-        }
-
-        if (
-            data.participant_id
-        ) {
-
-            userIDs.push(
-                String(
-                    data.participant_id
-                )
-            );
-
-        }
-
-        if (
-            data.participantID
-        ) {
-
-            userIDs.push(
-                String(
-                    data.participantID
-                )
-            );
-
-        }
-
-        const uniqueUserIDs =
-            [
-                ...new Set(
-                    userIDs
-                )
-            ];
-
-        if (
-            uniqueUserIDs.length ===
-            0
-        ) {
-
-            return;
-
-        }
-
-        const info =
-            await getThreadInfo(
-                event.threadID
-            );
-
-        if (!info) return;
-
-        const currentNicknames =
-            extractNicknames(
-                info
-            );
-
-        if (
-            !protection.saved
-        ) {
-
-            protection.saved = {};
-
-        }
-
-        if (
-            !protection.saved.nicknames ||
-            typeof protection.saved.nicknames !==
-            "object"
-        ) {
-
-            protection.saved.nicknames =
-                {};
-
-        }
-
-        let changed =
-            false;
-
-        for (
-            const userID
-            of uniqueUserIDs
-        ) {
-
-            // لا نسجل البوت ضمن حماية الكنيات
-
-            if (
-                await isBotUser(userID)
-            ) {
-
-                continue;
-
-            }
-
-            if (
-                Object.prototype.hasOwnProperty.call(
-                    protection.saved.nicknames,
-                    userID
-                )
-            ) {
-
-                continue;
-
-            }
-
-            if (
-                !Object.prototype.hasOwnProperty.call(
-                    currentNicknames,
-                    userID
-                )
-            ) {
-
-                protection.saved.nicknames[
-                    userID
-                ] = "";
-
-                changed = true;
-
-                continue;
-
-            }
-
-            protection.saved.nicknames[
-                userID
-            ] =
-                currentNicknames[
-                    userID
-                ] || "";
-
-            changed = true;
-
-        }
-
-        if (
-            changed
-        ) {
-
-            await Protection.saveProtection(
-                String(event.threadID),
-                protection
-            );
-
-            console.log(
-                `[PROTECTION] تم حفظ كنيات الأعضاء الجدد في ${event.threadID}`
-            );
-
-        }
-
-    }
-
-    // ==================================================
-    // 🖼️ حماية صورة المجموعة
+    // 🛡️ حماية صورة المجموعة
     // ==================================================
 
     async function protectGroupImage(
         event,
         protection
     ) {
+
+        if (
+            isBotEvent(event)
+        ) {
+
+            return;
+
+        }
 
         if (
             !protection.enabled.image
@@ -2129,29 +1604,13 @@ module.exports = function ({
 
         }
 
-        if (
-            await isBotEvent(event)
-        ) {
-
-            return;
-
-        }
-
-        const eventType =
-            String(
-                event.logMessageType ||
-                event.eventType ||
-                event.type ||
-                ""
-            );
-
         const isImageEvent =
-            eventType ===
+            event.logMessageType ===
                 "log:thread-image" ||
-            eventType ===
+            event.eventType ===
                 "change_thread_image" ||
-            eventType ===
-                "thread_image";
+            event.type ===
+                "change_thread_image";
 
         if (
             !isImageEvent
@@ -2206,9 +1665,9 @@ module.exports = function ({
         );
 
         const extension =
-            String(savedImage)
-                .toLowerCase()
-                .includes(".png")
+            savedImage.includes(
+                ".png"
+            )
                 ? ".png"
                 : ".jpg";
 
@@ -2290,6 +1749,227 @@ module.exports = function ({
     }
 
     // ==================================================
+    // 🛡️ تسجيل كنية عضو جديد
+    // ==================================================
+
+    async function registerNewMemberNickname(
+        event,
+        protection
+    ) {
+
+        if (
+            !protection.enabled.nicknames
+        ) {
+
+            return;
+
+        }
+
+        if (
+            event.logMessageType !==
+            "log:subscribe"
+        ) {
+
+            return;
+
+        }
+
+        const data =
+            event.logMessageData ||
+            {};
+
+        const userIDs = [];
+
+        if (
+            Array.isArray(
+                data.addedParticipants
+            )
+        ) {
+
+            for (
+                const participant
+                of data.addedParticipants
+            ) {
+
+                if (
+                    !participant
+                ) {
+
+                    continue;
+
+                }
+
+                const uid =
+                    participant.userFbId ||
+                    participant.userID ||
+                    participant.userid ||
+                    participant.id;
+
+                if (
+                    uid &&
+                    !isBotUser(uid)
+                ) {
+
+                    userIDs.push(
+                        String(uid)
+                    );
+
+                }
+
+            }
+
+        }
+
+        if (
+            data.participant_id &&
+            !isBotUser(
+                data.participant_id
+            )
+        ) {
+
+            userIDs.push(
+                String(
+                    data.participant_id
+                )
+            );
+
+        }
+
+        if (
+            data.participantID &&
+            !isBotUser(
+                data.participantID
+            )
+        ) {
+
+            userIDs.push(
+                String(
+                    data.participantID
+                )
+            );
+
+        }
+
+        const uniqueUserIDs =
+            [
+                ...new Set(
+                    userIDs
+                )
+            ];
+
+        if (
+            uniqueUserIDs.length ===
+            0
+        ) {
+
+            return;
+
+        }
+
+        const info =
+            await getThreadInfo(
+                event.threadID
+            );
+
+        if (!info) return;
+
+        const currentNicknames =
+            extractNicknames(
+                info
+            );
+
+        if (
+            !protection.saved
+        ) {
+
+            protection.saved = {};
+
+        }
+
+        if (
+            !protection.saved.nicknames ||
+            typeof protection.saved.nicknames !==
+            "object"
+        ) {
+
+            protection.saved.nicknames =
+                {};
+
+        }
+
+        let changed =
+            false;
+
+        for (
+            const userID
+            of uniqueUserIDs
+        ) {
+
+            if (
+                isBotUser(userID)
+            ) {
+
+                continue;
+
+            }
+
+            if (
+                Object.prototype.hasOwnProperty.call(
+                    protection.saved.nicknames,
+                    userID
+                )
+            ) {
+
+                continue;
+
+            }
+
+            if (
+                !Object.prototype.hasOwnProperty.call(
+                    currentNicknames,
+                    userID
+                )
+            ) {
+
+                protection.saved.nicknames[
+                    userID
+                ] = "";
+
+                changed = true;
+
+                continue;
+
+            }
+
+            protection.saved.nicknames[
+                userID
+            ] =
+                currentNicknames[
+                    userID
+                ] || "";
+
+            changed = true;
+
+        }
+
+        if (
+            changed
+        ) {
+
+            await Protection.saveProtection(
+                String(event.threadID),
+                protection
+            );
+
+            console.log(
+                `[PROTECTION] تم حفظ كنيات الأعضاء الجدد في ${event.threadID}`
+            );
+
+        }
+
+    }
+
+    // ==================================================
     // 🛡️ حماية المجموعة
     // ==================================================
 
@@ -2308,8 +1988,7 @@ module.exports = function ({
 
         if (
             event.type === "message" &&
-            !event.logMessageType &&
-            !event.eventType
+            !event.logMessageType
         ) {
 
             return;
@@ -2335,54 +2014,30 @@ module.exports = function ({
 
         }
 
-        // ==================================================
-        // تسجيل الأعضاء الجدد
-        // ==================================================
-
         await registerNewMemberNickname(
             event,
             protection
         );
-
-        // ==================================================
-        // اسم المجموعة
-        // ==================================================
 
         await protectGroupName(
             event,
             protection
         );
 
-        // ==================================================
-        // السمة
-        // ==================================================
-
         await protectTheme(
             event,
             protection
         );
-
-        // ==================================================
-        // الإيموجي
-        // ==================================================
 
         await protectEmoji(
             event,
             protection
         );
 
-        // ==================================================
-        // الكنيات
-        // ==================================================
-
         await protectNickname(
             event,
             protection
         );
-
-        // ==================================================
-        // صورة المجموعة
-        // ==================================================
 
         await protectGroupImage(
             event,
@@ -2400,10 +2055,6 @@ module.exports = function ({
     }) {
 
         try {
-
-            // ==================================================
-            // التأكد من وجود Event
-            // ==================================================
 
             if (!event) {
 
@@ -2450,11 +2101,19 @@ module.exports = function ({
                 let reaction =
                     null;
 
+                // ==================================================
+                // 🦧 كلمات القرد
+                // ==================================================
+
                 const monkeyWords = [
                     "يوتا",
                     "شفق",
                     "الشفق"
                 ];
+
+                // ==================================================
+                // 🐈‍⬛ كلمات القط
+                // ==================================================
 
                 const catWords = [
                     "هريرة",
@@ -2462,20 +2121,36 @@ module.exports = function ({
                     "أبو هريرة"
                 ];
 
+                // ==================================================
+                // 🦍 كلمات اياتو
+                // ==================================================
+
                 const gorillaWords = [
                     "اياتو",
                     "اياطو"
                 ];
+
+                // ==================================================
+                // 🦊 كلمات الثعلب
+                // ==================================================
 
                 const foxWords = [
                     "رؤى",
                     "ࢪؤى"
                 ];
 
+                // ==================================================
+                // 🦋 كلمات الفراشة
+                // ==================================================
+
                 const butterflyWords = [
                     "فريال",
                     "فࢪيال"
                 ];
+
+                // ==================================================
+                // 👽 كلمات كايزر
+                // ==================================================
 
                 const alienWords = [
                     "كايزر",
@@ -2484,21 +2159,33 @@ module.exports = function ({
                     "ڪايزࢪ"
                 ];
 
+                // ==================================================
+                // 🦌 كلمات نرجس
+                // ==================================================
+
                 const deerWords = [
                     "نرجس",
                     "نࢪجس"
                 ];
 
+                // ==================================================
+                // 🐧 كلمات جود
+                // ==================================================
+
                 const penguinWords = [
                     "جود"
                 ];
+
+                // ==================================================
+                // 🦔 كلمات يزن
+                // ==================================================
 
                 const hedgehogWords = [
                     "يزن"
                 ];
 
                 // ==================================================
-                // 🦧
+                // البحث عن 🦧
                 // ==================================================
 
                 for (
@@ -2521,7 +2208,7 @@ module.exports = function ({
                 }
 
                 // ==================================================
-                // 🐈‍⬛
+                // البحث عن 🐈‍⬛
                 // ==================================================
 
                 if (
@@ -2550,7 +2237,7 @@ module.exports = function ({
                 }
 
                 // ==================================================
-                // 🦍
+                // البحث عن 🦍
                 // ==================================================
 
                 if (
@@ -2579,7 +2266,7 @@ module.exports = function ({
                 }
 
                 // ==================================================
-                // 🦊
+                // البحث عن 🦊
                 // ==================================================
 
                 if (
@@ -2608,7 +2295,7 @@ module.exports = function ({
                 }
 
                 // ==================================================
-                // 🦋
+                // البحث عن 🦋
                 // ==================================================
 
                 if (
@@ -2637,7 +2324,7 @@ module.exports = function ({
                 }
 
                 // ==================================================
-                // 👽
+                // البحث عن 👽
                 // ==================================================
 
                 if (
@@ -2666,7 +2353,7 @@ module.exports = function ({
                 }
 
                 // ==================================================
-                // 🦌
+                // البحث عن 🦌
                 // ==================================================
 
                 if (
@@ -2695,7 +2382,7 @@ module.exports = function ({
                 }
 
                 // ==================================================
-                // 🐧
+                // البحث عن 🐧
                 // ==================================================
 
                 if (
@@ -2724,7 +2411,7 @@ module.exports = function ({
                 }
 
                 // ==================================================
-                // 🦔
+                // البحث عن 🦔
                 // ==================================================
 
                 if (
@@ -2824,8 +2511,7 @@ module.exports = function ({
             const {
                 userBanned,
                 threadBanned
-            } =
-                global.data;
+            } = global.data;
 
             // ==================================================
             // 📦 أوامر البوت
@@ -3118,4 +2804,91 @@ module.exports = function ({
 
                 }
 
-               
+                // ==================================================
+                // Object الخاص بالـEvent
+                // ==================================================
+
+                const Obj = {
+
+                    api,
+
+                    event,
+
+                    models,
+
+                    Users,
+
+                    Threads,
+
+                    Currencies,
+
+                    getText
+
+                };
+
+                // ==================================================
+                // تشغيل Event
+                // ==================================================
+
+                try {
+
+                    await eventModule.handleEvent(
+                        Obj
+                    );
+
+                } catch (
+                    error
+                ) {
+
+                    console.error(
+                        `❌ EVENT ERROR: ${eventName}`
+                    );
+
+                    console.error(
+                        error
+                    );
+
+                    try {
+
+                        logger(
+                            `❌ Event Error: ${eventName}\n${error.message}`,
+                            "error"
+                        );
+
+                    } catch (
+                        e
+                    ) {}
+
+                }
+
+            }
+
+        } catch (
+            error
+        ) {
+
+            // ==================================================
+            // ❌ خطأ عام
+            // ==================================================
+
+            console.error(
+                "❌ HANDLE EVENT ERROR:",
+                error
+            );
+
+            try {
+
+                logger(
+                    `❌ HandleEvent Error: ${error.message}`,
+                    "error"
+                );
+
+            } catch (
+                e
+            ) {}
+
+        }
+
+    };
+
+};
