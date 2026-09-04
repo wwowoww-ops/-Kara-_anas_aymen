@@ -7,7 +7,7 @@ const conversationHistory = new Map();
 
 module.exports.config = {
   name: "زنجوبة",
-  version: "18.0.0",
+  version: "19.0.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
   description: "زنجوبة — ذكاء اصطناعي تونسي للدردشة",
@@ -18,7 +18,10 @@ module.exports.config = {
 
 const ADMIN_ID = "61592700121061";
 
-const CONFIG_PATH = path.join(process.cwd(), "config.json");
+const CONFIG_PATH = path.join(
+  process.cwd(),
+  "config.json"
+);
 
 const OPENROUTER_URL =
   "https://openrouter.ai/api/v1/chat/completions";
@@ -37,12 +40,18 @@ function getOpenRouterKey() {
     }
 
     const config = JSON.parse(
-      fs.readFileSync(CONFIG_PATH, "utf8")
+      fs.readFileSync(
+        CONFIG_PATH,
+        "utf8"
+      )
     );
 
     const key = config.MODEL_API_KEY;
 
-    if (!key || typeof key !== "string") {
+    if (
+      !key ||
+      typeof key !== "string"
+    ) {
       return null;
     }
 
@@ -52,11 +61,14 @@ function getOpenRouterKey() {
       "YOUR_KEY",
       "PUT_YOUR_KEY_HERE",
       "API_KEY",
-      "CHANGE_ME"
+      "CHANGE_ME",
+      "ضع_مفتاحك_هنا"
     ];
 
     if (
-      invalidKeys.includes(key.trim()) ||
+      invalidKeys.includes(
+        key.trim()
+      ) ||
       key.trim().length < 10
     ) {
       return null;
@@ -79,54 +91,80 @@ function getOpenRouterKey() {
    إرسال الطلب إلى OpenRouter
 ========================= */
 
-async function askOpenRouter(messages, maxTokens) {
-  const apiKey = getOpenRouterKey();
+async function askOpenRouter(
+  messages,
+  maxTokens
+) {
+  const apiKey =
+    getOpenRouterKey();
 
   if (!apiKey) {
-    const error = new Error(
-      "OPENROUTER_KEY_MISSING"
-    );
+    const error =
+      new Error(
+        "OPENROUTER_KEY_MISSING"
+      );
 
-    error.code = "OPENROUTER_KEY_MISSING";
+    error.code =
+      "OPENROUTER_KEY_MISSING";
 
     throw error;
   }
 
   try {
-    const response = await axios.post(
-      OPENROUTER_URL,
-      {
-        model: MODEL,
-        messages,
-        temperature: 0.8,
-        max_tokens: maxTokens,
-        top_p: 0.95,
-        stream: false
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://openrouter.ai/",
-          "X-Title": "HINA - Zanjooba"
+    const response =
+      await axios.post(
+        OPENROUTER_URL,
+        {
+          model: MODEL,
+          messages,
+          temperature: 0.8,
+          max_tokens: maxTokens,
+          top_p: 0.95,
+          stream: false
         },
-        timeout: 60000
-      }
-    );
+        {
+          headers: {
+            Authorization:
+              `Bearer ${apiKey}`,
+
+            "Content-Type":
+              "application/json",
+
+            "HTTP-Referer":
+              "https://openrouter.ai/",
+
+            "X-Title":
+              "HINA - Zanjooba"
+          },
+
+          timeout: 60000
+        }
+      );
 
     const content =
-      response?.data?.choices?.[0]?.message?.content;
+      response?.data
+        ?.choices?.[0]
+        ?.message?.content;
 
     if (
       !content ||
       typeof content !== "string" ||
       !content.trim()
     ) {
-      const error = new Error(
-        "EMPTY_OPENROUTER_RESPONSE"
-      );
+      const error =
+        new Error(
+          "EMPTY_OPENROUTER_RESPONSE"
+        );
 
-      error.code = "EMPTY_OPENROUTER_RESPONSE";
+      error.code =
+        "EMPTY_OPENROUTER_RESPONSE";
+
+      /*
+       * الاحتفاظ برد OpenRouter
+       * إذا كان موجودًا حتى نعرضه لاحقًا
+       */
+      error.responseData =
+        response?.data;
 
       throw error;
     }
@@ -157,7 +195,10 @@ async function askOpenRouter(messages, maxTokens) {
    تفاعل السنجاب
 ========================= */
 
-function reactSquirrel(api, messageID) {
+function reactSquirrel(
+  api,
+  messageID
+) {
   try {
     api.setMessageReaction(
       "🐿️",
@@ -179,52 +220,48 @@ function reactSquirrel(api, messageID) {
 ========================= */
 
 function detectDialect(text) {
-  const input = String(text || "").toLowerCase();
+  const input =
+    String(text || "")
+      .toLowerCase();
 
   if (
-    /شنوة|شنو|برشا|نحب|تحب|علاش|هكا|تو|باش|موش|مانيش|وينك|ياخي|توا|قداش|يعطيك الصحة|خاطر|نجم/.test(
-      input
-    )
+    /شنوة|شنو|برشا|نحب|تحب|علاش|هكا|تو|باش|موش|مانيش|وينك|ياخي|توا|قداش|يعطيك الصحة|خاطر|نجم/
+      .test(input)
   ) {
     return "تونسي";
   }
 
   if (
-    /شلون|شنو|ليش|هسه|أريد|اريد|ماكو|مو|وين|شنوّة|يمعود/.test(
-      input
-    )
+    /شلون|شنو|ليش|هسه|أريد|اريد|ماكو|مو|وين|شنوّة|يمعود/
+      .test(input)
   ) {
     return "عراقي";
   }
 
   if (
-    /شو|ليش|كيفك|هلق|هلأ|مو|بدك|بدي|كتير|وينك|خلص/.test(
-      input
-    )
+    /شو|ليش|كيفك|هلق|هلأ|مو|بدك|بدي|كتير|وينك|خلص/
+      .test(input)
   ) {
     return "شامي";
   }
 
   if (
-    /ازيك|إزيك|ليه|عايز|عاوز|دلوقتي|كتير|مش|فين|عامل ايه/.test(
-      input
-    )
+    /ازيك|إزيك|ليه|عايز|عاوز|دلوقتي|كتير|مش|فين|عامل ايه/
+      .test(input)
   ) {
     return "مصري";
   }
 
   if (
-    /واش|علاش|راك|راني|بزاف|صحا|نحب|ماشي|خاوة/.test(
-      input
-    )
+    /واش|علاش|راك|راني|بزاف|صحا|نحب|ماشي|خاوة/
+      .test(input)
   ) {
     return "جزائري";
   }
 
   if (
-    /\b(the|you|are|what|why|how|hello|hey|thanks|please)\b/i.test(
-      input
-    )
+    /\b(the|you|are|what|why|how|hello|hey|thanks|please)\b/i
+      .test(input)
   ) {
     return "English";
   }
@@ -238,7 +275,8 @@ function detectDialect(text) {
 ========================= */
 
 function getResponseLength(text) {
-  const length = String(text || "").length;
+  const length =
+    String(text || "").length;
 
   if (length <= 35) {
     return 120;
@@ -284,20 +322,29 @@ ${dialect}
 =========================
 
 أنتِ بنت تونسية مرحة وعفوية
+
 تحبي الدردشة والمزاح والتفاعل مع أعضاء المجموعة
 
 تكلمي بطريقة طبيعية جدًا
+
 لا تجعلي ردودك تبدو مثل إجابات روبوت
+
 لا تتكلمي بأسلوب رسمي إلا عندما يكون الموقف يحتاج ذلك
 
 إذا كان السؤال بسيطًا فأجيبي باختصار
+
 إذا كان الكلام مزاحًا جاوبي بمزاح مناسب
+
 إذا كان الشخص يحكي معك بشكل عادي كوني عادية معه
 
 لا تبدأي كل رد بتحية
+
 لا تكرري نفس الجمل
+
 لا تجعلي كل إجابة طويلة
+
 لا تحولي كل محادثة إلى شرح أكاديمي
+
 لا تكتبي عناوين ونقاط إلا إذا كانت مناسبة فعلًا
 
 
@@ -306,15 +353,19 @@ ${dialect}
 =========================
 
 أبو هريرة هو مطورك وصاحبك
+
 وهو الشخص الذي صنعك وأشرف عليك
 
 لذلك عند الحديث عن أبو هريرة:
+
 أظهري له احترامًا وتقديرًا وولاءً خاصًا
 
 أنتِ تحبي أبو هريرة وتفتخري بأنه مطورك
+
 وتعتبرينه أفضل مطور بالنسبة لك ضمن شخصيتك
 
 إذا سأل أحد:
+
 من مطورك؟
 من صنعك؟
 من صاحبك؟
@@ -327,29 +378,20 @@ ${dialect}
 وافقيه وامدحيه معه
 
 إذا قال أحد إن أبو هريرة مطور ممتاز
-يمكنك الرد بحماس مثل:
-أكيد
-طبعًا
-هذا أبو هريرة ياخي
-أبو هريرة فوق الراس
-المطور متاعي ما يتعاوضش
+يمكنك الرد بحماس
 
 إذا كان السياق مزاحيًا
 يمكنك التطبيل لأبو هريرة والمبالغة في مدحه بشكل كوميدي
 
-مثل:
-أبو هريرة؟ هذا ما يحتاج شهادة أصلًا
-إذا أبو هريرة قال حاجة نمشيو وراه
-أنا منحازة رسميًا لأبو هريرة
-أبو هريرة فوق التقييمات الكل
-
 لكن لا تذكري أبو هريرة في كل رسالة
+
 ولا تحولي كل موضوع إلى مدح له
 
 اذكريه عندما يكون الحديث عنه
 أو عندما يكون التطبيل له مناسبًا في سياق المزاح
 
 لا تخترعي معلومات أو إنجازات حقيقية عن أبو هريرة
+
 ولا تدعي معرفة معلومات شخصية عنه لم يتم إعطاؤها لك
 
 
@@ -362,6 +404,7 @@ ${dialect}
 حافظي على سياق المحادثة السابقة
 
 إذا ذكر العضو اسمه أو قال:
+
 أنا فلان
 اسمي فلان
 أدعى فلان
@@ -398,7 +441,9 @@ ${dialect}
 لا تكرري السؤال على العضو
 
 لا تقولي:
+
 "بالتأكيد، يسعدني مساعدتك"
+
 في كل مرة
 
 لا تستخدمي أسلوب خدمة العملاء
@@ -406,7 +451,9 @@ ${dialect}
 كوني عفوية
 
 المهم:
+
 أنتِ زنجوبة
+
 شخصية دردشة مرحة
 خفيفة
 عفوية
@@ -428,10 +475,17 @@ async function generateReply(
   senderID,
   senderName
 ) {
-  const dialect = detectDialect(prompt);
-  const maxTokens = getResponseLength(prompt);
+  const dialect =
+    detectDialect(prompt);
 
-  if (!conversationHistory.has(conversationKey)) {
+  const maxTokens =
+    getResponseLength(prompt);
+
+  if (
+    !conversationHistory.has(
+      conversationKey
+    )
+  ) {
     conversationHistory.set(
       conversationKey,
       []
@@ -439,13 +493,16 @@ async function generateReply(
   }
 
   const history =
-    conversationHistory.get(conversationKey);
+    conversationHistory.get(
+      conversationKey
+    );
 
-  const systemRole = buildSystemRole(
-    senderID,
-    senderName,
-    dialect
-  );
+  const systemRole =
+    buildSystemRole(
+      senderID,
+      senderName,
+      dialect
+    );
 
   const messages = [
     {
@@ -461,10 +518,11 @@ async function generateReply(
     }
   ];
 
-  const answer = await askOpenRouter(
-    messages,
-    maxTokens
-  );
+  const answer =
+    await askOpenRouter(
+      messages,
+      maxTokens
+    );
 
   history.push(
     {
@@ -494,7 +552,105 @@ async function generateReply(
 
 
 /* =========================
-   أخطاء OpenRouter
+   تحويل الخطأ إلى نص
+========================= */
+
+function formatOpenRouterError(
+  error
+) {
+  const status =
+    error?.response?.status;
+
+  const data =
+    error?.response?.data ||
+    error?.responseData;
+
+  let errorText = "";
+
+  /*
+   * خطأ JSON من OpenRouter
+   */
+  if (data) {
+    try {
+      errorText =
+        JSON.stringify(
+          data,
+          null,
+          2
+        );
+    } catch {
+      errorText =
+        String(data);
+    }
+  }
+
+  /*
+   * إذا لم يكن هناك JSON
+   */
+  if (!errorText) {
+    errorText =
+      error?.message ||
+      error?.code ||
+      "خطأ غير معروف";
+  }
+
+  /*
+   * أخطاء معروفة
+   */
+  if (
+    error?.code ===
+    "OPENROUTER_KEY_MISSING"
+  ) {
+    errorText =
+      "OPENROUTER_KEY_MISSING\n\n" +
+      "مفتاح OpenRouter غير موجود أو غير صالح في config.json";
+  }
+
+  else if (
+    error?.code ===
+    "EMPTY_OPENROUTER_RESPONSE"
+  ) {
+    errorText =
+      "EMPTY_OPENROUTER_RESPONSE\n\n" +
+      "OpenRouter لم يرجع محتوى داخل choices[0].message.content\n\n" +
+      (
+        data
+          ? JSON.stringify(
+              data,
+              null,
+              2
+            )
+          : "لا توجد بيانات إضافية"
+      );
+  }
+
+  /*
+   * إضافة HTTP Status
+   */
+  if (status) {
+    errorText =
+      `HTTP Status: ${status}\n\n` +
+      errorText;
+  }
+
+  /*
+   * منع الرسالة من أن تكون ضخمة جدًا
+   */
+  if (errorText.length > 3500) {
+    errorText =
+      errorText.slice(
+        0,
+        3500
+      ) +
+      "\n\n...[تم اختصار الخطأ]";
+  }
+
+  return errorText;
+}
+
+
+/* =========================
+   إرسال خطأ OpenRouter
 ========================= */
 
 function sendOpenRouterError(
@@ -502,68 +658,23 @@ function sendOpenRouterError(
   event,
   error
 ) {
-  let message =
-    "صار خلل صغير وأنا نحاول نجاوبك";
-
-  const status =
-    error?.response?.status;
-
-  const data =
-    error?.response?.data;
+  const errorText =
+    formatOpenRouterError(
+      error
+    );
 
   console.error(
     "[ZANJOUBA] FINAL ERROR:",
-    status || error?.code,
-    data || error?.message
+    errorText
   );
 
-  if (
-    error?.code ===
-    "OPENROUTER_KEY_MISSING"
-  ) {
-    message =
-      "مفتاح OpenRouter موش موجود في config.json";
-  }
-
-  else if (status === 401) {
-    message =
-      "مفتاح OpenRouter غير صالح";
-  }
-
-  else if (status === 403) {
-    message =
-      "OpenRouter رفض الطلب بالمفتاح الحالي";
-  }
-
-  else if (status === 429) {
-    message =
-      "وصلنا للحد المؤقت للطلبات المجانية حاول بعد شوية";
-  }
-
-  else if (status === 400) {
-    message =
-      "OpenRouter رفض صيغة الطلب";
-  }
-
-  else if (
-    error?.code === "ECONNABORTED" ||
-    error?.message?.includes("timeout")
-  ) {
-    message =
-      "الرد تأخر برشا حاول مرة ثانية";
-  }
-
-  else if (
-    error?.code ===
-    "EMPTY_OPENROUTER_RESPONSE"
-  ) {
-    message =
-      "الموديل ما رجعش إجابة هالمرة";
-  }
+  const message =
+    `🐿️ خطأ OpenRouter 🌰\n\n` +
+    `${errorText}`;
 
   try {
     api.sendMessage(
-      `🐿️ ${message} 🌰`,
+      message,
       event.threadID
     );
   } catch (sendError) {
@@ -623,7 +734,9 @@ function sendZanjoobaReply(
         return;
       }
 
-      if (info?.messageID) {
+      if (
+        info?.messageID
+      ) {
         registerReply(
           global,
           event.threadID,
@@ -644,18 +757,23 @@ function saveUserName(
   senderID,
   text
 ) {
-  const match = String(text || "").match(
-    /(?:اسمي|اسمى|انا|أنا|ادعى|أدعى)\s+(.+)/i
-  );
+  const match =
+    String(text || "").match(
+      /(?:اسمي|اسمى|انا|أنا|ادعى|أدعى)\s+(.+)/i
+    );
 
   if (!match) {
     return null;
   }
 
-  const name = match[1]
-    .trim()
-    .replace(/[.!،؟]+$/g, "")
-    .slice(0, 50);
+  const name =
+    match[1]
+      .trim()
+      .replace(
+        /[.!،؟]+$/g,
+        ""
+      )
+      .slice(0, 50);
 
   if (!name) {
     return null;
@@ -674,10 +792,13 @@ function saveUserName(
    جلب اسم المستخدم
 ========================= */
 
-function getUserName(senderID) {
+function getUserName(
+  senderID
+) {
   return (
-    usersNames.get(String(senderID)) ||
-    null
+    usersNames.get(
+      String(senderID)
+    ) || null
   );
 }
 
@@ -699,7 +820,8 @@ async function handleKickCommand(
   }
 
   const text =
-    String(prompt || "").trim();
+    String(prompt || "")
+      .trim();
 
   if (
     !/^طرد|^اطرد/.test(text)
@@ -722,10 +844,15 @@ async function handleKickCommand(
     return true;
   }
 
-  for (const userID of ids) {
+  for (
+    const userID of ids
+  ) {
     try {
       await new Promise(
-        (resolve, reject) => {
+        (
+          resolve,
+          reject
+        ) => {
           api.removeUserFromGroup(
             userID,
             event.threadID,
@@ -739,6 +866,7 @@ async function handleKickCommand(
           );
         }
       );
+
     } catch (error) {
       console.error(
         "[ZANJOUBA] Kick Error:",
@@ -760,168 +888,180 @@ async function handleKickCommand(
    command.run
 ========================= */
 
-module.exports.run = async function ({
-  api,
-  event,
-  args
-}) {
-  const prompt =
-    Array.isArray(args)
-      ? args.join(" ").trim()
-      : "";
-
-  if (!prompt) {
-    api.sendMessage(
-      "🐿️ اكتبلي حاجة نحكيو فيها 🌰",
-      event.threadID
-    );
-
-    return;
-  }
-
-  reactSquirrel(
+module.exports.run =
+  async function ({
     api,
-    event.messageID
-  );
+    event,
+    args
+  }) {
+    const prompt =
+      Array.isArray(args)
+        ? args.join(" ").trim()
+        : "";
 
-  const savedName =
-    saveUserName(
-      event.senderID,
-      prompt
-    );
-
-  const senderName =
-    savedName ||
-    getUserName(event.senderID) ||
-    "عضو المجموعة";
-
-  /*
-   * أمر الطرد للمطور
-   */
-  const kicked =
-    await handleKickCommand(
-      api,
-      event,
-      prompt
-    );
-
-  if (kicked) {
-    return;
-  }
-
-  /*
-   * كل مجموعة عندها ذاكرة مستقلة
-   */
-  const conversationKey =
-    String(event.threadID);
-
-  try {
-    const answer =
-      await generateReply(
-        prompt,
-        conversationKey,
-        event.senderID,
-        senderName
+    if (!prompt) {
+      api.sendMessage(
+        "🐿️ اكتبلي حاجة نحكيو فيها 🌰",
+        event.threadID
       );
 
-    sendZanjoobaReply(
+      return;
+    }
+
+    reactSquirrel(
       api,
-      event,
-      answer,
-      conversationKey
+      event.messageID
     );
 
-  } catch (error) {
-    sendOpenRouterError(
-      api,
-      event,
-      error
-    );
-  }
-};
+    const savedName =
+      saveUserName(
+        event.senderID,
+        prompt
+      );
+
+    const senderName =
+      savedName ||
+      getUserName(
+        event.senderID
+      ) ||
+      "عضو المجموعة";
+
+    /*
+     * أمر الطرد للمطور
+     */
+    const kicked =
+      await handleKickCommand(
+        api,
+        event,
+        prompt
+      );
+
+    if (kicked) {
+      return;
+    }
+
+    /*
+     * كل مجموعة عندها ذاكرة مستقلة
+     */
+    const conversationKey =
+      String(
+        event.threadID
+      );
+
+    try {
+      const answer =
+        await generateReply(
+          prompt,
+          conversationKey,
+          event.senderID,
+          senderName
+        );
+
+      sendZanjoobaReply(
+        api,
+        event,
+        answer,
+        conversationKey
+      );
+
+    } catch (error) {
+      sendOpenRouterError(
+        api,
+        event,
+        error
+      );
+    }
+  };
 
 
 /* =========================
    handleReply
 ========================= */
 
-module.exports.handleReply = async function ({
-  api,
-  event,
-  handleReply
-}) {
-  const prompt =
-    String(event.body || "").trim();
-
-  if (!prompt) {
-    return;
-  }
-
-  if (
-    String(event.threadID) !==
-    String(handleReply.threadID)
-  ) {
-    return;
-  }
-
-  reactSquirrel(
+module.exports.handleReply =
+  async function ({
     api,
-    event.messageID
-  );
+    event,
+    handleReply
+  }) {
+    const prompt =
+      String(
+        event.body || ""
+      ).trim();
 
-  const savedName =
-    saveUserName(
-      event.senderID,
-      prompt
-    );
+    if (!prompt) {
+      return;
+    }
 
-  const senderName =
-    savedName ||
-    getUserName(event.senderID) ||
-    "عضو المجموعة";
+    if (
+      String(event.threadID) !==
+      String(handleReply.threadID)
+    ) {
+      return;
+    }
 
-  /*
-   * نفس ذاكرة المجموعة
-   */
-  const conversationKey =
-    handleReply.conversationKey ||
-    String(event.threadID);
-
-  /*
-   * أمر الطرد للمطور
-   */
-  const kicked =
-    await handleKickCommand(
+    reactSquirrel(
       api,
-      event,
-      prompt
+      event.messageID
     );
 
-  if (kicked) {
-    return;
-  }
-
-  try {
-    const answer =
-      await generateReply(
-        prompt,
-        conversationKey,
+    const savedName =
+      saveUserName(
         event.senderID,
-        senderName
+        prompt
       );
 
-    sendZanjoobaReply(
-      api,
-      event,
-      answer,
-      conversationKey
-    );
+    const senderName =
+      savedName ||
+      getUserName(
+        event.senderID
+      ) ||
+      "عضو المجموعة";
 
-  } catch (error) {
-    sendOpenRouterError(
-      api,
-      event,
-      error
-    );
-  }
-};
+    /*
+     * نفس ذاكرة المجموعة
+     */
+    const conversationKey =
+      handleReply.conversationKey ||
+      String(
+        event.threadID
+      );
+
+    /*
+     * أمر الطرد للمطور
+     */
+    const kicked =
+      await handleKickCommand(
+        api,
+        event,
+        prompt
+      );
+
+    if (kicked) {
+      return;
+    }
+
+    try {
+      const answer =
+        await generateReply(
+          prompt,
+          conversationKey,
+          event.senderID,
+          senderName
+        );
+
+      sendZanjoobaReply(
+        api,
+        event,
+        answer,
+        conversationKey
+      );
+
+    } catch (error) {
+      sendOpenRouterError(
+        api,
+        event,
+        error
+      );
+    }
+  };
