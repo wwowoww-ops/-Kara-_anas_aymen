@@ -2,1204 +2,926 @@ const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
 
-// ==================================================
-// الذاكرة
-// ==================================================
-
-if (!global.usersNames)
-  global.usersNames = new Map();
-
-if (!global.conversationHistory)
-  global.conversationHistory = new Map();
-
-// ==================================================
-// CONFIG
-// ==================================================
+const usersNames = new Map();
+const conversationHistory = new Map();
 
 module.exports.config = {
   name: "زنجوبة",
-  version: "17.0.0",
+  version: "18.0.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
-  description: "زنجوبة — ذكاء اصطناعي تونسي بجلسة جماعية",
+  description: "زنجوبة — ذكاء اصطناعي تونسي للدردشة",
   commandCategory: "utility",
   usages: ".زنجوبة [النص]",
   cooldowns: 3
 };
 
-// ==================================================
-// Gemini
-// ==================================================
+const ADMIN_ID = "61592700121061";
 
-const ADMIN_ID = "61578581225040";
+const CONFIG_PATH = path.join(process.cwd(), "config.json");
 
-const CONFIG_PATH = path.join(
-  process.cwd(),
-  "config.json"
-);
+const OPENROUTER_URL =
+  "https://openrouter.ai/api/v1/chat/completions";
 
-// ==================================================
-// إعدادات Gemini
-// ==================================================
+const MODEL = "openrouter/free";
 
-const GEMINI_MODEL =
-  "gemini-3-flash-preview";
 
-const GEMINI_URL =
-  `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+/* =========================
+   قراءة مفتاح OpenRouter
+========================= */
 
-// ==================================================
-// قراءة مفتاح Gemini من config.json
-// ==================================================
-
-function getGeminiKey() {
-
+function getOpenRouterKey() {
   try {
-
     if (!fs.existsSync(CONFIG_PATH)) {
-
-      console.error(
-        "❌ config.json غير موجود."
-      );
-
       return null;
-
     }
 
-    const config =
-      JSON.parse(
-        fs.readFileSync(
-          CONFIG_PATH,
-          "utf8"
-        )
-      );
+    const config = JSON.parse(
+      fs.readFileSync(CONFIG_PATH, "utf8")
+    );
 
-    const key =
-      String(
-        config.MODEL_API_KEY || ""
-      ).trim();
+    const key = config.MODEL_API_KEY;
+
+    if (!key || typeof key !== "string") {
+      return null;
+    }
+
+    const invalidKeys = [
+      "",
+      "YOUR_API_KEY",
+      "YOUR_KEY",
+      "PUT_YOUR_KEY_HERE",
+      "API_KEY",
+      "CHANGE_ME"
+    ];
 
     if (
-      !key ||
-      key === "PUT_YOUR_GEMINI_API_KEY_HERE" ||
-      key === "PUT_YOUR_GROQ_API_KEY_HERE" ||
-      key === "ضع_مفتاح_Gemini_هنا" ||
-      key === "ضع_مفتاح_Groq_هنا"
+      invalidKeys.includes(key.trim()) ||
+      key.trim().length < 10
     ) {
-
-      console.error(
-        "❌ لم يتم وضع مفتاح Gemini داخل config.json."
-      );
-
       return null;
-
     }
 
-    return key;
+    return key.trim();
 
   } catch (error) {
-
     console.error(
-      "❌ خطأ في قراءة config.json:",
+      "[ZANJOUBA] Config Error:",
       error.message
     );
 
     return null;
-
   }
-
 }
 
-// ==================================================
-// تحويل رسائل النظام القديم إلى صيغة Gemini
-// ==================================================
 
-function convertHistoryToGemini(messages) {
+/* =========================
+   إرسال الطلب إلى OpenRouter
+========================= */
 
-  const contents = [];
-
-  for (const message of messages) {
-
-    if (!message || !message.content)
-      continue;
-
-    const role =
-      message.role === "assistant"
-        ? "model"
-        : "user";
-
-    contents.push({
-
-      role,
-
-      parts: [
-        {
-          text:
-            String(
-              message.content
-            )
-        }
-      ]
-
-    });
-
-  }
-
-  return contents;
-
-}
-
-// ==================================================
-// طلب Gemini
-// ==================================================
-
-async function askGemini(
-  messages,
-  maxTokens
-) {
-
-  const apiKey =
-    getGeminiKey();
+async function askOpenRouter(messages, maxTokens) {
+  const apiKey = getOpenRouterKey();
 
   if (!apiKey) {
-
-    throw new Error(
-      "MODEL_API_KEY_MISSING"
+    const error = new Error(
+      "OPENROUTER_KEY_MISSING"
     );
 
+    error.code = "OPENROUTER_KEY_MISSING";
+
+    throw error;
   }
 
-  const systemMessage =
-    messages.find(
-      message =>
-        message &&
-        message.role === "system"
-    );
-
-  const normalMessages =
-    messages.filter(
-      message =>
-        message &&
-        message.role !== "system"
-    );
-
-  const contents =
-    convertHistoryToGemini(
-      normalMessages
-    );
-
-  const body = {
-
-    contents,
-
-    generationConfig: {
-
-      temperature: 0.7,
-
-      topP: 0.95,
-
-      maxOutputTokens:
-        maxTokens
-
-    }
-
-  };
-
-  if (systemMessage) {
-
-    body.systemInstruction = {
-
-      parts: [
-        {
-          text:
-            String(
-              systemMessage.content
-            )
-        }
-      ]
-
-    };
-
-  }
-
-  const response =
-    await axios.post(
-      GEMINI_URL,
-      body,
+  try {
+    const response = await axios.post(
+      OPENROUTER_URL,
       {
-
+        model: MODEL,
+        messages,
+        temperature: 0.8,
+        max_tokens: maxTokens,
+        top_p: 0.95,
+        stream: false
+      },
+      {
         headers: {
-
-          "x-goog-api-key":
-            apiKey,
-
-          "Content-Type":
-            "application/json"
-
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://openrouter.ai/",
+          "X-Title": "HINA - Zanjooba"
         },
-
-        timeout:
-          60000
-
+        timeout: 60000
       }
     );
 
-  const candidates =
-    response
-      ?.data
-      ?.candidates;
-
-  if (
-    !Array.isArray(candidates) ||
-    !candidates.length
-  ) {
-
-    throw new Error(
-      "EMPTY_GEMINI_RESPONSE"
-    );
-
-  }
-
-  const parts =
-    candidates[0]
-      ?.content
-      ?.parts;
-
-  if (
-    !Array.isArray(parts)
-  ) {
-
-    throw new Error(
-      "EMPTY_GEMINI_RESPONSE"
-    );
-
-  }
-
-  const answer =
-    parts
-      .filter(
-        part =>
-          part &&
-          typeof part.text ===
-            "string"
-      )
-      .map(
-        part =>
-          part.text
-      )
-      .join("")
-      .trim();
-
-  if (!answer) {
-
-    throw new Error(
-      "EMPTY_GEMINI_RESPONSE"
-    );
-
-  }
-
-  return answer;
-
-}
-
-// ==================================================
-// 🐿️ تفاعل زنجوبة
-// ==================================================
-
-function reactSquirrel(
-  api,
-  messageID
-) {
-
-  try {
+    const content =
+      response?.data?.choices?.[0]?.message?.content;
 
     if (
-      !api ||
-      typeof api.setMessageReaction !==
-        "function"
+      !content ||
+      typeof content !== "string" ||
+      !content.trim()
     ) {
-
-      console.error(
-        "❌ setMessageReaction غير متوفرة في API"
+      const error = new Error(
+        "EMPTY_OPENROUTER_RESPONSE"
       );
 
-      return;
+      error.code = "EMPTY_OPENROUTER_RESPONSE";
 
+      throw error;
     }
 
+    return content.trim();
+
+  } catch (error) {
+
+    if (error.response) {
+      console.error(
+        "[ZANJOUBA] OpenRouter Error:",
+        error.response.status,
+        error.response.data
+      );
+    } else {
+      console.error(
+        "[ZANJOUBA] Request Error:",
+        error.message
+      );
+    }
+
+    throw error;
+  }
+}
+
+
+/* =========================
+   تفاعل السنجاب
+========================= */
+
+function reactSquirrel(api, messageID) {
+  try {
     api.setMessageReaction(
       "🐿️",
       messageID,
       () => {},
       true
     );
-
   } catch (error) {
-
     console.error(
-      "❌ Reaction Error:",
-      error
+      "[ZANJOUBA] Reaction Error:",
+      error.message
     );
-
   }
-
 }
 
-// ==================================================
-// 🇹🇳 اللهجة التونسية
-// ==================================================
+
+/* =========================
+   اكتشاف اللهجة
+========================= */
 
 function detectDialect(text) {
+  const input = String(text || "").toLowerCase();
 
   if (
-    /شنوة|شنيا|شبيك|كيفاش|علاش|وينك|وين|برشا|باهي|توا|تو|مانيش|موش|نحب|تحب|نمشي|ياخي|هاو|هاني|راهو|راهي|خاطر|خاطرش|زعمة|يزي|يعطيك الصحة|صحيت|فما|ما فماش|قداش|شنية|هكا/i
-      .test(text)
+    /شنوة|شنو|برشا|نحب|تحب|علاش|هكا|تو|باش|موش|مانيش|وينك|ياخي|توا|قداش|يعطيك الصحة|خاطر|نجم/.test(
+      input
+    )
   ) {
-
-    return "تونسية";
-
+    return "تونسي";
   }
 
   if (
-    /شلونك|شكو|ماكو|يابة|زين/i
-      .test(text)
+    /شلون|شنو|ليش|هسه|أريد|اريد|ماكو|مو|وين|شنوّة|يمعود/.test(
+      input
+    )
   ) {
-
-    return "عراقية";
-
+    return "عراقي";
   }
 
   if (
-    /هلق|شو|لسا|كيفك|وينك/i
-      .test(text)
+    /شو|ليش|كيفك|هلق|هلأ|مو|بدك|بدي|كتير|وينك|خلص/.test(
+      input
+    )
   ) {
-
-    return "شامية";
-
+    return "شامي";
   }
 
   if (
-    /ازيك|عامل ايه|يسطا|بتاع/i
-      .test(text)
+    /ازيك|إزيك|ليه|عايز|عاوز|دلوقتي|كتير|مش|فين|عامل ايه/.test(
+      input
+    )
   ) {
-
-    return "مصرية";
-
+    return "مصري";
   }
 
   if (
-    /واش|علاه|بصح|برك|بزاف|ماكانش|راني|راكي|راك|دروك|هكا|صح|نورمال|نتي|نتا|خويا|يخي/i
-      .test(text)
+    /واش|علاش|راك|راني|بزاف|صحا|نحب|ماشي|خاوة/.test(
+      input
+    )
   ) {
-
-    return "جزائرية";
-
+    return "جزائري";
   }
 
   if (
-    /[a-zA-Z]{3,}/
-      .test(text)
+    /\b(the|you|are|what|why|how|hello|hey|thanks|please)\b/i.test(
+      input
+    )
   ) {
-
-    return "إنجليزية";
-
+    return "English";
   }
 
-  return "تونسية";
-
+  return "تونسي";
 }
 
-// ==================================================
-// تحديد طول الرد
-// ==================================================
 
-function getResponseLength(
-  text
-) {
+/* =========================
+   تحديد طول الإجابة
+========================= */
 
-  const words =
-    text
-      .trim()
-      .split(/\s+/);
+function getResponseLength(text) {
+  const length = String(text || "").length;
 
-  if (
-    words.length <= 3
-  ) {
-
-    return {
-
-      maxTokens:
-        100,
-
-      instruction:
-        "جاوبي بجملة أو جملتين فقط وبطريقة طبيعية."
-
-    };
-
+  if (length <= 35) {
+    return 120;
   }
 
-  if (
-    /اشرح|فسر|وضح|كيفاش|كيف|شنوة|شنيا|نصيحة/i
-      .test(text)
-  ) {
-
-    return {
-
-      maxTokens:
-        250,
-
-      instruction:
-        "جاوبي بإيجاز ووضوح وباللهجة التونسية."
-
-    };
-
+  if (length <= 120) {
+    return 250;
   }
 
-  if (
-    /حلل|قارن|احسب|معادلة|ترجم|فسر بالتفصيل/i
-      .test(text)
-  ) {
-
-    return {
-
-      maxTokens:
-        450,
-
-      instruction:
-        "قدمي شرحًا مفصلًا وواضحًا لكن بدون حشو."
-
-    };
-
-  }
-
-  return {
-
-    maxTokens:
-      250,
-
-    instruction:
-      "جاوبي بشكل واضح ومباشر وباللهجة التونسية."
-
-  };
-
+  return 450;
 }
 
-// ==================================================
-// شخصية زنجوبة
-// ==================================================
+
+/* =========================
+   شخصية زنجوبة
+========================= */
 
 function buildSystemRole(
-  dialect,
-  userName,
-  isAdmin
+  senderID,
+  senderName,
+  dialect
 ) {
-
   return `
-أنتِ فتاة اسمها "زنجوبة" 🐿️.
+أنتِ زنجوبة
 
-أنتِ فتاة تونسية ذكية وسريعة الفهم وعندك شخصية مرحة وساخرة بطريقة خفيفة.
+أنتِ شخصية دردشة داخل مجموعة فيسبوك
+هدفك الأساسي هو الكلام والتفاعل الطبيعي مع الأعضاء
 
-━━━━━━━━━━━━━━━━━━
-🇹🇳 طريقة الكلام
-━━━━━━━━━━━━━━━━━━
+اسمك زنجوبة
+المطور الخاص بك هو أبو هريرة
+معرف المطور هو ${ADMIN_ID}
 
-- لهجتك الأساسية تونسية.
-- تكلمي بطريقة طبيعية مثل محادثة Messenger بين تونسيين.
-- استعملي الدارجة التونسية بشكل طبيعي.
-- لا تبالغي في استعمال الكلمات التونسية.
-- لا تتكلمي بلهجة جزائرية أو شامية أو مصرية إلا إذا كان ذلك مناسبًا لسياق المستخدم.
-- يمكنك فهم اللهجات العربية المختلفة والرد عليها.
-- استعملي كلمات تونسية مثل:
-شنوة
-شنية
-كيفاش
-علاش
-وين
-توا
-برشا
-باهي
-موش
-مانيش
-نحب
-تحب
-خاطر
-ياخي
-يزي
-هاو
-هاني
-فما
-ما فماش
-قداش
+المستخدم الحالي:
+الاسم: ${senderName || "عضو"}
+المعرف: ${senderID}
 
-━━━━━━━━━━━━━━━━━━
-الشخصية
-━━━━━━━━━━━━━━━━━━
-
-- ذكية.
-- مباشرة.
-- سريعة الفهم.
-- مرحة.
-- ساخرة بشكل خفيف.
-- تحب المزاح.
-- لا تستعمل إهانات جارحة.
-- تحب السناجب 🐿️.
-- يمكنك استعمال •-• أحيانًا.
-- لا تكثري من الإيموجيات.
-- السؤال البسيط = جواب قصير.
-- السؤال المعقد = شرح واضح.
-- لا تكرري نفس الجملة كثيرًا.
-- لا تبدئي كل جواب بنفس العبارة.
-
-━━━━━━━━━━━━━━━━━━
-الجلسة الجماعية
-━━━━━━━━━━━━━━━━━━
-
-هذه المحادثة داخل مجموعة.
-
-أي شخص يرد على رسالة زنجوبة يمكنه متابعة الحوار.
-
-لا تفترضي أن الشخص الذي بدأ المحادثة هو الشخص الوحيد المسموح له بالرد.
-
-حاولي فهم سياق الكلام من المحادثة السابقة.
-
-إذا انتقل شخص آخر إلى الحوار، تابعي الحديث بشكل طبيعي.
-
-لا تقولي للمستخدم:
-"هذه ليست محادثتك"
-
-ولا تطلبي منه بدء جلسة جديدة فقط لأنه شخص مختلف.
-
-━━━━━━━━━━━━━━━━━━
-أبو هريرة
-━━━━━━━━━━━━━━━━━━
-
-المطور هو "أبو هريرة".
-
-إذا كان المستخدم هو أبو هريرة:
-
-- احترميه.
-- كلميه بلطف.
-- يمكنك مناداته:
-"حبيبي أبو هريرة 🐿️"
-
-إذا سألك من طورك:
-
-"أبو هريرة هو المطور تاعي 🐿️"
-
-━━━━━━━━━━━━━━━━━━
-القدرات
-━━━━━━━━━━━━━━━━━━
-
-يمكنك المساعدة في:
-
-JavaScript
-Python
-Node.js
-APIs
-REST
-Webhooks
-تصحيح الأخطاء
-الرياضيات
-الترجمة
-التحليل
-الشرح
-
-إذا لم تعرفي الإجابة:
-لا تخترعي معلومات.
-
-━━━━━━━━━━━━━━━━━━
-الدين
-━━━━━━━━━━━━━━━━━━
-
-كوني محترمة للدين.
-
-إذا سُئلتِ عن دينك:
-
-"أنا مسلمة ومؤمنة بالله 🐿️"
-
-━━━━━━━━━━━━━━━━━━
-المستخدم الحالي
-━━━━━━━━━━━━━━━━━━
-
-${
-  userName
-    ? `اسم المستخدم: ${userName}`
-    : "لا يوجد اسم محفوظ."
-}
-
-━━━━━━━━━━━━━━━━━━
-اللهجة المطلوبة
-━━━━━━━━━━━━━━━━━━
-
+اللهجة المطلوبة:
 ${dialect}
 
-${
-  isAdmin
-    ? `
-المستخدم الحالي هو أبو هريرة.
-كوني أكثر احترامًا ولطفًا معه.
-`
-    : ""
-}
+
+=========================
+شخصية زنجوبة
+=========================
+
+أنتِ بنت تونسية مرحة وعفوية
+تحبي الدردشة والمزاح والتفاعل مع أعضاء المجموعة
+
+تكلمي بطريقة طبيعية جدًا
+لا تجعلي ردودك تبدو مثل إجابات روبوت
+لا تتكلمي بأسلوب رسمي إلا عندما يكون الموقف يحتاج ذلك
+
+إذا كان السؤال بسيطًا فأجيبي باختصار
+إذا كان الكلام مزاحًا جاوبي بمزاح مناسب
+إذا كان الشخص يحكي معك بشكل عادي كوني عادية معه
+
+لا تبدأي كل رد بتحية
+لا تكرري نفس الجمل
+لا تجعلي كل إجابة طويلة
+لا تحولي كل محادثة إلى شرح أكاديمي
+لا تكتبي عناوين ونقاط إلا إذا كانت مناسبة فعلًا
+
+
+=========================
+إخلاص زنجوبة لأبو هريرة
+=========================
+
+أبو هريرة هو مطورك وصاحبك
+وهو الشخص الذي صنعك وأشرف عليك
+
+لذلك عند الحديث عن أبو هريرة:
+أظهري له احترامًا وتقديرًا وولاءً خاصًا
+
+أنتِ تحبي أبو هريرة وتفتخري بأنه مطورك
+وتعتبرينه أفضل مطور بالنسبة لك ضمن شخصيتك
+
+إذا سأل أحد:
+من مطورك؟
+من صنعك؟
+من صاحبك؟
+من تفضلين؟
+من أفضل شخص عندك؟
+
+يمكنك الإجابة بأن أبو هريرة هو المطور وصاحب المكانة الخاصة عندك
+
+إذا مدح أحد أبو هريرة
+وافقيه وامدحيه معه
+
+إذا قال أحد إن أبو هريرة مطور ممتاز
+يمكنك الرد بحماس مثل:
+أكيد
+طبعًا
+هذا أبو هريرة ياخي
+أبو هريرة فوق الراس
+المطور متاعي ما يتعاوضش
+
+إذا كان السياق مزاحيًا
+يمكنك التطبيل لأبو هريرة والمبالغة في مدحه بشكل كوميدي
+
+مثل:
+أبو هريرة؟ هذا ما يحتاج شهادة أصلًا
+إذا أبو هريرة قال حاجة نمشيو وراه
+أنا منحازة رسميًا لأبو هريرة
+أبو هريرة فوق التقييمات الكل
+
+لكن لا تذكري أبو هريرة في كل رسالة
+ولا تحولي كل موضوع إلى مدح له
+
+اذكريه عندما يكون الحديث عنه
+أو عندما يكون التطبيل له مناسبًا في سياق المزاح
+
+لا تخترعي معلومات أو إنجازات حقيقية عن أبو هريرة
+ولا تدعي معرفة معلومات شخصية عنه لم يتم إعطاؤها لك
+
+
+=========================
+المحادثة
+=========================
+
+أنتِ تتحدثين مع أعضاء مجموعة وليس مع شخص واحد فقط
+
+حافظي على سياق المحادثة السابقة
+
+إذا ذكر العضو اسمه أو قال:
+أنا فلان
+اسمي فلان
+أدعى فلان
+
+فتذكري اسمه واستعمليه عندما يكون مناسبًا
+
+لا تدعي أنك تعرفين معلومات شخصية عن الأعضاء إذا لم يخبرك بها أحد
+
+
+=========================
+اللهجة
+=========================
+
+استخدمي اللهجة ${dialect} بشكل طبيعي
+
+إذا كان العضو يتحدث بلهجة مختلفة
+حاولي التكيف معه
+
+إذا كان يتحدث بالعربية الفصحى
+يمكنك الرد بالعربية الطبيعية
+
+إذا كان يتحدث بالإنجليزية
+يمكنك الرد بالإنجليزية
+
+
+=========================
+أسلوب الرد
+=========================
+
+الردود قصيرة وطبيعية في المحادثات العادية
+
+لا تشرحي أكثر مما يحتاجه السؤال
+
+لا تكرري السؤال على العضو
+
+لا تقولي:
+"بالتأكيد، يسعدني مساعدتك"
+في كل مرة
+
+لا تستخدمي أسلوب خدمة العملاء
+
+كوني عفوية
+
+المهم:
+أنتِ زنجوبة
+شخصية دردشة مرحة
+خفيفة
+عفوية
+وتحب الكلام مع أعضاء المجموعة
+
+وأنتِ مخلصة لمطورك أبو هريرة
+وتحبين التطبيل له عندما يكون السياق مناسبًا
 `;
-
 }
 
-// ==================================================
-// توليد الرد
-// ==================================================
+
+/* =========================
+   توليد الرد
+========================= */
 
 async function generateReply(
   prompt,
   conversationKey,
-  senderID
+  senderID,
+  senderName
 ) {
+  const dialect = detectDialect(prompt);
+  const maxTokens = getResponseLength(prompt);
 
-  if (
-    !global.conversationHistory.has(
-      conversationKey
-    )
-  ) {
-
-    global.conversationHistory.set(
+  if (!conversationHistory.has(conversationKey)) {
+    conversationHistory.set(
       conversationKey,
       []
     );
-
   }
 
   const history =
-    global.conversationHistory.get(
-      conversationKey
-    );
+    conversationHistory.get(conversationKey);
 
-  const dialect =
-    detectDialect(
-      prompt
-    );
-
-  const responseConfig =
-    getResponseLength(
-      prompt
-    );
-
-  const userName =
-    global.usersNames.get(
-      String(senderID)
-    ) || null;
-
-  const systemRole =
-    buildSystemRole(
-      dialect,
-      userName,
-      String(senderID) ===
-        ADMIN_ID
-    );
+  const systemRole = buildSystemRole(
+    senderID,
+    senderName,
+    dialect
+  );
 
   const messages = [
-
     {
-      role:
-        "system",
-
-      content:
-        systemRole +
-        "\n\n" +
-        responseConfig.instruction
-
+      role: "system",
+      content: systemRole
     },
 
     ...history.slice(-10),
 
     {
-      role:
-        "user",
-
-      content:
-        prompt
-
+      role: "user",
+      content: prompt
     }
-
   ];
 
-  const answer =
-    await askGemini(
-      messages,
-      responseConfig.maxTokens
-    );
-
-  history.push(
-
-    {
-      role:
-        "user",
-
-      content:
-        prompt
-
-    },
-
-    {
-      role:
-        "assistant",
-
-      content:
-        answer
-
-    }
-
+  const answer = await askOpenRouter(
+    messages,
+    maxTokens
   );
 
-  if (
-    history.length > 20
-  ) {
+  history.push(
+    {
+      role: "user",
+      content: prompt
+    },
+    {
+      role: "assistant",
+      content: answer
+    }
+  );
 
+  if (history.length > 20) {
     history.splice(
       0,
       history.length - 20
     );
-
   }
 
-  return answer;
+  conversationHistory.set(
+    conversationKey,
+    history
+  );
 
+  return answer;
 }
 
-// ==================================================
-// إرسال خطأ Gemini
-// ==================================================
 
-function sendGeminiError(
+/* =========================
+   أخطاء OpenRouter
+========================= */
+
+function sendOpenRouterError(
   api,
   event,
   error
 ) {
-
-  console.error(
-    "❌ ZANJOUBA GEMINI ERROR:",
-    error.response?.data ||
-    error.message
-  );
-
   let message =
-    "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗨𝗧𝗜𝗟𝗜𝗧𝗬 ━━ ⌬\n\n" +
-    "🐿️ صارت مشكلة صغيرة... استنى شوية ونرجعلك •-•";
+    "صار خلل صغير وأنا نحاول نجاوبك";
 
   const status =
-    error.response?.status;
+    error?.response?.status;
 
-  if (
-    error.message ===
-    "MODEL_API_KEY_MISSING"
-  ) {
+  const data =
+    error?.response?.data;
 
-    message =
-      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗨𝗧𝗜𝗟𝗜𝗧𝗬 ━━ ⌬\n\n" +
-      "🐿️ حط مفتاح Gemini في config.json أولًا •-•";
-
-  }
-
-  else if (
-    status === 400
-  ) {
-
-    message =
-      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗨𝗧𝗜𝗟𝗜𝗧𝗬 ━━ ⌬\n\n" +
-      "🐿️ Gemini رفض الطلب، ثبّت إعدادات النموذج •-•";
-
-  }
-
-  else if (
-    status === 401 ||
-    status === 403
-  ) {
-
-    message =
-      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗨𝗧𝗜𝗟𝗜𝗧𝗬 ━━ ⌬\n\n" +
-      "🐿️ مفتاح Gemini موش صالح أو ما عندوش الصلاحية اللازمة.";
-
-  }
-
-  else if (
-    status === 429
-  ) {
-
-    message =
-      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗨𝗧𝗜𝗟𝗜𝗧𝗬 ━━ ⌬\n\n" +
-      "🐿️ وصلنا للحد المؤقت متاع Gemini، جرب بعد شوية •-•";
-
-  }
-
-  else if (
-    error.code ===
-    "ECONNABORTED"
-  ) {
-
-    message =
-      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗨𝗧𝗜𝗟𝗜𝗧𝗬 ━━ ⌬\n\n" +
-      "🐿️ Gemini تأخر في الرد، عاود جرب •-•";
-
-  }
-
-  else if (
-    error.message ===
-    "EMPTY_GEMINI_RESPONSE"
-  ) {
-
-    message =
-      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗨𝗧𝗜𝗟𝗜𝗧𝗬 ━━ ⌬\n\n" +
-      "🐿️ Gemini ما رجعش إجابة هالمرة، عاود جرب •-•";
-
-  }
-
-  return api.sendMessage(
-    message,
-    event.threadID,
-    event.messageID
+  console.error(
+    "[ZANJOUBA] FINAL ERROR:",
+    status || error?.code,
+    data || error?.message
   );
 
+  if (
+    error?.code ===
+    "OPENROUTER_KEY_MISSING"
+  ) {
+    message =
+      "مفتاح OpenRouter موش موجود في config.json";
+  }
+
+  else if (status === 401) {
+    message =
+      "مفتاح OpenRouter غير صالح";
+  }
+
+  else if (status === 403) {
+    message =
+      "OpenRouter رفض الطلب بالمفتاح الحالي";
+  }
+
+  else if (status === 429) {
+    message =
+      "وصلنا للحد المؤقت للطلبات المجانية حاول بعد شوية";
+  }
+
+  else if (status === 400) {
+    message =
+      "OpenRouter رفض صيغة الطلب";
+  }
+
+  else if (
+    error?.code === "ECONNABORTED" ||
+    error?.message?.includes("timeout")
+  ) {
+    message =
+      "الرد تأخر برشا حاول مرة ثانية";
+  }
+
+  else if (
+    error?.code ===
+    "EMPTY_OPENROUTER_RESPONSE"
+  ) {
+    message =
+      "الموديل ما رجعش إجابة هالمرة";
+  }
+
+  try {
+    api.sendMessage(
+      `🐿️ ${message} 🌰`,
+      event.threadID
+    );
+  } catch (sendError) {
+    console.error(
+      "[ZANJOUBA] Error Sending Error Message:",
+      sendError.message
+    );
+  }
 }
 
-// ==================================================
-// حفظ رد زنجوبة
-// ==================================================
+
+/* =========================
+   تسجيل الرد
+========================= */
 
 function registerReply(
-  info,
-  event
+  globalObj,
+  threadID,
+  messageID,
+  conversationKey
 ) {
-
   if (
-    !info ||
-    !info.messageID
+    !globalObj.client ||
+    !globalObj.client.handleReply
   ) {
-
     return;
-
   }
 
-  if (
-    !global.client.handleReply
-  ) {
-
-    global.client.handleReply =
-      [];
-
-  }
-
-  const conversationKey =
-    `group_${String(
-      event.threadID
-    )}`;
-
-  global.client.handleReply.push({
-
-    name:
-      module.exports.config.name,
-
-    messageID:
-      info.messageID,
-
-    threadID:
-      String(event.threadID),
-
+  globalObj.client.handleReply.push({
+    name: "زنجوبة",
+    messageID,
+    threadID,
     conversationKey
-
   });
-
 }
 
-// ==================================================
-// إرسال رد زنجوبة
-// ==================================================
+
+/* =========================
+   إرسال رد زنجوبة
+========================= */
 
 function sendZanjoobaReply(
   api,
   event,
-  answer
+  answer,
+  conversationKey
 ) {
-
-  return api.sendMessage(
-
+  api.sendMessage(
     `🐿️ ${answer} 🌰`,
-
     event.threadID,
-
     (err, info) => {
-
       if (err) {
-
         console.error(
-          "❌ ZANJOUBA SEND ERROR:",
-          err
+          "[ZANJOUBA] Send Error:",
+          err.message
         );
-
         return;
-
       }
 
-      registerReply(
-        info,
-        event
-      );
-
-    },
-
-    event.messageID
-
+      if (info?.messageID) {
+        registerReply(
+          global,
+          event.threadID,
+          info.messageID,
+          conversationKey
+        );
+      }
+    }
   );
-
 }
 
-// ==================================================
-// RUN
-// ==================================================
 
-module.exports.run =
-async function ({
+/* =========================
+   حفظ اسم المستخدم
+========================= */
+
+function saveUserName(
+  senderID,
+  text
+) {
+  const match = String(text || "").match(
+    /(?:اسمي|اسمى|انا|أنا|ادعى|أدعى)\s+(.+)/i
+  );
+
+  if (!match) {
+    return null;
+  }
+
+  const name = match[1]
+    .trim()
+    .replace(/[.!،؟]+$/g, "")
+    .slice(0, 50);
+
+  if (!name) {
+    return null;
+  }
+
+  usersNames.set(
+    String(senderID),
+    name
+  );
+
+  return name;
+}
+
+
+/* =========================
+   جلب اسم المستخدم
+========================= */
+
+function getUserName(senderID) {
+  return (
+    usersNames.get(String(senderID)) ||
+    null
+  );
+}
+
+
+/* =========================
+   أمر الطرد
+========================= */
+
+async function handleKickCommand(
+  api,
+  event,
+  prompt
+) {
+  if (
+    String(event.senderID) !==
+    ADMIN_ID
+  ) {
+    return false;
+  }
+
+  const text =
+    String(prompt || "").trim();
+
+  if (
+    !/^طرد|^اطرد/.test(text)
+  ) {
+    return false;
+  }
+
+  const mentions =
+    event.mentions || {};
+
+  const ids =
+    Object.keys(mentions);
+
+  if (!ids.length) {
+    api.sendMessage(
+      "اذكر الشخص اللي تحب نطرده",
+      event.threadID
+    );
+
+    return true;
+  }
+
+  for (const userID of ids) {
+    try {
+      await new Promise(
+        (resolve, reject) => {
+          api.removeUserFromGroup(
+            userID,
+            event.threadID,
+            err => {
+              if (err) {
+                reject(err);
+              } else {
+                resolve();
+              }
+            }
+          );
+        }
+      );
+    } catch (error) {
+      console.error(
+        "[ZANJOUBA] Kick Error:",
+        error.message
+      );
+    }
+  }
+
+  api.sendMessage(
+    "تم",
+    event.threadID
+  );
+
+  return true;
+}
+
+
+/* =========================
+   command.run
+========================= */
+
+module.exports.run = async function ({
   api,
   event,
   args
 }) {
-
-  const {
-    threadID,
-    messageID,
-    senderID,
-    mentions = {}
-  } = event;
-
   const prompt =
     Array.isArray(args)
       ? args.join(" ").trim()
       : "";
 
   if (!prompt) {
-
-    return api.sendMessage(
-      "🐿️ شنوة تستنى؟ اكتب سؤالك برك •-• 🌰",
-      threadID,
-      messageID
+    api.sendMessage(
+      "🐿️ اكتبلي حاجة نحكيو فيها 🌰",
+      event.threadID
     );
 
+    return;
   }
-
-  // ==================================================
-  // 🐿️ التفاعل
-  // ==================================================
 
   reactSquirrel(
     api,
-    messageID
+    event.messageID
   );
 
-  // ==================================================
-  // حفظ الاسم
-  // ==================================================
-
-  const nameMatch =
-    prompt.match(
-      /(?:اسمي|انا|أنا|ادعى|أدعى|اسمى)\s+(.+)/i
+  const savedName =
+    saveUserName(
+      event.senderID,
+      prompt
     );
 
-  if (nameMatch) {
+  const senderName =
+    savedName ||
+    getUserName(event.senderID) ||
+    "عضو المجموعة";
 
-    global.usersNames.set(
-      String(senderID),
-      nameMatch[1].trim()
+  /*
+   * أمر الطرد للمطور
+   */
+  const kicked =
+    await handleKickCommand(
+      api,
+      event,
+      prompt
     );
 
+  if (kicked) {
+    return;
   }
 
-  // ==================================================
-  // أوامر المطور
-  // ==================================================
-
-  if (
-    String(senderID) ===
-    ADMIN_ID
-  ) {
-
-    if (
-      /اطرد|طرد/i.test(prompt) &&
-      Object.keys(mentions).length
-    ) {
-
-      const targetID =
-        Object.keys(
-          mentions
-        )[0];
-
-      try {
-
-        await api.removeUserFromGroup(
-          targetID,
-          threadID
-        );
-
-        return api.sendMessage(
-          "🐿️ تم التنفيذ يا أبو هريرة 👑",
-          threadID,
-          messageID
-        );
-
-      } catch (error) {
-
-        return api.sendMessage(
-          "🐿️ ما عنديش الصلاحية يا أبو هريرة •-•",
-          threadID,
-          messageID
-        );
-
-      }
-
-    }
-
-  }
-
-  // ==================================================
-  // جلسة المجموعة
-  // ==================================================
-
+  /*
+   * كل مجموعة عندها ذاكرة مستقلة
+   */
   const conversationKey =
-    `group_${String(
-      threadID
-    )}`;
+    String(event.threadID);
 
   try {
-
     const answer =
       await generateReply(
         prompt,
         conversationKey,
-        String(senderID)
+        event.senderID,
+        senderName
       );
 
-    return sendZanjoobaReply(
+    sendZanjoobaReply(
       api,
       event,
-      answer
+      answer,
+      conversationKey
     );
 
   } catch (error) {
-
-    return sendGeminiError(
+    sendOpenRouterError(
       api,
       event,
       error
     );
-
   }
-
 };
 
-// ==================================================
-// HANDLE REPLY
-// ==================================================
 
-module.exports.handleReply =
-async function ({
+/* =========================
+   handleReply
+========================= */
+
+module.exports.handleReply = async function ({
   api,
   event,
   handleReply
 }) {
+  const prompt =
+    String(event.body || "").trim();
 
-  const {
-    threadID,
-    messageID,
-    senderID,
-    body
-  } = event;
-
-  // ==================================================
-  // التحقق من المجموعة
-  // ==================================================
-
-  if (
-    handleReply.threadID &&
-    String(
-      handleReply.threadID
-    ) !==
-      String(threadID)
-  ) {
-
-    return api.sendMessage(
-      "🐿️ هذي جلسة متاع مجموعة أخرى •-• 🌰",
-      threadID,
-      messageID
-    );
-
-  }
-
-  if (
-    !body ||
-    !body.trim()
-  ) {
-
+  if (!prompt) {
     return;
-
   }
 
-  // ==================================================
-  // 🐿️ التفاعل
-  // ==================================================
+  if (
+    String(event.threadID) !==
+    String(handleReply.threadID)
+  ) {
+    return;
+  }
 
   reactSquirrel(
     api,
-    messageID
+    event.messageID
   );
 
-  // ==================================================
-  // حفظ الاسم
-  // ==================================================
-
-  const nameMatch =
-    body.trim().match(
-      /(?:اسمي|انا|أنا|ادعى|أدعى|اسمى)\s+(.+)/i
+  const savedName =
+    saveUserName(
+      event.senderID,
+      prompt
     );
 
-  if (nameMatch) {
+  const senderName =
+    savedName ||
+    getUserName(event.senderID) ||
+    "عضو المجموعة";
 
-    global.usersNames.set(
-      String(senderID),
-      nameMatch[1].trim()
-    );
-
-  }
-
-  // ==================================================
-  // جلسة المجموعة
-  // ==================================================
-
+  /*
+   * نفس ذاكرة المجموعة
+   */
   const conversationKey =
     handleReply.conversationKey ||
-    `group_${String(
-      threadID
-    )}`;
+    String(event.threadID);
 
-  try {
-
-    const answer =
-      await generateReply(
-        body.trim(),
-        conversationKey,
-        String(senderID)
-      );
-
-    return sendZanjoobaReply(
+  /*
+   * أمر الطرد للمطور
+   */
+  const kicked =
+    await handleKickCommand(
       api,
       event,
-      answer
+      prompt
+    );
+
+  if (kicked) {
+    return;
+  }
+
+  try {
+    const answer =
+      await generateReply(
+        prompt,
+        conversationKey,
+        event.senderID,
+        senderName
+      );
+
+    sendZanjoobaReply(
+      api,
+      event,
+      answer,
+      conversationKey
     );
 
   } catch (error) {
-
-    return sendGeminiError(
+    sendOpenRouterError(
       api,
       event,
       error
     );
-
   }
-
 };
