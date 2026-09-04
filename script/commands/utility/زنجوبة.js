@@ -18,7 +18,7 @@ if (!global.conversationHistory)
 
 module.exports.config = {
   name: "زنجوبة",
-  version: "16.0.0",
+  version: "17.0.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
   description: "زنجوبة — ذكاء اصطناعي تونسي بجلسة جماعية",
@@ -28,7 +28,7 @@ module.exports.config = {
 };
 
 // ==================================================
-// إعدادات Groq
+// Gemini
 // ==================================================
 
 const ADMIN_ID = "61578581225040";
@@ -39,20 +39,20 @@ const CONFIG_PATH = path.join(
 );
 
 // ==================================================
-// Groq
+// إعدادات Gemini
 // ==================================================
 
-const GROQ_URL =
-  "https://api.groq.com/openai/v1/chat/completions";
+const GEMINI_MODEL =
+  "gemini-3-flash-preview";
 
-const GROQ_MODEL =
-  "llama-3.3-70b-versatile";
+const GEMINI_URL =
+  `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 // ==================================================
-// قراءة مفتاح Groq من config.json
+// قراءة مفتاح Gemini من config.json
 // ==================================================
 
-function getGroqKey() {
+function getGeminiKey() {
 
   try {
 
@@ -81,12 +81,14 @@ function getGroqKey() {
 
     if (
       !key ||
+      key === "PUT_YOUR_GEMINI_API_KEY_HERE" ||
       key === "PUT_YOUR_GROQ_API_KEY_HERE" ||
+      key === "ضع_مفتاح_Gemini_هنا" ||
       key === "ضع_مفتاح_Groq_هنا"
     ) {
 
       console.error(
-        "❌ لم يتم وضع مفتاح Groq داخل config.json."
+        "❌ لم يتم وضع مفتاح Gemini داخل config.json."
       );
 
       return null;
@@ -109,16 +111,55 @@ function getGroqKey() {
 }
 
 // ==================================================
-// طلب Groq
+// تحويل رسائل النظام القديم إلى صيغة Gemini
 // ==================================================
 
-async function askGroq(
+function convertHistoryToGemini(messages) {
+
+  const contents = [];
+
+  for (const message of messages) {
+
+    if (!message || !message.content)
+      continue;
+
+    const role =
+      message.role === "assistant"
+        ? "model"
+        : "user";
+
+    contents.push({
+
+      role,
+
+      parts: [
+        {
+          text:
+            String(
+              message.content
+            )
+        }
+      ]
+
+    });
+
+  }
+
+  return contents;
+
+}
+
+// ==================================================
+// طلب Gemini
+// ==================================================
+
+async function askGemini(
   messages,
   maxTokens
 ) {
 
   const apiKey =
-    getGroqKey();
+    getGeminiKey();
 
   if (!apiKey) {
 
@@ -128,35 +169,69 @@ async function askGroq(
 
   }
 
+  const systemMessage =
+    messages.find(
+      message =>
+        message &&
+        message.role === "system"
+    );
+
+  const normalMessages =
+    messages.filter(
+      message =>
+        message &&
+        message.role !== "system"
+    );
+
+  const contents =
+    convertHistoryToGemini(
+      normalMessages
+    );
+
+  const body = {
+
+    contents,
+
+    generationConfig: {
+
+      temperature: 0.7,
+
+      topP: 0.95,
+
+      maxOutputTokens:
+        maxTokens
+
+    }
+
+  };
+
+  if (systemMessage) {
+
+    body.systemInstruction = {
+
+      parts: [
+        {
+          text:
+            String(
+              systemMessage.content
+            )
+        }
+      ]
+
+    };
+
+  }
+
   const response =
     await axios.post(
-      GROQ_URL,
-      {
-
-        model:
-          GROQ_MODEL,
-
-        messages,
-
-        temperature:
-          0.7,
-
-        max_completion_tokens:
-          maxTokens,
-
-        top_p:
-          0.95,
-
-        stream:
-          false
-
-      },
+      GEMINI_URL,
+      body,
       {
 
         headers: {
 
-          Authorization:
-            `Bearer ${apiKey}`,
+          "x-goog-api-key":
+            apiKey,
 
           "Content-Type":
             "application/json"
@@ -169,18 +244,56 @@ async function askGroq(
       }
     );
 
-  const answer =
+  const candidates =
     response
       ?.data
-      ?.choices?.[0]
-      ?.message
+      ?.candidates;
+
+  if (
+    !Array.isArray(candidates) ||
+    !candidates.length
+  ) {
+
+    throw new Error(
+      "EMPTY_GEMINI_RESPONSE"
+    );
+
+  }
+
+  const parts =
+    candidates[0]
       ?.content
-      ?.trim();
+      ?.parts;
+
+  if (
+    !Array.isArray(parts)
+  ) {
+
+    throw new Error(
+      "EMPTY_GEMINI_RESPONSE"
+    );
+
+  }
+
+  const answer =
+    parts
+      .filter(
+        part =>
+          part &&
+          typeof part.text ===
+            "string"
+      )
+      .map(
+        part =>
+          part.text
+      )
+      .join("")
+      .trim();
 
   if (!answer) {
 
     throw new Error(
-      "EMPTY_GROQ_RESPONSE"
+      "EMPTY_GEMINI_RESPONSE"
     );
 
   }
@@ -610,7 +723,7 @@ async function generateReply(
   ];
 
   const answer =
-    await askGroq(
+    await askGemini(
       messages,
       responseConfig.maxTokens
     );
@@ -653,17 +766,17 @@ async function generateReply(
 }
 
 // ==================================================
-// إرسال خطأ Groq
+// إرسال خطأ Gemini
 // ==================================================
 
-function sendGroqError(
+function sendGeminiError(
   api,
   event,
   error
 ) {
 
   console.error(
-    "❌ ZANJOUBA GROQ ERROR:",
+    "❌ ZANJOUBA GEMINI ERROR:",
     error.response?.data ||
     error.message
   );
@@ -682,27 +795,7 @@ function sendGroqError(
 
     message =
       "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗨𝗧𝗜𝗟𝗜𝗧𝗬 ━━ ⌬\n\n" +
-      "🐿️ حط مفتاح Groq في config.json أولًا •-•";
-
-  }
-
-  else if (
-    status === 401
-  ) {
-
-    message =
-      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗨𝗧𝗜𝗟𝗜𝗧𝗬 ━━ ⌬\n\n" +
-      "🐿️ مفتاح Groq موش صالح.";
-
-  }
-
-  else if (
-    status === 429
-  ) {
-
-    message =
-      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗨𝗧𝗜𝗟𝗜𝗧𝗬 ━━ ⌬\n\n" +
-      "🐿️ وصلنا للحد المؤقت متاع الطلبات، جرب بعد شوية •-•";
+      "🐿️ حط مفتاح Gemini في config.json أولًا •-•";
 
   }
 
@@ -712,7 +805,28 @@ function sendGroqError(
 
     message =
       "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗨𝗧𝗜𝗟𝗜𝗧𝗬 ━━ ⌬\n\n" +
-      "🐿️ Groq رفض الطلب، ثبّت إعدادات النموذج •-•";
+      "🐿️ Gemini رفض الطلب، ثبّت إعدادات النموذج •-•";
+
+  }
+
+  else if (
+    status === 401 ||
+    status === 403
+  ) {
+
+    message =
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗨𝗧𝗜𝗟𝗜𝗧𝗬 ━━ ⌬\n\n" +
+      "🐿️ مفتاح Gemini موش صالح أو ما عندوش الصلاحية اللازمة.";
+
+  }
+
+  else if (
+    status === 429
+  ) {
+
+    message =
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗨𝗧𝗜𝗟𝗜𝗧𝗬 ━━ ⌬\n\n" +
+      "🐿️ وصلنا للحد المؤقت متاع Gemini، جرب بعد شوية •-•";
 
   }
 
@@ -723,7 +837,18 @@ function sendGroqError(
 
     message =
       "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗨𝗧𝗜𝗟𝗜𝗧𝗬 ━━ ⌬\n\n" +
-      "🐿️ Groq تأخر في الرد، عاود جرب •-•";
+      "🐿️ Gemini تأخر في الرد، عاود جرب •-•";
+
+  }
+
+  else if (
+    error.message ===
+    "EMPTY_GEMINI_RESPONSE"
+  ) {
+
+    message =
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗨𝗧𝗜𝗟𝗜𝗧𝗬 ━━ ⌬\n\n" +
+      "🐿️ Gemini ما رجعش إجابة هالمرة، عاود جرب •-•";
 
   }
 
@@ -958,7 +1083,7 @@ async function ({
 
   } catch (error) {
 
-    return sendGroqError(
+    return sendGeminiError(
       api,
       event,
       error
@@ -1069,7 +1194,7 @@ async function ({
 
   } catch (error) {
 
-    return sendGroqError(
+    return sendGeminiError(
       api,
       event,
       error
