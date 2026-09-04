@@ -2,10 +2,10 @@ const path = require("path");
 
 module.exports.config = {
     name: "حماية",
-    version: "2.0.0",
+    version: "3.0.0",
     credits: "أبو هريرة",
     description: "إدارة نظام حماية المجموعة",
-    commandCategory: "Admin",
+    commandCategory: "admin",
     usages: "حماية",
     cooldowns: 5
 };
@@ -16,7 +16,6 @@ module.exports.config = {
 // ============================================================
 
 function getProtectionController({ models }) {
-
     return require(
         path.join(
             process.cwd(),
@@ -27,29 +26,7 @@ function getProtectionController({ models }) {
     )({
         models
     });
-
 }
-
-
-// ============================================================
-// أسماء الحمايات
-// ============================================================
-
-const protectionNames = {
-
-    groupName: "حماية اسم المجموعة",
-
-    nicknames: "حماية الكنيات",
-
-    theme: "حماية السمة",
-
-    image: "حماية صورة المجموعة",
-
-    emoji: "حماية الإيموجي",
-
-    description: "حماية وصف المجموعة"
-
-};
 
 
 // ============================================================
@@ -66,27 +43,20 @@ function buildMenu(protection) {
             ? "مفعلة"
             : "غير مفعلة";
 
-
     return `
-╭───〔 ⌬ ━━ HINA ADMIN ━━ ⌬ 〕───╮
+⌬ ━━ HINA ADMIN ━━ ⌬
 
         نظام حماية المجموعة
 
-1 ـ ${protectionNames.groupName} : ${status("groupName")}
-2 ـ ${protectionNames.nicknames} : ${status("nicknames")}
-3 ـ ${protectionNames.theme} : ${status("theme")}
-4 ـ ${protectionNames.image} : ${status("image")}
-5 ـ ${protectionNames.emoji} : ${status("emoji")}
-6 ـ ${protectionNames.description} : ${status("description")}
-7 ـ حماية الكل
+1 ـ حماية اسم المجموعة : ${status("groupName")}
+2 ـ حماية الكنيات : ${status("nicknames")}
+3 ـ حماية السمة : ${status("theme")}
+4 ـ حماية صورة المجموعة : ${status("image")}
+5 ـ حماية الإيموجي : ${status("emoji")}
+6 ـ حماية الكل
 
-0 ـ حفظ الإعدادات
-
-╰──────────────────────────────╯
-
-أرسل رقم الحماية التي تريد تفعيلها أو تعطيلها
+بعد الانتهاء تفاعل بأي شيء على هذه الرسالة لحفظ الإعدادات
 `;
-
 }
 
 
@@ -112,11 +82,9 @@ async function getThreadInfo(api, threadID) {
                         );
 
                         return resolve(null);
-
                     }
 
                     resolve(info || null);
-
                 }
             );
 
@@ -128,11 +96,8 @@ async function getThreadInfo(api, threadID) {
             );
 
             resolve(null);
-
         }
-
     });
-
 }
 
 
@@ -146,9 +111,7 @@ function getAdminIDs(info) {
         !info ||
         !Array.isArray(info.adminIDs)
     ) {
-
         return [];
-
     }
 
     return info.adminIDs
@@ -165,14 +128,11 @@ function getAdminIDs(info) {
                     admin.userID ||
                     ""
                 );
-
             }
 
             return String(admin);
-
         })
         .filter(Boolean);
-
 }
 
 
@@ -180,11 +140,7 @@ function getAdminIDs(info) {
 // التحقق من الأدمن
 // ============================================================
 
-function isAdmin({
-    api,
-    event,
-    info
-}) {
+function isAdmin({ event, info }) {
 
     const senderID =
         String(
@@ -194,17 +150,11 @@ function isAdmin({
     const adminIDs =
         getAdminIDs(info);
 
-
     if (
-        adminIDs.includes(
-            senderID
-        )
+        adminIDs.includes(senderID)
     ) {
-
         return true;
-
     }
-
 
     const developers =
         Array.isArray(
@@ -213,11 +163,7 @@ function isAdmin({
             ? global.config.ADMINBOT.map(String)
             : [];
 
-
-    return developers.includes(
-        senderID
-    );
-
+    return developers.includes(senderID);
 }
 
 
@@ -229,62 +175,43 @@ function extractNicknames(info) {
 
     const result = {};
 
-
     if (
         !info ||
         !info.nicknames
     ) {
-
         return result;
-
     }
 
-
-    // بعض نسخ FCA ترجع Object
     if (
-        typeof info.nicknames ===
-        "object" &&
+        typeof info.nicknames === "object" &&
         !Array.isArray(info.nicknames)
     ) {
 
         for (
             const [uid, nickname]
-            of Object.entries(
-                info.nicknames
-            )
+            of Object.entries(info.nicknames)
         ) {
 
-            result[
-                String(uid)
-            ] =
+            result[String(uid)] =
                 nickname || "";
-
         }
 
         return result;
-
     }
 
-
-    // بعض النسخ قد ترجع Array
     if (
-        Array.isArray(
-            info.nicknames
-        )
+        Array.isArray(info.nicknames)
     ) {
 
         for (
-            const item
-            of info.nicknames
+            const item of info.nicknames
         ) {
 
             if (
                 !item ||
                 typeof item !== "object"
             ) {
-
                 continue;
-
             }
 
             const uid =
@@ -298,18 +225,12 @@ function extractNicknames(info) {
                 continue;
             }
 
-            result[
-                String(uid)
-            ] =
+            result[String(uid)] =
                 item.nickname || "";
-
         }
-
     }
 
-
     return result;
-
 }
 
 
@@ -330,7 +251,6 @@ function extractImage(info) {
         info.thread_image ||
         null
     );
-
 }
 
 
@@ -348,9 +268,10 @@ function extractTheme(info) {
         info.color ||
         info.threadColor ||
         info.thread_color ||
+        info.theme ||
+        info.themeColor ||
         null
     );
-
 }
 
 
@@ -364,7 +285,6 @@ function extractEmoji(info) {
         return null;
     }
 
-
     if (
         info.emoji &&
         typeof info.emoji === "object"
@@ -375,9 +295,7 @@ function extractEmoji(info) {
             info.emoji.value ||
             null
         );
-
     }
-
 
     return (
         info.emoji ||
@@ -385,12 +303,11 @@ function extractEmoji(info) {
         info.thread_emoji ||
         null
     );
-
 }
 
 
 // ============================================================
-// حفظ القيم الحالية
+// حفظ القيم الحالية عند التفعيل
 // ============================================================
 
 async function saveCurrentValues({
@@ -406,15 +323,12 @@ async function saveCurrentValues({
             threadID
         );
 
-
     if (!info) {
         return;
     }
 
 
-    // --------------------------------------------------------
     // اسم المجموعة
-    // --------------------------------------------------------
 
     if (
         protection.enabled.groupName &&
@@ -427,18 +341,12 @@ async function saveCurrentValues({
             "";
 
         if (name) {
-
-            protection.saved.name =
-                name;
-
+            protection.saved.name = name;
         }
-
     }
 
 
-    // --------------------------------------------------------
     // السمة
-    // --------------------------------------------------------
 
     if (
         protection.enabled.theme &&
@@ -449,18 +357,12 @@ async function saveCurrentValues({
             extractTheme(info);
 
         if (theme) {
-
-            protection.saved.theme =
-                theme;
-
+            protection.saved.theme = theme;
         }
-
     }
 
 
-    // --------------------------------------------------------
     // الإيموجي
-    // --------------------------------------------------------
 
     if (
         protection.enabled.emoji &&
@@ -471,18 +373,12 @@ async function saveCurrentValues({
             extractEmoji(info);
 
         if (emoji) {
-
-            protection.saved.emoji =
-                emoji;
-
+            protection.saved.emoji = emoji;
         }
-
     }
 
 
-    // --------------------------------------------------------
     // الصورة
-    // --------------------------------------------------------
 
     if (
         protection.enabled.image &&
@@ -493,18 +389,12 @@ async function saveCurrentValues({
             extractImage(info);
 
         if (image) {
-
-            protection.saved.image =
-                image;
-
+            protection.saved.image = image;
         }
-
     }
 
 
-    // --------------------------------------------------------
     // الكنيات
-    // --------------------------------------------------------
 
     if (
         protection.enabled.nicknames &&
@@ -513,26 +403,7 @@ async function saveCurrentValues({
 
         protection.saved.nicknames =
             extractNicknames(info);
-
     }
-
-
-    // --------------------------------------------------------
-    // الوصف
-    // --------------------------------------------------------
-
-    if (
-        protection.enabled.description &&
-        !previous.description
-    ) {
-
-        protection.saved.description =
-            info.description ||
-            info.threadDescription ||
-            "";
-
-    }
-
 }
 
 
@@ -543,8 +414,7 @@ async function saveCurrentValues({
 module.exports.run = async function ({
     api,
     event,
-    models,
-    Threads
+    models
 }) {
 
     const threadID =
@@ -552,20 +422,14 @@ module.exports.run = async function ({
             event.threadID || ""
         );
 
-
     if (!threadID) {
 
         return api.sendMessage(
             "لا يمكن استخدام نظام الحماية هنا",
             threadID
         );
-
     }
 
-
-    // ----------------------------------------------------------
-    // معلومات المجموعة
-    // ----------------------------------------------------------
 
     const info =
         await getThreadInfo(
@@ -573,24 +437,17 @@ module.exports.run = async function ({
             threadID
         );
 
-
     if (!info) {
 
         return api.sendMessage(
             "تعذر جلب معلومات المجموعة",
             threadID
         );
-
     }
 
 
-    // ----------------------------------------------------------
-    // أدمن؟
-    // ----------------------------------------------------------
-
     if (
         !isAdmin({
-            api,
             event,
             info
         })
@@ -600,13 +457,8 @@ module.exports.run = async function ({
             "هذا الأمر متاح لأدمن المجموعة فقط",
             threadID
         );
-
     }
 
-
-    // ----------------------------------------------------------
-    // Controller
-    // ----------------------------------------------------------
 
     const Protection =
         getProtectionController({
@@ -620,15 +472,9 @@ module.exports.run = async function ({
         );
 
 
-    // ----------------------------------------------------------
-    // إرسال القائمة
-    // ----------------------------------------------------------
-
     const message =
         await api.sendMessage(
-            buildMenu(
-                protection
-            ),
+            buildMenu(protection),
             threadID
         );
 
@@ -637,44 +483,86 @@ module.exports.run = async function ({
         !message ||
         !message.messageID
     ) {
-
         return;
-
     }
 
 
-    // ----------------------------------------------------------
-    // تسجيل Reply
-    // ----------------------------------------------------------
+    // ========================================================
+    // جلسة التحكم
+    // ========================================================
 
-    global.client.handleReply.push({
+    const session = {
 
         name:
             module.exports.config.name,
 
         messageID:
-            message.messageID,
+            String(message.messageID),
 
         author:
             String(event.senderID),
 
         type:
-            "protection"
+            "protection",
 
-    });
+        protection,
 
+        previous: {
+
+            groupName:
+                Boolean(protection.enabled.groupName),
+
+            nicknames:
+                Boolean(protection.enabled.nicknames),
+
+            theme:
+                Boolean(protection.enabled.theme),
+
+            image:
+                Boolean(protection.enabled.image),
+
+            emoji:
+                Boolean(protection.enabled.emoji)
+        }
+    };
+
+
+    // ========================================================
+    // استقبال الأرقام
+    // ========================================================
+
+    global.client.handleReply.push(
+        session
+    );
+
+
+    // ========================================================
+    // استقبال الـ Reaction
+    // ========================================================
+
+    if (
+        !Array.isArray(
+            global.client.handleReaction
+        )
+    ) {
+
+        global.client.handleReaction = [];
+    }
+
+    global.client.handleReaction.push(
+        session
+    );
 };
 
 
 // ============================================================
-// استقبال الرد
+// استقبال الأرقام
 // ============================================================
 
 module.exports.handleReply = async function ({
     api,
     event,
     models,
-    Threads,
     handleReply
 }) {
 
@@ -683,32 +571,21 @@ module.exports.handleReply = async function ({
             event.threadID || ""
         );
 
-
     const senderID =
         String(
             event.senderID || ""
         );
 
 
-    // ----------------------------------------------------------
-    // صاحب القائمة فقط
-    // ----------------------------------------------------------
+    // فقط صاحب القائمة
 
     if (
-        handleReply.author &&
-        String(
-            handleReply.author
-        ) !== senderID
+        String(handleReply.author) !==
+        senderID
     ) {
-
         return;
-
     }
 
-
-    // ----------------------------------------------------------
-    // التحقق من الرقم
-    // ----------------------------------------------------------
 
     const answer =
         String(
@@ -717,22 +594,15 @@ module.exports.handleReply = async function ({
 
 
     if (
-        !/^[0-7]$/.test(
-            answer
-        )
+        !/^[1-6]$/.test(answer)
     ) {
 
         return api.sendMessage(
-            "أرسل رقمًا من 0 إلى 7",
+            "أرسل رقمًا من 1 إلى 6",
             threadID
         );
-
     }
 
-
-    // ----------------------------------------------------------
-    // Controller
-    // ----------------------------------------------------------
 
     const Protection =
         getProtectionController({
@@ -740,127 +610,38 @@ module.exports.handleReply = async function ({
         });
 
 
-    // ----------------------------------------------------------
-    // الإعدادات الحالية
-    // ----------------------------------------------------------
-
     let protection =
+        handleReply.protection ||
         await Protection.getProtection(
             threadID
         );
 
 
-    // ----------------------------------------------------------
-    // الحالة السابقة
-    // ----------------------------------------------------------
+    const previous =
+        handleReply.previous || {
 
-    const previous = {
+            groupName:
+                Boolean(protection.enabled.groupName),
 
-        groupName:
-            Boolean(
-                protection.enabled.groupName
-            ),
+            nicknames:
+                Boolean(protection.enabled.nicknames),
 
-        nicknames:
-            Boolean(
-                protection.enabled.nicknames
-            ),
+            theme:
+                Boolean(protection.enabled.theme),
 
-        theme:
-            Boolean(
-                protection.enabled.theme
-            ),
+            image:
+                Boolean(protection.enabled.image),
 
-        image:
-            Boolean(
-                protection.enabled.image
-            ),
-
-        emoji:
-            Boolean(
-                protection.enabled.emoji
-            ),
-
-        description:
-            Boolean(
-                protection.enabled.description
-            )
-
-    };
+            emoji:
+                Boolean(protection.enabled.emoji)
+        };
 
 
-    // ==========================================================
-    // حفظ وإنهاء
-    // ==========================================================
-
-    if (
-        answer === "0"
-    ) {
-
-        const saved =
-            await Protection.saveProtection(
-                threadID,
-                protection
-            );
-
-
-        if (!saved) {
-
-            return api.sendMessage(
-                "حدث خطأ أثناء حفظ إعدادات الحماية",
-                threadID
-            );
-
-        }
-
-
-        // ------------------------------------------------------
-        // إزالة HandleReply
-        // ------------------------------------------------------
-
-        const index =
-            global.client.handleReply.findIndex(
-                item =>
-                    item.messageID ==
-                    handleReply.messageID
-            );
-
-
-        if (
-            index !== -1
-        ) {
-
-            global.client.handleReply.splice(
-                index,
-                1
-            );
-
-        }
-
-
-        // ------------------------------------------------------
-        // Reaction
-        // ------------------------------------------------------
-
-        return api.setMessageReaction(
-            "🛡️",
-            String(
-                handleReply.messageID
-            ),
-            () => {},
-            true
-        );
-
-    }
-
-
-    // ==========================================================
+    // ========================================================
     // حماية الكل
-    // ==========================================================
+    // ========================================================
 
-    if (
-        answer === "7"
-    ) {
+    if (answer === "6") {
 
         protection =
             await Protection.enableAll(
@@ -870,48 +651,28 @@ module.exports.handleReply = async function ({
     }
 
 
-    // ==========================================================
+    // ========================================================
     // حماية منفردة
-    // ==========================================================
+    // ========================================================
 
     else {
 
         const keys = {
 
-            "1":
-                "groupName",
-
-            "2":
-                "nicknames",
-
-            "3":
-                "theme",
-
-            "4":
-                "image",
-
-            "5":
-                "emoji",
-
-            "6":
-                "description"
+            "1": "groupName",
+            "2": "nicknames",
+            "3": "theme",
+            "4": "image",
+            "5": "emoji"
 
         };
-
 
         const key =
             keys[answer];
 
-
         if (!key) {
-
-            return api.sendMessage(
-                "اختيار غير صالح",
-                threadID
-            );
-
+            return;
         }
-
 
         protection =
             await Protection.toggle(
@@ -919,22 +680,19 @@ module.exports.handleReply = async function ({
                 key
             );
 
-
         if (!protection) {
 
             return api.sendMessage(
                 "تعذر تغيير إعداد الحماية",
                 threadID
             );
-
         }
-
     }
 
 
-    // ==========================================================
-    // حفظ القيم الحالية عند التفعيل
-    // ==========================================================
+    // ========================================================
+    // حفظ القيم المرجعية في الجلسة فقط
+    // ========================================================
 
     try {
 
@@ -951,44 +709,24 @@ module.exports.handleReply = async function ({
             "[PROTECTION] saveCurrentValues:",
             error
         );
-
     }
 
 
-    // ==========================================================
-    // حفظ الإعدادات
-    // ==========================================================
+    // مهم جدًا
+    // لا نحفظ في قاعدة البيانات هنا
+    // الحفظ النهائي يحصل عند الـ Reaction
 
-    const saved =
-        await Protection.saveProtection(
-            threadID,
-            protection
-        );
+    handleReply.protection =
+        protection;
 
 
-    if (!saved) {
-
-        return api.sendMessage(
-            "تعذر حفظ إعداد الحماية",
-            threadID
-        );
-
-    }
-
-
-    // ==========================================================
+    // ========================================================
     // تحديث القائمة
-    // ==========================================================
+    // ========================================================
 
     const menu =
-        buildMenu(
-            protection
-        );
+        buildMenu(protection);
 
-
-    // ----------------------------------------------------------
-    // محاولة تعديل الرسالة
-    // ----------------------------------------------------------
 
     try {
 
@@ -1010,7 +748,6 @@ module.exports.handleReply = async function ({
                 menu,
                 threadID
             );
-
         }
 
     } catch (error) {
@@ -1020,7 +757,6 @@ module.exports.handleReply = async function ({
             error.message || error
         );
 
-
         try {
 
             await api.sendMessage(
@@ -1029,7 +765,164 @@ module.exports.handleReply = async function ({
             );
 
         } catch (e) {}
+    }
+};
 
+
+// ============================================================
+// استقبال الـ Reaction = حفظ
+// ============================================================
+
+module.exports.handleReaction = async function ({
+    api,
+    event,
+    models,
+    handleReaction
+}) {
+
+    const threadID =
+        String(
+            event.threadID || ""
+        );
+
+    const senderID =
+        String(
+            event.userID ||
+            event.senderID ||
+            ""
+        );
+
+
+    // ========================================================
+    // فقط صاحب القائمة
+    // ========================================================
+
+    if (
+        String(handleReaction.author) !==
+        senderID
+    ) {
+        return;
     }
 
+
+    // ========================================================
+    // التأكد أن التفاعل على رسالة القائمة نفسها
+    // ========================================================
+
+    const messageID =
+        String(
+            event.messageID ||
+            ""
+        );
+
+    if (
+        messageID &&
+        messageID !==
+        String(handleReaction.messageID)
+    ) {
+        return;
+    }
+
+
+    const Protection =
+        getProtectionController({
+            models
+        });
+
+
+    const protection =
+        handleReaction.protection;
+
+
+    if (!protection) {
+        return;
+    }
+
+
+    // ========================================================
+    // الحفظ النهائي
+    // ========================================================
+
+    const saved =
+        await Protection.saveProtection(
+            threadID,
+            protection
+        );
+
+
+    if (!saved) {
+
+        return api.sendMessage(
+            "حدث خطأ أثناء حفظ إعدادات الحماية",
+            threadID
+        );
+    }
+
+
+    // ========================================================
+    // إزالة جلسة Reply
+    // ========================================================
+
+    if (
+        Array.isArray(
+            global.client.handleReply
+        )
+    ) {
+
+        global.client.handleReply =
+            global.client.handleReply.filter(
+                item =>
+                    String(item.messageID) !==
+                    String(handleReaction.messageID)
+            );
+    }
+
+
+    // ========================================================
+    // إزالة جلسة Reaction
+    // ========================================================
+
+    if (
+        Array.isArray(
+            global.client.handleReaction
+        )
+    ) {
+
+        global.client.handleReaction =
+            global.client.handleReaction.filter(
+                item =>
+                    String(item.messageID) !==
+                    String(handleReaction.messageID)
+            );
+    }
+
+
+    // ========================================================
+    // تأكيد الحفظ
+    // ========================================================
+
+    try {
+
+        if (
+            typeof api.setMessageReaction ===
+            "function"
+        ) {
+
+            await api.setMessageReaction(
+                "🛡️",
+                String(
+                    handleReaction.messageID
+                ),
+                () => {},
+                true
+            );
+        }
+
+    } catch (error) {
+
+        console.error(
+            "[PROTECTION] reaction confirmation:",
+            error
+        );
+    }
 };
