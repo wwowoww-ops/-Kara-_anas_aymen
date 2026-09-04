@@ -24,6 +24,176 @@ module.exports = function ({
         });
 
     // ==================================================
+    // 🤖 ID البوت
+    // ==================================================
+
+    let botIDCache = null;
+
+    async function getBotID() {
+
+        if (botIDCache) {
+            return botIDCache;
+        }
+
+        try {
+
+            if (
+                api &&
+                typeof api.getCurrentUserID ===
+                "function"
+            ) {
+
+                const result =
+                    await new Promise(resolve => {
+
+                        try {
+
+                            api.getCurrentUserID(
+                                (error, id) => {
+
+                                    if (error) {
+                                        return resolve("");
+                                    }
+
+                                    resolve(
+                                        id
+                                            ? String(id)
+                                            : ""
+                                    );
+
+                                }
+                            );
+
+                        } catch (error) {
+
+                            resolve("");
+
+                        }
+
+                    });
+
+                if (result) {
+
+                    botIDCache =
+                        String(result);
+
+                    return botIDCache;
+
+                }
+
+            }
+
+        } catch (error) {
+
+            console.error(
+                "[PROTECTION] getCurrentUserID:",
+                error.message || error
+            );
+
+        }
+
+        return "";
+    }
+
+    // ==================================================
+    // 🤖 التحقق هل الحدث صادر من البوت
+    // ==================================================
+
+    async function isBotEvent(event) {
+
+        if (!event) {
+            return false;
+        }
+
+        const botID =
+            await getBotID();
+
+        if (!botID) {
+            return false;
+        }
+
+        const data =
+            event.logMessageData ||
+            {};
+
+        const possibleIDs = [
+
+            event.senderID,
+
+            event.authorID,
+
+            event.authorId,
+
+            event.actorID,
+
+            event.actorId,
+
+            event.userID,
+
+            event.userId,
+
+            data.author_id,
+
+            data.authorID,
+
+            data.authorId,
+
+            data.actor_id,
+
+            data.actorID,
+
+            data.actorId,
+
+            data.senderID,
+
+            data.sender_id,
+
+            data.userID,
+
+            data.user_id
+
+        ];
+
+        for (
+            const id of possibleIDs
+        ) {
+
+            if (
+                id !== undefined &&
+                id !== null &&
+                String(id) === botID
+            ) {
+
+                return true;
+
+            }
+
+        }
+
+        return false;
+    }
+
+    // ==================================================
+    // 🤖 هل العضو المستهدف هو البوت
+    // ==================================================
+
+    async function isBotUser(userID) {
+
+        if (!userID) {
+            return false;
+        }
+
+        const botID =
+            await getBotID();
+
+        return (
+            Boolean(botID) &&
+            String(userID) ===
+            String(botID)
+        );
+    }
+
+    // ==================================================
     // 📊 إعدادات نشاط الأعضاء
     // ==================================================
 
@@ -450,11 +620,6 @@ module.exports = function ({
                             callback
                         );
 
-                    /*
-                     * بعض نسخ FCA ترجع Promise
-                     * وبعضها تعتمد callback
-                     */
-
                     if (
                         result &&
                         typeof result.then ===
@@ -608,10 +773,6 @@ module.exports = function ({
                             },
                             response => {
 
-                                /*
-                                 * Redirect
-                                 */
-
                                 if (
                                     response.statusCode >= 300 &&
                                     response.statusCode < 400 &&
@@ -658,9 +819,10 @@ module.exports = function ({
                                     () => {
 
                                         file.close(
-                                            () => resolve(
-                                                destination
-                                            )
+                                            () =>
+                                                resolve(
+                                                    destination
+                                                )
                                         );
 
                                     }
@@ -716,6 +878,423 @@ module.exports = function ({
     }
 
     // ==================================================
+    // 🛡️ استخراج الكنيات
+    // ==================================================
+
+    function extractNicknames(
+        info
+    ) {
+
+        const result = {};
+
+        if (
+            !info ||
+            !info.nicknames
+        ) {
+
+            return result;
+
+        }
+
+        if (
+            typeof info.nicknames ===
+            "object" &&
+            !Array.isArray(
+                info.nicknames
+            )
+        ) {
+
+            for (
+                const [
+                    uid,
+                    nickname
+                ]
+                of Object.entries(
+                    info.nicknames
+                )
+            ) {
+
+                result[
+                    String(uid)
+                ] =
+                    nickname ||
+                    "";
+
+            }
+
+            return result;
+
+        }
+
+        if (
+            Array.isArray(
+                info.nicknames
+            )
+        ) {
+
+            for (
+                const item
+                of info.nicknames
+            ) {
+
+                if (
+                    !item ||
+                    typeof item !==
+                    "object"
+                ) {
+
+                    continue;
+
+                }
+
+                const uid =
+                    item.userFbId ||
+                    item.userID ||
+                    item.userid ||
+                    item.user_id ||
+                    item.id;
+
+                if (
+                    !uid
+                ) {
+
+                    continue;
+
+                }
+
+                result[
+                    String(uid)
+                ] =
+                    item.nickname ||
+                    "";
+
+            }
+
+        }
+
+        return result;
+
+    }
+
+    // ==================================================
+    // 🖼️ استخراج صورة المجموعة
+    // ==================================================
+
+    function extractImage(
+        info
+    ) {
+
+        if (!info) return null;
+
+        return (
+            info.imageSrc ||
+            info.image ||
+            info.threadImage ||
+            info.thread_image ||
+            null
+        );
+
+    }
+
+    // ==================================================
+    // 🎨 استخراج السمة
+    // ==================================================
+
+    function extractTheme(
+        info
+    ) {
+
+        if (!info) return null;
+
+        const possibleValues = [
+
+            info.color,
+
+            info.threadColor,
+
+            info.thread_color,
+
+            info.theme,
+
+            info.themeColor,
+
+            info.theme_color,
+
+            info.colorValue,
+
+            info.color_value
+
+        ];
+
+        for (
+            const value
+            of possibleValues
+        ) {
+
+            if (
+                value !== undefined &&
+                value !== null &&
+                String(value).trim()
+            ) {
+
+                return String(value);
+
+            }
+
+        }
+
+        return null;
+
+    }
+
+    // ==================================================
+    // 🧩 استخراج الإيموجي
+    // ==================================================
+
+    function extractEmoji(
+        info
+    ) {
+
+        if (!info) return null;
+
+        if (
+            info.emoji &&
+            typeof info.emoji ===
+            "object"
+        ) {
+
+            const possibleValues = [
+
+                info.emoji.emoji,
+
+                info.emoji.value,
+
+                info.emoji.threadEmoji,
+
+                info.emoji.thread_emoji,
+
+                info.emoji.icon
+
+            ];
+
+            for (
+                const value
+                of possibleValues
+            ) {
+
+                if (
+                    value !== undefined &&
+                    value !== null &&
+                    String(value).trim()
+                ) {
+
+                    return String(value);
+
+                }
+
+            }
+
+        }
+
+        const possibleValues = [
+
+            info.emoji,
+
+            info.threadEmoji,
+
+            info.thread_emoji,
+
+            info.threadIcon,
+
+            info.thread_icon,
+
+            info.icon
+
+        ];
+
+        for (
+            const value
+            of possibleValues
+        ) {
+
+            if (
+                value !== undefined &&
+                value !== null &&
+                String(value).trim()
+            ) {
+
+                return String(value);
+
+            }
+
+        }
+
+        return null;
+
+    }
+
+    // ==================================================
+    // 🛡️ استخراج السمة من Event
+    // ==================================================
+
+    function extractThemeFromEvent(
+        event
+    ) {
+
+        const data =
+            event.logMessageData ||
+            {};
+
+        const possibleValues = [
+
+            data.color,
+
+            data.threadColor,
+
+            data.thread_color,
+
+            data.theme,
+
+            data.themeColor,
+
+            data.theme_color,
+
+            data.colorValue,
+
+            data.color_value,
+
+            event.color,
+
+            event.threadColor,
+
+            event.thread_color,
+
+            event.theme,
+
+            event.themeColor,
+
+            event.theme_color
+
+        ];
+
+        for (
+            const value
+            of possibleValues
+        ) {
+
+            if (
+                value !== undefined &&
+                value !== null &&
+                String(value).trim()
+            ) {
+
+                return String(value);
+
+            }
+
+        }
+
+        return null;
+
+    }
+
+    // ==================================================
+    // 🛡️ استخراج الإيموجي من Event
+    // ==================================================
+
+    function extractEmojiFromEvent(
+        event
+    ) {
+
+        const data =
+            event.logMessageData ||
+            {};
+
+        const possibleValues = [
+
+            data.emoji,
+
+            data.threadEmoji,
+
+            data.thread_emoji,
+
+            data.threadIcon,
+
+            data.thread_icon,
+
+            data.icon,
+
+            data.value,
+
+            data.newEmoji,
+
+            data.new_emoji,
+
+            event.emoji,
+
+            event.threadEmoji,
+
+            event.thread_emoji,
+
+            event.threadIcon,
+
+            event.thread_icon
+
+        ];
+
+        for (
+            const value
+            of possibleValues
+        ) {
+
+            if (
+                value !== undefined &&
+                value !== null
+            ) {
+
+                if (
+                    typeof value ===
+                    "object"
+                ) {
+
+                    const nested =
+
+                        value.emoji ||
+                        value.value ||
+                        value.icon ||
+                        value.threadEmoji ||
+                        value.thread_emoji ||
+                        null;
+
+                    if (
+                        nested
+                    ) {
+
+                        return String(
+                            nested
+                        );
+
+                    }
+
+                } else if (
+                    String(value).trim()
+                ) {
+
+                    return String(
+                        value
+                    );
+
+                }
+
+            }
+
+        }
+
+        return null;
+
+    }
+
+    // ==================================================
     // 🛡️ حماية اسم المجموعة
     // ==================================================
 
@@ -733,8 +1312,29 @@ module.exports = function ({
         }
 
         if (
-            event.logMessageType !==
-            "log:thread-name"
+            await isBotEvent(event)
+        ) {
+
+            return;
+
+        }
+
+        const eventType =
+            String(
+                event.logMessageType ||
+                event.eventType ||
+                event.type ||
+                ""
+            );
+
+        const isNameEvent =
+            eventType ===
+                "log:thread-name" ||
+            eventType ===
+                "change_thread_name";
+
+        if (
+            !isNameEvent
         ) {
 
             return;
@@ -763,6 +1363,8 @@ module.exports = function ({
         const newName =
             data.name ||
             data.threadName ||
+            data.newName ||
+            data.new_name ||
             event.logMessageBody ||
             "";
 
@@ -836,25 +1438,56 @@ module.exports = function ({
         }
 
         if (
-            event.logMessageType !==
-            "log:thread-color"
+            await isBotEvent(event)
         ) {
 
             return;
 
         }
 
-        const savedTheme =
+        const eventType =
+            String(
+                event.logMessageType ||
+                event.eventType ||
+                event.type ||
+                ""
+            );
+
+        const isThemeEvent =
+            eventType ===
+                "log:thread-color" ||
+            eventType ===
+                "change_thread_color" ||
+            eventType ===
+                "change_thread_theme" ||
+            eventType ===
+                "thread_color" ||
+            eventType ===
+                "thread_theme";
+
+        if (
+            !isThemeEvent
+        ) {
+
+            return;
+
+        }
+
+        let savedTheme =
             protection.saved.theme;
 
         if (
             savedTheme === null ||
-            savedTheme === undefined
+            savedTheme === undefined ||
+            String(savedTheme).trim() === ""
         ) {
 
             return;
 
         }
+
+        savedTheme =
+            String(savedTheme);
 
         const threadID =
             String(event.threadID);
@@ -878,7 +1511,7 @@ module.exports = function ({
         const result =
             await apiCall(
                 "changeThreadColor",
-                String(savedTheme),
+                savedTheme,
                 threadID
             );
 
@@ -920,25 +1553,56 @@ module.exports = function ({
         }
 
         if (
-            event.logMessageType !==
-            "log:thread-icon"
+            await isBotEvent(event)
         ) {
 
             return;
 
         }
 
-        const savedEmoji =
+        const eventType =
+            String(
+                event.logMessageType ||
+                event.eventType ||
+                event.type ||
+                ""
+            );
+
+        const isEmojiEvent =
+            eventType ===
+                "log:thread-icon" ||
+            eventType ===
+                "change_thread_icon" ||
+            eventType ===
+                "change_thread_emoji" ||
+            eventType ===
+                "thread_icon" ||
+            eventType ===
+                "thread_emoji";
+
+        if (
+            !isEmojiEvent
+        ) {
+
+            return;
+
+        }
+
+        let savedEmoji =
             protection.saved.emoji;
 
         if (
             savedEmoji === null ||
-            savedEmoji === undefined
+            savedEmoji === undefined ||
+            String(savedEmoji).trim() === ""
         ) {
 
             return;
 
         }
+
+        savedEmoji =
+            String(savedEmoji);
 
         const threadID =
             String(event.threadID);
@@ -962,7 +1626,7 @@ module.exports = function ({
         const result =
             await apiCall(
                 "changeThreadEmoji",
-                String(savedEmoji),
+                savedEmoji,
                 threadID
             );
 
@@ -1010,11 +1674,17 @@ module.exports = function ({
 
             data.user_id,
 
+            data.userid,
+
             data.uid,
 
             data.target_id,
 
-            data.changed_user_id
+            data.targetID,
+
+            data.changed_user_id,
+
+            data.changedUserID
 
         ];
 
@@ -1081,6 +1751,30 @@ module.exports = function ({
 
         }
 
+        // ==================================================
+        // 🤖 لا تحمي كنية البوت نفسه
+        // ==================================================
+
+        if (
+            await isBotUser(userID)
+        ) {
+
+            return;
+
+        }
+
+        // ==================================================
+        // 🤖 لا تعالج تغيير كنية صادر من البوت
+        // ==================================================
+
+        if (
+            await isBotEvent(event)
+        ) {
+
+            return;
+
+        }
+
         if (
             !protection.saved
         ) {
@@ -1108,11 +1802,6 @@ module.exports = function ({
                 userID
             )
         ) {
-
-            /*
-             * عضو جديد لم يكن موجوداً عند تفعيل الحماية
-             * نحاول تسجيل كنيته الحالية
-             */
 
             const info =
                 await getThreadInfo(
@@ -1208,86 +1897,50 @@ module.exports = function ({
     }
 
     // ==================================================
-    // 🛡️ استخراج الكنيات
+    // 🛡️ تسجيل كنية عضو جديد
     // ==================================================
 
-    function extractNicknames(
-        info
+    async function registerNewMemberNickname(
+        event,
+        protection
     ) {
 
-        const result = {};
-
         if (
-            !info ||
-            !info.nicknames
+            !protection.enabled.nicknames
         ) {
 
-            return result;
+            return;
 
         }
 
-        /*
-         * الشكل:
-         * {
-         *   "123": "اسم"
-         * }
-         */
-
         if (
-            typeof info.nicknames ===
-            "object" &&
-            !Array.isArray(
-                info.nicknames
-            )
+            event.logMessageType !==
+            "log:subscribe"
         ) {
 
-            for (
-                const [
-                    uid,
-                    nickname
-                ]
-                of Object.entries(
-                    info.nicknames
-                )
-            ) {
-
-                result[
-                    String(uid)
-                ] =
-                    nickname ||
-                    "";
-
-            }
-
-            return result;
+            return;
 
         }
 
-        /*
-         * الشكل:
-         * [
-         *   {
-         *      userid: "...",
-         *      nickname: "..."
-         *   }
-         * ]
-         */
+        const data =
+            event.logMessageData ||
+            {};
+
+        const userIDs = [];
 
         if (
             Array.isArray(
-                info.nicknames
+                data.addedParticipants
             )
         ) {
 
             for (
-                const item
-                of info.nicknames
+                const participant
+                of data.addedParticipants
             ) {
 
                 if (
-                    !item ||
-                    typeof item !==
-                    "object"
+                    !participant
                 ) {
 
                     continue;
@@ -1295,127 +1948,172 @@ module.exports = function ({
                 }
 
                 const uid =
-                    item.userFbId ||
-                    item.userID ||
-                    item.userid ||
-                    item.user_id ||
-                    item.id;
+                    participant.userFbId ||
+                    participant.userID ||
+                    participant.userid ||
+                    participant.id;
 
                 if (
-                    !uid
+                    uid
                 ) {
 
-                    continue;
+                    userIDs.push(
+                        String(uid)
+                    );
 
                 }
-
-                result[
-                    String(uid)
-                ] =
-                    item.nickname ||
-                    "";
 
             }
 
         }
 
-        return result;
-
-    }
-
-    // ==================================================
-    // 🖼️ استخراج صورة المجموعة
-    // ==================================================
-
-    function extractImage(
-        info
-    ) {
-
-        if (!info) return null;
-
-        return (
-            info.imageSrc ||
-            info.image ||
-            info.threadImage ||
-            info.thread_image ||
-            null
-        );
-
-    }
-
-    // ==================================================
-    // 🎨 استخراج السمة
-    // ==================================================
-
-    function extractTheme(
-        info
-    ) {
-
-        if (!info) return null;
-
-        return (
-            info.color ||
-            info.threadColor ||
-            info.thread_color ||
-            null
-        );
-
-    }
-
-    // ==================================================
-    // 🧩 استخراج الإيموجي
-    // ==================================================
-
-    function extractEmoji(
-        info
-    ) {
-
-        if (!info) return null;
-
         if (
-            info.emoji &&
-            typeof info.emoji ===
-            "object"
+            data.participant_id
         ) {
 
-            return (
-                info.emoji.emoji ||
-                info.emoji.value ||
-                null
+            userIDs.push(
+                String(
+                    data.participant_id
+                )
             );
 
         }
 
-        return (
-            info.emoji ||
-            info.threadEmoji ||
-            info.thread_emoji ||
-            null
-        );
+        if (
+            data.participantID
+        ) {
+
+            userIDs.push(
+                String(
+                    data.participantID
+                )
+            );
+
+        }
+
+        const uniqueUserIDs =
+            [
+                ...new Set(
+                    userIDs
+                )
+            ];
+
+        if (
+            uniqueUserIDs.length ===
+            0
+        ) {
+
+            return;
+
+        }
+
+        const info =
+            await getThreadInfo(
+                event.threadID
+            );
+
+        if (!info) return;
+
+        const currentNicknames =
+            extractNicknames(
+                info
+            );
+
+        if (
+            !protection.saved
+        ) {
+
+            protection.saved = {};
+
+        }
+
+        if (
+            !protection.saved.nicknames ||
+            typeof protection.saved.nicknames !==
+            "object"
+        ) {
+
+            protection.saved.nicknames =
+                {};
+
+        }
+
+        let changed =
+            false;
+
+        for (
+            const userID
+            of uniqueUserIDs
+        ) {
+
+            // لا نسجل البوت ضمن حماية الكنيات
+
+            if (
+                await isBotUser(userID)
+            ) {
+
+                continue;
+
+            }
+
+            if (
+                Object.prototype.hasOwnProperty.call(
+                    protection.saved.nicknames,
+                    userID
+                )
+            ) {
+
+                continue;
+
+            }
+
+            if (
+                !Object.prototype.hasOwnProperty.call(
+                    currentNicknames,
+                    userID
+                )
+            ) {
+
+                protection.saved.nicknames[
+                    userID
+                ] = "";
+
+                changed = true;
+
+                continue;
+
+            }
+
+            protection.saved.nicknames[
+                userID
+            ] =
+                currentNicknames[
+                    userID
+                ] || "";
+
+            changed = true;
+
+        }
+
+        if (
+            changed
+        ) {
+
+            await Protection.saveProtection(
+                String(event.threadID),
+                protection
+            );
+
+            console.log(
+                `[PROTECTION] تم حفظ كنيات الأعضاء الجدد في ${event.threadID}`
+            );
+
+        }
 
     }
 
     // ==================================================
-    // 📝 استخراج الوصف
-    // ==================================================
-
-    function extractDescription(
-        info
-    ) {
-
-        if (!info) return null;
-
-        return (
-            info.description ??
-            info.threadDescription ??
-            info.thread_description ??
-            null
-        );
-
-    }
-
-    // ==================================================
-    // 🛡️ حماية صورة المجموعة
+    // 🖼️ حماية صورة المجموعة
     // ==================================================
 
     async function protectGroupImage(
@@ -1431,21 +2129,29 @@ module.exports = function ({
 
         }
 
-        /*
-         * بعض FCA تستخدم:
-         * log:thread-image
-         *
-         * وبعض النسخ قد تستخدم:
-         * change_thread_image
-         */
+        if (
+            await isBotEvent(event)
+        ) {
+
+            return;
+
+        }
+
+        const eventType =
+            String(
+                event.logMessageType ||
+                event.eventType ||
+                event.type ||
+                ""
+            );
 
         const isImageEvent =
-            event.logMessageType ===
+            eventType ===
                 "log:thread-image" ||
-            event.eventType ===
+            eventType ===
                 "change_thread_image" ||
-            event.type ===
-                "change_thread_image";
+            eventType ===
+                "thread_image";
 
         if (
             !isImageEvent
@@ -1500,9 +2206,9 @@ module.exports = function ({
         );
 
         const extension =
-            savedImage.includes(
-                ".png"
-            )
+            String(savedImage)
+                .toLowerCase()
+                .includes(".png")
                 ? ".png"
                 : ".jpg";
 
@@ -1584,352 +2290,6 @@ module.exports = function ({
     }
 
     // ==================================================
-    // 🛡️ حماية الوصف
-    // ==================================================
-
-    async function protectDescription(
-        event,
-        protection
-    ) {
-
-        if (
-            !protection.enabled.description
-        ) {
-
-            return;
-
-        }
-
-        const eventType =
-            String(
-                event.logMessageType ||
-                event.eventType ||
-                ""
-            );
-
-        const isDescriptionEvent =
-            eventType ===
-                "log:thread-description" ||
-            eventType ===
-                "change_thread_description";
-
-        if (
-            !isDescriptionEvent
-        ) {
-
-            return;
-
-        }
-
-        const savedDescription =
-            protection.saved.description;
-
-        if (
-            savedDescription === null ||
-            savedDescription === undefined
-        ) {
-
-            return;
-
-        }
-
-        /*
-         * FCA الرسمي القديم لا يوفر
-         * changeThreadDescription ضمن API المعتاد.
-         *
-         * لذلك لا نخترع دالة غير موجودة.
-         *
-         * إذا كانت نسختك تحتوي عليها
-         * سيتم استخدامها تلقائياً.
-         */
-
-        if (
-            typeof api.changeThreadDescription !==
-            "function"
-        ) {
-
-            console.log(
-                "[PROTECTION DESCRIPTION] نسختك من API لا توفر changeThreadDescription"
-            );
-
-            return;
-
-        }
-
-        const threadID =
-            String(event.threadID);
-
-        if (
-            isProtectionLocked(
-                threadID,
-                "description"
-            )
-        ) {
-
-            return;
-
-        }
-
-        lockProtection(
-            threadID,
-            "description"
-        );
-
-        const result =
-            await apiCall(
-                "changeThreadDescription",
-                String(savedDescription),
-                threadID
-            );
-
-        if (
-            result.error
-        ) {
-
-            console.error(
-                "[PROTECTION DESCRIPTION ERROR]",
-                result.error.message ||
-                result.error
-            );
-
-            return;
-
-        }
-
-        console.log(
-            `[PROTECTION] تم استرجاع وصف المجموعة ${threadID}`
-        );
-
-    }
-
-    // ==================================================
-    // 🛡️ تسجيل كنية عضو جديد
-    // ==================================================
-
-    async function registerNewMemberNickname(
-        event,
-        protection
-    ) {
-
-        if (
-            !protection.enabled.nicknames
-        ) {
-
-            return;
-
-        }
-
-        /*
-         * نستخدم فقط أحداث دخول الأعضاء
-         */
-
-        if (
-            event.logMessageType !==
-            "log:subscribe"
-        ) {
-
-            return;
-
-        }
-
-        const data =
-            event.logMessageData ||
-            {};
-
-        const userIDs = [];
-
-        /*
-         * addedParticipants
-         */
-
-        if (
-            Array.isArray(
-                data.addedParticipants
-            )
-        ) {
-
-            for (
-                const participant
-                of data.addedParticipants
-            ) {
-
-                if (
-                    !participant
-                ) {
-
-                    continue;
-
-                }
-
-                const uid =
-                    participant.userFbId ||
-                    participant.userID ||
-                    participant.userid ||
-                    participant.id;
-
-                if (
-                    uid
-                ) {
-
-                    userIDs.push(
-                        String(uid)
-                    );
-
-                }
-
-            }
-
-        }
-
-        /*
-         * بعض النسخ تستخدم participant_id
-         */
-
-        if (
-            data.participant_id
-        ) {
-
-            userIDs.push(
-                String(
-                    data.participant_id
-                )
-            );
-
-        }
-
-        /*
-         * بعض النسخ تستخدم participantID
-         */
-
-        if (
-            data.participantID
-        ) {
-
-            userIDs.push(
-                String(
-                    data.participantID
-                )
-            );
-
-        }
-
-        const uniqueUserIDs =
-            [
-                ...new Set(
-                    userIDs
-                )
-            ];
-
-        if (
-            uniqueUserIDs.length ===
-            0
-        ) {
-
-            return;
-
-        }
-
-        const info =
-            await getThreadInfo(
-                event.threadID
-            );
-
-        if (!info) return;
-
-        const currentNicknames =
-            extractNicknames(
-                info
-            );
-
-        if (
-            !protection.saved
-        ) {
-
-            protection.saved = {};
-
-        }
-
-        if (
-            !protection.saved.nicknames ||
-            typeof protection.saved.nicknames !==
-            "object"
-        ) {
-
-            protection.saved.nicknames =
-                {};
-
-        }
-
-        let changed =
-            false;
-
-        for (
-            const userID
-            of uniqueUserIDs
-        ) {
-
-            if (
-                Object.prototype.hasOwnProperty.call(
-                    protection.saved.nicknames,
-                    userID
-                )
-            ) {
-
-                continue;
-
-            }
-
-            if (
-                !Object.prototype.hasOwnProperty.call(
-                    currentNicknames,
-                    userID
-                )
-            ) {
-
-                /*
-                 * لا توجد كنية
-                 * نحفظها كقيمة فارغة
-                 */
-
-                protection.saved.nicknames[
-                    userID
-                ] = "";
-
-                changed = true;
-
-                continue;
-
-            }
-
-            protection.saved.nicknames[
-                userID
-            ] =
-                currentNicknames[
-                    userID
-                ] || "";
-
-            changed = true;
-
-        }
-
-        if (
-            changed
-        ) {
-
-            await Protection.saveProtection(
-                String(event.threadID),
-                protection
-            );
-
-            console.log(
-                `[PROTECTION] تم حفظ كنيات الأعضاء الجدد في ${event.threadID}`
-            );
-
-        }
-
-    }
-
-    // ==================================================
     // 🛡️ حماية المجموعة
     // ==================================================
 
@@ -1946,13 +2306,10 @@ module.exports = function ({
 
         }
 
-        /*
-         * لا نحاول معالجة الرسائل العادية
-         */
-
         if (
             event.type === "message" &&
-            !event.logMessageType
+            !event.logMessageType &&
+            !event.eventType
         ) {
 
             return;
@@ -2032,15 +2389,6 @@ module.exports = function ({
             protection
         );
 
-        // ==================================================
-        // وصف المجموعة
-        // ==================================================
-
-        await protectDescription(
-            event,
-            protection
-        );
-
     }
 
     // ==================================================
@@ -2102,19 +2450,11 @@ module.exports = function ({
                 let reaction =
                     null;
 
-                // ==================================================
-                // 🦧 كلمات القرد
-                // ==================================================
-
                 const monkeyWords = [
                     "يوتا",
                     "شفق",
                     "الشفق"
                 ];
-
-                // ==================================================
-                // 🐈‍⬛ كلمات القط
-                // ==================================================
 
                 const catWords = [
                     "هريرة",
@@ -2122,36 +2462,20 @@ module.exports = function ({
                     "أبو هريرة"
                 ];
 
-                // ==================================================
-                // 🦍 كلمات اياتو
-                // ==================================================
-
                 const gorillaWords = [
                     "اياتو",
                     "اياطو"
                 ];
-
-                // ==================================================
-                // 🦊 كلمات الثعلب
-                // ==================================================
 
                 const foxWords = [
                     "رؤى",
                     "ࢪؤى"
                 ];
 
-                // ==================================================
-                // 🦋 كلمات الفراشة
-                // ==================================================
-
                 const butterflyWords = [
                     "فريال",
                     "فࢪيال"
                 ];
-
-                // ==================================================
-                // 👽 كلمات كايزر
-                // ==================================================
 
                 const alienWords = [
                     "كايزر",
@@ -2160,33 +2484,21 @@ module.exports = function ({
                     "ڪايزࢪ"
                 ];
 
-                // ==================================================
-                // 🦌 كلمات نرجس
-                // ==================================================
-
                 const deerWords = [
                     "نرجس",
                     "نࢪجس"
                 ];
 
-                // ==================================================
-                // 🐧 كلمات جود
-                // ==================================================
-
                 const penguinWords = [
                     "جود"
                 ];
-
-                // ==================================================
-                // 🦔 كلمات يزن
-                // ==================================================
 
                 const hedgehogWords = [
                     "يزن"
                 ];
 
                 // ==================================================
-                // البحث عن 🦧
+                // 🦧
                 // ==================================================
 
                 for (
@@ -2209,7 +2521,7 @@ module.exports = function ({
                 }
 
                 // ==================================================
-                // البحث عن 🐈‍⬛
+                // 🐈‍⬛
                 // ==================================================
 
                 if (
@@ -2238,7 +2550,7 @@ module.exports = function ({
                 }
 
                 // ==================================================
-                // البحث عن 🦍
+                // 🦍
                 // ==================================================
 
                 if (
@@ -2267,7 +2579,7 @@ module.exports = function ({
                 }
 
                 // ==================================================
-                // البحث عن 🦊
+                // 🦊
                 // ==================================================
 
                 if (
@@ -2296,7 +2608,7 @@ module.exports = function ({
                 }
 
                 // ==================================================
-                // البحث عن 🦋
+                // 🦋
                 // ==================================================
 
                 if (
@@ -2325,7 +2637,7 @@ module.exports = function ({
                 }
 
                 // ==================================================
-                // البحث عن 👽
+                // 👽
                 // ==================================================
 
                 if (
@@ -2354,7 +2666,7 @@ module.exports = function ({
                 }
 
                 // ==================================================
-                // البحث عن 🦌
+                // 🦌
                 // ==================================================
 
                 if (
@@ -2383,7 +2695,7 @@ module.exports = function ({
                 }
 
                 // ==================================================
-                // البحث عن 🐧
+                // 🐧
                 // ==================================================
 
                 if (
@@ -2412,7 +2724,7 @@ module.exports = function ({
                 }
 
                 // ==================================================
-                // البحث عن 🦔
+                // 🦔
                 // ==================================================
 
                 if (
@@ -2806,91 +3118,4 @@ module.exports = function ({
 
                 }
 
-                // ==================================================
-                // Object الخاص بالـEvent
-                // ==================================================
-
-                const Obj = {
-
-                    api,
-
-                    event,
-
-                    models,
-
-                    Users,
-
-                    Threads,
-
-                    Currencies,
-
-                    getText
-
-                };
-
-                // ==================================================
-                // تشغيل Event
-                // ==================================================
-
-                try {
-
-                    await eventModule.handleEvent(
-                        Obj
-                    );
-
-                } catch (
-                    error
-                ) {
-
-                    console.error(
-                        `❌ EVENT ERROR: ${eventName}`
-                    );
-
-                    console.error(
-                        error
-                    );
-
-                    try {
-
-                        logger(
-                            `❌ Event Error: ${eventName}\n${error.message}`,
-                            "error"
-                        );
-
-                    } catch (
-                        e
-                    ) {}
-
-                }
-
-            }
-
-        } catch (
-            error
-        ) {
-
-            // ==================================================
-            // ❌ خطأ عام
-            // ==================================================
-
-            console.error(
-                "❌ HANDLE EVENT ERROR:",
-                error
-            );
-
-            try {
-
-                logger(
-                    `❌ HandleEvent Error: ${error.message}`,
-                    "error"
-                );
-
-            } catch (
-                e
-            ) {}
-
-        }
-
-    };
-
-};
+               
