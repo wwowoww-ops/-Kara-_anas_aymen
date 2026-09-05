@@ -841,6 +841,26 @@ function onBot({ models: botModel }) {
                                 commandModule
                             );
 
+                            // ═══════════════════════════════════
+                            // تسجيل الأمر كـ Event إذا كان يحتوي handleEvent
+                            // ═══════════════════════════════════
+
+                            if (
+                                typeof commandModule.handleEvent ===
+                                "function"
+                            ) {
+
+                                global.client.events.set(
+                                    commandModule.config.name,
+                                    commandModule
+                                );
+
+                                console.log(
+                                    `[EVENT COMMAND] تم تسجيل ${commandModule.config.name} كـ Event`
+                                );
+
+                            }
+
                             logger.loader(
                                 `🌸『 تـم تحميل: ${commandModule.config.name} 』🌸`
                             );
