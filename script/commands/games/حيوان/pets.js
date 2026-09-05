@@ -1,4 +1,3 @@
-
 /**
  * ============================================================
  * نظام الحيوانات - بيانات الحيوانات
@@ -77,6 +76,9 @@ const SPECIAL_IMAGE_LEVEL = 60;
  * الشبع حسب الندرة
  * ============================================================
  *
+ * تم رفع تطور الشبع بشكل كبير استعدادًا لنظام القتال
+ * والأنظمة المستقبلية.
+ *
  * base:
  * الحد الأساسي للشبع عند Level 0
  *
@@ -102,37 +104,37 @@ const HUNGER_BY_RARITY = {
 
   [RARITIES.COMMON]: {
     base: 100,
-    growth: 2
+    growth: 4
   },
 
   [RARITIES.UNCOMMON]: {
     base: 115,
-    growth: 2.5
+    growth: 6
   },
 
   [RARITIES.RARE]: {
     base: 130,
-    growth: 3
+    growth: 8
   },
 
   [RARITIES.EPIC]: {
     base: 150,
-    growth: 3.5
+    growth: 11
   },
 
   [RARITIES.LEGENDARY]: {
     base: 175,
-    growth: 4
+    growth: 14
   },
 
   [RARITIES.MYTHICAL]: {
     base: 205,
-    growth: 5
+    growth: 17
   },
 
   [RARITIES.CELESTIAL]: {
     base: 240,
-    growth: 6
+    growth: 22
   }
 
 };
@@ -142,17 +144,8 @@ const HUNGER_BY_RARITY = {
  * بيانات الحيوانات
  * ============================================================
  *
- * basePower:
- * القوة عند Level 0
- *
- * baseHealth:
- * الصحة عند Level 0
- *
- * growth.power:
- * زيادة القوة لكل مستوى
- *
- * growth.health:
- * زيادة الصحة لكل مستوى
+ * تم رفع نمو القوة والصحة مع الحفاظ على الفروقات
+ * الأصلية بين الحيوانات.
  *
  * ============================================================
  */
@@ -168,14 +161,14 @@ const PETS = [
     type: "قطة",
     name: "قطة",
     rarity: RARITIES.COMMON,
-    price: 0,
+    price: 5000,
 
     basePower: 10,
     baseHealth: 100,
 
     growth: {
-      power: 5,
-      health: 20
+      power: 12,
+      health: 48
     },
 
     emoji: "🐱"
@@ -186,14 +179,14 @@ const PETS = [
     type: "كلب",
     name: "كلب",
     rarity: RARITIES.COMMON,
-    price: 0,
+    price: 6000,
 
     basePower: 12,
     baseHealth: 110,
 
     growth: {
-      power: 5,
-      health: 22
+      power: 12,
+      health: 53
     },
 
     emoji: "🐶"
@@ -204,14 +197,14 @@ const PETS = [
     type: "أرنب",
     name: "أرنب",
     rarity: RARITIES.COMMON,
-    price: 0,
+    price: 5500,
 
     basePower: 9,
     baseHealth: 95,
 
     growth: {
-      power: 5,
-      health: 19
+      power: 12,
+      health: 46
     },
 
     emoji: "🐰"
@@ -222,14 +215,14 @@ const PETS = [
     type: "هامستر",
     name: "هامستر",
     rarity: RARITIES.COMMON,
-    price: 0,
+    price: 5000,
 
     basePower: 8,
     baseHealth: 90,
 
     growth: {
-      power: 4,
-      health: 18
+      power: 10,
+      health: 43
     },
 
     emoji: "🐹"
@@ -240,14 +233,14 @@ const PETS = [
     type: "سنجاب",
     name: "سنجاب",
     rarity: RARITIES.COMMON,
-    price: 0,
+    price: 6000,
 
     basePower: 10,
     baseHealth: 100,
 
     growth: {
-      power: 5,
-      health: 20
+      power: 12,
+      health: 48
     },
 
     emoji: "🐿️"
@@ -258,14 +251,14 @@ const PETS = [
     type: "فراشة",
     name: "فراشة",
     rarity: RARITIES.COMMON,
-    price: 0,
+    price: 5000,
 
     basePower: 7,
     baseHealth: 80,
 
     growth: {
-      power: 4,
-      health: 16
+      power: 10,
+      health: 38
     },
 
     emoji: "🦋"
@@ -276,14 +269,14 @@ const PETS = [
     type: "حلزون",
     name: "حلزون",
     rarity: RARITIES.COMMON,
-    price: 0,
+    price: 5500,
 
     basePower: 6,
     baseHealth: 125,
 
     growth: {
-      power: 4,
-      health: 25
+      power: 10,
+      health: 60
     },
 
     emoji: "🐌"
@@ -294,14 +287,14 @@ const PETS = [
     type: "سمكة",
     name: "سمكة",
     rarity: RARITIES.COMMON,
-    price: 0,
+    price: 5500,
 
     basePower: 8,
     baseHealth: 90,
 
     growth: {
-      power: 4,
-      health: 18
+      power: 10,
+      health: 43
     },
 
     emoji: "🐟"
@@ -312,14 +305,14 @@ const PETS = [
     type: "قنفذ",
     name: "قنفذ",
     rarity: RARITIES.COMMON,
-    price: 2500,
+    price: 15000,
 
     basePower: 18,
     baseHealth: 130,
 
     growth: {
-      power: 6,
-      health: 26
+      power: 14,
+      health: 62
     },
 
     emoji: "🦔"
@@ -335,14 +328,14 @@ const PETS = [
     type: "ثعلب",
     name: "ثعلب",
     rarity: RARITIES.UNCOMMON,
-    price: 8000,
+    price: 20000,
 
     basePower: 25,
     baseHealth: 150,
 
     growth: {
-      power: 7,
-      health: 30
+      power: 18,
+      health: 75
     },
 
     emoji: "🦊"
@@ -353,14 +346,14 @@ const PETS = [
     type: "باندا",
     name: "باندا",
     rarity: RARITIES.UNCOMMON,
-    price: 11000,
+    price: 28000,
 
     basePower: 30,
     baseHealth: 190,
 
     growth: {
-      power: 8,
-      health: 38
+      power: 20,
+      health: 95
     },
 
     emoji: "🐼"
@@ -371,14 +364,14 @@ const PETS = [
     type: "ببغاء",
     name: "ببغاء",
     rarity: RARITIES.UNCOMMON,
-    price: 13000,
+    price: 32000,
 
     basePower: 32,
     baseHealth: 160,
 
     growth: {
-      power: 8,
-      health: 32
+      power: 20,
+      health: 80
     },
 
     emoji: "🦜"
@@ -389,14 +382,14 @@ const PETS = [
     type: "سلحفاة",
     name: "سلحفاة",
     rarity: RARITIES.UNCOMMON,
-    price: 12000,
+    price: 30000,
 
     basePower: 28,
     baseHealth: 230,
 
     growth: {
-      power: 7,
-      health: 46
+      power: 18,
+      health: 115
     },
 
     emoji: "🐢"
@@ -407,14 +400,14 @@ const PETS = [
     type: "بطريق",
     name: "بطريق",
     rarity: RARITIES.UNCOMMON,
-    price: 10000,
+    price: 25000,
 
     basePower: 25,
     baseHealth: 170,
 
     growth: {
-      power: 7,
-      health: 34
+      power: 18,
+      health: 85
     },
 
     emoji: "🐧"
@@ -425,14 +418,14 @@ const PETS = [
     type: "كوالا",
     name: "كوالا",
     rarity: RARITIES.UNCOMMON,
-    price: 12000,
+    price: 30000,
 
     basePower: 27,
     baseHealth: 180,
 
     growth: {
-      power: 7,
-      health: 36
+      power: 18,
+      health: 90
     },
 
     emoji: "🐨"
@@ -443,14 +436,14 @@ const PETS = [
     type: "غراب",
     name: "غراب",
     rarity: RARITIES.UNCOMMON,
-    price: 15000,
+    price: 38000,
 
     basePower: 35,
     baseHealth: 165,
 
     growth: {
-      power: 9,
-      health: 33
+      power: 23,
+      health: 83
     },
 
     emoji: "🐦‍⬛"
@@ -466,14 +459,14 @@ const PETS = [
     type: "ذئب",
     name: "ذئب",
     rarity: RARITIES.RARE,
-    price: 22000,
+    price: 75000,
 
     basePower: 35,
     baseHealth: 220,
 
     growth: {
-      power: 10,
-      health: 44
+      power: 30,
+      health: 132
     },
 
     emoji: "🐺"
@@ -484,14 +477,14 @@ const PETS = [
     type: "حصان",
     name: "حصان",
     rarity: RARITIES.RARE,
-    price: 30000,
+    price: 90000,
 
     basePower: 55,
     baseHealth: 280,
 
     growth: {
-      power: 13,
-      health: 56
+      power: 39,
+      health: 168
     },
 
     emoji: "🐴"
@@ -502,14 +495,14 @@ const PETS = [
     type: "نمر",
     name: "نمر",
     rarity: RARITIES.RARE,
-    price: 34000,
+    price: 105000,
 
     basePower: 50,
     baseHealth: 260,
 
     growth: {
-      power: 12,
-      health: 52
+      power: 36,
+      health: 156
     },
 
     emoji: "🐯"
@@ -520,14 +513,14 @@ const PETS = [
     type: "أسد",
     name: "أسد",
     rarity: RARITIES.RARE,
-    price: 40000,
+    price: 125000,
 
     basePower: 60,
     baseHealth: 300,
 
     growth: {
-      power: 14,
-      health: 60
+      power: 42,
+      health: 180
     },
 
     emoji: "🦁"
@@ -538,14 +531,14 @@ const PETS = [
     type: "دب",
     name: "دب",
     rarity: RARITIES.RARE,
-    price: 45000,
+    price: 150000,
 
     basePower: 65,
     baseHealth: 350,
 
     growth: {
-      power: 15,
-      health: 70
+      power: 45,
+      health: 210
     },
 
     emoji: "🐻"
@@ -561,14 +554,14 @@ const PETS = [
     type: "غزال",
     name: "غزال",
     rarity: RARITIES.EPIC,
-    price: 60000,
+    price: 250000,
 
     basePower: 45,
     baseHealth: 260,
 
     growth: {
-      power: 13,
-      health: 52
+      power: 46,
+      health: 182
     },
 
     emoji: "🦌"
@@ -579,14 +572,14 @@ const PETS = [
     type: "نسر",
     name: "نسر",
     rarity: RARITIES.EPIC,
-    price: 75000,
+    price: 300000,
 
     basePower: 70,
     baseHealth: 300,
 
     growth: {
-      power: 17,
-      health: 60
+      power: 60,
+      health: 210
     },
 
     emoji: "🦅"
@@ -597,14 +590,14 @@ const PETS = [
     type: "بومة",
     name: "بومة",
     rarity: RARITIES.EPIC,
-    price: 70000,
+    price: 280000,
 
     basePower: 58,
     baseHealth: 290,
 
     growth: {
-      power: 14,
-      health: 58
+      power: 49,
+      health: 203
     },
 
     emoji: "🦉"
@@ -615,14 +608,14 @@ const PETS = [
     type: "غوريلا",
     name: "غوريلا",
     rarity: RARITIES.EPIC,
-    price: 95000,
+    price: 400000,
 
     basePower: 85,
     baseHealth: 430,
 
     growth: {
-      power: 20,
-      health: 86
+      power: 70,
+      health: 301
     },
 
     emoji: "🦍"
@@ -633,14 +626,14 @@ const PETS = [
     type: "فهد",
     name: "فهد",
     rarity: RARITIES.EPIC,
-    price: 105000,
+    price: 450000,
 
     basePower: 88,
     baseHealth: 360,
 
     growth: {
-      power: 21,
-      health: 72
+      power: 74,
+      health: 252
     },
 
     emoji: "🐆"
@@ -651,14 +644,14 @@ const PETS = [
     type: "تمساح",
     name: "تمساح",
     rarity: RARITIES.EPIC,
-    price: 100000,
+    price: 430000,
 
     basePower: 78,
     baseHealth: 450,
 
     growth: {
-      power: 18,
-      health: 90
+      power: 63,
+      health: 315
     },
 
     emoji: "🐊"
@@ -669,14 +662,14 @@ const PETS = [
     type: "قرش",
     name: "قرش",
     rarity: RARITIES.EPIC,
-    price: 115000,
+    price: 480000,
 
     basePower: 82,
     baseHealth: 420,
 
     growth: {
-      power: 19,
-      health: 84
+      power: 67,
+      health: 294
     },
 
     emoji: "🦈"
@@ -687,14 +680,14 @@ const PETS = [
     type: "حوت",
     name: "حوت",
     rarity: RARITIES.EPIC,
-    price: 140000,
+    price: 600000,
 
     basePower: 90,
     baseHealth: 600,
 
     growth: {
-      power: 21,
-      health: 120
+      power: 74,
+      health: 420
     },
 
     emoji: "🐋"
@@ -705,14 +698,14 @@ const PETS = [
     type: "زرافة",
     name: "زرافة",
     rarity: RARITIES.EPIC,
-    price: 90000,
+    price: 380000,
 
     basePower: 65,
     baseHealth: 380,
 
     growth: {
-      power: 16,
-      health: 76
+      power: 56,
+      health: 266
     },
 
     emoji: "🦒"
@@ -723,14 +716,14 @@ const PETS = [
     type: "شمبانزي",
     name: "شمبانزي",
     rarity: RARITIES.EPIC,
-    price: 65000,
+    price: 260000,
 
     basePower: 55,
     baseHealth: 300,
 
     growth: {
-      power: 14,
-      health: 60
+      power: 49,
+      health: 210
     },
 
     emoji: "🐒"
@@ -746,14 +739,14 @@ const PETS = [
     type: "وحيد القرن",
     name: "وحيد القرن",
     rarity: RARITIES.LEGENDARY,
-    price: 180000,
+    price: 1000000,
 
     basePower: 105,
     baseHealth: 650,
 
     growth: {
-      power: 25,
-      health: 130
+      power: 100,
+      health: 520
     },
 
     emoji: "🦏"
@@ -764,14 +757,14 @@ const PETS = [
     type: "فيل",
     name: "فيل",
     rarity: RARITIES.LEGENDARY,
-    price: 220000,
+    price: 1500000,
 
     basePower: 110,
     baseHealth: 800,
 
     growth: {
-      power: 26,
-      health: 160
+      power: 104,
+      health: 640
     },
 
     emoji: "🐘"
@@ -782,14 +775,14 @@ const PETS = [
     type: "صقر",
     name: "صقر",
     rarity: RARITIES.LEGENDARY,
-    price: 170000,
+    price: 1200000,
 
     basePower: 95,
     baseHealth: 450,
 
     growth: {
-      power: 23,
-      health: 90
+      power: 92,
+      health: 360
     },
 
     emoji: "🦅"
@@ -800,14 +793,14 @@ const PETS = [
     type: "وحش أسطوري",
     name: "وحش أسطوري",
     rarity: RARITIES.LEGENDARY,
-    price: 350000,
+    price: 3000000,
 
     basePower: 150,
     baseHealth: 900,
 
     growth: {
-      power: 35,
-      health: 180
+      power: 140,
+      health: 720
     },
 
     emoji: "👹"
@@ -823,14 +816,14 @@ const PETS = [
     type: "يونيكورن",
     name: "يونيكورن",
     rarity: RARITIES.MYTHICAL,
-    price: 550000,
+    price: 5000000,
 
     basePower: 140,
     baseHealth: 850,
 
     growth: {
-      power: 35,
-      health: 170
+      power: 158,
+      health: 765
     },
 
     emoji: "🦄"
@@ -841,17 +834,35 @@ const PETS = [
     type: "كراكن",
     name: "كراكن",
     rarity: RARITIES.MYTHICAL,
-    price: 850000,
+    price: 8500000,
 
     basePower: 180,
     baseHealth: 1200,
 
     growth: {
-      power: 45,
-      health: 240
+      power: 203,
+      health: 1080
     },
 
     emoji: "🐙"
+  },
+
+  {
+    id: 40,
+    type: "ماموث خرافي",
+    name: "ماموث خرافي",
+    rarity: RARITIES.MYTHICAL,
+    price: 12000000,
+
+    basePower: 220,
+    baseHealth: 1500,
+
+    growth: {
+      power: 225,
+      health: 1350
+    },
+
+    emoji: "🦣"
   },
 
 
@@ -864,14 +875,14 @@ const PETS = [
     type: "تنين",
     name: "تنين",
     rarity: RARITIES.CELESTIAL,
-    price: 2500000,
+    price: 30000000,
 
     basePower: 250,
     baseHealth: 1800,
 
     growth: {
-      power: 65,
-      health: 350
+      power: 325,
+      health: 1750
     },
 
     emoji: "🐉"
@@ -882,17 +893,17 @@ const PETS = [
     type: "عنقاء",
     name: "عنقاء",
     rarity: RARITIES.CELESTIAL,
-    price: 5000000,
+    price: 50000000,
 
     basePower: 300,
     baseHealth: 2000,
 
     growth: {
-      power: 75,
-      health: 400
+      power: 375,
+      health: 2000
     },
 
-    emoji: "🔥"
+    emoji: "🐦‍🔥"
   }
 
 ];
@@ -900,16 +911,6 @@ const PETS = [
 
 /* ============================================================
  * تجهيز بيانات الحيوانات
- * ============================================================
- *
- * يتم هنا إضافة الإعدادات المشتركة لجميع الحيوانات:
- *
- * maxLevel
- * maxStars
- * specialImageLevel
- * baseHunger
- * growth.hunger
- *
  * ============================================================
  */
 
@@ -1050,8 +1051,6 @@ function getHighestRarity() {
  * حساب القوة
  * ============================================================
  *
- * مهم:
- *
  * لا يوجد حد 360 هنا.
  *
  * leveling.js هو المسؤول عن تحويل:
@@ -1059,15 +1058,6 @@ function getHighestRarity() {
  * النجمة + المستوى
  *
  * إلى المستوى الفعلي.
- *
- * لذلك:
- *
- * 0★ Lv60 = 60
- * 1★ Lv60 = 120
- * 2★ Lv60 = 180
- * 3★ Lv60 = 240
- * 4★ Lv60 = 300
- * 5★ Lv60 = 360
  *
  * ============================================================
  */
@@ -1278,10 +1268,6 @@ function calculateHungerPercentage(
 
 /* ============================================================
  * الصورة الخاصة
- * ============================================================
- *
- * الصورة تظهر عند Level 60.
- *
  * ============================================================
  */
 
