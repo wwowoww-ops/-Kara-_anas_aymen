@@ -12,12 +12,14 @@
  * يعتمد على:
  * Pdata.js
  * inventory.js
+ * achievements.js
  */
 
 "use strict";
 
 const Pdata = require("./Pdata");
 const Inventory = require("./inventory");
+const Achievements = require("./achievements");
 
 // =========================================================
 // الإعدادات
@@ -112,11 +114,6 @@ function calculateStatus(pet, maxHealth, maxHunger) {
 // =========================================================
 
 function getMaxHealth(pet) {
-  /*
-   * إذا كان health هو القيمة الحالية فقط
-   * نحاول حساب الحد الأقصى من pets.js
-   */
-
   try {
     const Pets = require("./pets");
 
@@ -365,6 +362,15 @@ async function feedPet({
     }
   );
 
+  // ---------------------------------------------------------
+  // تسجيل إنجاز الإطعام
+  // ---------------------------------------------------------
+
+  await Achievements.registerFeed(
+    models,
+    userID
+  );
+
   return {
     pet,
     amount,
@@ -504,6 +510,15 @@ async function healPet({
     }
   );
 
+  // ---------------------------------------------------------
+  // تسجيل إنجاز العلاج
+  // ---------------------------------------------------------
+
+  await Achievements.registerHeal(
+    models,
+    userID
+  );
+
   return {
     pet,
     amount,
@@ -560,6 +575,15 @@ async function fullHeal({
       health: maxHealth,
       status: STATUS.NORMAL
     }
+  );
+
+  // ---------------------------------------------------------
+  // تسجيل إنجاز العلاج
+  // ---------------------------------------------------------
+
+  await Achievements.registerHeal(
+    models,
+    userID
   );
 
   return {
