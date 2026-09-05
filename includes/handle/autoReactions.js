@@ -292,7 +292,7 @@ module.exports = function autoReactions({
     }
 
     // ==================================================
-    // 🪞 اليوريث
+    // 🪞 ايليوريث
     // ==================================================
 
     if (
@@ -300,7 +300,7 @@ module.exports = function autoReactions({
         containsWord(
             text,
             [
-                "اليوريث"
+                "ايليوريث"
             ]
         )
     ) {
