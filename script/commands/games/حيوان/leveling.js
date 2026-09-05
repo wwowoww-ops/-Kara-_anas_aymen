@@ -391,6 +391,35 @@ function getPetMaxHunger(
 
 
 /* ============================================================
+ * التحقق من الصورة الخاصة
+ * ============================================================ */
+
+function checkSpecialImage(
+  pet,
+  level = DEFAULT_LEVEL
+) {
+
+  const resolvedPet =
+    resolvePet(pet);
+
+  if (!resolvedPet) {
+    return false;
+  }
+
+  level =
+    normalizeLevel(
+      level,
+      resolvedPet
+    );
+
+  return hasSpecialImage(
+    resolvedPet,
+    level
+  );
+}
+
+
+/* ============================================================
  * إحصائيات الحيوان
  * ============================================================
  *
@@ -791,6 +820,7 @@ module.exports = {
   getPetHealth,
   getPetMaxHunger,
   getPetStats,
+  checkSpecialImage,
 
   /* النمو */
   getPowerGain,
