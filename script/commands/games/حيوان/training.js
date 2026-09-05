@@ -3,6 +3,7 @@
 const Pdata = require("./Pdata");
 const Inventory = require("./inventory");
 const Leveling = require("./leveling");
+const Achievements = require("./achievements");
 
 const TRAIN_COOLDOWN = 30 * 60 * 1000;
 
@@ -257,6 +258,16 @@ async function trainPet({
     }
   );
 
+  /* =========================
+     تسجيل الإنجازات
+  ========================= */
+
+  await Achievements.registerTraining(
+    models,
+    userID,
+    gainedXP
+  );
+
   return {
     success: true,
 
@@ -407,6 +418,16 @@ async function useXPCard(models, userID) {
       hunger: currentHunger,
       status
     }
+  );
+
+  /* =========================
+     تسجيل XP في الإنجازات
+  ========================= */
+
+  await Achievements.registerXP(
+    models,
+    userID,
+    XP_CARD_AMOUNT
   );
 
   return {
