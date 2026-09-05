@@ -3,9 +3,6 @@ const path = require("path");
 const https = require("https");
 const http = require("http");
 
-const autoReactions =
-    require("./autoReactions");
-
 module.exports = function ({
     api,
     models,
@@ -16,6 +13,9 @@ module.exports = function ({
 
     const logger =
         require("../../utils/log.js");
+
+    const autoReactions =
+        require("./autoReactions");
 
     // ==================================================
     // 🛡️ Controller الحماية
