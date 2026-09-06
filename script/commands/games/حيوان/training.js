@@ -3,6 +3,7 @@
 const Pdata = require("./Pdata");
 const Inventory = require("./inventory");
 const Leveling = require("./leveling");
+const Stats = require("./stats");
 const Achievements = require("./achievements");
 const Mission = require("./mission");
 
@@ -150,41 +151,119 @@ function getPetStats(
   pet,
   level
 ) {
+  if (!pet) {
+    return {
+      power: 0,
+      health: 0,
+      maxHunger: 0
+    };
+  }
+
   const stars =
     Math.max(
       0,
-      safeNumber(
-        pet?.stars,
-        0
+      Math.min(
+        Stats.MAX_STARS,
+        safeNumber(
+          pet.stars,
+          0
+        )
       )
     );
 
-  const power =
-    Leveling.getPetPower(
-      pet.type,
-      level,
-      stars
+  const safeLevel =
+    Math.max(
+      0,
+      Math.min(
+        Stats.MAX_LEVEL,
+        safeNumber(
+          level,
+          0
+        )
+      )
     );
 
-  const health =
-    Leveling.getPetHealth(
-      pet.type,
-      level,
-      stars
-    );
-
-  const maxHunger =
-    Leveling.getPetMaxHunger(
-      pet.type,
-      level,
+  const stats =
+    Stats.getStats(
+      pet,
+      safeLevel,
       stars
     );
 
   return {
-    power,
-    health,
-    maxHunger
+    power:
+      stats?.power || 0,
+
+    health:
+      stats?.maxHealth || 0,
+
+    maxHunger:
+      stats?.maxHunger || 0
   };
+}
+
+/* =========================================================
+   الحفاظ على الصحة الحالية
+========================================================= */
+
+function getPreservedHealth(
+  pet,
+  newMaxHealth
+) {
+  const maxHealth =
+    Math.max(
+      0,
+      safeNumber(
+        newMaxHealth,
+        0
+      )
+    );
+
+  const currentHealth =
+    safeNumber(
+      pet?.health,
+      maxHealth
+    );
+
+  return Math.max(
+    0,
+    Math.min(
+      currentHealth,
+      maxHealth
+    )
+  );
+}
+
+/* =========================================================
+   الحفاظ على الجوع الحالي
+========================================================= */
+
+function getPreservedHunger(
+  pet,
+  newMaxHunger
+) {
+  const maxHunger =
+    Math.max(
+      0,
+      safeNumber(
+        newMaxHunger,
+        0
+      )
+    );
+
+  const currentHunger =
+    safeNumber(
+      pet?.hunger,
+      maxHunger
+    );
+
+  return Math.max(
+    0,
+    Math.min(
+      currentHunger,
+      maxHunger
+    )
+  );
 }
 
 /* =========================================================
@@ -334,6 +413,22 @@ async function trainPet({
   }
 
   /* =======================================================
+     الإحصائيات قبل التدريب
+  ======================================================= */
+
+  const oldStats =
+    getPetStats(
+      pet,
+      currentLevel
+    );
+
+  const currentHealth =
+    getPreservedHealth(
+      pet,
+      oldStats.health
+    );
+
+  /* =======================================================
      حساب XP
   ======================================================= */
 
@@ -361,13 +456,24 @@ async function trainPet({
       result.level
     );
 
+  /*
+   * الصحة لا تعود للحد الأقصى عند رفع المستوى.
+   * نحافظ على الصحة الحالية ونرفع الحد الأقصى فقط.
+   */
+
+  const newHealth =
+    Math.min(
+      currentHealth,
+      stats.health
+    );
+
   /* =======================================================
      الجوع
   ======================================================= */
 
   const currentHunger =
-    safeNumber(
-      pet.hunger,
+    getPreservedHunger(
+      pet,
       stats.maxHunger
     );
 
@@ -385,7 +491,7 @@ async function trainPet({
     calculateTrainingStatus(
       newHunger,
       stats.maxHunger,
-      stats.health
+      newHealth
     );
 
   /* =======================================================
@@ -417,7 +523,7 @@ async function trainPet({
         stats.power,
 
       health:
-        stats.health,
+        newHealth,
 
       hunger:
         newHunger,
@@ -509,6 +615,9 @@ async function trainPet({
       stats.power,
 
     health:
+      newHealth,
+
+    maxHealth:
       stats.health,
 
     hunger:
@@ -609,6 +718,22 @@ async function useXPCard(
   }
 
   /* =======================================================
+     الإحصائيات قبل البطاقة
+  ======================================================= */
+
+  const oldStats =
+    getPetStats(
+      pet,
+      currentLevel
+    );
+
+  const currentHealth =
+    getPreservedHealth(
+      pet,
+      oldStats.health
+    );
+
+  /* =======================================================
      إضافة XP
   ======================================================= */
 
@@ -626,27 +751,32 @@ async function useXPCard(
       result.level
     );
 
+  /*
+   * بطاقة XP لا تعالج الحيوان.
+   * إذا ارتفع الحد الأقصى للصحة، تبقى الصحة الحالية كما هي.
+   */
+
+  const newHealth =
+    Math.min(
+      currentHealth,
+      stats.health
+    );
+
   /* =======================================================
      الجوع
   ======================================================= */
 
   const currentHunger =
-    Math.max(
-      0,
-      Math.min(
-        stats.maxHunger,
-        safeNumber(
-          pet.hunger,
-          stats.maxHunger
-        )
-      )
+    getPreservedHunger(
+      pet,
+      stats.maxHunger
     );
 
   const status =
     calculateTrainingStatus(
       currentHunger,
       stats.maxHunger,
-      stats.health
+      newHealth
     );
 
   /* =======================================================
@@ -676,7 +806,7 @@ async function useXPCard(
         stats.power,
 
       health:
-        stats.health,
+        newHealth,
 
       hunger:
         currentHunger,
@@ -768,6 +898,9 @@ async function useXPCard(
       stats.power,
 
     health:
+      newHealth,
+
+    maxHealth:
       stats.health,
 
     hunger:
@@ -1015,7 +1148,7 @@ async function trainingCommand({
         ) +
 
         `\n💪 القوة : ${result.power}` +
-        `\n❤️ الصحة : ${result.health}` +
+        `\n❤️ الصحة : ${result.health}/${result.maxHealth}` +
         `\n🍖 الجوع : ${result.hunger}/${result.maxHunger}` +
 
         `\n\n⏳ التدريب القادم بعد 30 دقيقة`
@@ -1067,7 +1200,7 @@ async function trainingCommand({
         ) +
 
         `\n💪 القوة : ${result.power}` +
-        `\n❤️ الصحة : ${result.health}` +
+        `\n❤️ الصحة : ${result.health}/${result.maxHealth}` +
         `\n🍖 الجوع : ${result.hunger}/${result.maxHunger}` +
 
         `\n\n⏳ التدريب القادم بعد 30 دقيقة`
@@ -1084,10 +1217,43 @@ async function trainingCommand({
     normalizedAction === "xp" ||
     normalizedAction === "xp card"
   ) {
-    return await useXPCard(
-      models,
-      userID
-    );
+    const result =
+      await useXPCard(
+        models,
+        userID
+      );
+
+    if (!result.success) {
+      return result;
+    }
+
+    return {
+      ...result,
+
+      message:
+        `⌬ ━━ 𝗛𝗜𝗡𝗔 TRAINING ━━ ⌬\n\n` +
+
+        `⚡ تم استخدام بطاقة XP\n\n` +
+
+        `⚡ XP المكتسبة : +${result.gainedXP}\n` +
+        `⭐ المستوى : ${result.level}` +
+        (
+          result.leveledUp
+            ? ` ↑ (+${result.levelsGained})`
+            : ""
+        ) +
+
+        `\n⚡ XP الحالية : ${result.xp}` +
+        (
+          result.requiredXP
+            ? `/${result.requiredXP}`
+            : ""
+        ) +
+
+        `\n💪 القوة : ${result.power}` +
+        `\n❤️ الصحة : ${result.health}/${result.maxHealth}` +
+        `\n🍖 الجوع : ${result.hunger}/${result.maxHunger}`
+    };
   }
 
   return {
@@ -1142,4 +1308,3 @@ module.exports = {
 
   trainingCommand
 };
-
