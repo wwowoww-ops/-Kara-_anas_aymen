@@ -259,7 +259,7 @@ async function trainPet({
   );
 
   /* =========================
-     تسجيل الإنجازات
+     تسجيل التدريب والـXP
   ========================= */
 
   await Achievements.registerTraining(
@@ -267,6 +267,22 @@ async function trainPet({
     userID,
     gainedXP
   );
+
+  /* =========================
+     فحص إنجازات المستوى
+  ========================= */
+
+  try {
+    await Achievements.checkAchievements(
+      models,
+      userID
+    );
+  } catch (achievementError) {
+    console.error(
+      "[HINA ACHIEVEMENTS] Level achievement check error:",
+      achievementError
+    );
+  }
 
   return {
     success: true,
@@ -429,6 +445,22 @@ async function useXPCard(models, userID) {
     userID,
     XP_CARD_AMOUNT
   );
+
+  /* =========================
+     فحص إنجازات المستوى
+  ========================= */
+
+  try {
+    await Achievements.checkAchievements(
+      models,
+      userID
+    );
+  } catch (achievementError) {
+    console.error(
+      "[HINA ACHIEVEMENTS] Level achievement check error:",
+      achievementError
+    );
+  }
 
   return {
     success: true,
