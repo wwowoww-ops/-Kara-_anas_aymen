@@ -3,16 +3,18 @@
  * نظام العناية بالحيوان
  *
  * المسؤول عن:
- * 🍖 إطعام الحيوان
- * 💊 علاج الحيوان
- * ❤️ الصحة
- * 🍗 الجوع
- * 🤒 حالة الحيوان
+ * إطعام الحيوان
+ * علاج الحيوان
+ * الصحة
+ * الجوع
+ * حالة الحيوان
  *
  * يعتمد على:
  * Pdata.js
  * inventory.js
  * achievements.js
+ * mission.js
+ * stats.js
  */
 
 "use strict";
@@ -20,12 +22,16 @@
 const Pdata = require("./Pdata");
 const Inventory = require("./inventory");
 const Achievements = require("./achievements");
+const Mission = require("./mission");
+const Stats = require("./stats");
+const Pets = require("./pets");
 
 // =========================================================
 // الإعدادات
 // =========================================================
 
-const CARE_HEADER = "⌬ ━━ 𝗛𝗜𝗡𝗔 CARE ━━ ⌬";
+const CARE_HEADER =
+  "⌬ ━━ 𝗛𝗜𝗡𝗔 CARE ━━ ⌬";
 
 // مقدار الجوع الذي يضيفه الطعام
 const FOOD_HUNGER = 25;
@@ -49,11 +55,18 @@ const STATUS = {
 // =========================================================
 
 function formatNumber(number) {
-  return Number(number || 0).toLocaleString("en-US");
+  const value = Number(number);
+
+  if (!Number.isFinite(value)) {
+    return "0";
+  }
+
+  return Math.floor(value)
+    .toLocaleString("en-US");
 }
 
 // =========================================================
-// الحصول على قيمة آمنة
+// رقم آمن
 // =========================================================
 
 function safeNumber(value, fallback = 0) {
@@ -65,74 +78,96 @@ function safeNumber(value, fallback = 0) {
 }
 
 // =========================================================
-// تحديد حالة الحيوان
+// المستوى والنجوم
 // =========================================================
 
-function calculateStatus(pet, maxHealth, maxHunger) {
-  const health =
-    safeNumber(pet.health);
+function getLevel(pet) {
+  return Math.max(
+    0,
+    Math.min(
+      Stats.MAX_LEVEL,
+      Math.floor(
+        safeNumber(pet?.level)
+      )
+    )
+  );
+}
 
-  const hunger =
-    safeNumber(pet.hunger);
-
-  // الحيوان المريض يبقى مريضًا
-  if (
-    pet.status === STATUS.SICK
-  ) {
-    return STATUS.SICK;
-  }
-
-  // صحة منخفضة جدًا
-  if (
-    maxHealth > 0 &&
-    health <= maxHealth * 0.25
-  ) {
-    return STATUS.SICK;
-  }
-
-  // جوع شديد
-  if (
-    maxHunger > 0 &&
-    hunger <= maxHunger * 0.20
-  ) {
-    return STATUS.HUNGRY;
-  }
-
-  // جوع متوسط
-  if (
-    maxHunger > 0 &&
-    hunger <= maxHunger * 0.50
-  ) {
-    return STATUS.NORMAL;
-  }
-
-  return STATUS.HAPPY;
+function getStars(pet) {
+  return Math.max(
+    0,
+    Math.min(
+      Stats.MAX_STARS,
+      Math.floor(
+        safeNumber(pet?.stars)
+      )
+    )
+  );
 }
 
 // =========================================================
-// الحصول على الحد الأقصى للصحة
+// بيانات الحيوان الأساسية
+// =========================================================
+
+function getPetData(pet) {
+  if (!pet) {
+    return null;
+  }
+
+  return Pets.getPetByType(
+    pet.type
+  );
+}
+
+// =========================================================
+// الإحصائيات
+//
+// مهم:
+// pets.calculateHealth و pets.calculateMaxHunger
+// لا تستقبل level + stars بشكل مباشر.
+//
+// Stats هي المسؤولة عن تحويل النجوم + المستوى
+// إلى effectiveLevel.
+// =========================================================
+
+function getPetStats(pet) {
+  if (!pet) {
+    return null;
+  }
+
+  const petData =
+    getPetData(pet);
+
+  if (!petData) {
+    return null;
+  }
+
+  const level =
+    getLevel(pet);
+
+  const stars =
+    getStars(pet);
+
+  return Stats.getStats(
+    petData,
+    level,
+    stars,
+    safeNumber(pet.health),
+    safeNumber(pet.hunger)
+  );
+}
+
+// =========================================================
+// الحد الأقصى للصحة
 // =========================================================
 
 function getMaxHealth(pet) {
   try {
-    const Pets = require("./pets");
+    const stats =
+      getPetStats(pet);
 
-    if (
-      pet &&
-      pet.type
-    ) {
-      const petData =
-        Pets.getPetByType(
-          pet.type
-        );
-
-      if (petData) {
-        return Pets.calculateHealth(
-          petData,
-          Number(pet.level) || 0,
-          Number(pet.stars) || 0
-        );
-      }
+    if (stats) {
+      return stats.maxHealth;
     }
   } catch (error) {
     console.error(
@@ -143,34 +178,24 @@ function getMaxHealth(pet) {
 
   return Math.max(
     100,
-    safeNumber(pet.health, 100)
+    safeNumber(
+      pet?.health,
+      100
+    )
   );
 }
 
 // =========================================================
-// الحصول على الحد الأقصى للجوع
+// الحد الأقصى للجوع
 // =========================================================
 
 function getMaxHunger(pet) {
   try {
-    const Pets = require("./pets");
+    const stats =
+      getPetStats(pet);
 
-    if (
-      pet &&
-      pet.type
-    ) {
-      const petData =
-        Pets.getPetByType(
-          pet.type
-        );
-
-      if (petData) {
-        return Pets.calculateMaxHunger(
-          petData,
-          Number(pet.level) || 0,
-          Number(pet.stars) || 0
-        );
-      }
+    if (stats) {
+      return stats.maxHunger;
     }
   } catch (error) {
     console.error(
@@ -179,7 +204,74 @@ function getMaxHunger(pet) {
     );
   }
 
-  return 100;
+  return Math.max(
+    100,
+    safeNumber(
+      pet?.hunger,
+      100
+    )
+  );
+}
+
+// =========================================================
+// تحديد حالة الحيوان
+// =========================================================
+
+function calculateStatus(
+  pet,
+  maxHealth,
+  maxHunger
+) {
+  const health =
+    Math.max(
+      0,
+      safeNumber(pet?.health)
+    );
+
+  const hunger =
+    Math.max(
+      0,
+      safeNumber(pet?.hunger)
+    );
+
+  // ---------------------------------------------------------
+  // صحة منخفضة جدًا = مريض
+  // ---------------------------------------------------------
+
+  if (
+    maxHealth > 0 &&
+    health <= maxHealth * 0.25
+  ) {
+    return STATUS.SICK;
+  }
+
+  // ---------------------------------------------------------
+  // جوع شديد
+  // ---------------------------------------------------------
+
+  if (
+    maxHunger > 0 &&
+    hunger <= maxHunger * 0.20
+  ) {
+    return STATUS.HUNGRY;
+  }
+
+  // ---------------------------------------------------------
+  // جوع متوسط
+  // ---------------------------------------------------------
+
+  if (
+    maxHunger > 0 &&
+    hunger <= maxHunger * 0.50
+  ) {
+    return STATUS.NORMAL;
+  }
+
+  // ---------------------------------------------------------
+  // صحة جيدة وشبع جيد
+  // ---------------------------------------------------------
+
+  return STATUS.HAPPY;
 }
 
 // =========================================================
@@ -187,7 +279,7 @@ function getMaxHunger(pet) {
 // =========================================================
 
 function getModels(models) {
-  const Pets =
+  const PetsModel =
     Pdata.getPetsModel(
       models
     );
@@ -198,7 +290,7 @@ function getModels(models) {
     );
 
   return {
-    Pets,
+    Pets: PetsModel,
     PetCurrency
   };
 }
@@ -212,9 +304,10 @@ async function getPlayer(
   userID
 ) {
   const {
-    Pets,
+    Pets: PetsModel,
     PetCurrency
-  } = getModels(models);
+  } =
+    getModels(models);
 
   const player =
     await Pdata.getPlayerData(
@@ -223,10 +316,14 @@ async function getPlayer(
     );
 
   return {
-    Pets,
+    Pets: PetsModel,
     PetCurrency,
-    pet: player.pet,
-    currency: player.currency
+
+    pet:
+      player?.pet || null,
+
+    currency:
+      player?.currency || null
   };
 }
 
@@ -253,10 +350,15 @@ async function registerFeedAchievement(
   userID
 ) {
   try {
-    await Achievements.registerFeed(
-      models,
-      userID
-    );
+    if (
+      typeof Achievements.registerFeed ===
+      "function"
+    ) {
+      await Achievements.registerFeed(
+        models,
+        userID
+      );
+    }
   } catch (error) {
     console.error(
       "[HINA ACHIEVEMENTS] Feed registration error:",
@@ -274,13 +376,74 @@ async function registerHealAchievement(
   userID
 ) {
   try {
-    await Achievements.registerHeal(
-      models,
-      userID
-    );
+    if (
+      typeof Achievements.registerHeal ===
+      "function"
+    ) {
+      await Achievements.registerHeal(
+        models,
+        userID
+      );
+    }
   } catch (error) {
     console.error(
       "[HINA ACHIEVEMENTS] Heal registration error:",
+      error
+    );
+  }
+}
+
+// =========================================================
+// تسجيل مهمة الإطعام
+// =========================================================
+
+async function registerFeedMission(
+  models,
+  userID,
+  amount
+) {
+  try {
+    if (
+      typeof Mission.registerFeed ===
+      "function"
+    ) {
+      await Mission.registerFeed(
+        models,
+        userID,
+        amount
+      );
+    }
+  } catch (error) {
+    console.error(
+      "[HINA MISSION] Feed registration error:",
+      error
+    );
+  }
+}
+
+// =========================================================
+// تسجيل مهمة العلاج
+// =========================================================
+
+async function registerHealMission(
+  models,
+  userID,
+  amount
+) {
+  try {
+    if (
+      typeof Mission.registerHeal ===
+      "function"
+    ) {
+      await Mission.registerHeal(
+        models,
+        userID,
+        amount
+      );
+    }
+  } catch (error) {
+    console.error(
+      "[HINA MISSION] Heal registration error:",
       error
     );
   }
@@ -318,15 +481,30 @@ async function feedPet({
 
   requirePet(pet);
 
+  if (!currency) {
+    throw new Error(
+      "CURRENCY_NOT_FOUND"
+    );
+  }
+
   // ---------------------------------------------------------
-  // الحد الأقصى للجوع
+  // الإحصائيات الحالية
   // ---------------------------------------------------------
 
   const maxHunger =
     getMaxHunger(pet);
 
+  const maxHealth =
+    getMaxHealth(pet);
+
   const currentHunger =
-    safeNumber(pet.hunger);
+    Math.max(
+      0,
+      Math.min(
+        maxHunger,
+        safeNumber(pet.hunger)
+      )
+    );
 
   // ---------------------------------------------------------
   // إذا كان ممتلئًا
@@ -341,6 +519,31 @@ async function feedPet({
   }
 
   // ---------------------------------------------------------
+  // الطعام المطلوب فعليًا
+  //
+  // إذا احتاج الحيوان 10 فقط للوصول للحد الأقصى
+  // فلا داعي لاستهلاك 3 أو 4 أطعمة.
+  // ---------------------------------------------------------
+
+  const hungerNeeded =
+    Math.max(
+      0,
+      maxHunger - currentHunger
+    );
+
+  const maxUsefulFood =
+    Math.ceil(
+      hungerNeeded /
+      FOOD_HUNGER
+    );
+
+  const foodToUse =
+    Math.min(
+      amount,
+      maxUsefulFood
+    );
+
+  // ---------------------------------------------------------
   // التحقق من الطعام
   // ---------------------------------------------------------
 
@@ -348,7 +551,7 @@ async function feedPet({
     !Inventory.hasItem(
       currency,
       "food",
-      amount
+      foodToUse
     )
   ) {
     throw new Error(
@@ -357,16 +560,18 @@ async function feedPet({
   }
 
   // ---------------------------------------------------------
-  // كمية الجوع الفعلية
+  // حساب الجوع الجديد
   // ---------------------------------------------------------
 
   const addedHunger =
-    FOOD_HUNGER * amount;
+    FOOD_HUNGER *
+    foodToUse;
 
   const newHunger =
     Math.min(
       maxHunger,
-      currentHunger + addedHunger
+      currentHunger +
+        addedHunger
     );
 
   // ---------------------------------------------------------
@@ -376,36 +581,51 @@ async function feedPet({
   await Inventory.useItem(
     currency,
     "food",
-    amount
+    foodToUse
   );
+
+  // ---------------------------------------------------------
+  // الحالة الجديدة
+  // ---------------------------------------------------------
+
+  const newStatus =
+    calculateStatus(
+      {
+        ...(
+          pet.dataValues ||
+          pet
+        ),
+
+        health:
+          safeNumber(
+            pet.health
+          ),
+
+        hunger:
+          newHunger
+      },
+
+      maxHealth,
+      maxHunger
+    );
 
   // ---------------------------------------------------------
   // تحديث الحيوان
   // ---------------------------------------------------------
 
-  const maxHealth =
-    getMaxHealth(pet);
-
-  const newStatus =
-    calculateStatus(
-      {
-        ...pet.dataValues,
-        hunger: newHunger
-      },
-      maxHealth,
-      maxHunger
-    );
-
   await Pdata.updatePet(
     pet,
     {
-      hunger: newHunger,
-      status: newStatus
+      hunger:
+        newHunger,
+
+      status:
+        newStatus
     }
   );
 
   // ---------------------------------------------------------
-  // تسجيل إنجاز الإطعام
+  // تسجيل الإنجازات
   // ---------------------------------------------------------
 
   await registerFeedAchievement(
@@ -413,13 +633,34 @@ async function feedPet({
     userID
   );
 
+  // ---------------------------------------------------------
+  // تسجيل المهمة
+  // ---------------------------------------------------------
+
+  await registerFeedMission(
+    models,
+    userID,
+    foodToUse
+  );
+
   return {
     pet,
-    amount,
-    oldHunger: currentHunger,
+
+    amount:
+      foodToUse,
+
+    requestedAmount:
+      amount,
+
+    oldHunger:
+      currentHunger,
+
     newHunger,
+
     maxHunger,
-    status: newStatus
+
+    status:
+      newStatus
   };
 }
 
@@ -455,16 +696,31 @@ async function healPet({
 
   requirePet(pet);
 
+  if (!currency) {
+    throw new Error(
+      "CURRENCY_NOT_FOUND"
+    );
+  }
+
   // ---------------------------------------------------------
-  // الحد الأقصى للصحة
+  // الإحصائيات
   // ---------------------------------------------------------
 
   const maxHealth =
     getMaxHealth(pet);
 
+  const maxHunger =
+    getMaxHunger(pet);
+
   const currentHealth =
-    safeNumber(
-      pet.health
+    Math.max(
+      0,
+      Math.min(
+        maxHealth,
+        safeNumber(
+          pet.health
+        )
+      )
     );
 
   // ---------------------------------------------------------
@@ -472,13 +728,35 @@ async function healPet({
   // ---------------------------------------------------------
 
   if (
-    currentHealth >= maxHealth &&
-    pet.status !== STATUS.SICK
+    currentHealth >= maxHealth
   ) {
     throw new Error(
       "HEALTH_FULL"
     );
   }
+
+  // ---------------------------------------------------------
+  // عدد الأدوية المفيد
+  // ---------------------------------------------------------
+
+  const healthNeeded =
+    Math.max(
+      0,
+      maxHealth -
+        currentHealth
+    );
+
+  const maxUsefulMedicine =
+    Math.ceil(
+      healthNeeded /
+      MEDICINE_HEALTH
+    );
+
+  const medicineToUse =
+    Math.min(
+      amount,
+      maxUsefulMedicine
+    );
 
   // ---------------------------------------------------------
   // التحقق من الدواء
@@ -488,7 +766,7 @@ async function healPet({
     !Inventory.hasItem(
       currency,
       "medicine",
-      amount
+      medicineToUse
     )
   ) {
     throw new Error(
@@ -497,16 +775,18 @@ async function healPet({
   }
 
   // ---------------------------------------------------------
-  // حساب الصحة الجديدة
+  // الصحة الجديدة
   // ---------------------------------------------------------
 
   const addedHealth =
-    MEDICINE_HEALTH * amount;
+    MEDICINE_HEALTH *
+    medicineToUse;
 
   const newHealth =
     Math.min(
       maxHealth,
-      currentHealth + addedHealth
+      currentHealth +
+        addedHealth
     );
 
   // ---------------------------------------------------------
@@ -516,26 +796,30 @@ async function healPet({
   await Inventory.useItem(
     currency,
     "medicine",
-    amount
+    medicineToUse
   );
 
   // ---------------------------------------------------------
-  // تحديد الحالة الجديدة
+  // الحالة الجديدة
   // ---------------------------------------------------------
-
-  const maxHunger =
-    getMaxHunger(pet);
 
   const newStatus =
     calculateStatus(
       {
-        ...pet.dataValues,
-        health: newHealth,
-        status:
-          newHealth >= maxHealth
-            ? STATUS.NORMAL
-            : pet.status
+        ...(
+          pet.dataValues ||
+          pet
+        ),
+
+        health:
+          newHealth,
+
+        hunger:
+          safeNumber(
+            pet.hunger
+          )
       },
+
       maxHealth,
       maxHunger
     );
@@ -547,13 +831,16 @@ async function healPet({
   await Pdata.updatePet(
     pet,
     {
-      health: newHealth,
-      status: newStatus
+      health:
+        newHealth,
+
+      status:
+        newStatus
     }
   );
 
   // ---------------------------------------------------------
-  // تسجيل إنجاز العلاج
+  // تسجيل الإنجاز
   // ---------------------------------------------------------
 
   await registerHealAchievement(
@@ -561,13 +848,34 @@ async function healPet({
     userID
   );
 
+  // ---------------------------------------------------------
+  // تسجيل المهمة
+  // ---------------------------------------------------------
+
+  await registerHealMission(
+    models,
+    userID,
+    medicineToUse
+  );
+
   return {
     pet,
-    amount,
-    oldHealth: currentHealth,
+
+    amount:
+      medicineToUse,
+
+    requestedAmount:
+      amount,
+
+    oldHealth:
+      currentHealth,
+
     newHealth,
+
     maxHealth,
-    status: newStatus
+
+    status:
+      newStatus
   };
 }
 
@@ -590,8 +898,44 @@ async function fullHeal({
 
   requirePet(pet);
 
+  if (!currency) {
+    throw new Error(
+      "CURRENCY_NOT_FOUND"
+    );
+  }
+
   const maxHealth =
     getMaxHealth(pet);
+
+  const maxHunger =
+    getMaxHunger(pet);
+
+  const currentHealth =
+    Math.max(
+      0,
+      Math.min(
+        maxHealth,
+        safeNumber(
+          pet.health
+        )
+      )
+    );
+
+  // ---------------------------------------------------------
+  // لا داعي لاستهلاك دواء إذا كانت كاملة
+  // ---------------------------------------------------------
+
+  if (
+    currentHealth >= maxHealth
+  ) {
+    throw new Error(
+      "HEALTH_FULL"
+    );
+  }
+
+  // ---------------------------------------------------------
+  // التحقق من الدواء
+  // ---------------------------------------------------------
 
   if (
     !Inventory.hasItem(
@@ -605,22 +949,58 @@ async function fullHeal({
     );
   }
 
+  // ---------------------------------------------------------
+  // استهلاك الدواء
+  // ---------------------------------------------------------
+
   await Inventory.useItem(
     currency,
     "medicine",
     1
   );
 
+  // ---------------------------------------------------------
+  // الحالة الجديدة
+  // ---------------------------------------------------------
+
+  const newStatus =
+    calculateStatus(
+      {
+        ...(
+          pet.dataValues ||
+          pet
+        ),
+
+        health:
+          maxHealth,
+
+        hunger:
+          safeNumber(
+            pet.hunger
+          )
+      },
+
+      maxHealth,
+      maxHunger
+    );
+
+  // ---------------------------------------------------------
+  // تحديث الحيوان
+  // ---------------------------------------------------------
+
   await Pdata.updatePet(
     pet,
     {
-      health: maxHealth,
-      status: STATUS.NORMAL
+      health:
+        maxHealth,
+
+      status:
+        newStatus
     }
   );
 
   // ---------------------------------------------------------
-  // تسجيل إنجاز العلاج
+  // الإنجازات
   // ---------------------------------------------------------
 
   await registerHealAchievement(
@@ -628,11 +1008,26 @@ async function fullHeal({
     userID
   );
 
+  // ---------------------------------------------------------
+  // المهمة
+  // ---------------------------------------------------------
+
+  await registerHealMission(
+    models,
+    userID,
+    1
+  );
+
   return {
     pet,
-    health: maxHealth,
+
+    health:
+      maxHealth,
+
     maxHealth,
-    status: STATUS.NORMAL
+
+    status:
+      newStatus
   };
 }
 
@@ -643,46 +1038,85 @@ async function fullHeal({
 function getCareStatus(pet) {
   requirePet(pet);
 
-  const maxHealth =
-    getMaxHealth(pet);
+  const stats =
+    getPetStats(pet);
 
-  const maxHunger =
-    getMaxHunger(pet);
+  if (!stats) {
+    throw new Error(
+      "PET_DATA_NOT_FOUND"
+    );
+  }
 
   const health =
-    safeNumber(
-      pet.health
+    Math.max(
+      0,
+      Math.min(
+        stats.maxHealth,
+        safeNumber(
+          pet.health
+        )
+      )
     );
 
   const hunger =
-    safeNumber(
-      pet.hunger
+    Math.max(
+      0,
+      Math.min(
+        stats.maxHunger,
+        safeNumber(
+          pet.hunger
+        )
+      )
+    );
+
+  const status =
+    calculateStatus(
+      {
+        ...(
+          pet.dataValues ||
+          pet
+        ),
+
+        health,
+        hunger
+      },
+
+      stats.maxHealth,
+      stats.maxHunger
     );
 
   return {
     health,
-    maxHealth,
+
+    maxHealth:
+      stats.maxHealth,
 
     hunger,
-    maxHunger,
+
+    maxHunger:
+      stats.maxHunger,
 
     healthPercentage:
-      maxHealth > 0
+      stats.maxHealth > 0
         ? Math.floor(
-            (health / maxHealth) * 100
+            (
+              health /
+              stats.maxHealth
+            ) * 100
           )
         : 0,
 
     hungerPercentage:
-      maxHunger > 0
+      stats.maxHunger > 0
         ? Math.floor(
-            (hunger / maxHunger) * 100
+            (
+              hunger /
+              stats.maxHunger
+            ) * 100
           )
         : 0,
 
-    status:
-      pet.status ||
-      STATUS.NORMAL
+    status
   };
 }
 
@@ -695,7 +1129,9 @@ function buildCareMessage(
   currency
 ) {
   const status =
-    getCareStatus(pet);
+    getCareStatus(
+      pet
+    );
 
   const bag =
     Inventory.getInventoryData(
@@ -706,37 +1142,54 @@ function buildCareMessage(
     `${CARE_HEADER}\n\n`;
 
   message +=
-    `🐾 ${pet.name || pet.type}\n\n`;
+    `🐾 ${
+      pet.name ||
+      pet.type
+    }\n\n`;
 
   message +=
-    `❤️ الصحة: ${formatNumber(
-      status.health
-    )}/${formatNumber(
-      status.maxHealth
-    )}\n`;
+    `❤️ الصحة: ${
+      formatNumber(
+        status.health
+      )
+    }/${
+      formatNumber(
+        status.maxHealth
+      )
+    }\n`;
 
   message +=
-    `🍗 الجوع: ${formatNumber(
-      status.hunger
-    )}/${formatNumber(
-      status.maxHunger
-    )}\n`;
+    `🍗 الجوع: ${
+      formatNumber(
+        status.hunger
+      )
+    }/${
+      formatNumber(
+        status.maxHunger
+      )
+    }\n`;
 
   message +=
-    `📊 الحالة: ${status.status}\n\n`;
+    `📊 الحالة: ${
+      status.status
+    }\n\n`;
 
   message +=
     "━━━━━━━━━━━━━━━━━━\n\n";
 
   message +=
-    `🍖 الطعام: ×${formatNumber(
-      bag.food
-    )}\n`;
+    `🍖 الطعام: ×${
+      formatNumber(
+        bag.food
+      )
+    }\n`;
 
   message +=
-    `💊 الدواء: ×${formatNumber(
-      bag.medicine
-    )}\n\n`;
+    `💊 الدواء: ×${
+      formatNumber(
+        bag.medicine
+      )
+    }\n\n`;
 
   message +=
     "أوامر العناية:\n";
@@ -755,9 +1208,17 @@ function buildCareMessage(
 // =========================================================
 
 function getErrorMessage(error) {
-  switch (error.message) {
+  switch (
+    error?.message
+  ) {
     case "PET_NOT_FOUND":
       return "❌ لا تملك حيوانًا بعد.";
+
+    case "PET_DATA_NOT_FOUND":
+      return "❌ تعذر العثور على بيانات هذا الحيوان.";
+
+    case "CURRENCY_NOT_FOUND":
+      return "❌ تعذر العثور على بيانات محفظتك.";
 
     case "INVALID_AMOUNT":
       return "❌ الكمية غير صحيحة.";
@@ -777,7 +1238,10 @@ function getErrorMessage(error) {
     default:
       return (
         "❌ حدث خطأ أثناء عملية العناية.\n\n" +
-        `📝 ${error.message || "خطأ غير معروف"}`
+        `📝 ${
+          error?.message ||
+          "خطأ غير معروف"
+        }`
       );
   }
 }
@@ -851,7 +1315,8 @@ async function careCommand({
       const result =
         await feedPet({
           models,
-          userID: senderID,
+          userID:
+            senderID,
           amount
         });
 
@@ -860,21 +1325,34 @@ async function careCommand({
 
         "🍖 تمت إطعام الحيوان بنجاح\n\n" +
 
-        `🐾 ${result.pet.name || result.pet.type}\n` +
+        `🐾 ${
+          result.pet.name ||
+          result.pet.type
+        }\n` +
 
-        `🍖 الطعام المستخدم: ×${formatNumber(
-          result.amount
-        )}\n` +
+        `🍖 الطعام المستخدم: ×${
+          formatNumber(
+            result.amount
+          )
+        }\n` +
 
-        `🍗 الجوع: ${formatNumber(
-          result.oldHunger
-        )} → ${formatNumber(
-          result.newHunger
-        )}/${formatNumber(
-          result.maxHunger
-        )}\n\n` +
+        `🍗 الجوع: ${
+          formatNumber(
+            result.oldHunger
+          )
+        } → ${
+          formatNumber(
+            result.newHunger
+          )
+        }/${
+          formatNumber(
+            result.maxHunger
+          )
+        }\n\n` +
 
-        `📊 الحالة: ${result.status}`,
+        `📊 الحالة: ${
+          result.status
+        }`,
 
         threadID,
         messageID
@@ -894,7 +1372,8 @@ async function careCommand({
       const result =
         await healPet({
           models,
-          userID: senderID,
+          userID:
+            senderID,
           amount
         });
 
@@ -903,26 +1382,43 @@ async function careCommand({
 
         "💊 تمت معالجة الحيوان بنجاح\n\n" +
 
-        `🐾 ${result.pet.name || result.pet.type}\n` +
+        `🐾 ${
+          result.pet.name ||
+          result.pet.type
+        }\n` +
 
-        `💊 الدواء المستخدم: ×${formatNumber(
-          result.amount
-        )}\n` +
+        `💊 الدواء المستخدم: ×${
+          formatNumber(
+            result.amount
+          )
+        }\n` +
 
-        `❤️ الصحة: ${formatNumber(
-          result.oldHealth
-        )} → ${formatNumber(
-          result.newHealth
-        )}/${formatNumber(
-          result.maxHealth
-        )}\n\n` +
+        `❤️ الصحة: ${
+          formatNumber(
+            result.oldHealth
+          )
+        } → ${
+          formatNumber(
+            result.newHealth
+          )
+        }/${
+          formatNumber(
+            result.maxHealth
+          )
+        }\n\n` +
 
-        `📊 الحالة: ${result.status}`,
+        `📊 الحالة: ${
+          result.status
+        }`,
 
         threadID,
         messageID
       );
     }
+
+    // -------------------------------------------------------
+    // أمر غير معروف
+    // -------------------------------------------------------
 
     return api.sendMessage(
       `${CARE_HEADER}\n\n` +
@@ -938,6 +1434,7 @@ async function careCommand({
       threadID,
       messageID
     );
+
   } catch (error) {
     console.error(
       "[HINA CARE ERROR]",
