@@ -1143,7 +1143,3 @@ module.exports = {
   trainingCommand
 };
 
-"mission.js"
-
-:::writing{variant="standard" id="31854" title="mission.js"}
-
