@@ -20,7 +20,8 @@ const TRAINING_BOOSTER_MULTIPLIER = 2;
 // تكلفة التدريب من الجوع
 const TRAIN_HUNGER_COST = 10;
 
-const MAX_LEVEL = Leveling.DEFAULT_MAX_LEVEL || 60;
+const MAX_LEVEL =
+  Leveling.DEFAULT_MAX_LEVEL || 60;
 
 /* =========================
    أدوات مساعدة
@@ -37,27 +38,46 @@ function safeNumber(value, fallback = 0) {
 }
 
 function getRemainingCooldown(lastTrain) {
-  if (!lastTrain) return 0;
+  if (!lastTrain) {
+    return 0;
+  }
 
-  const last = new Date(lastTrain).getTime();
+  const last =
+    new Date(lastTrain).getTime();
 
   if (!Number.isFinite(last)) {
     return 0;
   }
 
-  const remaining = TRAIN_COOLDOWN - (Date.now() - last);
+  const remaining =
+    TRAIN_COOLDOWN -
+    (Date.now() - last);
 
-  return Math.max(0, remaining);
+  return Math.max(
+    0,
+    remaining
+  );
 }
 
 function formatTime(milliseconds) {
-  const totalSeconds = Math.ceil(milliseconds / 1000);
+  const totalSeconds =
+    Math.ceil(milliseconds / 1000);
 
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
+  const minutes =
+    Math.floor(totalSeconds / 60);
+
+  const seconds =
+    totalSeconds % 60;
 
   if (minutes > 0) {
-    return `${minutes} دقيقة${seconds > 0 ? ` و ${seconds} ثانية` : ""}`;
+    return (
+      `${minutes} دقيقة` +
+      (
+        seconds > 0
+          ? ` و ${seconds} ثانية`
+          : ""
+      )
+    );
   }
 
   return `${seconds} ثانية`;
@@ -67,8 +87,14 @@ function formatTime(milliseconds) {
    بيانات اللاعب
 ========================= */
 
-async function getTrainingData(models, userID) {
-  return await Pdata.getPlayerData(models, userID);
+async function getTrainingData(
+  models,
+  userID
+) {
+  return await Pdata.getPlayerData(
+    models,
+    userID
+  );
 }
 
 /* =========================
@@ -76,12 +102,21 @@ async function getTrainingData(models, userID) {
 ========================= */
 
 function checkTrainingCooldown(pet) {
-  const remaining = getRemainingCooldown(pet?.lastTrain);
+  const remaining =
+    getRemainingCooldown(
+      pet?.lastTrain
+    );
 
   return {
-    onCooldown: remaining > 0,
+    onCooldown:
+      remaining > 0,
+
     remaining,
-    text: remaining > 0 ? formatTime(remaining) : null
+
+    text:
+      remaining > 0
+        ? formatTime(remaining)
+        : null
   };
 }
 
@@ -89,10 +124,19 @@ function checkTrainingCooldown(pet) {
    حساب XP التدريب
 ========================= */
 
-function calculateTrainingXP(level, useBooster = false) {
-  const safeLevel = Math.max(0, safeNumber(level, 0));
+function calculateTrainingXP(
+  level,
+  useBooster = false
+) {
+  const safeLevel =
+    Math.max(
+      0,
+      safeNumber(level, 0)
+    );
 
-  let xp = TRAIN_XP_BASE + safeLevel * TRAIN_XP_PER_LEVEL;
+  let xp =
+    TRAIN_XP_BASE +
+    safeLevel * TRAIN_XP_PER_LEVEL;
 
   if (useBooster) {
     xp *= TRAINING_BOOSTER_MULTIPLIER;
@@ -102,395 +146,44 @@ function calculateTrainingXP(level, useBooster = false) {
 }
 
 /* =========================
-   تدريب الحيوان
+   حساب الإحصائيات
 ========================= */
 
-async function trainPet({
-  models,
-  userID,
-  useBooster = false
-}) {
-  const playerData = await getTrainingData(models, userID);
-
-  const pet = playerData?.pet;
-
-  if (!pet) {
-    return {
-      success: false,
-      reason: "NO_PET",
-      message: "ليس لديك حيوان حاليًا"
-    };
-  }
-
-  const currentLevel = Leveling.normalizeLevel(
-    pet.level,
-    pet.type
-  );
-
-  const currentXP = Leveling.normalizeXP(pet.exp);
-
-  if (currentLevel >= MAX_LEVEL) {
-    return {
-      success: false,
-      reason: "MAX_LEVEL",
-      message: "حيوانك وصل إلى المستوى الأقصى 60"
-    };
-  }
-
-  const cooldown = checkTrainingCooldown(pet);
-
-  if (cooldown.onCooldown) {
-    return {
-      success: false,
-      reason: "COOLDOWN",
-      remaining: cooldown.remaining,
-      message: `يمكنك تدريب حيوانك بعد ${cooldown.text}`
-    };
-  }
-
-  /* =========================
-     التحقق من المنشط
-  ========================= */
-
-  if (useBooster) {
-    const hasBooster = await Inventory.hasItem(
-      models,
-      userID,
-      "trainingBoosters",
-      1
+function getPetStats(
+  pet,
+  level
+) {
+  const stars =
+    Math.max(
+      0,
+      safeNumber(pet?.stars, 0)
     );
 
-    if (!hasBooster) {
-      return {
-        success: false,
-        reason: "NO_BOOSTER",
-        message: "لا تملك منشط تدريب 🧪"
-      };
-    }
-  }
+  const power =
+    Leveling.getPetPower(
+      pet.type,
+      level,
+      stars
+    );
 
-  /* =========================
-     حساب XP
-  ========================= */
+  const health =
+    Leveling.getPetHealth(
+      pet.type,
+      level,
+      stars
+    );
 
-  const gainedXP = calculateTrainingXP(
-    currentLevel,
-    useBooster
-  );
+  const maxHunger =
+    Leveling.getPetMaxHunger(
+      pet.type,
+      level,
+      stars
+    );
 
-  const result = Leveling.addXP(
-    currentLevel,
-    currentXP,
-    gainedXP,
-    pet.type
-  );
-
-  /* =========================
-     الجوع
-  ========================= */
-
-  const maxHunger = Leveling.getPetMaxHunger(
-    pet.type,
-    result.level
-  );
-
-  const currentHunger = safeNumber(
-    pet.hunger,
+  return {
+    power,
+    health,
     maxHunger
-  );
-
-  const newHunger = Math.max(
-    0,
-    Math.min(
-      maxHunger,
-      currentHunger - TRAIN_HUNGER_COST
-    )
-  );
-
-  /* =========================
-     الإحصائيات
-  ========================= */
-
-  const newPower = Leveling.getPetPower(
-    pet.type,
-    result.level
-  );
-
-  const newHealth = Leveling.getPetHealth(
-    pet.type,
-    result.level
-  );
-
-  const status = calculateTrainingStatus(
-    newHunger,
-    maxHunger,
-    newHealth
-  );
-
-  /* =========================
-     استهلاك المنشط
-  ========================= */
-
-  if (useBooster) {
-    await Inventory.removeItem(
-      models,
-      userID,
-      "trainingBoosters",
-      1
-    );
-  }
-
-  /* =========================
-     حفظ البيانات
-  ========================= */
-
-  await Pdata.updatePet(
-    models,
-    userID,
-    {
-      level: result.level,
-      exp: result.xp,
-      power: newPower,
-      health: newHealth,
-      hunger: newHunger,
-      status,
-      lastTrain: new Date()
-    }
-  );
-
-  /* =========================
-     تسجيل التدريب والـXP
-  ========================= */
-
-  await Achievements.registerTraining(
-    models,
-    userID,
-    gainedXP
-  );
-
-  /* =========================
-     فحص إنجازات المستوى
-  ========================= */
-
-  try {
-    await Achievements.checkAchievements(
-      models,
-      userID
-    );
-  } catch (achievementError) {
-    console.error(
-      "[HINA ACHIEVEMENTS] Level achievement check error:",
-      achievementError
-    );
-  }
-
-  return {
-    success: true,
-
-    gainedXP,
-
-    level: result.level,
-    previousLevel: currentLevel,
-
-    xp: result.xp,
-
-    requiredXP: Leveling.getXPForNextLevel(
-      result.level,
-      pet.type
-    ),
-
-    levelsGained: result.levelsGained,
-    leveledUp: result.leveledUp,
-
-    power: newPower,
-    health: newHealth,
-
-    hunger: newHunger,
-    maxHunger,
-
-    status,
-
-    usedBooster: useBooster,
-
-    nextTraining: TRAIN_COOLDOWN,
-
-    hasSpecialImage: result.hasSpecialImage
-  };
-}
-
-/* =========================
-   بطاقة XP
-========================= */
-
-async function useXPCard(models, userID) {
-  const playerData = await getTrainingData(
-    models,
-    userID
-  );
-
-  const pet = playerData?.pet;
-
-  if (!pet) {
-    return {
-      success: false,
-      reason: "NO_PET",
-      message: "ليس لديك حيوان حاليًا"
-    };
-  }
-
-  const currentLevel = Leveling.normalizeLevel(
-    pet.level,
-    pet.type
-  );
-
-  const currentXP = Leveling.normalizeXP(pet.exp);
-
-  if (currentLevel >= MAX_LEVEL) {
-    return {
-      success: false,
-      reason: "MAX_LEVEL",
-      message: "حيوانك وصل إلى المستوى الأقصى 60"
-    };
-  }
-
-  const hasCard = await Inventory.hasItem(
-    models,
-    userID,
-    "xpCards",
-    1
-  );
-
-  if (!hasCard) {
-    return {
-      success: false,
-      reason: "NO_XP_CARD",
-      message: "لا تملك بطاقة XP ⚡"
-    };
-  }
-
-  /* =========================
-     إضافة XP
-  ========================= */
-
-  const result = Leveling.addXP(
-    currentLevel,
-    currentXP,
-    XP_CARD_AMOUNT,
-    pet.type
-  );
-
-  const maxHunger = Leveling.getPetMaxHunger(
-    pet.type,
-    result.level
-  );
-
-  const currentHunger = Math.max(
-    0,
-    Math.min(
-      maxHunger,
-      safeNumber(pet.hunger, maxHunger)
-    )
-  );
-
-  const newPower = Leveling.getPetPower(
-    pet.type,
-    result.level
-  );
-
-  const newHealth = Leveling.getPetHealth(
-    pet.type,
-    result.level
-  );
-
-  const status = calculateTrainingStatus(
-    currentHunger,
-    maxHunger,
-    newHealth
-  );
-
-  /* =========================
-     استهلاك البطاقة
-  ========================= */
-
-  await Inventory.removeItem(
-    models,
-    userID,
-    "xpCards",
-    1
-  );
-
-  /* =========================
-     حفظ البيانات
-  ========================= */
-
-  await Pdata.updatePet(
-    models,
-    userID,
-    {
-      level: result.level,
-      exp: result.xp,
-      power: newPower,
-      health: newHealth,
-      hunger: currentHunger,
-      status
-    }
-  );
-
-  /* =========================
-     تسجيل XP في الإنجازات
-  ========================= */
-
-  await Achievements.registerXP(
-    models,
-    userID,
-    XP_CARD_AMOUNT
-  );
-
-  /* =========================
-     فحص إنجازات المستوى
-  ========================= */
-
-  try {
-    await Achievements.checkAchievements(
-      models,
-      userID
-    );
-  } catch (achievementError) {
-    console.error(
-      "[HINA ACHIEVEMENTS] Level achievement check error:",
-      achievementError
-    );
-  }
-
-  return {
-    success: true,
-
-    gainedXP: XP_CARD_AMOUNT,
-
-    level: result.level,
-    previousLevel: currentLevel,
-
-    xp: result.xp,
-
-    requiredXP: Leveling.getXPForNextLevel(
-      result.level,
-      pet.type
-    ),
-
-    levelsGained: result.levelsGained,
-    leveledUp: result.leveledUp,
-
-    power: newPower,
-    health: newHealth,
-
-    hunger: currentHunger,
-    maxHunger,
-
-    status,
-
-    usedCard: true,
-
-    hasSpecialImage: result.hasSpecialImage
   };
 }
 
@@ -503,18 +196,20 @@ function calculateTrainingStatus(
   maxHunger,
   health
 ) {
-  const safeMaxHunger = Math.max(
-    1,
-    safeNumber(maxHunger, 100)
-  );
+  const safeMaxHunger =
+    Math.max(
+      1,
+      safeNumber(maxHunger, 100)
+    );
 
   const hungerPercentage =
-    (safeNumber(hunger, 0) / safeMaxHunger) * 100;
+    (
+      safeNumber(hunger, 0) /
+      safeMaxHunger
+    ) * 100;
 
-  const safeHealth = safeNumber(
-    health,
-    0
-  );
+  const safeHealth =
+    safeNumber(health, 0);
 
   if (safeHealth <= 0) {
     return "ميت";
@@ -536,33 +231,557 @@ function calculateTrainingStatus(
 }
 
 /* =========================
-   معلومات التدريب
+   تدريب الحيوان
 ========================= */
 
-async function getTrainingInfo(models, userID) {
-  const playerData = await getTrainingData(
-    models,
-    userID
-  );
+async function trainPet({
+  models,
+  userID,
+  useBooster = false
+}) {
+  const playerData =
+    await getTrainingData(
+      models,
+      userID
+    );
 
-  const pet = playerData?.pet;
+  const pet =
+    playerData?.pet;
+
+  const currency =
+    playerData?.currency;
 
   if (!pet) {
     return {
       success: false,
       reason: "NO_PET",
-      message: "ليس لديك حيوان حاليًا"
+      message:
+        "ليس لديك حيوان حاليًا"
     };
   }
 
-  const level = Leveling.normalizeLevel(
-    pet.level,
-    pet.type
+  if (!currency) {
+    return {
+      success: false,
+      reason: "NO_CURRENCY",
+      message:
+        "تعذر الوصول إلى بيانات العملات والمخزون"
+    };
+  }
+
+  const currentLevel =
+    Leveling.normalizeLevel(
+      pet.level,
+      pet.type
+    );
+
+  const currentXP =
+    Leveling.normalizeXP(
+      pet.exp
+    );
+
+  if (currentLevel >= MAX_LEVEL) {
+    return {
+      success: false,
+      reason: "MAX_LEVEL",
+      message:
+        `حيوانك وصل إلى المستوى الأقصى ${MAX_LEVEL}`
+    };
+  }
+
+  const cooldown =
+    checkTrainingCooldown(pet);
+
+  if (cooldown.onCooldown) {
+    return {
+      success: false,
+      reason: "COOLDOWN",
+      remaining:
+        cooldown.remaining,
+      message:
+        `يمكنك تدريب حيوانك بعد ${cooldown.text}`
+    };
+  }
+
+  /* =========================
+     التحقق من المنشط
+  ========================= */
+
+  if (useBooster) {
+    const hasBooster =
+      Inventory.hasItem(
+        currency,
+        "trainingBoosters",
+        1
+      );
+
+    if (!hasBooster) {
+      return {
+        success: false,
+        reason: "NO_BOOSTER",
+        message:
+          "لا تملك منشط تدريب"
+      };
+    }
+  }
+
+  /* =========================
+     حساب XP
+  ========================= */
+
+  const gainedXP =
+    calculateTrainingXP(
+      currentLevel,
+      useBooster
+    );
+
+  const result =
+    Leveling.addXP(
+      currentLevel,
+      currentXP,
+      gainedXP,
+      pet.type
+    );
+
+  /* =========================
+     الإحصائيات الجديدة
+  ========================= */
+
+  const stats =
+    getPetStats(
+      pet,
+      result.level
+    );
+
+  /* =========================
+     الجوع
+  ========================= */
+
+  const currentHunger =
+    safeNumber(
+      pet.hunger,
+      stats.maxHunger
+    );
+
+  const newHunger =
+    Math.max(
+      0,
+      Math.min(
+        stats.maxHunger,
+        currentHunger -
+          TRAIN_HUNGER_COST
+      )
+    );
+
+  const status =
+    calculateTrainingStatus(
+      newHunger,
+      stats.maxHunger,
+      stats.health
+    );
+
+  /* =========================
+     استهلاك المنشط
+  ========================= */
+
+  if (useBooster) {
+    await Inventory.removeItem(
+      currency,
+      "trainingBoosters",
+      1
+    );
+  }
+
+  /* =========================
+     حفظ بيانات الحيوان
+  ========================= */
+
+  await Pdata.updatePet(
+    pet,
+    {
+      level:
+        result.level,
+
+      exp:
+        result.xp,
+
+      power:
+        stats.power,
+
+      health:
+        stats.health,
+
+      hunger:
+        newHunger,
+
+      status,
+
+      lastTrain:
+        new Date()
+    }
   );
 
-  const xp = Leveling.normalizeXP(
-    pet.exp
+  /* =========================
+     تسجيل التدريب في الإنجازات
+  ========================= */
+
+  try {
+    await Achievements.registerTraining(
+      models,
+      userID,
+      gainedXP
+    );
+  } catch (achievementError) {
+    console.error(
+      "[HINA ACHIEVEMENTS] Training registration error:",
+      achievementError
+    );
+  }
+
+  /* =========================
+     فحص الإنجازات
+  ========================= */
+
+  try {
+    await Achievements.checkAchievements(
+      models,
+      userID
+    );
+  } catch (achievementError) {
+    console.error(
+      "[HINA ACHIEVEMENTS] Achievement check error:",
+      achievementError
+    );
+  }
+
+  return {
+    success: true,
+
+    gainedXP,
+
+    level:
+      result.level,
+
+    previousLevel:
+      currentLevel,
+
+    xp:
+      result.xp,
+
+    requiredXP:
+      Leveling.getXPForNextLevel(
+        result.level,
+        pet.type
+      ),
+
+    levelsGained:
+      result.levelsGained,
+
+    leveledUp:
+      result.leveledUp,
+
+    power:
+      stats.power,
+
+    health:
+      stats.health,
+
+    hunger:
+      newHunger,
+
+    maxHunger:
+      stats.maxHunger,
+
+    status,
+
+    usedBooster:
+      useBooster,
+
+    nextTraining:
+      TRAIN_COOLDOWN,
+
+    hasSpecialImage:
+      result.hasSpecialImage
+  };
+}
+
+/* =========================
+   بطاقة XP
+========================= */
+
+async function useXPCard(
+  models,
+  userID
+) {
+  const playerData =
+    await getTrainingData(
+      models,
+      userID
+    );
+
+  const pet =
+    playerData?.pet;
+
+  const currency =
+    playerData?.currency;
+
+  if (!pet) {
+    return {
+      success: false,
+      reason: "NO_PET",
+      message:
+        "ليس لديك حيوان حاليًا"
+    };
+  }
+
+  if (!currency) {
+    return {
+      success: false,
+      reason: "NO_CURRENCY",
+      message:
+        "تعذر الوصول إلى بيانات العملات والمخزون"
+    };
+  }
+
+  const currentLevel =
+    Leveling.normalizeLevel(
+      pet.level,
+      pet.type
+    );
+
+  const currentXP =
+    Leveling.normalizeXP(
+      pet.exp
+    );
+
+  if (currentLevel >= MAX_LEVEL) {
+    return {
+      success: false,
+      reason: "MAX_LEVEL",
+      message:
+        `حيوانك وصل إلى المستوى الأقصى ${MAX_LEVEL}`
+    };
+  }
+
+  /* =========================
+     التحقق من البطاقة
+  ========================= */
+
+  const hasCard =
+    Inventory.hasItem(
+      currency,
+      "xpCards",
+      1
+    );
+
+  if (!hasCard) {
+    return {
+      success: false,
+      reason: "NO_XP_CARD",
+      message:
+        "لا تملك بطاقة XP"
+    };
+  }
+
+  /* =========================
+     إضافة XP
+  ========================= */
+
+  const result =
+    Leveling.addXP(
+      currentLevel,
+      currentXP,
+      XP_CARD_AMOUNT,
+      pet.type
+    );
+
+  /* =========================
+     الإحصائيات الجديدة
+  ========================= */
+
+  const stats =
+    getPetStats(
+      pet,
+      result.level
+    );
+
+  /* =========================
+     الجوع
+  ========================= */
+
+  const currentHunger =
+    Math.max(
+      0,
+      Math.min(
+        stats.maxHunger,
+        safeNumber(
+          pet.hunger,
+          stats.maxHunger
+        )
+      )
+    );
+
+  const status =
+    calculateTrainingStatus(
+      currentHunger,
+      stats.maxHunger,
+      stats.health
+    );
+
+  /* =========================
+     استهلاك البطاقة
+  ========================= */
+
+  await Inventory.removeItem(
+    currency,
+    "xpCards",
+    1
   );
+
+  /* =========================
+     حفظ الحيوان
+  ========================= */
+
+  await Pdata.updatePet(
+    pet,
+    {
+      level:
+        result.level,
+
+      exp:
+        result.xp,
+
+      power:
+        stats.power,
+
+      health:
+        stats.health,
+
+      hunger:
+        currentHunger,
+
+      status
+    }
+  );
+
+  /* =========================
+     تسجيل XP في الإنجازات
+  ========================= */
+
+  try {
+    await Achievements.registerXP(
+      models,
+      userID,
+      XP_CARD_AMOUNT
+    );
+  } catch (achievementError) {
+    console.error(
+      "[HINA ACHIEVEMENTS] XP registration error:",
+      achievementError
+    );
+  }
+
+  /* =========================
+     فحص الإنجازات
+  ========================= */
+
+  try {
+    await Achievements.checkAchievements(
+      models,
+      userID
+    );
+  } catch (achievementError) {
+    console.error(
+      "[HINA ACHIEVEMENTS] Achievement check error:",
+      achievementError
+    );
+  }
+
+  return {
+    success: true,
+
+    gainedXP:
+      XP_CARD_AMOUNT,
+
+    level:
+      result.level,
+
+    previousLevel:
+      currentLevel,
+
+    xp:
+      result.xp,
+
+    requiredXP:
+      Leveling.getXPForNextLevel(
+        result.level,
+        pet.type
+      ),
+
+    levelsGained:
+      result.levelsGained,
+
+    leveledUp:
+      result.leveledUp,
+
+    power:
+      stats.power,
+
+    health:
+      stats.health,
+
+    hunger:
+      currentHunger,
+
+    maxHunger:
+      stats.maxHunger,
+
+    status,
+
+    usedCard:
+      true,
+
+    hasSpecialImage:
+      result.hasSpecialImage
+  };
+}
+
+/* =========================
+   معلومات التدريب
+========================= */
+
+async function getTrainingInfo(
+  models,
+  userID
+) {
+  const playerData =
+    await getTrainingData(
+      models,
+      userID
+    );
+
+  const pet =
+    playerData?.pet;
+
+  if (!pet) {
+    return {
+      success: false,
+      reason: "NO_PET",
+      message:
+        "ليس لديك حيوان حاليًا"
+    };
+  }
+
+  const level =
+    Leveling.normalizeLevel(
+      pet.level,
+      pet.type
+    );
+
+  const xp =
+    Leveling.normalizeXP(
+      pet.exp
+    );
 
   const requiredXP =
     Leveling.getXPForNextLevel(
@@ -571,27 +790,39 @@ async function getTrainingInfo(models, userID) {
     );
 
   const cooldown =
-    checkTrainingCooldown(pet);
+    checkTrainingCooldown(
+      pet
+    );
 
   const trainingXP =
-    calculateTrainingXP(level, false);
+    calculateTrainingXP(
+      level,
+      false
+    );
 
   const boosterXP =
-    calculateTrainingXP(level, true);
+    calculateTrainingXP(
+      level,
+      true
+    );
 
   const xpCardAmount =
     XP_CARD_AMOUNT;
 
   const boosterCount =
     safeNumber(
-      playerData?.currency?.data
+      playerData
+        ?.currency
+        ?.data
         ?.trainingBoosters,
       0
     );
 
   const xpCardCount =
     safeNumber(
-      playerData?.currency?.data
+      playerData
+        ?.currency
+        ?.data
         ?.xpCards,
       0
     );
@@ -623,13 +854,18 @@ async function getTrainingInfo(models, userID) {
    رسالة حالة التدريب
 ========================= */
 
-function buildTrainingMessage(info) {
+function buildTrainingMessage(
+  info
+) {
   if (!info || !info.success) {
-    return info?.message ||
-      "تعذر الحصول على معلومات التدريب";
+    return (
+      info?.message ||
+      "تعذر الحصول على معلومات التدريب"
+    );
   }
 
-  const pet = info.pet;
+  const pet =
+    info.pet;
 
   let message =
     `⌬ ━━ 𝗛𝗜𝗡𝗔 TRAINING ━━ ⌬\n\n` +
@@ -673,11 +909,14 @@ async function trainingCommand({
   userID,
   action = "status"
 }) {
-  const normalizedAction = String(
-    action || "status"
-  )
-    .trim()
-    .toLowerCase();
+  const normalizedAction =
+    String(action || "status")
+      .trim()
+      .toLowerCase();
+
+  /* =========================
+     الحالة
+  ========================= */
 
   if (
     normalizedAction === "status" ||
@@ -691,9 +930,17 @@ async function trainingCommand({
 
     return {
       ...info,
-      message: buildTrainingMessage(info)
+
+      message:
+        buildTrainingMessage(
+          info
+        )
     };
   }
+
+  /* =========================
+     التدريب العادي
+  ========================= */
 
   if (
     normalizedAction === "تدريب" ||
@@ -721,6 +968,7 @@ async function trainingCommand({
         `⚡ XP المكتسبة : +${result.gainedXP}\n` +
 
         `⭐ المستوى : ${result.level}` +
+
         (
           result.leveledUp
             ? ` ↑ (+${result.levelsGained})`
@@ -744,6 +992,10 @@ async function trainingCommand({
         `\n\n⏳ التدريب القادم بعد 30 دقيقة`
     };
   }
+
+  /* =========================
+     التدريب بالمنشط
+  ========================= */
 
   if (
     normalizedAction === "منشط" ||
@@ -772,6 +1024,7 @@ async function trainingCommand({
         `⚡ XP المكتسبة : +${result.gainedXP}\n` +
 
         `⭐ المستوى : ${result.level}` +
+
         (
           result.leveledUp
             ? ` ↑ (+${result.levelsGained})`
@@ -796,10 +1049,13 @@ async function trainingCommand({
     };
   }
 
+  /* =========================
+     بطاقة XP
+  ========================= */
+
   if (
     normalizedAction === "بطاقة" ||
     normalizedAction === "بطاقة xp" ||
-    normalizedAction === "بطاقة XP" ||
     normalizedAction === "xp" ||
     normalizedAction === "xp card"
   ) {
@@ -811,7 +1067,10 @@ async function trainingCommand({
 
   return {
     success: false,
-    reason: "INVALID_ACTION",
+
+    reason:
+      "INVALID_ACTION",
+
     message:
       "الأوامر المتاحة:\n" +
       "حالة\n" +
