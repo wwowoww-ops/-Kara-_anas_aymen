@@ -4,26 +4,103 @@ const axios = require("axios");
 
 module.exports.config = {
   name: "بانكاي",
-  version: "2.5.0",
+  version: "3.0.0",
   hasPermssion: 1,
   credits: "أبو هريرة",
-  description: "طرد عضو مع صورة بانكاي (بدون صوت)",
+  description: "طرد عضو مع بانكاي أونوهانا",
   commandCategory: "admin",
   usages: "بانكاي (رد على رسالة العضو)",
   cooldowns: 5
 };
 
-module.exports.run = async function({ api, event, args }) {
-  const { threadID, messageID, senderID, messageReply } = event;
+// ═══════════════════════════════════════════════
+// 📁 إعداد الكاش
+// ═══════════════════════════════════════════════
+
+const cacheDir = path.join(__dirname, "cache");
+fs.ensureDirSync(cacheDir);
+
+const gifPath = path.join(cacheDir, "unohana_bankai.gif");
+
+// رابط GIF أونوهانا
+const IMAGE_URL = "https://files.catbox.moe/ne6qn5.bin";
+
+// تحميل الصورة مرة واحدة فقط
+let downloadPromise = null;
+
+async function prepareGif() {
+  if (fs.existsSync(gifPath)) {
+    return true;
+  }
+
+  if (!downloadPromise) {
+    downloadPromise = (async () => {
+      try {
+        console.log("[BANKAI] جاري تحميل GIF أونوهانا...");
+
+        const response = await axios.get(IMAGE_URL, {
+          responseType: "arraybuffer",
+          timeout: 15000,
+          headers: {
+            "User-Agent": "Mozilla/5.0"
+          }
+        });
+
+        await fs.writeFile(gifPath, Buffer.from(response.data));
+
+        console.log("[BANKAI] تم حفظ GIF أونوهانا في الكاش");
+        return true;
+
+      } catch (error) {
+        console.error(
+          "[BANKAI] فشل تحميل GIF:",
+          error.message
+        );
+
+        return false;
+      } finally {
+        downloadPromise = null;
+      }
+    })();
+  }
+
+  return await downloadPromise;
+}
+
+// تجهيز الصورة عند تشغيل البوت
+prepareGif().catch(() => {});
+
+module.exports.run = async function({ api, event }) {
+  const {
+    threadID,
+    messageID,
+    senderID,
+    messageReply
+  } = event;
 
   try {
+
+    // ═══════════════════════════════════════════════
+    // 🛡️ فحص المجموعة
+    // ═══════════════════════════════════════════════
+
     const threadInfo = await api.getThreadInfo(threadID);
-    const isAdmin = threadInfo.adminIDs.some(admin => admin.id === senderID);
-    const isBotAdmin = threadInfo.adminIDs.some(admin => admin.id === api.getCurrentUserID());
+
+    const admins = threadInfo.adminIDs || [];
+
+    const isAdmin = admins.some(
+      admin => admin.id === senderID
+    );
+
+    const botID = api.getCurrentUserID();
+
+    const isBotAdmin = admins.some(
+      admin => admin.id === botID
+    );
 
     if (!isAdmin) {
       return api.sendMessage(
-        `⌬ ━━ HINA ━━ ⌬\n\n⛔ هذا الأمر للأدمن فقط!`,
+        "⌬ ━━ HINA ━━ ⌬\n\n⛔ هذا الأمر للأدمن فقط!",
         threadID,
         messageID
       );
@@ -31,27 +108,29 @@ module.exports.run = async function({ api, event, args }) {
 
     if (!isBotAdmin) {
       return api.sendMessage(
-        `⌬ ━━ HINA ━━ ⌬\n\n⚠️ يجب أن أكون أدمن في المجموعة لاستخدام هذا الأمر`,
+        "⌬ ━━ HINA ━━ ⌬\n\n⚠️ يجب أن أكون أدمن في المجموعة لاستخدام هذا الأمر",
         threadID,
         messageID
       );
     }
 
-    let targetID;
+    // ═══════════════════════════════════════════════
+    // 🎯 تحديد العضو
+    // ═══════════════════════════════════════════════
 
-    if (messageReply) {
-      targetID = messageReply.senderID;
-    } else {
+    if (!messageReply) {
       return api.sendMessage(
-        `⌬ ━━ HINA ━━ ⌬\n\n📝 الاستخدام:\n• قم بالرد على رسالة العضو ثم اكتب .بانكاي`,
+        "⌬ ━━ HINA ━━ ⌬\n\n📝 قم بالرد على رسالة العضو ثم اكتب .بانكاي",
         threadID,
         messageID
       );
     }
+
+    const targetID = messageReply.senderID;
 
     if (!targetID) {
       return api.sendMessage(
-        `⌬ ━━ HINA ━━ ⌬\n\n❌ لم يتم تحديد العضو المستهدف.`,
+        "⌬ ━━ HINA ━━ ⌬\n\n❌ لم يتم تحديد العضو المستهدف.",
         threadID,
         messageID
       );
@@ -60,98 +139,132 @@ module.exports.run = async function({ api, event, args }) {
     // ═══════════════════════════════════════════════
     // 🛡️ حماية المطور
     // ═══════════════════════════════════════════════
+
     const DEV_ID = "61578581225040";
-    
+
     if (targetID === DEV_ID) {
       return api.sendMessage(
-        `⌬ ━━ HINA ━━ ⌬\n\n🛡️ لا يمكن طرد المطور!`,
+        "⌬ ━━ HINA ━━ ⌬\n\n🛡️ لا يمكن طرد المطور!",
         threadID,
         messageID
       );
     }
 
-    if (targetID === api.getCurrentUserID()) {
+    if (targetID === botID) {
       return api.sendMessage(
-        `⌬ ━━ HINA ━━ ⌬\n\n😅 لا يمكنني طرد نفسي!`,
+        "⌬ ━━ HINA ━━ ⌬\n\n😅 لا يمكنني طرد نفسي!",
         threadID,
         messageID
       );
     }
 
-    // جلب اسم العضو
+    // ═══════════════════════════════════════════════
+    // 👤 اسم العضو
+    // ═══════════════════════════════════════════════
+
     let userName = "العضو";
+
     try {
       const userInfo = await api.getUserInfo(targetID);
-      userName = userInfo[targetID]?.name || "العضو";
-    } catch (e) {}
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 📁 مجلد الكاش
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    const cacheDir = path.join(__dirname, "cache");
-    fs.ensureDirSync(cacheDir);
-    const pathImg = path.join(cacheDir, `bankai_${Date.now()}.gif`);
+      userName =
+        userInfo[targetID]?.name ||
+        "العضو";
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 🖼️ تحميل الصورة (GIF)
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    let imageAttachment = null;
-    
-    try {
-      const imageUrl = "https://www.image2url.com/r2/default/gifs/1784918159700-c4c984fc-ae25-4b9e-9e95-c4339273808f.gif";
-      
-      const response = await axios.get(imageUrl, { 
-        responseType: "arraybuffer", 
-        timeout: 10000 
-      });
-      fs.writeFileSync(pathImg, Buffer.from(response.data));
-      
-      if (fs.existsSync(pathImg)) {
-        imageAttachment = fs.createReadStream(pathImg);
-        console.log("✅ تم تحميل الصورة بنجاح");
-      }
-    } catch (e) {
-      console.log("❌ فشل تحميل الصورة:", e.message);
-    }
-
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 📨 إرسال الرسالة مع الصورة
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    const messageBody = `⌬ ━━ HINA ━━ ⌬\n\n🔥 BANKAI! ZANKA NO TACHI 🔥\n\n(BLADE OF EMBER)\n\n✅ تم طرد العضو:\n📌 ${userName}\n🆔 ${targetID}`;
-
-    if (imageAttachment) {
-      await api.sendMessage(
-        {
-          body: messageBody,
-          attachment: imageAttachment
-        },
-        threadID
-      );
-    } else {
-      // إذا فشل تحميل الصورة، أرسل النص فقط
-      await api.sendMessage(messageBody, threadID);
-    }
-
-    // طرد العضو
-    await api.removeUserFromGroup(targetID, threadID);
-
-    // حذف الملفات المؤقتة
-    try {
-      if (fs.existsSync(pathImg)) fs.unlinkSync(pathImg);
     } catch (_) {}
 
+    // ═══════════════════════════════════════════════
+    // 🖼️ تجهيز GIF
+    // ═══════════════════════════════════════════════
+
+    let imageAttachment = null;
+
+    const gifReady = await prepareGif();
+
+    if (gifReady && fs.existsSync(gifPath)) {
+      imageAttachment = fs.createReadStream(gifPath);
+    }
+
+    // ═══════════════════════════════════════════════
+    // 🔥 رسالة بانكاي أونوهانا
+    // ═══════════════════════════════════════════════
+
+    const messageBody =
+      `⌬ ━━ HINA ━━ ⌬\n\n` +
+      `🩸 BANKAI — MINAZUKI 🩸\n\n` +
+      `⚔️ Unohana Retsu\n\n` +
+      `✅ تم طرد العضو:\n` +
+      `📌 ${userName}\n` +
+      `🆔 ${targetID}`;
+
+    // ═══════════════════════════════════════════════
+    // ⚡ الطرد + إرسال الصورة
+    // ═══════════════════════════════════════════════
+
+    const removePromise =
+      api.removeUserFromGroup(
+        targetID,
+        threadID
+      );
+
+    const sendPromise = imageAttachment
+      ? api.sendMessage(
+          {
+            body: messageBody,
+            attachment: imageAttachment
+          },
+          threadID
+        )
+      : api.sendMessage(
+          messageBody,
+          threadID
+        );
+
+    // تنفيذ العمليتين معًا
+    const results = await Promise.allSettled([
+      removePromise,
+      sendPromise
+    ]);
+
+    // ═══════════════════════════════════════════════
+    // 📊 تسجيل الأخطاء فقط
+    // ═══════════════════════════════════════════════
+
+    if (results[0].status === "rejected") {
+      console.error(
+        "[BANKAI] فشل الطرد:",
+        results[0].reason?.message
+      );
+    }
+
+    if (results[1].status === "rejected") {
+      console.error(
+        "[BANKAI] فشل إرسال GIF:",
+        results[1].reason?.message
+      );
+
+      // محاولة إرسال النص إذا فشل الـGIF
+      try {
+        await api.sendMessage(
+          messageBody,
+          threadID
+        );
+      } catch (_) {}
+    }
+
   } catch (error) {
-    console.error("❌ خطأ في بانكاي:", error);
-    
-    // رسالة احتياطية
+
+    console.error(
+      "[BANKAI] خطأ:",
+      error
+    );
+
     try {
       await api.sendMessage(
-        `⌬ ━━ HINA ━━ ⌬\n\n✅ تم طرد العضو بنجاح!`,
+        "⌬ ━━ HINA ━━ ⌬\n\n❌ حدث خطأ أثناء تنفيذ البانكاي.",
         threadID,
         messageID
       );
-    } catch (e) {
-      console.error("❌ فشل حتى في الرسالة النصية:", e);
-    }
+    } catch (_) {}
   }
 };
