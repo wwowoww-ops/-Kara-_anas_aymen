@@ -9,37 +9,36 @@ const Leveling = require("./leveling");
  HINA PETS - MISSIONS SYSTEM
  مهام يومية + أسبوعية
 ============================================================
-
 • المهام مفعلة تلقائيًا
 • لا تحتاج إلى قبول
 • التقدم يُحسب تلقائيًا
 • اليومية تتجدد كل 24 ساعة
 • الأسبوعية تتجدد كل 7 أيام
-• المكافآت:
-  - مال
-  - XP للحيوان
-  - موارد
-  - فرصة للحصول على بطاقة XP ⚡
 ============================================================
 */
 
-/* =========================================================
-   الإعدادات
-========================================================= */
+const DAILY_DURATION =
+  24 * 60 * 60 * 1000;
 
-const DAILY_DURATION = 24 * 60 * 60 * 1000;
-const WEEKLY_DURATION = 7 * 24 * 60 * 60 * 1000;
+const WEEKLY_DURATION =
+  7 * 24 * 60 * 60 * 1000;
 
-const LUCKY_CARD_CHANCE = 0.15; // 15%
+const LUCKY_CARD_CHANCE =
+  0.15;
 
-const XP_CARD_AMOUNT = 100000;
+const XP_CARD_AMOUNT =
+  100000;
 
 /* =========================================================
    أدوات مساعدة
 ========================================================= */
 
-function safeNumber(value, fallback = 0) {
-  const number = Number(value);
+function safeNumber(
+  value,
+  fallback = 0
+) {
+  const number =
+    Number(value);
 
   if (!Number.isFinite(number)) {
     return fallback;
@@ -51,7 +50,9 @@ function safeNumber(value, fallback = 0) {
 function normalizeProgress(value) {
   return Math.max(
     0,
-    Math.floor(safeNumber(value, 0))
+    Math.floor(
+      safeNumber(value, 0)
+    )
   );
 }
 
@@ -59,8 +60,15 @@ function now() {
   return Date.now();
 }
 
-function getPeriodStart(timestamp, duration) {
-  return Math.floor(timestamp / duration) * duration;
+function getPeriodStart(
+  timestamp,
+  duration
+) {
+  return (
+    Math.floor(
+      timestamp / duration
+    ) * duration
+  );
 }
 
 function getDailyPeriod() {
@@ -78,7 +86,7 @@ function getWeeklyPeriod() {
 }
 
 /* =========================================================
-   تعريف المهام
+   تعريف المهام اليومية
 ========================================================= */
 
 const DAILY_MISSIONS = [
@@ -86,7 +94,8 @@ const DAILY_MISSIONS = [
     id: "daily_train_3",
     type: "train",
     title: "تدريب الحيوان 3 مرات",
-    description: "قم بتدريب حيوانك ثلاث مرات",
+    description:
+      "قم بتدريب حيوانك ثلاث مرات",
     target: 3,
 
     rewards: {
@@ -103,7 +112,8 @@ const DAILY_MISSIONS = [
     id: "daily_feed_5",
     type: "feed",
     title: "إطعام الحيوان 5 مرات",
-    description: "قم بإطعام حيوانك خمس مرات",
+    description:
+      "قم بإطعام حيوانك خمس مرات",
     target: 5,
 
     rewards: {
@@ -120,7 +130,8 @@ const DAILY_MISSIONS = [
     id: "daily_heal_3",
     type: "heal",
     title: "علاج الحيوان 3 مرات",
-    description: "استخدم الدواء على حيوانك ثلاث مرات",
+    description:
+      "استخدم الدواء على حيوانك ثلاث مرات",
     target: 3,
 
     rewards: {
@@ -137,7 +148,8 @@ const DAILY_MISSIONS = [
     id: "daily_xp_100k",
     type: "xp",
     title: "اجمع 100,000 XP",
-    description: "اكسب 100,000 XP للحيوان",
+    description:
+      "اكسب 100,000 XP للحيوان",
     target: 100000,
 
     rewards: {
@@ -154,7 +166,8 @@ const DAILY_MISSIONS = [
     id: "daily_train_xp",
     type: "trainingXP",
     title: "احصل على 150,000 XP من التدريب",
-    description: "اجمع 150,000 XP عن طريق التدريب",
+    description:
+      "اجمع 150,000 XP عن طريق التدريب",
     target: 150000,
 
     rewards: {
@@ -168,12 +181,17 @@ const DAILY_MISSIONS = [
   }
 ];
 
+/* =========================================================
+   تعريف المهام الأسبوعية
+========================================================= */
+
 const WEEKLY_MISSIONS = [
   {
     id: "weekly_train_15",
     type: "train",
     title: "تدريب الحيوان 15 مرة",
-    description: "قم بتدريب حيوانك 15 مرة",
+    description:
+      "قم بتدريب حيوانك 15 مرة",
     target: 15,
 
     rewards: {
@@ -191,7 +209,8 @@ const WEEKLY_MISSIONS = [
     id: "weekly_feed_30",
     type: "feed",
     title: "إطعام الحيوان 30 مرة",
-    description: "قم بإطعام حيوانك 30 مرة",
+    description:
+      "قم بإطعام حيوانك 30 مرة",
     target: 30,
 
     rewards: {
@@ -208,7 +227,8 @@ const WEEKLY_MISSIONS = [
     id: "weekly_heal_15",
     type: "heal",
     title: "علاج الحيوان 15 مرة",
-    description: "استخدم الدواء 15 مرة",
+    description:
+      "استخدم الدواء 15 مرة",
     target: 15,
 
     rewards: {
@@ -225,7 +245,8 @@ const WEEKLY_MISSIONS = [
     id: "weekly_xp_1000000",
     type: "xp",
     title: "جمع 1,000,000 XP",
-    description: "اجمع مليون XP للحيوان",
+    description:
+      "اجمع مليون XP للحيوان",
     target: 1000000,
 
     rewards: {
@@ -242,7 +263,8 @@ const WEEKLY_MISSIONS = [
     id: "weekly_training_xp",
     type: "trainingXP",
     title: "جمع 1,500,000 XP من التدريب",
-    description: "اجمع 1,500,000 XP عن طريق التدريب",
+    description:
+      "اجمع 1,500,000 XP عن طريق التدريب",
     target: 1500000,
 
     rewards: {
@@ -257,54 +279,106 @@ const WEEKLY_MISSIONS = [
 ];
 
 /* =========================================================
-   تخزين بيانات المهام
+   بيانات المهام
 ========================================================= */
 
 function createEmptyMissionData() {
   return {
     daily: {
-      period: getDailyPeriod(),
+      period:
+        getDailyPeriod(),
+
       progress: {},
+
       claimed: {}
     },
 
     weekly: {
-      period: getWeeklyPeriod(),
+      period:
+        getWeeklyPeriod(),
+
       progress: {},
+
       claimed: {}
     }
   };
 }
 
-function normalizeMissionData(data) {
-  const base = createEmptyMissionData();
+function normalizeMissionData(
+  data
+) {
+  const base =
+    createEmptyMissionData();
 
-  if (!data || typeof data !== "object") {
+  if (
+    !data ||
+    typeof data !== "object"
+  ) {
     return base;
   }
 
-  if (!data.daily || typeof data.daily !== "object") {
-    data.daily = base.daily;
+  if (
+    !data.daily ||
+    typeof data.daily !== "object"
+  ) {
+    data.daily =
+      base.daily;
   }
 
-  if (!data.weekly || typeof data.weekly !== "object") {
-    data.weekly = base.weekly;
+  if (
+    !data.weekly ||
+    typeof data.weekly !== "object"
+  ) {
+    data.weekly =
+      base.weekly;
   }
 
-  if (!data.daily.progress) {
+  if (
+    !data.daily.progress ||
+    typeof data.daily.progress !== "object"
+  ) {
     data.daily.progress = {};
   }
 
-  if (!data.daily.claimed) {
+  if (
+    !data.daily.claimed ||
+    typeof data.daily.claimed !== "object"
+  ) {
     data.daily.claimed = {};
   }
 
-  if (!data.weekly.progress) {
+  if (
+    !data.weekly.progress ||
+    typeof data.weekly.progress !== "object"
+  ) {
     data.weekly.progress = {};
   }
 
-  if (!data.weekly.claimed) {
+  if (
+    !data.weekly.claimed ||
+    typeof data.weekly.claimed !== "object"
+  ) {
     data.weekly.claimed = {};
+  }
+
+  if (
+    !safeNumber(
+      data.daily.period,
+      0
+    )
+  ) {
+    data.daily.period =
+      base.daily.period;
+  }
+
+  if (
+    !safeNumber(
+      data.weekly.period,
+      0
+    )
+  ) {
+    data.weekly.period =
+      base.weekly.period;
   }
 
   return data;
@@ -314,23 +388,35 @@ function normalizeMissionData(data) {
    الحصول على بيانات المهام
 ========================================================= */
 
-async function getMissionData(models, userID) {
-  const playerData = await Pdata.getPlayerData(
-    models,
-    userID
-  );
+async function getMissionData(
+  models,
+  userID
+) {
+  const playerData =
+    await Pdata.getPlayerData(
+      models,
+      userID
+    );
 
-  const currency = playerData?.currency;
+  const currency =
+    playerData?.currency;
+
+  if (!currency) {
+    throw new Error(
+      "Currency data not found"
+    );
+  }
 
   const currencyData =
-    currency?.data &&
+    currency.data &&
     typeof currency.data === "object"
       ? currency.data
       : {};
 
-  const missions = normalizeMissionData(
-    currencyData.missions
-  );
+  const missions =
+    normalizeMissionData(
+      currencyData.missions
+    );
 
   let changed = false;
 
@@ -342,12 +428,17 @@ async function getMissionData(models, userID) {
     getDailyPeriod();
 
   if (
-    safeNumber(missions.daily.period, 0) !==
-    currentDailyPeriod
+    safeNumber(
+      missions.daily.period,
+      0
+    ) !== currentDailyPeriod
   ) {
     missions.daily = {
-      period: currentDailyPeriod,
+      period:
+        currentDailyPeriod,
+
       progress: {},
+
       claimed: {}
     };
 
@@ -362,12 +453,17 @@ async function getMissionData(models, userID) {
     getWeeklyPeriod();
 
   if (
-    safeNumber(missions.weekly.period, 0) !==
-    currentWeeklyPeriod
+    safeNumber(
+      missions.weekly.period,
+      0
+    ) !== currentWeeklyPeriod
   ) {
     missions.weekly = {
-      period: currentWeeklyPeriod,
+      period:
+        currentWeeklyPeriod,
+
       progress: {},
+
       claimed: {}
     };
 
@@ -375,16 +471,15 @@ async function getMissionData(models, userID) {
   }
 
   /* =======================================================
-     حفظ إذا تغيرت الفترة
+     حفظ التغييرات
   ======================================================= */
 
   if (changed) {
-    currencyData.missions = missions;
-
     await Pdata.updateCurrencyData(
-      models,
-      userID,
-      currencyData
+      currency,
+      {
+        missions
+      }
     );
   }
 
@@ -400,26 +495,31 @@ async function saveMissionData(
   userID,
   missions
 ) {
-  const playerData = await Pdata.getPlayerData(
-    models,
-    userID
-  );
+  const playerData =
+    await Pdata.getPlayerData(
+      models,
+      userID
+    );
 
-  const currency = playerData?.currency;
+  const currency =
+    playerData?.currency;
 
-  const currencyData =
-    currency?.data &&
-    typeof currency.data === "object"
-      ? currency.data
-      : {};
+  if (!currency) {
+    throw new Error(
+      "Currency data not found"
+    );
+  }
 
-  currencyData.missions =
-    normalizeMissionData(missions);
+  const normalized =
+    normalizeMissionData(
+      missions
+    );
 
   return await Pdata.updateCurrencyData(
-    models,
-    userID,
-    currencyData
+    currency,
+    {
+      missions: normalized
+    }
   );
 }
 
@@ -427,14 +527,25 @@ async function saveMissionData(
    الحصول على المهمة
 ========================================================= */
 
-function findMission(type, missionID) {
+function findMission(
+  type,
+  missionID
+) {
+  const normalizedType =
+    String(type || "")
+      .trim()
+      .toLowerCase();
+
   const list =
-    type === "weekly"
+    normalizedType === "weekly" ||
+    normalizedType === "أسبوعية" ||
+    normalizedType === "اسبوعية"
       ? WEEKLY_MISSIONS
       : DAILY_MISSIONS;
 
   return list.find(
-    mission => mission.id === missionID
+    mission =>
+      mission.id === missionID
   );
 }
 
@@ -454,9 +565,10 @@ async function updateMissionProgress(
       userID
     );
 
-  const value = normalizeProgress(
-    amount
-  );
+  const value =
+    normalizeProgress(
+      amount
+    );
 
   if (value <= 0) {
     return missions;
@@ -468,12 +580,21 @@ async function updateMissionProgress(
      اليومية
   ======================================================= */
 
-  for (const mission of DAILY_MISSIONS) {
-    if (mission.type !== action) {
+  for (
+    const mission
+    of DAILY_MISSIONS
+  ) {
+    if (
+      mission.type !== action
+    ) {
       continue;
     }
 
-    if (missions.daily.claimed[mission.id]) {
+    if (
+      missions.daily.claimed[
+        mission.id
+      ]
+    ) {
       continue;
     }
 
@@ -484,12 +605,15 @@ async function updateMissionProgress(
         ]
       );
 
-    const next = Math.min(
-      mission.target,
-      current + value
-    );
+    const next =
+      Math.min(
+        mission.target,
+        current + value
+      );
 
-    if (next !== current) {
+    if (
+      next !== current
+    ) {
       missions.daily.progress[
         mission.id
       ] = next;
@@ -502,12 +626,21 @@ async function updateMissionProgress(
      الأسبوعية
   ======================================================= */
 
-  for (const mission of WEEKLY_MISSIONS) {
-    if (mission.type !== action) {
+  for (
+    const mission
+    of WEEKLY_MISSIONS
+  ) {
+    if (
+      mission.type !== action
+    ) {
       continue;
     }
 
-    if (missions.weekly.claimed[mission.id]) {
+    if (
+      missions.weekly.claimed[
+        mission.id
+      ]
+    ) {
       continue;
     }
 
@@ -518,12 +651,15 @@ async function updateMissionProgress(
         ]
       );
 
-    const next = Math.min(
-      mission.target,
-      current + value
-    );
+    const next =
+      Math.min(
+        mission.target,
+        current + value
+      );
 
-    if (next !== current) {
+    if (
+      next !== current
+    ) {
       missions.weekly.progress[
         mission.id
       ] = next;
@@ -553,9 +689,10 @@ async function addMissionXP(
   amount,
   fromTraining = false
 ) {
-  const xp = normalizeProgress(
-    amount
-  );
+  const xp =
+    normalizeProgress(
+      amount
+    );
 
   if (xp <= 0) {
     return;
@@ -579,7 +716,7 @@ async function addMissionXP(
 }
 
 /* =========================================================
-   أحداث التدريب
+   حدث التدريب
 ========================================================= */
 
 async function registerTraining(
@@ -608,13 +745,14 @@ async function registerTraining(
 
 async function registerFeed(
   models,
-  userID
+  userID,
+  amount = 1
 ) {
   return await updateMissionProgress(
     models,
     userID,
     "feed",
-    1
+    amount
   );
 }
 
@@ -624,13 +762,14 @@ async function registerFeed(
 
 async function registerHeal(
   models,
-  userID
+  userID,
+  amount = 1
 ) {
   return await updateMissionProgress(
     models,
     userID,
     "heal",
-    1
+    amount
   );
 }
 
@@ -643,17 +782,29 @@ function isMissionCompleted(
   type,
   mission
 ) {
+  const normalizedType =
+    String(type || "")
+      .trim()
+      .toLowerCase();
+
   const data =
-    type === "weekly"
+    normalizedType === "weekly" ||
+    normalizedType === "أسبوعية" ||
+    normalizedType === "اسبوعية"
       ? missions.weekly
       : missions.daily;
 
   const progress =
     normalizeProgress(
-      data.progress[mission.id]
+      data.progress[
+        mission.id
+      ]
     );
 
-  return progress >= mission.target;
+  return (
+    progress >=
+    mission.target
+  );
 }
 
 /* =========================================================
@@ -661,8 +812,10 @@ function isMissionCompleted(
 ========================================================= */
 
 function rollLuckyCard() {
-  return Math.random() <
-    LUCKY_CARD_CHANCE;
+  return (
+    Math.random() <
+    LUCKY_CARD_CHANCE
+  );
 }
 
 /* =========================================================
@@ -681,128 +834,165 @@ async function giveMissionRewards(
     luckyCard: false
   };
 
+  const playerData =
+    await Pdata.getPlayerData(
+      models,
+      userID
+    );
+
+  const currency =
+    playerData?.currency;
+
+  if (!currency) {
+    throw new Error(
+      "Currency data not found"
+    );
+  }
+
+  const pet =
+    playerData?.pet;
+
   /* =======================================================
      المال
   ======================================================= */
 
-  const money = normalizeProgress(
-    rewards?.money
-  );
+  const money =
+    normalizeProgress(
+      rewards?.money
+    );
 
   if (money > 0) {
     await Pdata.addMoney(
-      models,
-      userID,
+      currency,
       money
     );
 
-    result.money = money;
+    result.money =
+      money;
   }
 
   /* =======================================================
-     XP
+     XP للحيوان
   ======================================================= */
 
-  const xp = normalizeProgress(
-    rewards?.xp
-  );
+  const xp =
+    normalizeProgress(
+      rewards?.xp
+    );
 
-  if (xp > 0) {
-    const playerData =
-      await Pdata.getPlayerData(
-        models,
-        userID
+  if (
+    xp > 0 &&
+    pet
+  ) {
+    const currentLevel =
+      Leveling.normalizeLevel(
+        pet.level,
+        pet.type
       );
 
-    const pet =
-      playerData?.pet;
+    const currentXP =
+      Leveling.normalizeXP(
+        pet.exp
+      );
 
-    if (pet) {
-      const currentLevel =
-        Leveling.normalizeLevel(
-          pet.level,
-          pet.type
-        );
+    const levelResult =
+      Leveling.addXP(
+        currentLevel,
+        currentXP,
+        xp,
+        pet.type
+      );
 
-      const currentXP =
-        Leveling.normalizeXP(
-          pet.exp
-        );
+    const stars =
+      Math.max(
+        0,
+        safeNumber(
+          pet.stars,
+          0
+        )
+      );
 
-      const levelResult =
-        Leveling.addXP(
-          currentLevel,
-          currentXP,
-          xp,
-          pet.type
-        );
+    const newPower =
+      Leveling.getPetPower(
+        pet.type,
+        levelResult.level,
+        stars
+      );
 
-      const newPower =
-        Leveling.getPetPower(
-          pet.type,
-          levelResult.level
-        );
+    const newHealth =
+      Leveling.getPetHealth(
+        pet.type,
+        levelResult.level,
+        stars
+      );
 
-      const newHealth =
-        Leveling.getPetHealth(
-          pet.type,
-          levelResult.level
-        );
+    const maxHunger =
+      Leveling.getPetMaxHunger(
+        pet.type,
+        levelResult.level,
+        stars
+      );
 
-      const maxHunger =
-        Leveling.getPetMaxHunger(
-          pet.type,
-          levelResult.level
-        );
-
-      const hunger =
+    const hunger =
+      Math.max(
+        0,
         Math.min(
           maxHunger,
-          normalizeProgress(
-            pet.hunger
+          safeNumber(
+            pet.hunger,
+            maxHunger
           )
-        );
-
-      await Pdata.updatePet(
-        models,
-        userID,
-        {
-          level: levelResult.level,
-          exp: levelResult.xp,
-          power: newPower,
-          health: newHealth,
-          hunger: hunger,
-          maxHunger: maxHunger
-        }
+        )
       );
 
-      result.xp = xp;
-      result.levelsGained =
-        levelResult.levelsGained;
-    }
+    await Pdata.updatePet(
+      pet,
+      {
+        level:
+          levelResult.level,
+
+        exp:
+          levelResult.xp,
+
+        power:
+          newPower,
+
+        health:
+          newHealth,
+
+        hunger
+      }
+    );
+
+    result.xp =
+      xp;
   }
 
   /* =======================================================
-     الموارد
+     العناصر
   ======================================================= */
 
   const items =
     rewards?.items || {};
 
-  for (const [
-    item,
-    amount
-  ] of Object.entries(items)) {
+  for (
+    const [
+      item,
+      amount
+    ]
+    of Object.entries(items)
+  ) {
     const quantity =
-      normalizeProgress(amount);
+      normalizeProgress(
+        amount
+      );
 
     if (quantity <= 0) {
       continue;
     }
 
     await Inventory.addItem(
-      models,
-      userID,
+      currency,
       item,
       quantity
     );
@@ -817,13 +1007,13 @@ async function giveMissionRewards(
 
   if (rollLuckyCard()) {
     await Inventory.addItem(
-      models,
-      userID,
+      currency,
       "xpCards",
       1
     );
 
-    result.luckyCard = true;
+    result.luckyCard =
+      true;
   }
 
   return result;
@@ -845,44 +1035,74 @@ async function claimMission(
       userID
     );
 
+  const normalizedType =
+    String(type || "")
+      .trim()
+      .toLowerCase();
+
+  const normalizedMissionType =
+    normalizedType === "weekly" ||
+    normalizedType === "أسبوعية" ||
+    normalizedType === "اسبوعية"
+      ? "weekly"
+      : "daily";
+
   const mission =
     findMission(
-      type,
+      normalizedMissionType,
       missionID
     );
 
   if (!mission) {
     return {
       success: false,
-      reason: "MISSION_NOT_FOUND",
-      message: "المهمة غير موجودة"
+      reason:
+        "MISSION_NOT_FOUND",
+      message:
+        "المهمة غير موجودة"
     };
   }
 
   const data =
-    type === "weekly"
+    normalizedMissionType === "weekly"
       ? missions.weekly
       : missions.daily;
 
-  if (data.claimed[mission.id]) {
+  if (
+    data.claimed[
+      mission.id
+    ]
+  ) {
     return {
       success: false,
-      reason: "ALREADY_CLAIMED",
-      message: "تم استلام مكافأة هذه المهمة مسبقًا"
+      reason:
+        "ALREADY_CLAIMED",
+      message:
+        "تم استلام مكافأة هذه المهمة مسبقًا"
     };
   }
 
   const progress =
     normalizeProgress(
-      data.progress[mission.id]
+      data.progress[
+        mission.id
+      ]
     );
 
-  if (progress < mission.target) {
+  if (
+    progress <
+    mission.target
+  ) {
     return {
       success: false,
-      reason: "NOT_COMPLETED",
+      reason:
+        "NOT_COMPLETED",
+
       progress,
-      target: mission.target,
+
+      target:
+        mission.target,
+
       message:
         `المهمة لم تكتمل بعد\n${progress}/${mission.target}`
     };
@@ -899,8 +1119,9 @@ async function claimMission(
       mission.rewards
     );
 
-  data.claimed[mission.id] =
-    true;
+  data.claimed[
+    mission.id
+  ] = true;
 
   await saveMissionData(
     models,
@@ -930,18 +1151,21 @@ async function claimCompletedMissions(
   models,
   userID
 ) {
-  const missions =
-    await getMissionData(
-      models,
-      userID
-    );
-
   const results = [];
 
-  for (const type of [
-    "daily",
-    "weekly"
-  ]) {
+  for (
+    const type
+    of [
+      "daily",
+      "weekly"
+    ]
+  ) {
+    const missions =
+      await getMissionData(
+        models,
+        userID
+      );
+
     const list =
       type === "weekly"
         ? WEEKLY_MISSIONS
@@ -952,7 +1176,10 @@ async function claimCompletedMissions(
         ? missions.weekly
         : missions.daily;
 
-    for (const mission of list) {
+    for (
+      const mission
+      of list
+    ) {
       if (
         data.claimed[
           mission.id
@@ -981,7 +1208,9 @@ async function claimCompletedMissions(
           );
 
         if (result.success) {
-          results.push(result);
+          results.push(
+            result
+          );
         }
       }
     }
@@ -991,26 +1220,39 @@ async function claimCompletedMissions(
 }
 
 /* =========================================================
-   عرض المهام
+   عرض المكافآت
 ========================================================= */
 
-function formatReward(rewards) {
+function formatReward(
+  rewards
+) {
   const parts = [];
 
-  if (rewards?.money) {
+  if (
+    safeNumber(
+      rewards?.money,
+      0
+    ) > 0
+  ) {
     parts.push(
-      `💰 +${rewards.money.toLocaleString()}`
+      `💰 +${Number(
+        rewards.money
+      ).toLocaleString()}`
     );
   }
 
-  if (rewards?.xp) {
+  if (
+    safeNumber(
+      rewards?.xp,
+      0
+    ) > 0
+  ) {
     parts.push(
-      `⚡ +${rewards.xp.toLocaleString()} XP`
+      `⚡ +${Number(
+        rewards.xp
+      ).toLocaleString()} XP`
     );
   }
-
-  const items =
-    rewards?.items || {};
 
   const itemNames = {
     food: "🍖",
@@ -1022,12 +1264,21 @@ function formatReward(rewards) {
     developmentStones: "💎"
   };
 
-  for (const [
-    item,
-    amount
-  ] of Object.entries(items)) {
+  const items =
+    rewards?.items || {};
+
+  for (
+    const [
+      item,
+      amount
+    ]
+    of Object.entries(items)
+  ) {
     if (
-      safeNumber(amount) > 0
+      safeNumber(
+        amount,
+        0
+      ) > 0
     ) {
       parts.push(
         `${itemNames[item] || item} ×${amount}`
@@ -1035,8 +1286,14 @@ function formatReward(rewards) {
     }
   }
 
-  return parts.join(" + ");
+  return parts.join(
+    " + "
+  );
 }
+
+/* =========================================================
+   عرض مهمة
+========================================================= */
 
 function formatMission(
   mission,
@@ -1044,14 +1301,17 @@ function formatMission(
   claimed
 ) {
   const completed =
-    progress >= mission.target;
+    progress >=
+    mission.target;
 
   let status = "";
 
   if (claimed) {
-    status = " ✓ مستلمة";
+    status =
+      " ✓ مستلمة";
   } else if (completed) {
-    status = " ✓ مكتملة";
+    status =
+      " ✓ مكتملة";
   }
 
   return (
@@ -1078,7 +1338,10 @@ function buildMissionsMessage(
   message +=
     "✦ المهام اليومية\n";
 
-  for (const mission of DAILY_MISSIONS) {
+  for (
+    const mission
+    of DAILY_MISSIONS
+  ) {
     const progress =
       normalizeProgress(
         missions.daily.progress[
@@ -1093,11 +1356,12 @@ function buildMissionsMessage(
         ]
       );
 
-    message += formatMission(
-      mission,
-      progress,
-      claimed
-    );
+    message +=
+      formatMission(
+        mission,
+        progress,
+        claimed
+      );
   }
 
   /* =======================================================
@@ -1107,7 +1371,10 @@ function buildMissionsMessage(
   message +=
     "\n✦ المهام الأسبوعية\n";
 
-  for (const mission of WEEKLY_MISSIONS) {
+  for (
+    const mission
+    of WEEKLY_MISSIONS
+  ) {
     const progress =
       normalizeProgress(
         missions.weekly.progress[
@@ -1122,11 +1389,12 @@ function buildMissionsMessage(
         ]
       );
 
-    message += formatMission(
-      mission,
-      progress,
-      claimed
-    );
+    message +=
+      formatMission(
+        mission,
+        progress,
+        claimed
+      );
   }
 
   message +=
@@ -1156,45 +1424,47 @@ async function getMissions(
     );
 
   return {
-    daily: DAILY_MISSIONS.map(
-      mission => ({
-        ...mission,
+    daily:
+      DAILY_MISSIONS.map(
+        mission => ({
+          ...mission,
 
-        progress:
-          normalizeProgress(
-            missions.daily.progress[
-              mission.id
-            ]
-          ),
+          progress:
+            normalizeProgress(
+              missions.daily.progress[
+                mission.id
+              ]
+            ),
 
-        claimed:
-          Boolean(
-            missions.daily.claimed[
-              mission.id
-            ]
-          )
-      })
-    ),
+          claimed:
+            Boolean(
+              missions.daily.claimed[
+                mission.id
+              ]
+            )
+        })
+      ),
 
-    weekly: WEEKLY_MISSIONS.map(
-      mission => ({
-        ...mission,
+    weekly:
+      WEEKLY_MISSIONS.map(
+        mission => ({
+          ...mission,
 
-        progress:
-          normalizeProgress(
-            missions.weekly.progress[
-              mission.id
-            ]
-          ),
+          progress:
+            normalizeProgress(
+              missions.weekly.progress[
+                mission.id
+              ]
+            ),
 
-        claimed:
-          Boolean(
-            missions.weekly.claimed[
-              mission.id
-            ]
-          )
-      })
-    ),
+          claimed:
+            Boolean(
+              missions.weekly.claimed[
+                mission.id
+              ]
+            )
+        })
+      ),
 
     periods: {
       daily:
@@ -1265,7 +1535,8 @@ async function missionsCommand({
     ) {
       return {
         success: false,
-        reason: "MISSING_MISSION",
+        reason:
+          "MISSING_MISSION",
         message:
           "حدد نوع المهمة ورقمها"
       };
@@ -1295,6 +1566,7 @@ async function missionsCommand({
 
     return {
       success: true,
+
       results,
 
       count:
@@ -1309,7 +1581,9 @@ async function missionsCommand({
 
   return {
     success: false,
-    reason: "INVALID_ACTION",
+
+    reason:
+      "INVALID_ACTION",
 
     message:
       "الأوامر المتاحة:\n" +
