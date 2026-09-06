@@ -4,28 +4,25 @@ const Pdata = require("./Pdata");
 const Inventory = require("./inventory");
 const Leveling = require("./leveling");
 const Achievements = require("./achievements");
+const Mission = require("./mission");
 
 const TRAIN_COOLDOWN = 30 * 60 * 1000;
 
-// XP التدريب
 const TRAIN_XP_BASE = 10000;
 const TRAIN_XP_PER_LEVEL = 1000;
 
-// بطاقة XP
 const XP_CARD_AMOUNT = 100000;
 
-// المنشط يضاعف XP
 const TRAINING_BOOSTER_MULTIPLIER = 2;
 
-// تكلفة التدريب من الجوع
 const TRAIN_HUNGER_COST = 10;
 
 const MAX_LEVEL =
   Leveling.DEFAULT_MAX_LEVEL || 60;
 
-/* =========================
+/* =========================================================
    أدوات مساعدة
-========================= */
+========================================================= */
 
 function safeNumber(value, fallback = 0) {
   const number = Number(value);
@@ -83,9 +80,9 @@ function formatTime(milliseconds) {
   return `${seconds} ثانية`;
 }
 
-/* =========================
+/* =========================================================
    بيانات اللاعب
-========================= */
+========================================================= */
 
 async function getTrainingData(
   models,
@@ -97,9 +94,9 @@ async function getTrainingData(
   );
 }
 
-/* =========================
+/* =========================================================
    الكول داون
-========================= */
+========================================================= */
 
 function checkTrainingCooldown(pet) {
   const remaining =
@@ -120,9 +117,9 @@ function checkTrainingCooldown(pet) {
   };
 }
 
-/* =========================
+/* =========================================================
    حساب XP التدريب
-========================= */
+========================================================= */
 
 function calculateTrainingXP(
   level,
@@ -145,9 +142,9 @@ function calculateTrainingXP(
   return Math.floor(xp);
 }
 
-/* =========================
-   حساب الإحصائيات
-========================= */
+/* =========================================================
+   حساب إحصائيات الحيوان
+========================================================= */
 
 function getPetStats(
   pet,
@@ -156,7 +153,10 @@ function getPetStats(
   const stars =
     Math.max(
       0,
-      safeNumber(pet?.stars, 0)
+      safeNumber(
+        pet?.stars,
+        0
+      )
     );
 
   const power =
@@ -187,9 +187,9 @@ function getPetStats(
   };
 }
 
-/* =========================
-   حالة الحيوان أثناء التدريب
-========================= */
+/* =========================================================
+   حالة الحيوان
+========================================================= */
 
 function calculateTrainingStatus(
   hunger,
@@ -199,7 +199,10 @@ function calculateTrainingStatus(
   const safeMaxHunger =
     Math.max(
       1,
-      safeNumber(maxHunger, 100)
+      safeNumber(
+        maxHunger,
+        100
+      )
     );
 
   const hungerPercentage =
@@ -209,7 +212,10 @@ function calculateTrainingStatus(
     ) * 100;
 
   const safeHealth =
-    safeNumber(health, 0);
+    safeNumber(
+      health,
+      0
+    );
 
   if (safeHealth <= 0) {
     return "ميت";
@@ -230,9 +236,9 @@ function calculateTrainingStatus(
   return "جيد";
 }
 
-/* =========================
+/* =========================================================
    تدريب الحيوان
-========================= */
+========================================================= */
 
 async function trainPet({
   models,
@@ -290,7 +296,9 @@ async function trainPet({
   }
 
   const cooldown =
-    checkTrainingCooldown(pet);
+    checkTrainingCooldown(
+      pet
+    );
 
   if (cooldown.onCooldown) {
     return {
@@ -303,9 +311,9 @@ async function trainPet({
     };
   }
 
-  /* =========================
+  /* =======================================================
      التحقق من المنشط
-  ========================= */
+  ======================================================= */
 
   if (useBooster) {
     const hasBooster =
@@ -325,9 +333,9 @@ async function trainPet({
     }
   }
 
-  /* =========================
+  /* =======================================================
      حساب XP
-  ========================= */
+  ======================================================= */
 
   const gainedXP =
     calculateTrainingXP(
@@ -343,9 +351,9 @@ async function trainPet({
       pet.type
     );
 
-  /* =========================
+  /* =======================================================
      الإحصائيات الجديدة
-  ========================= */
+  ======================================================= */
 
   const stats =
     getPetStats(
@@ -353,9 +361,9 @@ async function trainPet({
       result.level
     );
 
-  /* =========================
+  /* =======================================================
      الجوع
-  ========================= */
+  ======================================================= */
 
   const currentHunger =
     safeNumber(
@@ -380,9 +388,9 @@ async function trainPet({
       stats.health
     );
 
-  /* =========================
+  /* =======================================================
      استهلاك المنشط
-  ========================= */
+  ======================================================= */
 
   if (useBooster) {
     await Inventory.removeItem(
@@ -392,9 +400,9 @@ async function trainPet({
     );
   }
 
-  /* =========================
+  /* =======================================================
      حفظ بيانات الحيوان
-  ========================= */
+  ======================================================= */
 
   await Pdata.updatePet(
     pet,
@@ -421,9 +429,9 @@ async function trainPet({
     }
   );
 
-  /* =========================
+  /* =======================================================
      تسجيل التدريب في الإنجازات
-  ========================= */
+  ======================================================= */
 
   try {
     await Achievements.registerTraining(
@@ -431,26 +439,43 @@ async function trainPet({
       userID,
       gainedXP
     );
-  } catch (achievementError) {
+  } catch (error) {
     console.error(
       "[HINA ACHIEVEMENTS] Training registration error:",
-      achievementError
+      error
     );
   }
 
-  /* =========================
+  /* =======================================================
+     تحديث المهام
+  ======================================================= */
+
+  try {
+    await Mission.registerTraining(
+      models,
+      userID,
+      gainedXP
+    );
+  } catch (error) {
+    console.error(
+      "[HINA MISSIONS] Training registration error:",
+      error
+    );
+  }
+
+  /* =======================================================
      فحص الإنجازات
-  ========================= */
+  ======================================================= */
 
   try {
     await Achievements.checkAchievements(
       models,
       userID
     );
-  } catch (achievementError) {
+  } catch (error) {
     console.error(
       "[HINA ACHIEVEMENTS] Achievement check error:",
-      achievementError
+      error
     );
   }
 
@@ -505,9 +530,9 @@ async function trainPet({
   };
 }
 
-/* =========================
+/* =========================================================
    بطاقة XP
-========================= */
+========================================================= */
 
 async function useXPCard(
   models,
@@ -563,9 +588,9 @@ async function useXPCard(
     };
   }
 
-  /* =========================
+  /* =======================================================
      التحقق من البطاقة
-  ========================= */
+  ======================================================= */
 
   const hasCard =
     Inventory.hasItem(
@@ -583,9 +608,9 @@ async function useXPCard(
     };
   }
 
-  /* =========================
+  /* =======================================================
      إضافة XP
-  ========================= */
+  ======================================================= */
 
   const result =
     Leveling.addXP(
@@ -595,19 +620,15 @@ async function useXPCard(
       pet.type
     );
 
-  /* =========================
-     الإحصائيات الجديدة
-  ========================= */
-
   const stats =
     getPetStats(
       pet,
       result.level
     );
 
-  /* =========================
+  /* =======================================================
      الجوع
-  ========================= */
+  ======================================================= */
 
   const currentHunger =
     Math.max(
@@ -628,9 +649,9 @@ async function useXPCard(
       stats.health
     );
 
-  /* =========================
+  /* =======================================================
      استهلاك البطاقة
-  ========================= */
+  ======================================================= */
 
   await Inventory.removeItem(
     currency,
@@ -638,9 +659,9 @@ async function useXPCard(
     1
   );
 
-  /* =========================
+  /* =======================================================
      حفظ الحيوان
-  ========================= */
+  ======================================================= */
 
   await Pdata.updatePet(
     pet,
@@ -664,9 +685,9 @@ async function useXPCard(
     }
   );
 
-  /* =========================
+  /* =======================================================
      تسجيل XP في الإنجازات
-  ========================= */
+  ======================================================= */
 
   try {
     await Achievements.registerXP(
@@ -674,26 +695,45 @@ async function useXPCard(
       userID,
       XP_CARD_AMOUNT
     );
-  } catch (achievementError) {
+  } catch (error) {
     console.error(
       "[HINA ACHIEVEMENTS] XP registration error:",
-      achievementError
+      error
     );
   }
 
-  /* =========================
+  /* =======================================================
+     تحديث مهمة XP
+     البطاقة ليست تدريبًا
+  ======================================================= */
+
+  try {
+    await Mission.addMissionXP(
+      models,
+      userID,
+      XP_CARD_AMOUNT,
+      false
+    );
+  } catch (error) {
+    console.error(
+      "[HINA MISSIONS] XP card registration error:",
+      error
+    );
+  }
+
+  /* =======================================================
      فحص الإنجازات
-  ========================= */
+  ======================================================= */
 
   try {
     await Achievements.checkAchievements(
       models,
       userID
     );
-  } catch (achievementError) {
+  } catch (error) {
     console.error(
       "[HINA ACHIEVEMENTS] Achievement check error:",
-      achievementError
+      error
     );
   }
 
@@ -746,9 +786,9 @@ async function useXPCard(
   };
 }
 
-/* =========================
+/* =========================================================
    معلومات التدريب
-========================= */
+========================================================= */
 
 async function getTrainingInfo(
   models,
@@ -850,9 +890,9 @@ async function getTrainingInfo(
   };
 }
 
-/* =========================
+/* =========================================================
    رسالة حالة التدريب
-========================= */
+========================================================= */
 
 function buildTrainingMessage(
   info
@@ -871,19 +911,14 @@ function buildTrainingMessage(
     `⌬ ━━ 𝗛𝗜𝗡𝗔 TRAINING ━━ ⌬\n\n` +
 
     `🐾 الحيوان : ${pet.name || pet.type}\n` +
-
     `⭐ المستوى : ${info.level}/${MAX_LEVEL}\n` +
-
     `⚡ XP : ${info.xp}/${info.requiredXP || "MAX"}\n\n` +
 
     `🏋️ تدريب عادي : +${info.trainingXP} XP\n` +
-
     `🧪 مع المنشط : +${info.boosterXP} XP\n` +
-
     `⚡ بطاقة XP : +${info.xpCardAmount} XP\n\n` +
 
     `🧪 المنشطات : ${info.boosterCount}\n` +
-
     `⚡ بطاقات XP : ${info.xpCardCount}\n`;
 
   if (info.isMaxLevel) {
@@ -900,9 +935,9 @@ function buildTrainingMessage(
   return message;
 }
 
-/* =========================
+/* =========================================================
    أمر التدريب
-========================= */
+========================================================= */
 
 async function trainingCommand({
   models,
@@ -914,9 +949,9 @@ async function trainingCommand({
       .trim()
       .toLowerCase();
 
-  /* =========================
+  /* =======================================================
      الحالة
-  ========================= */
+  ======================================================= */
 
   if (
     normalizedAction === "status" ||
@@ -938,9 +973,9 @@ async function trainingCommand({
     };
   }
 
-  /* =========================
+  /* =======================================================
      التدريب العادي
-  ========================= */
+  ======================================================= */
 
   if (
     normalizedAction === "تدريب" ||
@@ -962,13 +997,10 @@ async function trainingCommand({
 
       message:
         `⌬ ━━ 𝗛𝗜𝗡𝗔 TRAINING ━━ ⌬\n\n` +
-
         `🐾 تم تدريب حيوانك بنجاح\n\n` +
 
         `⚡ XP المكتسبة : +${result.gainedXP}\n` +
-
         `⭐ المستوى : ${result.level}` +
-
         (
           result.leveledUp
             ? ` ↑ (+${result.levelsGained})`
@@ -976,7 +1008,6 @@ async function trainingCommand({
         ) +
 
         `\n⚡ XP الحالية : ${result.xp}` +
-
         (
           result.requiredXP
             ? `/${result.requiredXP}`
@@ -984,18 +1015,16 @@ async function trainingCommand({
         ) +
 
         `\n💪 القوة : ${result.power}` +
-
         `\n❤️ الصحة : ${result.health}` +
-
         `\n🍖 الجوع : ${result.hunger}/${result.maxHunger}` +
 
         `\n\n⏳ التدريب القادم بعد 30 دقيقة`
     };
   }
 
-  /* =========================
+  /* =======================================================
      التدريب بالمنشط
-  ========================= */
+  ======================================================= */
 
   if (
     normalizedAction === "منشط" ||
@@ -1024,7 +1053,6 @@ async function trainingCommand({
         `⚡ XP المكتسبة : +${result.gainedXP}\n` +
 
         `⭐ المستوى : ${result.level}` +
-
         (
           result.leveledUp
             ? ` ↑ (+${result.levelsGained})`
@@ -1032,7 +1060,6 @@ async function trainingCommand({
         ) +
 
         `\n⚡ XP الحالية : ${result.xp}` +
-
         (
           result.requiredXP
             ? `/${result.requiredXP}`
@@ -1040,18 +1067,16 @@ async function trainingCommand({
         ) +
 
         `\n💪 القوة : ${result.power}` +
-
         `\n❤️ الصحة : ${result.health}` +
-
         `\n🍖 الجوع : ${result.hunger}/${result.maxHunger}` +
 
         `\n\n⏳ التدريب القادم بعد 30 دقيقة`
     };
   }
 
-  /* =========================
+  /* =======================================================
      بطاقة XP
-  ========================= */
+  ======================================================= */
 
   if (
     normalizedAction === "بطاقة" ||
@@ -1080,9 +1105,9 @@ async function trainingCommand({
   };
 }
 
-/* =========================
+/* =========================================================
    التصدير
-========================= */
+========================================================= */
 
 module.exports = {
   TRAIN_COOLDOWN,
@@ -1103,20 +1128,22 @@ module.exports = {
   formatTime,
 
   getTrainingData,
-
   checkTrainingCooldown,
 
   calculateTrainingXP,
 
   trainPet,
-
   useXPCard,
 
   calculateTrainingStatus,
 
   getTrainingInfo,
-
   buildTrainingMessage,
 
   trainingCommand
 };
+
+"mission.js"
+
+:::writing{variant="standard" id="31854" title="mission.js"}
+
