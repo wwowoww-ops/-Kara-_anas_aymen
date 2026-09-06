@@ -1,5 +1,13 @@
+/**
+ * achievements.js
+ * نظام إنجازات الحيوانات والمكافآت
+ *
+ * متوافق مع Pdata.js الحالي
+ */
+
+"use strict";
+
 const Pdata = require("./Pdata");
-const PetsData = require("./pets");
 const Leveling = require("./leveling");
 const Inventory = require("./inventory");
 
@@ -18,44 +26,79 @@ function formatNumber(value) {
   return safeNumber(value).toLocaleString("en-US");
 }
 
-function getModel(models, name) {
-  if (!models) return null;
-
-  if (typeof models.use === "function") {
-    try {
-      const model = models.use(name);
-      if (model) return model;
-    } catch (_) {}
-  }
-
-  return models[name] || null;
-}
-
 function getUserID(userID) {
   return String(userID);
 }
 
+/**
+ * تحويل قيم مثل:
+ * 100
+ * 100k
+ * 1m
+ * 5m
+ * 10m
+ * 1b
+ */
+function parseAchievementTarget(value) {
+  const text = String(value)
+    .trim()
+    .toLowerCase();
+
+  if (text.endsWith("k")) {
+    return safeNumber(
+      text.slice(0, -1)
+    ) * 1000;
+  }
+
+  if (text.endsWith("m")) {
+    return safeNumber(
+      text.slice(0, -1)
+    ) * 1000000;
+  }
+
+  if (text.endsWith("b")) {
+    return safeNumber(
+      text.slice(0, -1)
+    ) * 1000000000;
+  }
+
+  return safeNumber(text);
+}
+
+// ======================================================
+// Achievement Data
+// ======================================================
+
 function getAchievementsData(currency) {
-  if (!currency || typeof currency !== "object") {
+  if (
+    !currency ||
+    typeof currency !== "object"
+  ) {
     return {};
   }
 
-  if (!currency.data || typeof currency.data !== "object") {
-    currency.data = {};
+  let data = Pdata.getCurrencyData(currency);
+
+  if (
+    !data ||
+    typeof data !== "object"
+  ) {
+    data = {};
   }
 
   if (
-    !currency.data.achievements ||
-    typeof currency.data.achievements !== "object"
+    !data.achievements ||
+    typeof data.achievements !== "object"
   ) {
-    currency.data.achievements = {};
+    data.achievements = {};
   }
 
-  return currency.data.achievements;
+  return data.achievements;
 }
 
 function getAchievementStats(currency) {
-  const achievements = getAchievementsData(currency);
+  const achievements =
+    getAchievementsData(currency);
 
   if (
     !achievements.stats ||
@@ -68,7 +111,8 @@ function getAchievementStats(currency) {
 }
 
 function getUnlockedAchievements(currency) {
-  const achievements = getAchievementsData(currency);
+  const achievements =
+    getAchievementsData(currency);
 
   if (!Array.isArray(achievements.unlocked)) {
     achievements.unlocked = [];
@@ -77,15 +121,21 @@ function getUnlockedAchievements(currency) {
   return achievements.unlocked;
 }
 
-function isUnlocked(currency, achievementID) {
-  return getUnlockedAchievements(currency).includes(achievementID);
+function isUnlocked(
+  currency,
+  achievementID
+) {
+  return getUnlockedAchievements(
+    currency
+  ).includes(achievementID);
 }
 
 // ======================================================
-// Achievement definitions
+// Achievement Definitions
 // ======================================================
 
 const ACHIEVEMENTS = [
+
   // ----------------------------------------------------
   // Level
   // ----------------------------------------------------
@@ -95,7 +145,10 @@ const ACHIEVEMENTS = [
     category: "level",
     title: "البداية الحقيقية",
     description: "وصل بحيوانك إلى المستوى 5",
-    check: ({ pet }) => safeNumber(pet?.level) >= 5,
+
+    check: ({ pet }) =>
+      safeNumber(pet?.level) >= 5,
+
     reward: {
       money: 10000,
       xp: 5000
@@ -107,7 +160,10 @@ const ACHIEVEMENTS = [
     category: "level",
     title: "متدرب قوي",
     description: "وصل بحيوانك إلى المستوى 10",
-    check: ({ pet }) => safeNumber(pet?.level) >= 10,
+
+    check: ({ pet }) =>
+      safeNumber(pet?.level) >= 10,
+
     reward: {
       money: 25000,
       xp: 10000
@@ -119,7 +175,10 @@ const ACHIEVEMENTS = [
     category: "level",
     title: "محترف",
     description: "وصل بحيوانك إلى المستوى 20",
-    check: ({ pet }) => safeNumber(pet?.level) >= 20,
+
+    check: ({ pet }) =>
+      safeNumber(pet?.level) >= 20,
+
     reward: {
       money: 50000,
       xp: 25000
@@ -131,7 +190,10 @@ const ACHIEVEMENTS = [
     category: "level",
     title: "نخبة",
     description: "وصل بحيوانك إلى المستوى 30",
-    check: ({ pet }) => safeNumber(pet?.level) >= 30,
+
+    check: ({ pet }) =>
+      safeNumber(pet?.level) >= 30,
+
     reward: {
       money: 100000,
       xp: 50000
@@ -143,7 +205,10 @@ const ACHIEVEMENTS = [
     category: "level",
     title: "أسطورة التدريب",
     description: "وصل بحيوانك إلى المستوى 40",
-    check: ({ pet }) => safeNumber(pet?.level) >= 40,
+
+    check: ({ pet }) =>
+      safeNumber(pet?.level) >= 40,
+
     reward: {
       money: 200000,
       xp: 100000
@@ -155,7 +220,10 @@ const ACHIEVEMENTS = [
     category: "level",
     title: "قوة هائلة",
     description: "وصل بحيوانك إلى المستوى 50",
-    check: ({ pet }) => safeNumber(pet?.level) >= 50,
+
+    check: ({ pet }) =>
+      safeNumber(pet?.level) >= 50,
+
     reward: {
       money: 350000,
       xp: 150000
@@ -167,7 +235,10 @@ const ACHIEVEMENTS = [
     category: "level",
     title: "قمة المستوى",
     description: "وصل بحيوانك إلى المستوى 60",
-    check: ({ pet }) => safeNumber(pet?.level) >= 60,
+
+    check: ({ pet }) =>
+      safeNumber(pet?.level) >= 60,
+
     reward: {
       money: 750000,
       xp: 300000,
@@ -184,7 +255,10 @@ const ACHIEVEMENTS = [
     category: "stars",
     title: "الترقية الأولى",
     description: "ارفع حيوانك إلى نجمة واحدة",
-    check: ({ pet }) => safeNumber(pet?.stars) >= 1,
+
+    check: ({ pet }) =>
+      safeNumber(pet?.stars) >= 1,
+
     reward: {
       money: 50000,
       xp: 25000
@@ -196,7 +270,10 @@ const ACHIEVEMENTS = [
     category: "stars",
     title: "تطور متقدم",
     description: "ارفع حيوانك إلى نجمتين",
-    check: ({ pet }) => safeNumber(pet?.stars) >= 2,
+
+    check: ({ pet }) =>
+      safeNumber(pet?.stars) >= 2,
+
     reward: {
       money: 100000,
       xp: 50000
@@ -208,7 +285,10 @@ const ACHIEVEMENTS = [
     category: "stars",
     title: "قوة نادرة",
     description: "ارفع حيوانك إلى 3 نجوم",
-    check: ({ pet }) => safeNumber(pet?.stars) >= 3,
+
+    check: ({ pet }) =>
+      safeNumber(pet?.stars) >= 3,
+
     reward: {
       money: 200000,
       xp: 100000
@@ -220,7 +300,10 @@ const ACHIEVEMENTS = [
     category: "stars",
     title: "قوة أسطورية",
     description: "ارفع حيوانك إلى 4 نجوم",
-    check: ({ pet }) => safeNumber(pet?.stars) >= 4,
+
+    check: ({ pet }) =>
+      safeNumber(pet?.stars) >= 4,
+
     reward: {
       money: 400000,
       xp: 200000
@@ -232,7 +315,10 @@ const ACHIEVEMENTS = [
     category: "stars",
     title: "إتقان كامل",
     description: "ارفع حيوانك إلى 5 نجوم",
-    check: ({ pet }) => safeNumber(pet?.stars) >= 5,
+
+    check: ({ pet }) =>
+      safeNumber(pet?.stars) >= 5,
+
     reward: {
       money: 1000000,
       xp: 500000,
@@ -249,7 +335,10 @@ const ACHIEVEMENTS = [
     category: "training",
     title: "المتدرب النشيط",
     description: "درّب حيوانك 10 مرات",
-    check: ({ stats }) => safeNumber(stats.training) >= 10,
+
+    check: ({ stats }) =>
+      safeNumber(stats?.training) >= 10,
+
     reward: {
       money: 25000,
       xp: 15000,
@@ -262,7 +351,10 @@ const ACHIEVEMENTS = [
     category: "training",
     title: "مدرب محترف",
     description: "درّب حيوانك 50 مرة",
-    check: ({ stats }) => safeNumber(stats.training) >= 50,
+
+    check: ({ stats }) =>
+      safeNumber(stats?.training) >= 50,
+
     reward: {
       money: 100000,
       xp: 50000,
@@ -275,7 +367,10 @@ const ACHIEVEMENTS = [
     category: "training",
     title: "مدرب أسطوري",
     description: "درّب حيوانك 100 مرة",
-    check: ({ stats }) => safeNumber(stats.training) >= 100,
+
+    check: ({ stats }) =>
+      safeNumber(stats?.training) >= 100,
+
     reward: {
       money: 250000,
       xp: 125000,
@@ -288,7 +383,10 @@ const ACHIEVEMENTS = [
     category: "training",
     title: "آلة تدريب",
     description: "درّب حيوانك 250 مرة",
-    check: ({ stats }) => safeNumber(stats.training) >= 250,
+
+    check: ({ stats }) =>
+      safeNumber(stats?.training) >= 250,
+
     reward: {
       money: 750000,
       xp: 300000,
@@ -305,7 +403,10 @@ const ACHIEVEMENTS = [
     category: "care",
     title: "مربي مبتدئ",
     description: "أطعم حيوانك 10 مرات",
-    check: ({ stats }) => safeNumber(stats.feed) >= 10,
+
+    check: ({ stats }) =>
+      safeNumber(stats?.feed) >= 10,
+
     reward: {
       money: 15000,
       xp: 5000,
@@ -318,7 +419,10 @@ const ACHIEVEMENTS = [
     category: "care",
     title: "مربي محترف",
     description: "أطعم حيوانك 50 مرة",
-    check: ({ stats }) => safeNumber(stats.feed) >= 50,
+
+    check: ({ stats }) =>
+      safeNumber(stats?.feed) >= 50,
+
     reward: {
       money: 50000,
       xp: 25000,
@@ -331,7 +435,10 @@ const ACHIEVEMENTS = [
     category: "care",
     title: "رعاية ممتازة",
     description: "أطعم حيوانك 100 مرة",
-    check: ({ stats }) => safeNumber(stats.feed) >= 100,
+
+    check: ({ stats }) =>
+      safeNumber(stats?.feed) >= 100,
+
     reward: {
       money: 150000,
       xp: 75000,
@@ -344,7 +451,10 @@ const ACHIEVEMENTS = [
     category: "care",
     title: "مربي استثنائي",
     description: "أطعم حيوانك 500 مرة",
-    check: ({ stats }) => safeNumber(stats.feed) >= 500,
+
+    check: ({ stats }) =>
+      safeNumber(stats?.feed) >= 500,
+
     reward: {
       money: 500000,
       xp: 250000,
@@ -361,7 +471,10 @@ const ACHIEVEMENTS = [
     category: "care",
     title: "الطبيب المبتدئ",
     description: "عالج حيوانك 10 مرات",
-    check: ({ stats }) => safeNumber(stats.heal) >= 10,
+
+    check: ({ stats }) =>
+      safeNumber(stats?.heal) >= 10,
+
     reward: {
       money: 20000,
       xp: 7500,
@@ -374,7 +487,10 @@ const ACHIEVEMENTS = [
     category: "care",
     title: "الطبيب المحترف",
     description: "عالج حيوانك 50 مرة",
-    check: ({ stats }) => safeNumber(stats.heal) >= 50,
+
+    check: ({ stats }) =>
+      safeNumber(stats?.heal) >= 50,
+
     reward: {
       money: 75000,
       xp: 30000,
@@ -387,7 +503,10 @@ const ACHIEVEMENTS = [
     category: "care",
     title: "حامي الحيوانات",
     description: "عالج حيوانك 100 مرة",
-    check: ({ stats }) => safeNumber(stats.heal) >= 100,
+
+    check: ({ stats }) =>
+      safeNumber(stats?.heal) >= 100,
+
     reward: {
       money: 200000,
       xp: 100000,
@@ -404,7 +523,10 @@ const ACHIEVEMENTS = [
     category: "xp",
     title: "أول مئة ألف",
     description: "اجمع 100,000 XP من خلال نظام اللعبة",
-    check: ({ stats }) => safeNumber(stats.totalXP) >= 100000,
+
+    check: ({ stats }) =>
+      safeNumber(stats?.totalXP) >= 100000,
+
     reward: {
       money: 25000,
       xp: 10000
@@ -416,7 +538,10 @@ const ACHIEVEMENTS = [
     category: "xp",
     title: "جامع الخبرة",
     description: "اجمع 500,000 XP",
-    check: ({ stats }) => safeNumber(stats.totalXP) >= 500000,
+
+    check: ({ stats }) =>
+      safeNumber(stats?.totalXP) >= 500000,
+
     reward: {
       money: 100000,
       xp: 50000
@@ -428,7 +553,10 @@ const ACHIEVEMENTS = [
     category: "xp",
     title: "مليون خبرة",
     description: "اجمع 1,000,000 XP",
-    check: ({ stats }) => safeNumber(stats.totalXP) >= 1000000,
+
+    check: ({ stats }) =>
+      safeNumber(stats?.totalXP) >= 1000000,
+
     reward: {
       money: 250000,
       xp: 100000,
@@ -441,7 +569,10 @@ const ACHIEVEMENTS = [
     category: "xp",
     title: "سيد الخبرة",
     description: "اجمع 5,000,000 XP",
-    check: ({ stats }) => safeNumber(stats.totalXP) >= 5000000,
+
+    check: ({ stats }) =>
+      safeNumber(stats?.totalXP) >= 5000000,
+
     reward: {
       money: 1000000,
       xp: 500000,
@@ -458,7 +589,10 @@ const ACHIEVEMENTS = [
     category: "money",
     title: "أول ثروة",
     description: "اجمع 100,000 من العملات",
-    check: ({ money }) => safeNumber(money) >= 100000,
+
+    check: ({ money }) =>
+      safeNumber(money) >= 100000,
+
     reward: {
       xp: 25000,
       investmentCards: 1
@@ -470,7 +604,10 @@ const ACHIEVEMENTS = [
     category: "money",
     title: "المليون الأول",
     description: "اجمع 1,000,000 من العملات",
-    check: ({ money }) => safeNumber(money) >= 1000000,
+
+    check: ({ money }) =>
+      safeNumber(money) >= 1000000,
+
     reward: {
       xp: 100000,
       investmentCards: 2
@@ -482,7 +619,10 @@ const ACHIEVEMENTS = [
     category: "money",
     title: "ثروة ضخمة",
     description: "اجمع 10,000,000 من العملات",
-    check: ({ money }) => safeNumber(money) >= 10000000,
+
+    check: ({ money }) =>
+      safeNumber(money) >= 10000000,
+
     reward: {
       xp: 500000,
       investmentCards: 5,
@@ -492,64 +632,97 @@ const ACHIEVEMENTS = [
 ];
 
 // ======================================================
-// Find achievement
+// Find Achievement
 // ======================================================
 
 function getAchievement(id) {
   return ACHIEVEMENTS.find(
-    achievement => achievement.id === id
+    achievement =>
+      achievement.id === id
   ) || null;
 }
 
 function getAchievementsByCategory(category) {
   return ACHIEVEMENTS.filter(
-    achievement => achievement.category === category
+    achievement =>
+      achievement.category === category
   );
 }
 
 // ======================================================
-// Reward handling
+// Reward Handling
 // ======================================================
 
-async function giveReward(models, userID, reward) {
+async function giveReward(
+  currency,
+  pet,
+  reward
+) {
   const rewards = [];
 
-  if (!reward || typeof reward !== "object") {
+  if (
+    !reward ||
+    typeof reward !== "object"
+  ) {
     return rewards;
   }
 
-  if (safeNumber(reward.money) > 0) {
+  // ----------------------------------------------------
+  // Money
+  // ----------------------------------------------------
+
+  const money =
+    safeNumber(reward.money);
+
+  if (money > 0) {
     await Pdata.addMoney(
-      models,
-      userID,
-      safeNumber(reward.money)
+      currency,
+      money
     );
 
     rewards.push(
-      `💰 ${formatNumber(reward.money)} عملة`
+      `💰 ${formatNumber(money)} عملة`
     );
   }
 
-  if (safeNumber(reward.xp) > 0) {
-    const pet = await Pdata.getPet(models, userID);
+  // ----------------------------------------------------
+  // XP
+  // ----------------------------------------------------
 
-    if (pet) {
-      const result = Leveling.addXP(
-        pet,
-        safeNumber(reward.xp)
+  const xp =
+    safeNumber(reward.xp);
+
+  if (
+    xp > 0 &&
+    pet
+  ) {
+    const result =
+      Leveling.addXP(
+        safeNumber(pet.level),
+        safeNumber(pet.exp),
+        xp,
+        pet
       );
 
-      await Pdata.updatePet(
-        models,
-        userID,
-        result.pet || result
-      );
+    await Pdata.updatePet(
+      pet,
+      {
+        level: result.level,
+        exp: result.xp,
+        power: result.power,
+        health: result.health,
+        hunger: result.maxHunger
+      }
+    );
 
-      rewards.push(
-        `⚡ ${formatNumber(reward.xp)} XP`
-      );
-    }
+    rewards.push(
+      `⚡ ${formatNumber(xp)} XP`
+    );
   }
+
+  // ----------------------------------------------------
+  // Items
+  // ----------------------------------------------------
 
   const items = [
     ["food", "🍖", "طعام"],
@@ -561,14 +734,19 @@ async function giveReward(models, userID, reward) {
     ["developmentStones", "💎", "حجر تطوير"]
   ];
 
-  for (const [key, emoji, name] of items) {
-    const amount = safeNumber(reward[key]);
+  for (
+    const [key, emoji, name]
+    of items
+  ) {
+    const amount =
+      safeNumber(reward[key]);
 
-    if (amount <= 0) continue;
+    if (amount <= 0) {
+      continue;
+    }
 
     await Inventory.addItem(
-      models,
-      userID,
+      currency,
       key,
       amount
     );
@@ -582,41 +760,85 @@ async function giveReward(models, userID, reward) {
 }
 
 // ======================================================
-// Unlock achievement
+// Save Achievement Data
+// ======================================================
+
+async function saveAchievementData(
+  currency
+) {
+  const achievements =
+    getAchievementsData(currency);
+
+  await Pdata.updateCurrencyData(
+    currency,
+    {
+      achievements
+    }
+  );
+
+  return achievements;
+}
+
+// ======================================================
+// Unlock Achievement
 // ======================================================
 
 async function unlockAchievement(
   models,
   userID,
   achievement,
-  currency
+  currency,
+  pet = null
 ) {
-  if (!achievement) return null;
-
-  if (isUnlocked(currency, achievement.id)) {
+  if (!achievement) {
     return null;
   }
 
-  const unlocked = getUnlockedAchievements(currency);
+  if (!currency) {
+    return null;
+  }
 
-  unlocked.push(achievement.id);
+  if (
+    isUnlocked(
+      currency,
+      achievement.id
+    )
+  ) {
+    return null;
+  }
 
-  const stats = getAchievementStats(currency);
+  const unlocked =
+    getUnlockedAchievements(
+      currency
+    );
 
-  stats.unlockedCount = unlocked.length;
-  stats.lastUnlocked = achievement.id;
-  stats.lastUnlockedAt = Date.now();
-
-  const rewardText = await giveReward(
-    models,
-    userID,
-    achievement.reward
+  unlocked.push(
+    achievement.id
   );
 
-  await Pdata.updateCurrencyData(
-    models,
-    userID,
-    currency.data
+  const stats =
+    getAchievementStats(
+      currency
+    );
+
+  stats.unlockedCount =
+    unlocked.length;
+
+  stats.lastUnlocked =
+    achievement.id;
+
+  stats.lastUnlockedAt =
+    Date.now();
+
+  const rewardText =
+    await giveReward(
+      currency,
+      pet,
+      achievement.reward
+    );
+
+  await saveAchievementData(
+    currency
   );
 
   return {
@@ -626,29 +848,43 @@ async function unlockAchievement(
 }
 
 // ======================================================
-// Check all achievements
+// Check All Achievements
 // ======================================================
 
-async function checkAchievements(models, userID) {
-  const uid = getUserID(userID);
+async function checkAchievements(
+  models,
+  userID
+) {
+  const uid =
+    getUserID(userID);
 
-  const player = await Pdata.getPlayerData(
-    models,
-    uid
-  );
+  const player =
+    await Pdata.getPlayerData(
+      models,
+      uid
+    );
 
   if (!player) {
     return [];
   }
 
-  const currency = player.currency || {
-    data: {}
-  };
+  const currency =
+    player.currency;
 
-  const pet = player.pet;
-  const money = safeNumber(player.money);
+  if (!currency) {
+    return [];
+  }
 
-  const stats = getAchievementStats(currency);
+  const pet =
+    player.pet;
+
+  const money =
+    safeNumber(player.money);
+
+  const stats =
+    getAchievementStats(
+      currency
+    );
 
   const context = {
     userID: uid,
@@ -661,18 +897,34 @@ async function checkAchievements(models, userID) {
 
   const unlockedNow = [];
 
-  for (const achievement of ACHIEVEMENTS) {
-    if (isUnlocked(currency, achievement.id)) {
+  for (
+    const achievement
+    of ACHIEVEMENTS
+  ) {
+    if (
+      isUnlocked(
+        currency,
+        achievement.id
+      )
+    ) {
       continue;
     }
 
     let completed = false;
 
     try {
-      completed = Boolean(
-        achievement.check(context)
+      completed =
+        Boolean(
+          achievement.check(
+            context
+          )
+        );
+    } catch (error) {
+      console.error(
+        `[ACHIEVEMENT CHECK ERROR] ${achievement.id}`,
+        error
       );
-    } catch (_) {
+
       completed = false;
     }
 
@@ -680,15 +932,26 @@ async function checkAchievements(models, userID) {
       continue;
     }
 
-    const result = await unlockAchievement(
-      models,
-      uid,
-      achievement,
-      currency
-    );
+    try {
+      const result =
+        await unlockAchievement(
+          models,
+          uid,
+          achievement,
+          currency,
+          pet
+        );
 
-    if (result) {
-      unlockedNow.push(result);
+      if (result) {
+        unlockedNow.push(
+          result
+        );
+      }
+    } catch (error) {
+      console.error(
+        `[ACHIEVEMENT UNLOCK ERROR] ${achievement.id}`,
+        error
+      );
     }
   }
 
@@ -705,25 +968,43 @@ async function updateStat(
   stat,
   amount = 1
 ) {
-  const currency = await Pdata.getPetCurrency(
-    models,
-    userID
-  );
+  const PetCurrency =
+    Pdata.getPetCurrencyModel(
+      models
+    );
+
+  const currency =
+    await Pdata.getPetCurrency(
+      PetCurrency,
+      userID
+    );
 
   if (!currency) {
     return [];
   }
 
-  const stats = getAchievementStats(currency);
+  const achievements =
+    getAchievementsData(
+      currency
+    );
+
+  const stats =
+    getAchievementStats(
+      currency
+    );
 
   stats[stat] =
     safeNumber(stats[stat]) +
     safeNumber(amount);
 
+  achievements.stats =
+    stats;
+
   await Pdata.updateCurrencyData(
-    models,
-    userID,
-    currency.data
+    currency,
+    {
+      achievements
+    }
   );
 
   return checkAchievements(
@@ -732,19 +1013,39 @@ async function updateStat(
   );
 }
 
+// ======================================================
+// Register Training
+// ======================================================
+
 async function registerTraining(
   models,
   userID,
   xp = 0
 ) {
-  const currency = await Pdata.getPetCurrency(
-    models,
-    userID
-  );
+  const PetCurrency =
+    Pdata.getPetCurrencyModel(
+      models
+    );
 
-  if (!currency) return [];
+  const currency =
+    await Pdata.getPetCurrency(
+      PetCurrency,
+      userID
+    );
 
-  const stats = getAchievementStats(currency);
+  if (!currency) {
+    return [];
+  }
+
+  const achievements =
+    getAchievementsData(
+      currency
+    );
+
+  const stats =
+    getAchievementStats(
+      currency
+    );
 
   stats.training =
     safeNumber(stats.training) + 1;
@@ -753,10 +1054,14 @@ async function registerTraining(
     safeNumber(stats.totalXP) +
     safeNumber(xp);
 
+  achievements.stats =
+    stats;
+
   await Pdata.updateCurrencyData(
-    models,
-    userID,
-    currency.data
+    currency,
+    {
+      achievements
+    }
   );
 
   return checkAchievements(
@@ -764,6 +1069,10 @@ async function registerTraining(
     userID
   );
 }
+
+// ======================================================
+// Register Feed
+// ======================================================
 
 async function registerFeed(
   models,
@@ -777,6 +1086,10 @@ async function registerFeed(
   );
 }
 
+// ======================================================
+// Register Heal
+// ======================================================
+
 async function registerHeal(
   models,
   userID
@@ -788,6 +1101,10 @@ async function registerHeal(
     1
   );
 }
+
+// ======================================================
+// Register XP
+// ======================================================
 
 async function registerXP(
   models,
@@ -818,51 +1135,166 @@ function getAchievementProgress(
     };
   }
 
-  const id = achievement.id;
+  const id =
+    achievement.id;
 
   let current = 0;
   let target = 0;
 
-  if (id.startsWith("level_")) {
-    current = safeNumber(context.pet?.level);
-    target = Number(id.replace("level_", ""));
+  // ----------------------------------------------------
+  // Level
+  // ----------------------------------------------------
+
+  if (
+    id.startsWith("level_")
+  ) {
+    current =
+      safeNumber(
+        context.pet?.level
+      );
+
+    target =
+      parseAchievementTarget(
+        id.replace(
+          "level_",
+          ""
+        )
+      );
   }
 
-  else if (id.startsWith("star_")) {
-    current = safeNumber(context.pet?.stars);
-    target = Number(id.replace("star_", ""));
+  // ----------------------------------------------------
+  // Stars
+  // ----------------------------------------------------
+
+  else if (
+    id.startsWith("star_")
+  ) {
+    current =
+      safeNumber(
+        context.pet?.stars
+      );
+
+    target =
+      parseAchievementTarget(
+        id.replace(
+          "star_",
+          ""
+        )
+      );
   }
 
-  else if (id.startsWith("training_")) {
-    current = safeNumber(context.stats?.training);
-    target = Number(id.replace("training_", ""));
+  // ----------------------------------------------------
+  // Training
+  // ----------------------------------------------------
+
+  else if (
+    id.startsWith("training_")
+  ) {
+    current =
+      safeNumber(
+        context.stats?.training
+      );
+
+    target =
+      parseAchievementTarget(
+        id.replace(
+          "training_",
+          ""
+        )
+      );
   }
 
-  else if (id.startsWith("feed_")) {
-    current = safeNumber(context.stats?.feed);
-    target = Number(id.replace("feed_", ""));
+  // ----------------------------------------------------
+  // Feeding
+  // ----------------------------------------------------
+
+  else if (
+    id.startsWith("feed_")
+  ) {
+    current =
+      safeNumber(
+        context.stats?.feed
+      );
+
+    target =
+      parseAchievementTarget(
+        id.replace(
+          "feed_",
+          ""
+        )
+      );
   }
 
-  else if (id.startsWith("heal_")) {
-    current = safeNumber(context.stats?.heal);
-    target = Number(id.replace("heal_", ""));
+  // ----------------------------------------------------
+  // Healing
+  // ----------------------------------------------------
+
+  else if (
+    id.startsWith("heal_")
+  ) {
+    current =
+      safeNumber(
+        context.stats?.heal
+      );
+
+    target =
+      parseAchievementTarget(
+        id.replace(
+          "heal_",
+          ""
+        )
+      );
   }
 
-  else if (id.startsWith("xp_")) {
-    current = safeNumber(context.stats?.totalXP);
-    target = Number(id.replace("xp_", ""));
+  // ----------------------------------------------------
+  // XP
+  // ----------------------------------------------------
+
+  else if (
+    id.startsWith("xp_")
+  ) {
+    current =
+      safeNumber(
+        context.stats?.totalXP
+      );
+
+    target =
+      parseAchievementTarget(
+        id.replace(
+          "xp_",
+          ""
+        )
+      );
   }
 
-  else if (id.startsWith("money_")) {
-    current = safeNumber(context.money);
-    target = Number(id.replace("money_", ""));
+  // ----------------------------------------------------
+  // Money
+  // ----------------------------------------------------
+
+  else if (
+    id.startsWith("money_")
+  ) {
+    current =
+      safeNumber(
+        context.money
+      );
+
+    target =
+      parseAchievementTarget(
+        id.replace(
+          "money_",
+          ""
+        )
+      );
   }
 
   const percentage =
     target > 0
       ? Math.min(
           100,
-          Math.floor((current / target) * 100)
+          Math.floor(
+            (current / target) * 100
+          )
         )
       : 0;
 
@@ -877,7 +1309,9 @@ function getAchievementProgress(
 // Display
 // ======================================================
 
-function getCategoryName(category) {
+function getCategoryName(
+  category
+) {
   const names = {
     level: "المستوى",
     stars: "النجوم",
@@ -887,21 +1321,34 @@ function getCategoryName(category) {
     money: "المال"
   };
 
-  return names[category] || category;
+  return (
+    names[category] ||
+    category
+  );
 }
 
-function buildRewardText(reward) {
+function buildRewardText(
+  reward
+) {
   const parts = [];
 
-  if (safeNumber(reward.money) > 0) {
+  if (
+    safeNumber(reward.money) > 0
+  ) {
     parts.push(
-      `💰 ${formatNumber(reward.money)}`
+      `💰 ${formatNumber(
+        reward.money
+      )}`
     );
   }
 
-  if (safeNumber(reward.xp) > 0) {
+  if (
+    safeNumber(reward.xp) > 0
+  ) {
     parts.push(
-      `⚡ ${formatNumber(reward.xp)} XP`
+      `⚡ ${formatNumber(
+        reward.xp
+      )} XP`
     );
   }
 
@@ -915,59 +1362,89 @@ function buildRewardText(reward) {
     ["developmentStones", "💎"]
   ];
 
-  for (const [key, emoji] of items) {
-    const amount = safeNumber(reward[key]);
+  for (
+    const [key, emoji]
+    of items
+  ) {
+    const amount =
+      safeNumber(
+        reward[key]
+      );
 
     if (amount > 0) {
       parts.push(
-        `${emoji} ×${formatNumber(amount)}`
+        `${emoji} ×${formatNumber(
+          amount
+        )}`
       );
     }
   }
 
-  return parts.join("  ") || "لا توجد";
+  return (
+    parts.join("  ") ||
+    "لا توجد"
+  );
 }
+
+// ======================================================
+// Build Achievements Message
+// ======================================================
 
 async function buildAchievementsMessage(
   models,
   userID,
   page = 1
 ) {
-  const player = await Pdata.getPlayerData(
-    models,
-    userID
-  );
+  const player =
+    await Pdata.getPlayerData(
+      models,
+      userID
+    );
 
   if (!player) {
-    return "⌬ ━━ 𝗛𝗜𝗡𝗔 ACHIEVEMENTS ━━ ⌬\n\nلا توجد بيانات للاعب";
+    return (
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 ACHIEVEMENTS ━━ ⌬\n\n" +
+      "لا توجد بيانات للاعب"
+    );
   }
 
-  const currency = player.currency || {
-    data: {}
-  };
+  const currency =
+    player.currency || {
+      data: {}
+    };
 
-  const unlocked = getUnlockedAchievements(
-    currency
-  );
+  const unlocked =
+    getUnlockedAchievements(
+      currency
+    );
 
-  const stats = getAchievementStats(
-    currency
-  );
+  const stats =
+    getAchievementStats(
+      currency
+    );
 
-  const total = ACHIEVEMENTS.length;
-  const unlockedCount = unlocked.length;
+  const total =
+    ACHIEVEMENTS.length;
 
-  const maxPage = Math.max(
-    1,
-    Math.ceil(
-      total / MAX_ACHIEVEMENTS_PER_PAGE
-    )
-  );
+  const unlockedCount =
+    unlocked.length;
+
+  const maxPage =
+    Math.max(
+      1,
+      Math.ceil(
+        total /
+        MAX_ACHIEVEMENTS_PER_PAGE
+      )
+    );
 
   page = Math.max(
     1,
     Math.min(
-      safeNumber(page, 1),
+      safeNumber(
+        page,
+        1
+      ),
       maxPage
     )
   );
@@ -976,10 +1453,12 @@ async function buildAchievementsMessage(
     (page - 1) *
     MAX_ACHIEVEMENTS_PER_PAGE;
 
-  const list = ACHIEVEMENTS.slice(
-    start,
-    start + MAX_ACHIEVEMENTS_PER_PAGE
-  );
+  const list =
+    ACHIEVEMENTS.slice(
+      start,
+      start +
+      MAX_ACHIEVEMENTS_PER_PAGE
+    );
 
   const lines = [];
 
@@ -995,7 +1474,8 @@ async function buildAchievementsMessage(
 
   lines.push(
     `✦ نسبة الإنجاز : ${Math.floor(
-      (unlockedCount / total) * 100
+      (unlockedCount / total) *
+      100
     )}%`
   );
 
@@ -1005,12 +1485,17 @@ async function buildAchievementsMessage(
 
   lines.push("");
 
-  for (const achievement of list) {
-    const done = unlocked.includes(
-      achievement.id
-    );
+  for (
+    const achievement
+    of list
+  ) {
+    const done =
+      unlocked.includes(
+        achievement.id
+      );
 
-    const icon = done ? "✓" : "○";
+    const icon =
+      done ? "✓" : "○";
 
     lines.push(
       `${icon} ${achievement.title}`
@@ -1043,7 +1528,9 @@ async function buildAchievementsMessage(
           }
         );
 
-      if (progress.target > 0) {
+      if (
+        progress.target > 0
+      ) {
         lines.push(
           `   └ التقدم : ${formatNumber(
             progress.current
@@ -1076,32 +1563,49 @@ async function achievementsCommand({
   models,
   args = []
 }) {
-  const userID = getUserID(
-    event.senderID
-  );
-
-  await checkAchievements(
-    models,
-    userID
-  );
-
-  const page = safeNumber(
-    args[0],
-    1
-  );
-
-  const text =
-    await buildAchievementsMessage(
-      models,
-      userID,
-      page
+  const userID =
+    getUserID(
+      event.senderID
     );
 
-  return api.sendMessage(
-    text,
-    event.threadID,
-    event.messageID
-  );
+  try {
+    await checkAchievements(
+      models,
+      userID
+    );
+
+    const page =
+      safeNumber(
+        args[0],
+        1
+      );
+
+    const text =
+      await buildAchievementsMessage(
+        models,
+        userID,
+        page
+      );
+
+    return api.sendMessage(
+      text,
+      event.threadID,
+      event.messageID
+    );
+
+  } catch (error) {
+    console.error(
+      "[HINA ACHIEVEMENTS ERROR]",
+      error
+    );
+
+    return api.sendMessage(
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 ACHIEVEMENTS ━━ ⌬\n\n" +
+      "حدث خطأ أثناء تحميل الإنجازات.",
+      event.threadID,
+      event.messageID
+    );
+  }
 }
 
 // ======================================================
@@ -1110,17 +1614,26 @@ async function achievementsCommand({
 
 module.exports.config = {
   name: "انجازات",
+
   aliases: [
     "إنجازات",
     "انجاز",
     "إنجاز",
     "achievements"
   ],
-  version: "1.0.0",
+
+  version: "2.0.0",
+
   credits: "أبو هريرة",
-  description: "نظام إنجازات الحيوانات والمكافآت",
+
+  description:
+    "نظام إنجازات الحيوانات والمكافآت",
+
   commandCategory: "Games",
-  usages: "انجازات [رقم الصفحة]",
+
+  usages:
+    "انجازات [رقم الصفحة]",
+
   cooldowns: 3
 };
 
