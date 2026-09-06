@@ -10,12 +10,14 @@ const Achievements = require("./achievements");
 const Training = require("./training");
 const Care = require("./care");
 const Mission = require("./mission");
+const Shop = require("./shop");
+const Inventory = require("./inventory");
 
 module.exports.config = {
   name: "تجربة",
-  version: "6.0.0",
+  version: "7.0.0",
   credits: "أبو هريرة",
-  description: "اختبار شامل لنظام الحيوانات والإنجازات",
+  description: "اختبار شامل لنظام الحيوانات والإنجازات والمتجر والحقيبة",
   commandCategory: "Games",
   hasPermssion: 0,
   usages: "تجربة",
@@ -55,6 +57,20 @@ module.exports.run = async function ({
       }
     }
 
+    function section(number, title) {
+      lines.push(
+        `${number}. ${title}`,
+        ""
+      );
+    }
+
+    function isFinitePositiveNumber(value) {
+      return (
+        Number.isFinite(Number(value)) &&
+        Number(value) > 0
+      );
+    }
+
     lines.push(
       "اختبار شامل لنظام الحيوانات",
       "════════════════════",
@@ -62,13 +78,10 @@ module.exports.run = async function ({
     );
 
     /* =====================================================
-       1. اختبار بيانات الحيوانات
+       1. بيانات الحيوانات
     ===================================================== */
 
-    lines.push(
-      "1. اختبار بيانات الحيوانات",
-      ""
-    );
+    section(1, "اختبار بيانات الحيوانات");
 
     lines.push(
       `القنفذ : ${hedgehog.name}`,
@@ -118,13 +131,10 @@ module.exports.run = async function ({
     lines.push("");
 
     /* =====================================================
-       2. اختبار المستويات
+       2. المستويات
     ===================================================== */
 
-    lines.push(
-      "2. اختبار المستويات",
-      ""
-    );
+    section(2, "اختبار المستويات");
 
     const levels = [
       0,
@@ -199,13 +209,10 @@ module.exports.run = async function ({
     lines.push("");
 
     /* =====================================================
-       3. اختبار stats.js
+       3. stats.js
     ===================================================== */
 
-    lines.push(
-      "3. اختبار الإحصائيات",
-      ""
-    );
+    section(3, "اختبار الإحصائيات");
 
     const statLevels = [
       {
@@ -295,13 +302,10 @@ module.exports.run = async function ({
     lines.push("");
 
     /* =====================================================
-       4. اختبار XP
+       4. XP
     ===================================================== */
 
-    lines.push(
-      "4. اختبار XP",
-      ""
-    );
+    section(4, "اختبار XP");
 
     const xpLevels = [
       0,
@@ -330,9 +334,7 @@ module.exports.run = async function ({
       }
 
       const required =
-        leveling.getRequiredXP(
-          level
-        );
+        leveling.getRequiredXP(level);
 
       if (required <= previousXP) {
         xpIncreasing = false;
@@ -354,13 +356,10 @@ module.exports.run = async function ({
     lines.push("");
 
     /* =====================================================
-       5. اختبار stars.js
+       5. stars.js
     ===================================================== */
 
-    lines.push(
-      "5. اختبار النجوم",
-      ""
-    );
+    section(5, "اختبار النجوم");
 
     let starsTest = true;
 
@@ -426,13 +425,10 @@ module.exports.run = async function ({
     lines.push("");
 
     /* =====================================================
-       6. اختبار الترقية
+       6. الترقية
     ===================================================== */
 
-    lines.push(
-      "6. اختبار الترقية",
-      ""
-    );
+    section(6, "اختبار الترقية");
 
     const before =
       stats.getStats(
@@ -495,13 +491,10 @@ module.exports.run = async function ({
     lines.push("");
 
     /* =====================================================
-       7. اختبار الحالات الممنوعة
+       7. الحالات الممنوعة
     ===================================================== */
 
-    lines.push(
-      "7. اختبار حالات الترقية الممنوعة",
-      ""
-    );
+    section(7, "اختبار حالات الترقية الممنوعة");
 
     const earlyPromotion =
       stars.promotePet(
@@ -541,13 +534,10 @@ module.exports.run = async function ({
     lines.push("");
 
     /* =====================================================
-       8. اختبار achievements.js
+       8. نظام الإنجازات
     ===================================================== */
 
-    lines.push(
-      "8. اختبار نظام الإنجازات",
-      ""
-    );
+    section(8, "اختبار نظام الإنجازات");
 
     const achievementList =
       Achievements.ACHIEVEMENTS;
@@ -603,13 +593,10 @@ module.exports.run = async function ({
     );
 
     /* =====================================================
-       9. اختبار معرفات الإنجازات
+       9. معرفات الإنجازات
     ===================================================== */
 
-    lines.push(
-      "9. اختبار معرفات الإنجازات",
-      ""
-    );
+    section(9, "اختبار معرفات الإنجازات");
 
     const achievementIDs =
       achievementList.map(
@@ -636,13 +623,10 @@ module.exports.run = async function ({
     );
 
     /* =====================================================
-       10. اختبار تعريف كل إنجاز
+       10. تعريف الإنجازات
     ===================================================== */
 
-    lines.push(
-      "10. اختبار تعريفات الإنجازات",
-      ""
-    );
+    section(10, "اختبار تعريفات الإنجازات");
 
     let definitionsTest = true;
 
@@ -660,6 +644,7 @@ module.exports.run = async function ({
 
       if (!valid) {
         definitionsTest = false;
+
         lines.push(
           `✗ تعريف غير صالح : ${achievement?.id || "UNKNOWN"}`
         );
@@ -675,13 +660,10 @@ module.exports.run = async function ({
     lines.push("");
 
     /* =====================================================
-       11. اختبار شروط الإنجازات
+       11. شروط الإنجازات
     ===================================================== */
 
-    lines.push(
-      "11. اختبار شروط الإنجازات",
-      ""
-    );
+    section(11, "اختبار شروط الإنجازات");
 
     const achievementContexts = {
       level: {
@@ -788,13 +770,10 @@ module.exports.run = async function ({
     lines.push("");
 
     /* =====================================================
-       12. اختبار التقدم
+       12. تقدم الإنجازات
     ===================================================== */
 
-    lines.push(
-      "12. اختبار تقدم الإنجازات",
-      ""
-    );
+    section(12, "اختبار تقدم الإنجازات");
 
     let progressTest = true;
 
@@ -868,6 +847,18 @@ module.exports.run = async function ({
       },
 
       {
+        id: "xp_5m",
+        pet: {
+          level: 1,
+          stars: 0
+        },
+        stats: {
+          totalXP: 2500000
+        },
+        money: 0
+      },
+
+      {
         id: "money_1m",
         pet: {
           level: 1,
@@ -875,6 +866,16 @@ module.exports.run = async function ({
         },
         stats: {},
         money: 500000
+      },
+
+      {
+        id: "money_10m",
+        pet: {
+          level: 1,
+          stars: 0
+        },
+        stats: {},
+        money: 5000000
       }
     ];
 
@@ -932,13 +933,10 @@ module.exports.run = async function ({
     lines.push("");
 
     /* =====================================================
-       13. اختبار المكافآت
+       13. مكافآت الإنجازات
     ===================================================== */
 
-    lines.push(
-      "13. اختبار تعريف المكافآت",
-      ""
-    );
+    section(13, "اختبار تعريف المكافآت");
 
     let rewardsTest = true;
 
@@ -979,27 +977,21 @@ module.exports.run = async function ({
     lines.push("");
 
     /* =====================================================
-       14. اختبار ربط التدريب
+       14. ربط التدريب
     ===================================================== */
 
-    lines.push(
-      "14. اختبار ربط التدريب بالإنجازات",
-      ""
-    );
+    section(14, "اختبار ربط التدريب بالإنجازات");
 
-    const trainingAchievements =
-      [
-        "training_10",
-        "training_50",
-        "training_100",
-        "training_250"
-      ];
+    const trainingAchievements = [
+      "training_10",
+      "training_50",
+      "training_100",
+      "training_250"
+    ];
 
     let trainingAchievementTest = true;
 
-    for (
-      const id of trainingAchievements
-    ) {
+    for (const id of trainingAchievements) {
       const achievement =
         Achievements.getAchievement(
           id
@@ -1036,13 +1028,10 @@ module.exports.run = async function ({
     lines.push("");
 
     /* =====================================================
-       15. اختبار ربط العناية
+       15. ربط العناية
     ===================================================== */
 
-    lines.push(
-      "15. اختبار ربط العناية بالإنجازات",
-      ""
-    );
+    section(15, "اختبار ربط العناية بالإنجازات");
 
     const careAchievements = [
       "feed_10",
@@ -1056,9 +1045,7 @@ module.exports.run = async function ({
 
     let careAchievementTest = true;
 
-    for (
-      const id of careAchievements
-    ) {
+    for (const id of careAchievements) {
       const achievement =
         Achievements.getAchievement(
           id
@@ -1095,13 +1082,10 @@ module.exports.run = async function ({
     lines.push("");
 
     /* =====================================================
-       16. اختبار نظام المهام
+       16. نظام المهام
     ===================================================== */
 
-    lines.push(
-      "16. اختبار نظام المهام",
-      ""
-    );
+    section(16, "اختبار نظام المهام");
 
     const missionModuleTest =
       Array.isArray(
@@ -1134,13 +1118,10 @@ module.exports.run = async function ({
     lines.push("");
 
     /* =====================================================
-       17. اختبار الإنجازات المالية
+       17. الإنجازات المالية
     ===================================================== */
 
-    lines.push(
-      "17. اختبار الإنجازات المالية",
-      ""
-    );
+    section(17, "اختبار الإنجازات المالية");
 
     const moneyAchievements = [
       {
@@ -1159,9 +1140,7 @@ module.exports.run = async function ({
 
     let moneyAchievementTest = true;
 
-    for (
-      const item of moneyAchievements
-    ) {
+    for (const item of moneyAchievements) {
       const achievement =
         Achievements.getAchievement(
           item.id
@@ -1209,13 +1188,965 @@ module.exports.run = async function ({
     lines.push("");
 
     /* =====================================================
-       18. اختبار قاعدة البيانات
+       18. اختبار المتجر
     ===================================================== */
 
+    section(18, "اختبار المتجر");
+
+    const shopItems =
+      Shop.SHOP_ITEMS;
+
+    const shopLoaded =
+      Array.isArray(shopItems) &&
+      shopItems.length > 0;
+
+    testResult(
+      shopLoaded,
+      "تم تحميل منتجات المتجر",
+      "فشل تحميل منتجات المتجر"
+    );
+
     lines.push(
-      "18. اختبار قاعدة البيانات",
+      `عدد المنتجات : ${
+        Array.isArray(shopItems)
+          ? shopItems.length
+          : 0
+      }`,
+      `الحد الأقصى للشراء : ${Shop.MAX_PURCHASE_QUANTITY}`,
       ""
     );
+
+    /* -----------------------------------------------------
+       اختبار تعريف المنتجات
+    ----------------------------------------------------- */
+
+    let shopDefinitionsTest = true;
+    const shopNumbers = new Set();
+    const shopIDs = new Set();
+
+    for (const item of shopItems || []) {
+      const valid =
+        item &&
+        typeof item.id === "string" &&
+        item.id.length > 0 &&
+        Number.isInteger(item.number) &&
+        item.number > 0 &&
+        typeof item.name === "string" &&
+        item.name.length > 0 &&
+        Number.isFinite(Number(item.price)) &&
+        Number(item.price) > 0 &&
+        typeof item.emoji === "string" &&
+        typeof item.description === "string" &&
+        typeof item.bagField === "string" &&
+        item.bagField.length > 0;
+
+      if (!valid) {
+        shopDefinitionsTest = false;
+
+        lines.push(
+          `✗ منتج غير صالح : ${item?.id || "UNKNOWN"}`
+        );
+      }
+
+      if (shopNumbers.has(item.number)) {
+        shopDefinitionsTest = false;
+
+        lines.push(
+          `✗ رقم منتج مكرر : ${item.number}`
+        );
+      }
+
+      if (shopIDs.has(item.id)) {
+        shopDefinitionsTest = false;
+
+        lines.push(
+          `✗ معرف منتج مكرر : ${item.id}`
+        );
+      }
+
+      shopNumbers.add(item.number);
+      shopIDs.add(item.id);
+    }
+
+    testResult(
+      shopDefinitionsTest,
+      "جميع منتجات المتجر معرفة بشكل صحيح",
+      "يوجد خطأ في تعريف منتجات المتجر"
+    );
+
+    lines.push("");
+
+    /* -----------------------------------------------------
+       اختبار أرقام المتجر
+    ----------------------------------------------------- */
+
+    let shopNumberTest = true;
+
+    for (const item of shopItems || []) {
+      const byNumber =
+        Shop.getItemByNumber(
+          item.number
+        );
+
+      const byID =
+        Shop.getItemByID(
+          item.id
+        );
+
+      if (
+        !byNumber ||
+        byNumber.id !== item.id ||
+        !byID ||
+        byID.number !== item.number
+      ) {
+        shopNumberTest = false;
+
+        lines.push(
+          `✗ فشل الوصول إلى المنتج : ${item.id}`
+        );
+      }
+    }
+
+    testResult(
+      shopNumberTest,
+      "الوصول إلى المنتجات بالرقم والمعرف يعمل",
+      "يوجد خطأ في الوصول إلى منتجات المتجر"
+    );
+
+    lines.push("");
+
+    /* -----------------------------------------------------
+       اختبار أسعار المتجر
+    ----------------------------------------------------- */
+
+    let pricesTest = true;
+
+    for (const item of shopItems || []) {
+      const price =
+        Number(item.price);
+
+      if (
+        !Number.isSafeInteger(price) ||
+        price <= 0
+      ) {
+        pricesTest = false;
+
+        lines.push(
+          `✗ سعر غير صالح : ${item.id}`
+        );
+      }
+    }
+
+    testResult(
+      pricesTest,
+      "جميع أسعار المتجر صحيحة",
+      "يوجد سعر غير صالح في المتجر"
+    );
+
+    lines.push("");
+
+    /* =====================================================
+       19. توافق المتجر مع الحقيبة
+    ===================================================== */
+
+    section(19, "اختبار توافق المتجر مع الحقيبة");
+
+    const inventoryItems =
+      Inventory.INVENTORY_ITEMS;
+
+    let shopInventoryTest = true;
+
+    for (const shopItem of shopItems || []) {
+      const inventoryItem =
+        Inventory.getInventoryItem(
+          shopItem.bagField
+        );
+
+      if (
+        !inventoryItem ||
+        inventoryItem.field !== shopItem.bagField
+      ) {
+        shopInventoryTest = false;
+
+        lines.push(
+          `✗ منتج المتجر غير موجود في الحقيبة : ${shopItem.id} → ${shopItem.bagField}`
+        );
+      } else {
+        lines.push(
+          `✓ ${shopItem.id} → ${inventoryItem.field}`
+        );
+      }
+    }
+
+    testResult(
+      shopInventoryTest,
+      "جميع منتجات المتجر مرتبطة بحقوق الحقيبة الصحيحة",
+      "يوجد منتج غير مرتبط بالحقيبة"
+    );
+
+    lines.push("");
+
+    /* =====================================================
+       20. اختبار الحقيبة
+    ===================================================== */
+
+    section(20, "اختبار الحقيبة");
+
+    const inventoryLoaded =
+      Array.isArray(inventoryItems) &&
+      inventoryItems.length > 0;
+
+    testResult(
+      inventoryLoaded,
+      "تم تحميل عناصر الحقيبة",
+      "فشل تحميل عناصر الحقيبة"
+    );
+
+    lines.push(
+      `عدد عناصر الحقيبة : ${
+        Array.isArray(inventoryItems)
+          ? inventoryItems.length
+          : 0
+      }`,
+      ""
+    );
+
+    let inventoryDefinitionsTest = true;
+
+    const inventoryIDs = new Set();
+    const inventoryFields = new Set();
+
+    for (const item of inventoryItems || []) {
+      const valid =
+        item &&
+        typeof item.id === "string" &&
+        item.id.length > 0 &&
+        typeof item.name === "string" &&
+        item.name.length > 0 &&
+        typeof item.emoji === "string" &&
+        typeof item.field === "string" &&
+        item.field.length > 0 &&
+        typeof item.description === "string";
+
+      if (!valid) {
+        inventoryDefinitionsTest = false;
+
+        lines.push(
+          `✗ عنصر حقيبة غير صالح : ${item?.id || "UNKNOWN"}`
+        );
+      }
+
+      if (inventoryIDs.has(item.id)) {
+        inventoryDefinitionsTest = false;
+
+        lines.push(
+          `✗ معرف حقيبة مكرر : ${item.id}`
+        );
+      }
+
+      if (inventoryFields.has(item.field)) {
+        inventoryDefinitionsTest = false;
+
+        lines.push(
+          `✗ حقل حقيبة مكرر : ${item.field}`
+        );
+      }
+
+      inventoryIDs.add(item.id);
+      inventoryFields.add(item.field);
+    }
+
+    testResult(
+      inventoryDefinitionsTest,
+      "جميع عناصر الحقيبة معرفة بشكل صحيح",
+      "يوجد خطأ في تعريف الحقيبة"
+    );
+
+    lines.push("");
+
+    /* =====================================================
+       21. اختبار توافق جميع عناصر الحقيبة
+    ===================================================== */
+
+    section(21, "اختبار اكتمال موارد الحقيبة");
+
+    let inventoryMethodsTest =
+      typeof Inventory.getInventoryData === "function" &&
+      typeof Inventory.getInventoryItem === "function" &&
+      typeof Inventory.getTotalItems === "function" &&
+      typeof Inventory.buildInventoryMessage === "function" &&
+      typeof Inventory.hasItem === "function" &&
+      typeof Inventory.useItem === "function" &&
+      typeof Inventory.addItem === "function" &&
+      typeof Inventory.removeItem === "function" &&
+      typeof Inventory.getAllItems === "function";
+
+    testResult(
+      inventoryMethodsTest,
+      "جميع دوال الحقيبة الأساسية موجودة",
+      "هناك دالة مفقودة في الحقيبة"
+    );
+
+    const allItems =
+      typeof Inventory.getAllItems === "function"
+        ? Inventory.getAllItems()
+        : [];
+
+    testResult(
+      Array.isArray(allItems) &&
+      allItems.length === inventoryItems.length,
+      "getAllItems يعيد جميع موارد الحقيبة",
+      "getAllItems لا يعيد جميع الموارد"
+    );
+
+    lines.push("");
+
+    /* =====================================================
+       22. اختبار بيانات الحقيبة الوهمية
+    ===================================================== */
+
+    section(22, "اختبار قراءة الحقيبة");
+
+    /*
+     * بيانات وهمية بالكامل
+     * لا يتم استخدام قاعدة بيانات اللاعب الحقيقية
+     */
+
+    const fakeCurrency = {
+      money: 2500000,
+
+      data: {
+        food: 10,
+        medicine: 5,
+        shields: 3,
+        investmentCards: 2,
+        xpCards: 4,
+        trainingBoosters: 6,
+        developmentStones: 1
+      },
+
+      save: async function () {
+        return true;
+      }
+    };
+
+    let inventoryReadTest = false;
+
+    try {
+      const fakeInventory =
+        Inventory.getInventoryData(
+          fakeCurrency
+        );
+
+      inventoryReadTest =
+        fakeInventory.food === 10 &&
+        fakeInventory.medicine === 5 &&
+        fakeInventory.shields === 3 &&
+        fakeInventory.investmentCards === 2 &&
+        fakeInventory.xpCards === 4 &&
+        fakeInventory.trainingBoosters === 6 &&
+        fakeInventory.developmentStones === 1;
+
+      lines.push(
+        `طعام : ${fakeInventory.food}`,
+        `دواء : ${fakeInventory.medicine}`,
+        `دروع : ${fakeInventory.shields}`,
+        `بطاقات استثمار : ${fakeInventory.investmentCards}`,
+        `بطاقات XP : ${fakeInventory.xpCards}`,
+        `منشطات تدريب : ${fakeInventory.trainingBoosters}`,
+        `أحجار تطوير : ${fakeInventory.developmentStones}`,
+        ""
+      );
+    } catch (error) {
+      lines.push(
+        `✗ خطأ أثناء قراءة الحقيبة الوهمية : ${error.message}`,
+        ""
+      );
+    }
+
+    testResult(
+      inventoryReadTest,
+      "قراءة بيانات الحقيبة تعمل بشكل صحيح",
+      "يوجد خطأ في قراءة بيانات الحقيبة"
+    );
+
+    /* =====================================================
+       23. إجمالي الموارد
+    ===================================================== */
+
+    section(23, "اختبار إجمالي موارد الحقيبة");
+
+    let totalItemsTest = false;
+
+    try {
+      const total =
+        Inventory.getTotalItems(
+          fakeCurrency
+        );
+
+      const expectedTotal =
+        10 +
+        5 +
+        3 +
+        2 +
+        4 +
+        6 +
+        1;
+
+      lines.push(
+        `الإجمالي الفعلي : ${total}`,
+        `الإجمالي المتوقع : ${expectedTotal}`,
+        ""
+      );
+
+      totalItemsTest =
+        total === expectedTotal;
+    } catch (error) {
+      lines.push(
+        `✗ خطأ في حساب الإجمالي : ${error.message}`,
+        ""
+      );
+    }
+
+    testResult(
+      totalItemsTest,
+      "حساب مجموع موارد الحقيبة يعمل",
+      "يوجد خطأ في حساب مجموع الموارد"
+    );
+
+    /* =====================================================
+       24. hasItem
+    ===================================================== */
+
+    section(24, "اختبار امتلاك الموارد");
+
+    let hasItemTest = true;
+
+    try {
+      const tests = [
+        {
+          field: "food",
+          amount: 10,
+          expected: true
+        },
+        {
+          field: "food",
+          amount: 11,
+          expected: false
+        },
+        {
+          field: "medicine",
+          amount: 5,
+          expected: true
+        },
+        {
+          field: "medicine",
+          amount: 6,
+          expected: false
+        },
+        {
+          field: "shields",
+          amount: 0,
+          expected: true
+        },
+        {
+          field: "unknown",
+          amount: 1,
+          expected: false
+        }
+      ];
+
+      for (const item of tests) {
+        const result =
+          Inventory.hasItem(
+            fakeCurrency,
+            item.field,
+            item.amount
+          );
+
+        lines.push(
+          `${item.field} ×${item.amount} → ${
+            result ? "نعم" : "لا"
+          }`
+        );
+
+        if (result !== item.expected) {
+          hasItemTest = false;
+        }
+      }
+
+      lines.push("");
+    } catch (error) {
+      hasItemTest = false;
+
+      lines.push(
+        `✗ خطأ في hasItem : ${error.message}`,
+        ""
+      );
+    }
+
+    testResult(
+      hasItemTest,
+      "التحقق من امتلاك الموارد يعمل",
+      "يوجد خطأ في hasItem"
+    );
+
+    /* =====================================================
+       25. إضافة مورد
+    ===================================================== */
+
+    section(25, "اختبار إضافة مورد للحقيبة");
+
+    let addItemTest = false;
+
+    try {
+      const beforeAmount =
+        fakeCurrency.data.food;
+
+      const newAmount =
+        await Inventory.addItem(
+          fakeCurrency,
+          "food",
+          5
+        );
+
+      addItemTest =
+        newAmount === 15 &&
+        fakeCurrency.data.food === 15 &&
+        beforeAmount === 10;
+
+      lines.push(
+        `قبل الإضافة : ${beforeAmount}`,
+        `بعد الإضافة : ${newAmount}`,
+        ""
+      );
+    } catch (error) {
+      lines.push(
+        `✗ خطأ في إضافة المورد : ${error.message}`,
+        ""
+      );
+    }
+
+    testResult(
+      addItemTest,
+      "إضافة الموارد إلى الحقيبة تعمل",
+      "يوجد خطأ في إضافة الموارد"
+    );
+
+    /* =====================================================
+       26. استخدام مورد
+    ===================================================== */
+
+    section(26, "اختبار استخدام مورد من الحقيبة");
+
+    let useItemTest = false;
+
+    try {
+      const beforeAmount =
+        fakeCurrency.data.food;
+
+      const newAmount =
+        await Inventory.useItem(
+          fakeCurrency,
+          "food",
+          3
+        );
+
+      useItemTest =
+        beforeAmount === 15 &&
+        newAmount === 12 &&
+        fakeCurrency.data.food === 12;
+
+      lines.push(
+        `قبل الاستخدام : ${beforeAmount}`,
+        `بعد الاستخدام : ${newAmount}`,
+        ""
+      );
+    } catch (error) {
+      lines.push(
+        `✗ خطأ في استخدام المورد : ${error.message}`,
+        ""
+      );
+    }
+
+    testResult(
+      useItemTest,
+      "استخدام الموارد من الحقيبة يعمل",
+      "يوجد خطأ في استخدام الموارد"
+    );
+
+    /* =====================================================
+       27. إزالة مورد
+    ===================================================== */
+
+    section(27, "اختبار إزالة مورد");
+
+    let removeItemTest = false;
+
+    try {
+      const beforeAmount =
+        fakeCurrency.data.medicine;
+
+      const newAmount =
+        await Inventory.removeItem(
+          fakeCurrency,
+          "medicine",
+          2
+        );
+
+      removeItemTest =
+        beforeAmount === 5 &&
+        newAmount === 3 &&
+        fakeCurrency.data.medicine === 3;
+
+      lines.push(
+        `قبل الإزالة : ${beforeAmount}`,
+        `بعد الإزالة : ${newAmount}`,
+        ""
+      );
+    } catch (error) {
+      lines.push(
+        `✗ خطأ في إزالة المورد : ${error.message}`,
+        ""
+      );
+    }
+
+    testResult(
+      removeItemTest,
+      "إزالة الموارد من الحقيبة تعمل",
+      "يوجد خطأ في إزالة الموارد"
+    );
+
+    /* =====================================================
+       28. حالات الحقيبة الممنوعة
+    ===================================================== */
+
+    section(28, "اختبار الحالات الممنوعة للحقيبة");
+
+    let inventoryInvalidTest = true;
+
+    try {
+      const invalidTests = [
+        {
+          name: "عنصر غير موجود",
+          fn: () =>
+            Inventory.addItem(
+              fakeCurrency,
+              "unknown",
+              1
+            ),
+          error: "INVALID_INVENTORY_ITEM"
+        },
+
+        {
+          name: "كمية صفر",
+          fn: () =>
+            Inventory.addItem(
+              fakeCurrency,
+              "food",
+              0
+            ),
+          error: "INVALID_AMOUNT"
+        },
+
+        {
+          name: "كمية سالبة",
+          fn: () =>
+            Inventory.addItem(
+              fakeCurrency,
+              "food",
+              -1
+            ),
+          error: "INVALID_AMOUNT"
+        },
+
+        {
+          name: "كمية عشرية",
+          fn: () =>
+            Inventory.addItem(
+              fakeCurrency,
+              "food",
+              1.5
+            ),
+          error: "INVALID_AMOUNT"
+        },
+
+        {
+          name: "استخدام أكثر من الموجود",
+          fn: () =>
+            Inventory.useItem(
+              fakeCurrency,
+              "food",
+              999999
+            ),
+          error: "INSUFFICIENT_ITEM"
+        }
+      ];
+
+      for (const test of invalidTests) {
+        let caught = false;
+
+        try {
+          await test.fn();
+        } catch (error) {
+          caught =
+            error.message === test.error;
+        }
+
+        lines.push(
+          `${caught ? "✓" : "✗"} ${test.name}`
+        );
+
+        if (!caught) {
+          inventoryInvalidTest = false;
+        }
+      }
+
+      lines.push("");
+    } catch (error) {
+      inventoryInvalidTest = false;
+
+      lines.push(
+        `✗ خطأ في اختبارات الحالات الممنوعة : ${error.message}`,
+        ""
+      );
+    }
+
+    testResult(
+      inventoryInvalidTest,
+      "الحالات الممنوعة للحقيبة تعمل بشكل صحيح",
+      "يوجد خطأ في حماية الحقيبة"
+    );
+
+    /* =====================================================
+       29. رسالة الحقيبة
+    ===================================================== */
+
+    section(29, "اختبار رسالة الحقيبة");
+
+    let inventoryMessageTest = false;
+
+    try {
+      const message =
+        Inventory.buildInventoryMessage(
+          fakeCurrency
+        );
+
+      inventoryMessageTest =
+        typeof message === "string" &&
+        message.includes("𝗛𝗜𝗡𝗔 BAG") &&
+        message.includes("طعام الحيوان") &&
+        message.includes("دواء الحيوان") &&
+        message.includes("درع الحماية") &&
+        message.includes("بطاقة الاستثمار") &&
+        message.includes("بطاقة مضاعفة XP") &&
+        message.includes("منشّط التدريب") &&
+        message.includes("حجر التطوير") &&
+        message.includes("2,500,000") &&
+        message.includes("31");
+
+      lines.push(
+        inventoryMessageTest
+          ? "✓ رسالة الحقيبة تحتوي على جميع الموارد والرصيد"
+          : "✗ رسالة الحقيبة ناقصة"
+      );
+
+      lines.push("");
+    } catch (error) {
+      lines.push(
+        `✗ خطأ في بناء رسالة الحقيبة : ${error.message}`,
+        ""
+      );
+    }
+
+    testResult(
+      inventoryMessageTest,
+      "رسالة الحقيبة تعمل بشكل صحيح",
+      "يوجد خطأ في رسالة الحقيبة"
+    );
+
+    /* =====================================================
+       30. رسالة المتجر
+    ===================================================== */
+
+    section(30, "اختبار رسالة المتجر");
+
+    let shopMessageTest = false;
+
+    try {
+      const message =
+        Shop.getShopList();
+
+      shopMessageTest =
+        typeof message === "string" &&
+        message.includes("𝗛𝗜𝗡𝗔 SHOP") &&
+        message.includes("متجر موارد الحيوانات") &&
+        message.includes("طعام الحيوان") &&
+        message.includes("دواء الحيوان") &&
+        message.includes("درع الحماية") &&
+        message.includes("بطاقة الاستثمار") &&
+        message.includes("بطاقة مضاعفة XP") &&
+        message.includes("منشّط التدريب") &&
+        message.includes("حجر التطوير") &&
+        message.includes(
+          String(Shop.MAX_PURCHASE_QUANTITY)
+        );
+
+      lines.push(
+        shopMessageTest
+          ? "✓ رسالة المتجر تحتوي على جميع المنتجات"
+          : "✗ رسالة المتجر ناقصة"
+      );
+
+      lines.push("");
+    } catch (error) {
+      lines.push(
+        `✗ خطأ في بناء رسالة المتجر : ${error.message}`,
+        ""
+      );
+    }
+
+    testResult(
+      shopMessageTest,
+      "رسالة المتجر تعمل بشكل صحيح",
+      "يوجد خطأ في رسالة المتجر"
+    );
+
+    /* =====================================================
+       31. أسعار المنتجات وحساب الشراء
+    ===================================================== */
+
+    section(31, "اختبار حساب أسعار المتجر");
+
+    let purchaseMathTest = true;
+
+    for (const item of shopItems || []) {
+      const quantities = [
+        1,
+        2,
+        10,
+        100
+      ];
+
+      for (const quantity of quantities) {
+        const total =
+          item.price * quantity;
+
+        if (
+          !Number.isSafeInteger(total) ||
+          total <= 0 ||
+          total !==
+            Number(item.price) *
+              quantity
+        ) {
+          purchaseMathTest = false;
+
+          lines.push(
+            `✗ حساب خاطئ : ${item.id} ×${quantity}`
+          );
+        }
+      }
+
+      lines.push(
+        `✓ ${item.name} : ${item.price.toLocaleString("en-US")} للعملة الواحدة`
+      );
+    }
+
+    lines.push("");
+
+    testResult(
+      purchaseMathTest,
+      "حساب أسعار الشراء يعمل بشكل صحيح",
+      "يوجد خطأ في حساب أسعار الشراء"
+    );
+
+    /* =====================================================
+       32. الحد الأقصى للشراء
+    ===================================================== */
+
+    section(32, "اختبار حدود شراء المتجر");
+
+    const maxPurchase =
+      Number(
+        Shop.MAX_PURCHASE_QUANTITY
+      );
+
+    const purchaseLimitTest =
+      Number.isSafeInteger(maxPurchase) &&
+      maxPurchase > 0 &&
+      maxPurchase === 100;
+
+    lines.push(
+      `الحد الأقصى : ${maxPurchase}`,
+      `شراء 1 : مسموح`,
+      `شراء ${maxPurchase} : مسموح`,
+      `شراء ${maxPurchase + 1} : ممنوع`,
+      ""
+    );
+
+    testResult(
+      purchaseLimitTest,
+      "حد كمية الشراء مضبوط بشكل صحيح",
+      "يوجد خطأ في حد كمية الشراء"
+    );
+
+    /* =====================================================
+       33. ربط كل منتج بالحقيبة
+    ===================================================== */
+
+    section(33, "اختبار تكامل المتجر والحقيبة");
+
+    let integrationTest = true;
+
+    for (const shopItem of shopItems || []) {
+      const bagItem =
+        Inventory.getInventoryItem(
+          shopItem.bagField
+        );
+
+      if (!bagItem) {
+        integrationTest = false;
+
+        lines.push(
+          `✗ ${shopItem.id} لا يملك حقل حقيبة`
+        );
+
+        continue;
+      }
+
+      const sameName =
+        typeof bagItem.name === "string";
+
+      const sameField =
+        bagItem.field ===
+        shopItem.bagField;
+
+      if (!sameName || !sameField) {
+        integrationTest = false;
+
+        lines.push(
+          `✗ عدم تطابق : ${shopItem.id}`
+        );
+      } else {
+        lines.push(
+          `✓ ${shopItem.id} → ${bagItem.field}`
+        );
+      }
+    }
+
+    lines.push("");
+
+    testResult(
+      integrationTest,
+      "تكامل المتجر والحقيبة يعمل بشكل صحيح",
+      "يوجد خلل في تكامل المتجر والحقيبة"
+    );
+
+    /* =====================================================
+       34. اختبار قاعدة البيانات الحقيقية
+    ===================================================== */
+
+    section(34, "اختبار قاعدة البيانات");
 
     const data =
       await Pdata.getPlayerData(
@@ -1254,6 +2185,9 @@ module.exports.run = async function ({
       `دواء : ${data.bag.medicine}`,
       `دروع : ${data.bag.shields}`,
       `بطاقات استثمار : ${data.bag.investmentCards}`,
+      `بطاقات XP : ${data.bag.xpCards}`,
+      `منشطات تدريب : ${data.bag.trainingBoosters}`,
+      `أحجار تطوير : ${data.bag.developmentStones}`,
       ""
     );
 
@@ -1314,26 +2248,199 @@ module.exports.run = async function ({
     );
 
     /* =====================================================
-       19. اختبار عدم تعديل اللاعب
+       35. فحص الحقيبة الحقيقية
     ===================================================== */
 
+    section(35, "اختبار الحقيبة في قاعدة البيانات");
+
+    let realInventoryTest = true;
+
+    if (!data.bag) {
+      realInventoryTest = false;
+
+      lines.push(
+        "✗ لم يتم العثور على بيانات الحقيبة"
+      );
+    } else {
+      for (const item of inventoryItems || []) {
+        const amount =
+          Number(
+            data.bag[item.field] ?? 0
+          );
+
+        const valid =
+          Number.isSafeInteger(amount) &&
+          amount >= 0;
+
+        lines.push(
+          `${valid ? "✓" : "✗"} ${item.field} : ${amount}`
+        );
+
+        if (!valid) {
+          realInventoryTest = false;
+        }
+      }
+    }
+
+    lines.push("");
+
+    testResult(
+      realInventoryTest,
+      "بيانات الحقيبة في قاعدة البيانات سليمة",
+      "يوجد مورد غير صالح في بيانات الحقيبة"
+    );
+
+    /* =====================================================
+       36. فحص المحفظة
+    ===================================================== */
+
+    section(36, "اختبار المحفظة");
+
+    const realMoney =
+      Number(data.money);
+
+    const moneyTest =
+      Number.isFinite(realMoney) &&
+      realMoney >= 0;
+
     lines.push(
-      "19. اختبار أمان الاختبار",
+      `الرصيد الحالي : ${realMoney.toLocaleString("en-US")}`,
       ""
     );
+
+    testResult(
+      moneyTest,
+      "بيانات المحفظة سليمة",
+      "بيانات المحفظة غير صالحة"
+    );
+
+    /* =====================================================
+       37. اختبار عدم وجود موارد سالبة
+    ===================================================== */
+
+    section(37, "اختبار حماية الموارد من القيم السالبة");
+
+    let negativeProtectionTest = true;
+
+    for (const item of inventoryItems || []) {
+      const amount =
+        Number(
+          fakeCurrency.data[item.field] ?? 0
+        );
+
+      if (
+        !Number.isSafeInteger(amount) ||
+        amount < 0
+      ) {
+        negativeProtectionTest = false;
+
+        lines.push(
+          `✗ قيمة سالبة أو غير صالحة : ${item.field}`
+        );
+      }
+    }
+
+    testResult(
+      negativeProtectionTest,
+      "جميع موارد الاختبار بقيم صحيحة وغير سالبة",
+      "تم العثور على قيمة مورد غير صالحة"
+    );
+
+    lines.push("");
+
+    /* =====================================================
+       38. اختبار دوال المتجر الأساسية
+    ===================================================== */
+
+    section(38, "اختبار دوال المتجر الأساسية");
+
+    const shopMethodsTest =
+      typeof Shop.getItemByID === "function" &&
+      typeof Shop.getItemByNumber === "function" &&
+      typeof Shop.getShopList === "function" &&
+      typeof Shop.openShop === "function" &&
+      typeof Shop.handleReply === "function";
+
+    testResult(
+      shopMethodsTest,
+      "جميع دوال المتجر الأساسية موجودة",
+      "هناك دالة مفقودة في المتجر"
+    );
+
+    /* =====================================================
+       39. اختبار عناصر المتجر والحقيبة واحدًا بواحد
+    ===================================================== */
+
+    section(39, "اختبار المطابقة الكاملة بين المتجر والحقيبة");
+
+    let exactMappingTest = true;
+
+    const mapping = [
+      ["food", "food"],
+      ["medicine", "medicine"],
+      ["shield", "shields"],
+      ["investment_card", "investmentCards"],
+      ["xp_card", "xpCards"],
+      ["training_booster", "trainingBoosters"],
+      ["development_stone", "developmentStones"]
+    ];
+
+    for (const [shopID, bagField] of mapping) {
+      const shopItem =
+        Shop.getItemByID(
+          shopID
+        );
+
+      const bagItem =
+        Inventory.getInventoryItem(
+          bagField
+        );
+
+      const valid =
+        !!shopItem &&
+        !!bagItem &&
+        shopItem.bagField === bagField &&
+        bagItem.field === bagField;
+
+      lines.push(
+        `${valid ? "✓" : "✗"} ${shopID} → ${bagField}`
+      );
+
+      if (!valid) {
+        exactMappingTest = false;
+      }
+    }
+
+    lines.push("");
+
+    testResult(
+      exactMappingTest,
+      "جميع منتجات المتجر تطابق موارد الحقيبة",
+      "يوجد اختلاف بين المتجر والحقيبة"
+    );
+
+    /* =====================================================
+       40. اختبار أمان الاختبار
+    ===================================================== */
+
+    section(40, "اختبار أمان الاختبار");
 
     lines.push(
       "✓ اختبارات الإنجازات استخدمت بيانات وهمية",
       "✓ لم يتم استدعاء checkAchievements",
       "✓ لم يتم فتح إنجازات حقيقية",
-      "✓ لم يتم منح مكافآت",
-      "✓ لم يتم تعديل مستوى الحيوان",
-      "✓ لم يتم تعديل المال",
-      "✓ لم يتم تعديل الحقيبة",
+      "✓ لم يتم منح مكافآت إنجازات حقيقية",
+      "✓ لم يتم شراء أي منتج من المتجر الحقيقي",
+      "✓ لم يتم خصم مال حقيقي من اللاعب",
+      "✓ لم تتم إضافة منتجات إلى حقيبة اللاعب الحقيقية",
+      "✓ لم تتم إزالة منتجات من حقيبة اللاعب الحقيقية",
+      "✓ اختبارات addItem/useItem استخدمت محفظة وهمية",
+      "✓ اختبارات المتجر اعتمدت على بيانات المنتجات",
+      "✓ لم يتم تعديل مستوى الحيوان الحقيقي",
       ""
     );
 
-    passed += 6;
+    passed += 11;
 
     /* =====================================================
        النتيجة النهائية
