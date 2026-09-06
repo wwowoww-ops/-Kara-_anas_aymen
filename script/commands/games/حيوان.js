@@ -267,9 +267,50 @@ function buildPetStatus(pet) {
         );
     }
 
+    /*
+    ========================================================
+       قراءة بيانات Sequelize بشكل آمن
+    ========================================================
+    */
+
+    const petValues =
+        pet?.dataValues &&
+        typeof pet.dataValues === "object"
+            ? pet.dataValues
+            : pet;
+
+    const petType =
+        petValues?.type ||
+        pet.type;
+
+    const petName =
+        petValues?.name ||
+        pet.name;
+
+    const petLevel =
+        petValues?.level;
+
+    const petStars =
+        petValues?.stars;
+
+    const petHealth =
+        petValues?.health;
+
+    const petHunger =
+        petValues?.hunger;
+
+    const petXP =
+        petValues?.exp;
+
+    const petStatus =
+        petValues?.status;
+
+    const petRarity =
+        petValues?.rarity;
+
     const petData =
         Pets.getPetByType(
-            pet.type
+            petType
         );
 
     if (!petData) {
@@ -279,42 +320,70 @@ function buildPetStatus(pet) {
         );
     }
 
+    /* =====================================================
+       المستوى
+    ===================================================== */
+
     const level =
         Leveling.normalizeLevel(
-            pet.level,
-            pet.type
+            petLevel,
+            petType
         );
+
+    /* =====================================================
+       النجوم
+    ===================================================== */
 
     const stars =
         Stars.normalizeStars(
-            pet.stars
+            petStars
         );
+
+    /* =====================================================
+       الإحصائيات
+    ===================================================== */
+
+    const currentHealth =
+        petHealth === undefined ||
+        petHealth === null
+            ? null
+            : Number(petHealth);
+
+    const currentHunger =
+        petHunger === undefined ||
+        petHunger === null
+            ? null
+            : Number(petHunger);
 
     const stats =
         Stats.getStats(
             petData,
             level,
             stars,
-            pet.health,
-            pet.hunger
+            currentHealth,
+            currentHunger
         );
+
+    /* =====================================================
+       البيانات النهائية
+    ===================================================== */
 
     const emoji =
         petData.emoji ||
         "🐾";
 
     const rarity =
-        pet.rarity ||
+        petRarity ||
         petData.rarity ||
         "شائع";
 
     const status =
-        pet.status ||
+        petStatus ||
         "سعيد";
 
     const xp =
         Leveling.normalizeXP(
-            pet.exp
+            petXP
         );
 
     const effectiveLevel =
@@ -323,9 +392,9 @@ function buildPetStatus(pet) {
     return (
         "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗣𝗘𝗧 ━━ ⌬\n\n" +
 
-        `${emoji} ${pet.name || petData.name}\n\n` +
+        `${emoji} ${petName || petData.name}\n\n` +
 
-        `النوع: ${pet.type}\n` +
+        `النوع: ${petType}\n` +
         `الندرة: ${rarity}\n\n` +
 
         `⭐ المستوى: ${level}/${Stats.MAX_LEVEL}\n` +
