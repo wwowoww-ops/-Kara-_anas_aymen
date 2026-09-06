@@ -258,6 +258,11 @@ async function createPet(
 
 /**
  * تحديث بيانات الحيوان
+ *
+ * مهم:
+ * نستخدم set() ثم save() ثم reload()
+ * لضمان أن القيم الجديدة مثل health و hunger
+ * يتم حفظها وقراءة آخر نسخة من قاعدة البيانات.
  */
 async function updatePet(
   pet,
@@ -266,6 +271,16 @@ async function updatePet(
   if (!pet) {
     throw new Error(
       "PET_NOT_FOUND"
+    );
+  }
+
+  if (
+    !changes ||
+    typeof changes !== "object" ||
+    Array.isArray(changes)
+  ) {
+    throw new Error(
+      "INVALID_CHANGES"
     );
   }
 
@@ -285,9 +300,12 @@ async function updatePet(
 
   const safeChanges = {};
 
+  /* =======================================================
+     أخذ الحقول المسموح بها فقط
+  ======================================================= */
+
   for (
-    const field
-    of allowedFields
+    const field of allowedFields
   ) {
     if (
       Object.prototype.hasOwnProperty.call(
@@ -299,6 +317,10 @@ async function updatePet(
         changes[field];
     }
   }
+
+  /* =======================================================
+     LEVEL
+  ======================================================= */
 
   if (
     Object.prototype.hasOwnProperty.call(
@@ -325,6 +347,10 @@ async function updatePet(
       level;
   }
 
+  /* =======================================================
+     STARS
+  ======================================================= */
+
   if (
     Object.prototype.hasOwnProperty.call(
       safeChanges,
@@ -350,6 +376,10 @@ async function updatePet(
       stars;
   }
 
+  /* =======================================================
+     EXP
+  ======================================================= */
+
   if (
     Object.prototype.hasOwnProperty.call(
       safeChanges,
@@ -373,6 +403,10 @@ async function updatePet(
     safeChanges.exp =
       exp;
   }
+
+  /* =======================================================
+     POWER
+  ======================================================= */
 
   if (
     Object.prototype.hasOwnProperty.call(
@@ -398,6 +432,10 @@ async function updatePet(
       power;
   }
 
+  /* =======================================================
+     HEALTH
+  ======================================================= */
+
   if (
     Object.prototype.hasOwnProperty.call(
       safeChanges,
@@ -421,6 +459,10 @@ async function updatePet(
     safeChanges.health =
       health;
   }
+
+  /* =======================================================
+     HUNGER
+  ======================================================= */
 
   if (
     Object.prototype.hasOwnProperty.call(
@@ -446,14 +488,43 @@ async function updatePet(
       hunger;
   }
 
+  /* =======================================================
+     لا توجد تغييرات
+  ======================================================= */
+
   if (
     Object.keys(
       safeChanges
-    ).length > 0
+    ).length === 0
   ) {
-    await pet.update(
-      safeChanges
-    );
+    return pet;
+  }
+
+  /* =======================================================
+     حفظ التغييرات
+  ======================================================= */
+
+  /*
+   * set() يضمن تحديث الـ Sequelize instance
+   * سواء كانت القيمة health أو hunger أو غيرها.
+   */
+  pet.set(
+    safeChanges
+  );
+
+  /*
+   * حفظ التغييرات في PostgreSQL
+   */
+  await pet.save();
+
+  /*
+   * إعادة تحميل السجل من قاعدة البيانات
+   * حتى لا تبقى لدينا نسخة قديمة من البيانات.
+   */
+  if (
+    typeof pet.reload === "function"
+  ) {
+    await pet.reload();
   }
 
   return pet;
@@ -490,6 +561,12 @@ async function savePet(
 
   await pet.save();
 
+  if (
+    typeof pet.reload === "function"
+  ) {
+    await pet.reload();
+  }
+
   return pet;
 }
 
@@ -510,8 +587,7 @@ function normalizeBagData(
   };
 
   for (
-    const field
-    of BAG_FIELDS
+    const field of BAG_FIELDS
   ) {
     const value =
       Number(
@@ -557,7 +633,8 @@ async function getPetCurrency(
 
         money: 0,
 
-        data: normalizeBagData({})
+        data:
+          normalizeBagData({})
       });
 
     return currency;
@@ -576,8 +653,7 @@ async function getPetCurrency(
   let changed = false;
 
   for (
-    const field
-    of BAG_FIELDS
+    const field of BAG_FIELDS
   ) {
     if (
       !Object.prototype.hasOwnProperty.call(
@@ -590,7 +666,9 @@ async function getPetCurrency(
     }
 
     if (
-      safeNumber(data[field]) !==
+      safeNumber(
+        data[field]
+      ) !==
       normalized[field]
     ) {
       changed = true;
@@ -861,7 +939,8 @@ function getBag(
     );
 
   return {
-    food: data.food,
+    food:
+      data.food,
 
     medicine:
       data.medicine,
