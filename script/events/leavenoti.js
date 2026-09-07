@@ -1,7 +1,7 @@
 module.exports.config = {
     name: "leaveNoti",
     eventType: ["log:unsubscribe"],
-    version: "9.0.0",
+    version: "9.1.0",
     credits: "HINA System - Abu Huraira",
     description: "نظام وداع سريع عند مغادرة أو طرد أعضاء المجموعة",
     category: "events"
@@ -66,16 +66,120 @@ module.exports.handleEvent = async function ({
         }
 
         // ==================================================
-        // الاسم
-        // نستخدم اسم الحدث أولًا حتى يكون الإرسال سريعًا
+        // تنظيف الاسم
+        // حماية من الأسماء المخفية والرموز غير المرئية
+        // ==================================================
+
+        function cleanUserName(name) {
+
+            if (
+                name === undefined ||
+                name === null
+            ) {
+                return "";
+            }
+
+            return String(name)
+                .replace(
+                    /[\u0000-\u001F\u007F\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\uFEFF]/g,
+                    ""
+                )
+                .trim();
+
+        }
+
+        // ==================================================
+        // استخراج الاسم من الحدث
         // ==================================================
 
         let userName =
-            String(
+            cleanUserName(
                 logData.leftParticipantName ||
                 logData.leftParticipantFullName ||
-                "العضو"
-            ).trim();
+                ""
+            );
+
+        // ==================================================
+        // إذا لم يتوفر الاسم
+        // نحاول استخراجه من Users
+        // ==================================================
+
+        if (
+            !userName &&
+            Users &&
+            typeof Users.getData ===
+            "function"
+        ) {
+
+            try {
+
+                const userData =
+                    await Users.getData(
+                        leftID
+                    );
+
+                if (userData) {
+
+                    userName =
+                        cleanUserName(
+                            userData.name ||
+                            userData.fullName ||
+                            userData.data?.name ||
+                            userData.data?.fullName ||
+                            ""
+                        );
+
+                }
+
+            } catch (error) {
+
+                console.error(
+                    "[LEAVE] GET USER NAME ERROR:",
+                    error.message
+                );
+
+            }
+
+        }
+
+        // ==================================================
+        // محاولة أخيرة من Users.getName
+        // إذا كان النظام يدعمها
+        // ==================================================
+
+        if (
+            !userName &&
+            Users &&
+            typeof Users.getName ===
+            "function"
+        ) {
+
+            try {
+
+                const fetchedName =
+                    await Users.getName(
+                        leftID
+                    );
+
+                userName =
+                    cleanUserName(
+                        fetchedName
+                    );
+
+            } catch (error) {
+
+                console.error(
+                    "[LEAVE] GET USER NAME FALLBACK ERROR:",
+                    error.message
+                );
+
+            }
+
+        }
+
+        // ==================================================
+        // الاسم الاحتياطي
+        // ==================================================
 
         if (!userName) {
             userName = "العضو";
@@ -104,22 +208,20 @@ module.exports.handleEvent = async function ({
         if (leftVoluntarily) {
 
             message =
-`╭━━━━━━━━━━━━━━━━╮
-     𝗛𝗜𝗡𝗔          〢       وداع
-╰━━━━━━━━━━━━━━━━╯
+`⌬ ━ 𝗛𝗜𝗡𝗔 〢 𝗚𝗢𝗢𝗗𝗕𝗬𝗘 ━⌬
 
-👋 وداعًا
-    @${userName}
+${userName}
 
-✦ قرر ${userName} أخيرًا أن يتركنا
-✦ بعد أن أتعب المجموعة بحضوره
+قرر ${userName} ينسحب من الخدمة
 
-نتمنى له رحلة موفقة
-ولا تنسَ أن الباب مفتوح... من الخارج فقط
+☕ شال قهوته
+🍰 وخلى القاطو ورانا
 
-╭━━━━━━━━━━━━━━━━╮
-                      وداعًا
-╰━━━━━━━━━━━━━━━━╯`;
+قال تحرك تموت
+وطلع يجري قبل ما نلحقه
+
+الله يعينك على الطريق
+ونشوفك على خير`;
 
         }
 
@@ -130,21 +232,20 @@ module.exports.handleEvent = async function ({
         else {
 
             message =
-`╭━━━━━━━━━━━━━━━━╮
-     𝗛𝗜𝗡𝗔          〢       وداع
-╰━━━━━━━━━━━━━━━━╯
+`⌬ ━ 𝗛𝗜𝗡𝗔 〢 𝗞𝗜𝗖𝗞 ━⌬
 
-👋 وداعًا
-    @${userName}
+${userName}
 
-✦ تم طرد ${userName} من المجموعة
-✦ يبدو أن المجموعة قررت أخذ استراحة منه
+تم طرد ${userName} بنجاح
 
-نتمنى له حظًا سعيدًا في مكان آخر
+☕ القهوة قالت خليه يمشي
+🍰 والقاطو رفض يروح معاه
 
-╭━━━━━━━━━━━━━━━━╮
-                      وداعًا
-╰━━━━━━━━━━━━━━━━╯`;
+بعد دراسة الوضع
+قررنا أن وجوده خارج المجموعة أفضل للجميع
+
+مع السلامة يا ${userName}
+الباب مفتوح من الجهة الثانية`;
 
         }
 
@@ -160,8 +261,7 @@ module.exports.handleEvent = async function ({
         ];
 
         // ==================================================
-        // الإرسال الفوري
-        // لا ننتظر Users أو Threads
+        // الإرسال
         // ==================================================
 
         api.sendMessage(
@@ -216,6 +316,7 @@ module.exports.handleEvent = async function ({
                         );
 
                     }
+
                 }
 
                 // ------------------------------------------
@@ -244,6 +345,7 @@ module.exports.handleEvent = async function ({
                         );
 
                     }
+
                 }
 
                 // ------------------------------------------
@@ -270,6 +372,7 @@ module.exports.handleEvent = async function ({
                         );
 
                     }
+
                 }
 
             } catch (error) {
