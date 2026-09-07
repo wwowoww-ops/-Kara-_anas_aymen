@@ -7,7 +7,7 @@ const moment = require("moment-timezone");
 const port = process.env.PORT || 8000;
 
 // ═══════════════════════════════════════════════
-//           KIRA — HELLGATE UPTIME PAGE
+//           HINA — HELLGATE UPTIME PAGE
 // ═══════════════════════════════════════════════
 
 app.get("/", (req, res) => {
@@ -16,10 +16,10 @@ app.get("/", (req, res) => {
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>KIRA BOT</title>
+    <title>HINA BOT</title>
 </head>
 <body>
-    <h1>KIRA BOT</h1>
+    <h1>HINA BOT</h1>
     <p>Bot is online.</p>
 </body>
 </html>
@@ -71,7 +71,7 @@ const axios = require("axios");
 
 console.log(
     chalk.bold.hex("#03f0fc")(
-        "[ KIRA ] » "
+        "[ HINA ] » "
     ) +
     chalk.bold.hex("#fcba03")(
         "Initializing variables..."
@@ -83,15 +83,49 @@ console.log(
 // ═══════════════════════════════════════════════
 
 global.client = new Object({
+
     commands: new Map(),
+
     events: new Map(),
+
     cooldowns: new Map(),
+
     eventRegistered: new Array(),
+
     handleSchedule: new Array(),
+
     handleReaction: new Array(),
+
     handleReply: new Array(),
+
     mainPath: process.cwd(),
-    configPath: new String()
+
+    configPath: new String(),
+
+    // ═══════════════════════════════════════════
+    // LOAD STATISTICS
+    // ═══════════════════════════════════════════
+
+    loadStats: {
+
+        commandsLoaded: 0,
+
+        commandsFailed: 0,
+
+        eventsLoaded: 0,
+
+        eventsFailed: 0,
+
+        totalCommandFiles: 0,
+
+        totalEventFiles: 0,
+
+        failedCommands: [],
+
+        failedEvents: []
+
+    }
+
 });
 
 // ═══════════════════════════════════════════════
@@ -99,16 +133,27 @@ global.client = new Object({
 // ═══════════════════════════════════════════════
 
 global.data = new Object({
+
     threadInfo: new Map(),
+
     threadData: new Map(),
+
     userName: new Map(),
+
     userBanned: new Map(),
+
     threadBanned: new Map(),
+
     commandBanned: new Map(),
+
     threadAllowNSFW: new Array(),
+
     allUserID: new Array(),
+
     allCurrenciesID: new Array(),
+
     allThreadID: new Array()
+
 });
 
 // ═══════════════════════════════════════════════
@@ -116,14 +161,27 @@ global.data = new Object({
 // ═══════════════════════════════════════════════
 
 global.utils = require("./utils/index.js");
-global.utils.config = require("./utils/config.js");
-global.utils.decorations = require("./utils/decorations.js");
 
-global.nodemodule = new Object();
-global.config = new Object();
-global.configModule = new Object();
-global.moduleData = new Array();
-global.language = new Object();
+global.utils.config =
+    require("./utils/config.js");
+
+global.utils.decorations =
+    require("./utils/decorations.js");
+
+global.nodemodule =
+    new Object();
+
+global.config =
+    new Object();
+
+global.configModule =
+    new Object();
+
+global.moduleData =
+    new Array();
+
+global.language =
+    new Object();
 
 // ═══════════════════════════════════════════════
 // تحميل الإعدادات
@@ -156,11 +214,14 @@ try {
     );
 
     process.exit(1);
+
 }
 
 try {
 
-    for (const key in configValue) {
+    for (
+        const key in configValue
+    ) {
 
         global.config[key] =
             configValue[key];
@@ -179,6 +240,7 @@ try {
     );
 
     process.exit(1);
+
 }
 
 // ═══════════════════════════════════════════════
@@ -226,13 +288,19 @@ try {
                 item !== ""
         );
 
-    for (const item of langData) {
+    for (
+        const item of langData
+    ) {
 
         const getSeparator =
             item.indexOf("=");
 
-        if (getSeparator === -1) {
+        if (
+            getSeparator === -1
+        ) {
+
             continue;
+
         }
 
         const itemKey =
@@ -249,8 +317,12 @@ try {
         const dotIndex =
             itemKey.indexOf(".");
 
-        if (dotIndex === -1) {
+        if (
+            dotIndex === -1
+        ) {
+
             continue;
+
         }
 
         const head =
@@ -310,7 +382,9 @@ global.getText = function (...args) {
             langText[args[0]][args[1]];
 
         if (!text) {
+
             return `[${args[1]}]`;
+
         }
 
         for (
@@ -358,7 +432,9 @@ const appStateFile =
 
 let appState;
 
-if (process.env.APPSTATE) {
+if (
+    process.env.APPSTATE
+) {
 
     try {
 
@@ -459,7 +535,9 @@ function getReconnectDelay() {
 
 function clearReconnectTimer() {
 
-    if (reconnectTimer) {
+    if (
+        reconnectTimer
+    ) {
 
         clearTimeout(
             reconnectTimer
@@ -477,8 +555,12 @@ function clearReconnectTimer() {
 
 function closeOldConnection() {
 
-    if (!activeApi) {
+    if (
+        !activeApi
+    ) {
+
         return;
+
     }
 
     try {
@@ -511,6 +593,7 @@ function closeOldConnection() {
     }
 
     activeApi = null;
+
     isConnected = false;
 
 }
@@ -521,7 +604,9 @@ function closeOldConnection() {
 
 function scheduleReconnect(botModel) {
 
-    if (reconnectTimer) {
+    if (
+        reconnectTimer
+    ) {
 
         console.log(
             chalk.gray(
@@ -579,9 +664,13 @@ function scheduleReconnect(botModel) {
 // LOGIN / BOT
 // ═══════════════════════════════════════════════
 
-function onBot({ models: botModel }) {
+function onBot({
+    models: botModel
+}) {
 
-    if (isConnecting) {
+    if (
+        isConnecting
+    ) {
 
         console.log(
             chalk.gray(
@@ -642,7 +731,9 @@ function onBot({ models: botModel }) {
             // LOGIN ERROR
             // ═══════════════════════════════════
 
-            if (loginError) {
+            if (
+                loginError
+            ) {
 
                 isConnected = false;
 
@@ -696,7 +787,7 @@ function onBot({ models: botModel }) {
 
                 console.log(
                     chalk.yellow(
-                        "[ KIRA ] فشل تطبيق FCAOption: " +
+                        "[ HINA ] فشل تطبيق FCAOption: " +
                         error.message
                     )
                 );
@@ -734,6 +825,38 @@ function onBot({ models: botModel }) {
 
             global.client.timeStart =
                 new Date().getTime();
+
+            // ═══════════════════════════════════
+            // تصفير إحصائيات التحميل
+            // ═══════════════════════════════════
+
+            global.client.loadStats = {
+
+                commandsLoaded: 0,
+
+                commandsFailed: 0,
+
+                eventsLoaded: 0,
+
+                eventsFailed: 0,
+
+                totalCommandFiles: 0,
+
+                totalEventFiles: 0,
+
+                failedCommands: [],
+
+                failedEvents: []
+
+            };
+
+            // ═══════════════════════════════════
+            // مسح الخرائط القديمة
+            // ═══════════════════════════════════
+
+            global.client.commands.clear();
+
+            global.client.events.clear();
 
             // ═══════════════════════════════════
             // تحميل الأوامر
@@ -817,57 +940,95 @@ function onBot({ models: botModel }) {
 
                 }
 
+                global.client.loadStats.totalCommandFiles +=
+                    listCommand.length;
+
                 for (
                     const command of listCommand
                 ) {
 
                     try {
 
+                        const commandPath =
+                            join(
+                                categoryPath,
+                                command
+                            );
+
                         const commandModule =
                             require(
-                                join(
-                                    categoryPath,
-                                    command
-                                )
+                                commandPath
                             );
+
+                        // ═══════════════════════════════
+                        // التحقق من صحة الأمر
+                        // ═══════════════════════════════
 
                         if (
-                            commandModule.config &&
-                            commandModule.run
+                            !commandModule ||
+                            !commandModule.config ||
+                            !commandModule.config.name ||
+                            typeof commandModule.run !==
+                            "function"
                         ) {
 
-                            global.client.commands.set(
-                                commandModule.config.name,
-                                commandModule
-                            );
-
-                            // ═══════════════════════════════════
-                            // تسجيل الأمر كـ Event إذا كان يحتوي handleEvent
-                            // ═══════════════════════════════════
-
-                            if (
-                                typeof commandModule.handleEvent ===
-                                "function"
-                            ) {
-
-                                global.client.events.set(
-                                    commandModule.config.name,
-                                    commandModule
-                                );
-
-                                console.log(
-                                    `[EVENT COMMAND] تم تسجيل ${commandModule.config.name} كـ Event`
-                                );
-
-                            }
-
-                            logger.loader(
-                                `🌸『 تـم تحميل: ${commandModule.config.name} 』🌸`
+                            throw new Error(
+                                "ملف الأمر لا يحتوي config.name أو run"
                             );
 
                         }
 
+                        // ═══════════════════════════════
+                        // تسجيل الأمر
+                        // ═══════════════════════════════
+
+                        global.client.commands.set(
+                            commandModule.config.name,
+                            commandModule
+                        );
+
+                        global.client.loadStats.commandsLoaded++;
+
+                        // ═══════════════════════════════
+                        // تسجيل الأمر كـ Event
+                        // بدون احتسابه كحدث إضافي
+                        // ═══════════════════════════════
+
+                        if (
+                            typeof commandModule.handleEvent ===
+                            "function"
+                        ) {
+
+                            global.client.events.set(
+                                commandModule.config.name,
+                                commandModule
+                            );
+
+                            console.log(
+                                `[EVENT COMMAND] تم تسجيل ${commandModule.config.name} كـ Event`
+                            );
+
+                        }
+
+                        logger.loader(
+                            `🌸『 تـم تحميل: ${commandModule.config.name} 』🌸`
+                        );
+
                     } catch (error) {
+
+                        global.client.loadStats.commandsFailed++;
+
+                        global.client.loadStats.failedCommands.push({
+
+                            file: command,
+
+                            category: category,
+
+                            reason:
+                                error?.message ||
+                                String(error)
+
+                        });
 
                         logger.loader(
                             `Fail load command: ${command}`,
@@ -926,39 +1087,80 @@ function onBot({ models: botModel }) {
 
                 }
 
+                global.client.loadStats.totalEventFiles =
+                    events.length;
+
                 for (
                     const ev of events
                 ) {
 
                     try {
 
-                        const event =
-                            require(
-                                join(
-                                    eventsPath,
-                                    ev
-                                )
+                        const eventPath =
+                            join(
+                                eventsPath,
+                                ev
                             );
 
+                        const event =
+                            require(
+                                eventPath
+                            );
+
+                        // ═══════════════════════════════
+                        // التحقق من صحة الحدث
+                        // ═══════════════════════════════
+
                         if (
-                            event &&
-                            event.config &&
-                            event.config.name
+                            !event ||
+                            !event.config ||
+                            !event.config.name ||
+                            typeof event.handleEvent !==
+                            "function"
                         ) {
 
-                            global.client.events.set(
-                                event.config.name,
-                                event
+                            throw new Error(
+                                "ملف الحدث لا يحتوي config.name أو handleEvent"
                             );
 
                         }
 
-                    } catch (error) {
+                        // ═══════════════════════════════
+                        // تسجيل الحدث
+                        // ═══════════════════════════════
+
+                        global.client.events.set(
+                            event.config.name,
+                            event
+                        );
+
+                        global.client.loadStats.eventsLoaded++;
 
                         logger.loader(
-                            "Fail load event: " +
-                            ev,
+                            `⚡『 تـم تحميل الحدث: ${event.config.name} 』⚡`
+                        );
+
+                    } catch (error) {
+
+                        global.client.loadStats.eventsFailed++;
+
+                        global.client.loadStats.failedEvents.push({
+
+                            file: ev,
+
+                            reason:
+                                error?.message ||
+                                String(error)
+
+                        });
+
+                        logger.loader(
+                            `Fail load event: ${ev}`,
                             "error"
+                        );
+
+                        console.log(
+                            error
                         );
 
                     }
@@ -967,17 +1169,68 @@ function onBot({ models: botModel }) {
 
             }
 
+            // ═══════════════════════════════════
+            // LOAD SUMMARY
+            // ═══════════════════════════════════
+
+            const stats =
+                global.client.loadStats;
+
+            const totalLoaded =
+                stats.commandsLoaded +
+                stats.eventsLoaded;
+
+            const totalFailed =
+                stats.commandsFailed +
+                stats.eventsFailed;
+
+            const totalFiles =
+                stats.totalCommandFiles +
+                stats.totalEventFiles;
+
             logger.loader(
-                `Loaded ${
-                    global.client.commands.size
-                } commands and ${
-                    global.client.events.size
-                } events`
+                `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
             );
 
-            // ═══════════════════════════════════════════════
+            logger.loader(
+                `🌸 HINA LOADER`
+            );
+
+            logger.loader(
+                `الأوامر المحملة: ${stats.commandsLoaded}`
+            );
+
+            logger.loader(
+                `الأحداث المحملة: ${stats.eventsLoaded}`
+            );
+
+            logger.loader(
+                `الأوامر الفاشلة: ${stats.commandsFailed}`
+            );
+
+            logger.loader(
+                `الأحداث الفاشلة: ${stats.eventsFailed}`
+            );
+
+            logger.loader(
+                `إجمالي المحمل: ${totalLoaded}`
+            );
+
+            logger.loader(
+                `إجمالي الفاشل: ${totalFailed}`
+            );
+
+            logger.loader(
+                `إجمالي الملفات: ${totalFiles}`
+            );
+
+            logger.loader(
+                `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
+            );
+
+            // ═══════════════════════════════════
             // حذف ملف config المؤقت
-            // ═══════════════════════════════════════════════
+            // ═══════════════════════════════════
 
             if (
                 existsSync(
@@ -997,13 +1250,16 @@ function onBot({ models: botModel }) {
 
             }
 
-            // ═══════════════════════════════════════════════
+            // ═══════════════════════════════════
             // LISTENER
-            // ═══════════════════════════════════════════════
+            // ═══════════════════════════════════
 
             const listenerData = {
+
                 api: loginApiData,
+
                 models: botModel
+
             };
 
             let listener;
@@ -1036,9 +1292,9 @@ function onBot({ models: botModel }) {
 
             }
 
-            // ═══════════════════════════════════════════════
+            // ═══════════════════════════════════
             // MQTT LISTENER
-            // ═══════════════════════════════════════════════
+            // ═══════════════════════════════════
 
             try {
 
@@ -1048,7 +1304,10 @@ function onBot({ models: botModel }) {
                         message
                     ) => {
 
+                        // ═══════════════════════════════
                         // تجاهل أحداث اتصال قديم
+                        // ═══════════════════════════════
+
                         if (
                             currentGeneration !==
                             connectionGeneration
@@ -1058,11 +1317,13 @@ function onBot({ models: botModel }) {
 
                         }
 
-                        // ═══════════════════════════
+                        // ═══════════════════════════════
                         // MQTT ERROR
-                        // ═══════════════════════════
+                        // ═══════════════════════════════
 
-                        if (error) {
+                        if (
+                            error
+                        ) {
 
                             isConnected = false;
 
@@ -1104,7 +1365,9 @@ function onBot({ models: botModel }) {
 
                                 }
 
-                            } catch (closeError) {}
+                            } catch (
+                                closeError
+                            ) {}
 
                             console.log(
                                 chalk.yellow(
@@ -1120,17 +1383,21 @@ function onBot({ models: botModel }) {
 
                         }
 
-                        // ═══════════════════════════
+                        // ═══════════════════════════════
                         // MESSAGE
-                        // ═══════════════════════════
+                        // ═══════════════════════════════
 
-                        if (!message) {
+                        if (
+                            !message
+                        ) {
+
                             return;
+
                         }
 
-                        // ═══════════════════════════
+                        // ═══════════════════════════════
                         // HINA LISTENER
-                        // ═══════════════════════════
+                        // ═══════════════════════════════
 
                         try {
 
@@ -1138,7 +1405,9 @@ function onBot({ models: botModel }) {
                                 message
                             );
 
-                        } catch (listenerError) {
+                        } catch (
+                            listenerError
+                        ) {
 
                             console.error(
                                 chalk.red(
@@ -1152,7 +1421,9 @@ function onBot({ models: botModel }) {
                     }
                 );
 
-            } catch (mqttError) {
+            } catch (
+                mqttError
+            ) {
 
                 isConnected = false;
 
@@ -1173,21 +1444,21 @@ function onBot({ models: botModel }) {
 
             }
 
-            // ═══════════════════════════════════════════════
+            // ═══════════════════════════════════
             // API
-            // ═══════════════════════════════════════════════
+            // ═══════════════════════════════════
 
             global.client.api =
                 loginApiData;
 
             logger(
-                "KIRA ✨",
+                "HINA ✨",
                 "[ by ayman ]"
             );
 
-            // ═══════════════════════════════════════════════
+            // ═══════════════════════════════════
             // رسالة تشغيل البوت
-            // ═══════════════════════════════════════════════
+            // ═══════════════════════════════════
 
             const timeNow =
                 moment()
@@ -1206,7 +1477,9 @@ function onBot({ models: botModel }) {
                         global.config.ADMINBOT[0]
                     );
 
-                } catch (error) {
+                } catch (
+                    error
+                ) {
 
                     console.log(
                         chalk.gray(
@@ -1219,9 +1492,9 @@ function onBot({ models: botModel }) {
 
             }
 
-            // ═══════════════════════════════════════════════
+            // ═══════════════════════════════════
             // تحديث البايو
-            // ═══════════════════════════════════════════════
+            // ═══════════════════════════════════
 
             try {
 
@@ -1257,7 +1530,9 @@ function onBot({ models: botModel }) {
                                 }`
                             );
 
-                        } catch (error) {
+                        } catch (
+                            error
+                        ) {
 
                             console.log(
                                 chalk.gray(
@@ -1276,7 +1551,9 @@ function onBot({ models: botModel }) {
                     }
                 );
 
-            } catch (error) {
+            } catch (
+                error
+            ) {
 
                 console.log(
                     chalk.gray(
@@ -1289,7 +1566,7 @@ function onBot({ models: botModel }) {
 
             console.log(
                 chalk.green(
-                    "🟢 KIRA MQTT connection is active."
+                    "🟢 HINA MQTT connection is active."
                 )
             );
 
@@ -1326,7 +1603,9 @@ function onBot({ models: botModel }) {
             models
         });
 
-    } catch (error) {
+    } catch (
+        error
+    ) {
 
         console.log(
             chalk.red(
