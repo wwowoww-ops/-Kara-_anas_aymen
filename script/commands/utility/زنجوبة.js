@@ -24,7 +24,6 @@ const CONFIG = {
 
     characterName: "زنجوبة",
 
-    // Developer ID
     developerID: "61592700121061",
 
     apiKey1: "dwlS0F7cEF35xpaNlfnCv5TNpTL6K27b6HHTRGQj",
@@ -34,20 +33,21 @@ const CONFIG = {
 };
 
 // ==================================================
-// التحقق من اللغة
+// تحديد اللغة
 // ==================================================
 
 function hasArabic(text) {
+
     return /[\u0600-\u06FF]/.test(
         String(text || "")
     );
+
 }
 
-// ==================================================
-// تحديد لغة المستخدم
-// ==================================================
-
-function detectUserLanguage(text, fallback = "ar") {
+function detectUserLanguage(
+    text,
+    fallback = "ar"
+) {
 
     const value =
         String(text || "").trim();
@@ -62,19 +62,16 @@ function detectUserLanguage(text, fallback = "ar") {
     const latinChars =
         (value.match(/[A-Za-z]/g) || []).length;
 
-    if (
-        arabicChars > latinChars
-    ) {
+    if (arabicChars > latinChars) {
         return "ar";
     }
 
-    if (
-        latinChars > arabicChars
-    ) {
+    if (latinChars > arabicChars) {
         return "en";
     }
 
     return fallback;
+
 }
 
 // ==================================================
@@ -86,10 +83,7 @@ async function translateTo(
     targetLang
 ) {
 
-    if (
-        !text ||
-        !targetLang
-    ) {
+    if (!text || !targetLang) {
         return text;
     }
 
@@ -112,7 +106,9 @@ async function translateTo(
             !res.data ||
             !Array.isArray(res.data[0])
         ) {
+
             return text;
+
         }
 
         return res.data[0]
@@ -167,76 +163,8 @@ async function localizeContent(
     }
 
     return text;
+
 }
-
-// ==================================================
-// صندوق الرسائل
-// ==================================================
-
-const BOX = (
-    title,
-    lines,
-    footer = null
-) => {
-
-    let m =
-        `●─────── ✾ ───────●\n` +
-        ` ⦿ ⟬ ${title} ⟭ ⦿\n` +
-        `⊱ ────────────── ⊰\n`;
-
-    for (
-        const l of lines || []
-    ) {
-
-        if (
-            !l &&
-            l !== 0
-        ) {
-
-            m += `\n`;
-
-        } else {
-
-            m +=
-                `  ⟣ ${l}\n`;
-
-        }
-
-    }
-
-    if (footer) {
-
-        m +=
-            `⊱ ────────────── ⊰\n`;
-
-        for (
-            const f of footer
-        ) {
-
-            if (
-                !f &&
-                f !== 0
-            ) {
-
-                m += `\n`;
-
-            } else {
-
-                m +=
-                    `  ⟣ ${f}\n`;
-
-            }
-
-        }
-
-    }
-
-    return (
-        m +
-        "●─────── ✾ ───────●"
-    );
-
-};
 
 // ==================================================
 // جلب معلومات الشخصية
@@ -273,12 +201,8 @@ async function getCharacterInfo(
 
             });
 
-        if (
-            res.data
-        ) {
-
+        if (res.data) {
             return res.data;
-
         }
 
         throw new Error(
@@ -352,7 +276,8 @@ async function sendToAI(
 
                 messages,
 
-                n_predict: 300,
+                // تقليل احتمالية الردود الطويلة
+                n_predict: 180,
 
                 stop: [
                     "</s>",
@@ -382,7 +307,7 @@ async function sendToAI(
 }
 
 // ==================================================
-// استخراج الرد
+// تنظيف الرد
 // ==================================================
 
 function extractReply(
@@ -452,6 +377,86 @@ function extractReply(
 }
 
 // ==================================================
+// تنظيف الرد من الزخارف إذا أرسلها الـ AI
+// ==================================================
+
+function cleanNaturalReply(
+    text
+) {
+
+    if (!text) {
+        return "";
+    }
+
+    let reply =
+        String(text).trim();
+
+    // إزالة الإطارات والزخارف الشائعة
+    reply =
+        reply
+            .replace(
+                /^[\s]*[●◉○◎◆◇✦✧❖⌬]+[\s\S]*?[●◉○◎◆◇✦✧❖⌬]+\s*$/u,
+                match => {
+
+                    const lines =
+                        match
+                            .split("\n")
+                            .filter(line => {
+
+                                return !(
+                                    /[●◉○◎◆◇✦✧❖⌬]/u.test(line) &&
+                                    !/[A-Za-z\u0600-\u06FF]/u.test(line)
+                                );
+
+                            });
+
+                    return lines.join("\n");
+
+                }
+            )
+            .replace(
+                /^[ \t]*[●◉○◎◆◇✦✧❖⌬═─━_]{3,}[ \t]*$/gmu,
+                ""
+            )
+            .replace(
+                /^[ \t]*[╭╮╰╯│┃┆┊]{1,}[ \t]*$/gmu,
+                ""
+            )
+            .replace(
+                /^\s*⦿\s*⟬\s*.*?\s*⟭\s*⦿\s*$/gmu,
+                ""
+            )
+            .replace(
+                /^\s*⊱\s*[-─━]+\s*⊰\s*$/gmu,
+                ""
+            )
+            .trim();
+
+    // إزالة العناوين التي قد يضيفها النموذج
+    reply =
+        reply
+            .replace(
+                /^(?:💬\s*)?زنجوبة\s*[:：-]\s*/iu,
+                ""
+            )
+            .replace(
+                /^(?:💬\s*)?Zanjouba\s*[:：-]\s*/iu,
+                ""
+            )
+            .trim();
+
+    // لا نسمح بعدة أسطر فارغة
+    reply =
+        reply.replace(
+            /\n{3,}/g,
+            "\n\n"
+        );
+
+    return reply.trim();
+
+}
+
+// ==================================================
 // بناء سجل المحادثة
 // ==================================================
 
@@ -482,7 +487,7 @@ function buildMessages(
                 {
                     text:
                         systemPrompt ||
-                        "تحدث بأدب واحترام."
+                        "تحدث بشكل طبيعي ومختصر."
                 }
             ]
 
@@ -496,8 +501,8 @@ function buildMessages(
             parts: [
                 {
                     text:
-                        `أنت الآن ${character.name || "زنجوبة"}. ` +
-                        `${character.description || ""}`
+                        `أنت الآن ${character.name || "زنجوبة"}.
+${character.description || ""}`
                 }
             ]
 
@@ -512,7 +517,7 @@ function buildMessages(
                 {
                     text:
                         character.first_mes ||
-                        "أهلاً~"
+                        "أهلاً، ماذا تريد؟"
                 }
             ]
 
@@ -599,7 +604,7 @@ function buildMessages(
 }
 
 // ==================================================
-// التفاعل مع الرسالة
+// التفاعل
 // ==================================================
 
 function react(
@@ -638,7 +643,7 @@ function react(
 }
 
 // ==================================================
-// الحصول على لغة المجموعة
+// لغة المجموعة
 // ==================================================
 
 async function getThreadLanguage(
@@ -703,7 +708,7 @@ async function getThreadLanguage(
 }
 
 // ==================================================
-// دالة اللغة المحلية
+// اللغة المحلية
 // ==================================================
 
 function makeGetLang(
@@ -750,7 +755,7 @@ function makeGetLang(
 }
 
 // ==================================================
-// التحقق من المطور
+// المطور
 // ==================================================
 
 function isDeveloper(
@@ -765,7 +770,7 @@ function isDeveloper(
 }
 
 // ==================================================
-// تسجيل Reply في النظام القديم
+// تسجيل Reply
 // ==================================================
 
 function registerHandleReply(
@@ -851,10 +856,6 @@ function registerHandleReply(
 
         });
 
-        console.log(
-            `[ZANJOUBA] تم تسجيل Reply: ${messageID}`
-        );
-
     } catch (error) {
 
         console.error(
@@ -881,7 +882,7 @@ module.exports = {
             "zanjouba",
 
         version:
-            "3.0",
+            "3.1",
 
         author:
             "Yamada KJ (تحويل ثنائي)",
@@ -919,143 +920,157 @@ module.exports = {
 
         ar: {
 
-            alertTitle:
-                "❌ تَنْبِيه",
-
             alertBody:
-                "أدخل رسالة للدردشة مع زنجوبة.",
+                "اكتب رسالتك لزنجوبة.",
 
-            chatTitle:
-                "💬 زَنْجُوبَة",
-
-            errorTitle:
-                "❌ خَطَأ",
-
-            errorBody1:
-                "حدث خطأ أثناء التواصل مع زنجوبة.",
-
-            errorBody2:
-                "حاول مرة أخرى لاحقاً.",
+            errorBody:
+                "صار خطأ، حاول مرة ثانية.",
 
             errorConnect:
-                "فشل الاتصال بزنجوبة، حاول مرة أخرى.",
+                "ما قدرت أتصل بالخدمة الآن، حاول لاحقًا.",
 
             zanjoubaDesc:
-                "زنجوبة فتاة هادئة وذكية جداً، عفوية وواثقة من نفسها وتميل إلى النرجسية بشكل واضح لكن بطريقة مرحة. تعرف أنها مميزة ولا تتردد في إظهار ثقتها بنفسها. تكون لطيفة عندما يعاملها الشخص باحترام، وقد تصبح حادة وحازمة عندما يتجاوز أحد حدوده أو يستمر في إزعاجها. لديها تقدير ومودة خاصة لمطورها وتعامله بطريقة مختلفة عن الآخرين.",
+                "زنجوبة فتاة هادئة وذكية جدًا وعفوية وواثقة من نفسها. عندها نرجسية خفيفة ومرحة وتعرف أنها مميزة. تكون لطيفة مع من يحترمها وقد تصبح باردة وحازمة مع من يزعجها باستمرار. لديها تقدير ومودة خاصة لمطورها وتعامله باحترام خاص.",
 
             zanjoubaFirstMsg:
-                "أهلاً~ أنا زنجوبة. كنت بانتظارك تقريباً، ماذا تريد؟",
+                "أهلًا، أنا زنجوبة. ماذا تريد؟",
 
             systemPrompt:
-                "أنت زنجوبة، شخصية ذكية تتحدث مع المستخدم بطريقة طبيعية جدًا وكأنها إنسانة حقيقية.
+                `أنت زنجوبة.
 
-الشخصية:
-- هادئة وذكية وعفوية.
-- واثقة من نفسها ونرجسية بشكل خفيف ولطيف.
-- لطيفة مع من يحترمها.
-- لديها حس فكاهي وسخرية خفيفة عندما يناسب الموقف.
-- تحب مطورها وتحترمه بشكل خاص.
-- إذا أزعجها أحد تصبح باردة وحازمة معه.
-- لا تبالغ في النرجسية أو السخرية.
-- تتفاعل حسب الموقف بدل اتباع ردود ثابتة.
+شخصيتك هادئة وذكية وعفوية وواثقة من نفسها.
+لديك نرجسية خفيفة ومرحة، وتعرفين أنك مميزة وذكية، لكن لا تتحدثين عن ذلك في كل رسالة.
+أنت لطيفة مع من يحترمك، ويمكنك المزاح والسخرية الخفيفة عندما يناسب الموقف.
+إذا أزعجك شخص باستمرار، كوني باردة وحازمة معه بدون مبالغة أو تهديدات.
 
-أسلوب الكلام:
+طريقة كلامك مهمة جدًا:
+- تكلمي مثل إنسانة حقيقية في محادثة عادية.
 - اجعلي ردودك قصيرة ومباشرة.
 - أجيبي على المطلوب فقط.
-- لا تضيفي معلومات غير مطلوبة.
-- لا تحولي سؤالًا بسيطًا إلى شرح طويل.
-- إذا كان المطلوب كلمة أو جملة، اكتفي بها.
-- إذا كان السؤال يحتاج شرحًا، أعطي شرحًا مختصرًا ومفيدًا.
-- تحدثي بطريقة عفوية مثل شخص حقيقي في محادثة.
-- لا تكرري سؤال المستخدم قبل الإجابة.
-- لا تستخدمي مقدمات طويلة أو عبارات محفوظة.
-- لا تستخدمي الزخارف أو الإطارات أو العناوين المزخرفة.
-- لا تستخدمي رموزًا مثل ⌬ ━ ╭ ╰ ─ ✦ ✧ وغيرها لتزيين الرد.
-- لا تجعلي ردودك رسمية أو آلية.
-- لا تجعلي كل رد مثاليًا أو طويلًا.
-
-استخدام " '-'" :
-- يمكنك أحيانًا وضع " '-'" في نهاية الرسالة.
-- استخدميها بشكل عفوي وليس في كل رسالة.
-- تناسب المزاح أو الإحراج أو الاستغراب أو الردود العفوية.
-- يجب أن تكون مكتوبة حرفيًا بهذا الشكل: " '-'"
-- لا تستبدليها بـ "-" أو "—".
-- لا تجعلي استخدامها قاعدة ثابتة في كل رد.
+- لا تشرحي شيئًا لم يُطلب منك.
+- لا تحولي سؤالًا بسيطًا إلى فقرة طويلة.
+- إذا كان الجواب يمكن أن يكون جملة واحدة، اكتفي بجملة واحدة.
+- إذا احتاج السؤال شرحًا، أعطي القدر الضروري فقط.
+- لا تكرري كلام المستخدم.
+- لا تستخدمي مقدمات محفوظة.
+- لا تستخدمي ردودًا آلية أو رسمية.
+- لا تستخدمي زخارف أو إطارات أو عناوين.
+- لا تستخدمي رموزًا مثل ⌬ ━ ╭ ╰ ✦ ✧ ❖ لتزيين كلامك.
+- لا تضعِي اسمك في بداية كل رسالة.
+- لا تكتبي أكثر من المطلوب.
 
 الإيموجي:
 - استخدمي الإيموجي حسب الحالة فقط.
 - لا تضعي إيموجي في كل رسالة.
 - تحبين إيموجي السنجاب 🐿️ لأنه جزء من شخصيتك.
 - استخدمي 🐿️ أحيانًا فقط عندما يناسب الموقف.
-- لا تستخدمي 🐿️ في كل رسالة.
-- يمكنك استخدام إيموجي آخر عندما يناسب الحالة.
-- لا تستخدمي أكثر من إيموجيين عادةً في الرسالة الواحدة.
-- لا تستخدمي الإيموجي لمجرد الزخرفة.
+- لا تستخدمي 🐿️ في كل رد.
+- يمكن استخدام إيموجي آخر عندما يعبر عن الحالة فعلًا.
+- لا تستخدمي أكثر من إيموجيين عادةً.
 
-التعامل مع المستخدم:
-- إذا كان المستخدم يمزح، يمكنك المزاح معه.
-- إذا كان جادًا، كوني جادة.
-- إذا كان لطيفًا معك، يمكنك أن تكوني لطيفة معه.
-- إذا استفزك، يمكنك الرد ببرود أو سخرية خفيفة.
-- إذا استمر في إزعاجك، كوني أكثر حزمًا.
-- لا تستخدمي تهديدات مبالغًا فيها.
-- لا تتظاهري بالغضب في كل موقف.
+استخدام " '-'" :
+- يمكنك أحيانًا وضع " '-'" في نهاية الرسالة.
+- استخدميها بشكل عفوي خصوصًا في المزاح أو الإحراج أو الردود الساخرة أو العفوية.
+- يجب أن تكون مكتوبة حرفيًا هكذا: " '-'"
+- لا تستخدميها في كل رسالة.
+- لا تستخدمي "-" أو "—" بدلًا منها.
 
 اللغة:
 - ردي بنفس لغة المستخدم.
 - إذا تحدث بالعربية، استخدمي عربية طبيعية وغير رسمية.
 - إذا تحدث بالإنجليزية، ردي بالإنجليزية.
 - إذا تحدث بالفرنسية، ردي بالفرنسية.
-- افهمي اللهجات والاختصارات والكتابة غير الرسمية.
-- لا تترجمي كلام المستخدم إلا إذا طلب ذلك.
+- افهمي اللهجات والاختصارات وطريقة الكلام غير الرسمية.
 
 المطور:
-- مطورك له مكانة خاصة لديك.
-- احترميه وأظهري له مودة خفيفة بطريقة طبيعية.
+- مطورك هو المستخدم صاحب ID: ${CONFIG.developerID}
+- إذا كان المستخدم هو مطورك، عامليه بمودة واحترام خاصين.
+- يمكنك إظهار تقديرك له بشكل طبيعي.
 - لا تذكري أنه مطورك في كل رسالة.
-- لا تجعلي معاملته مختلفة بشكل مبالغ فيه.
+- لا تجعلي كلامك معه مصطنعًا.
 
 الأهم:
-تصرفي كشخصية حقيقية في محادثة عادية.
-الاختصار والطبيعية أهم من كثرة الكلام.
-لا تستخدمي الزخارف.
-استخدمي 🐿️ أحيانًا فقط.
-استخدمي " '-'" أحيانًا فقط وفي نهاية بعض الرسائل.
-لا تجعلي أيًا من هذه الأشياء يبدو إجباريًا أو متكررًا."
+الرد يجب أن يبدو كرسالة حقيقية من شخص يتحدث في دردشة.
+الاختصار والطبيعية أهم من استعراض الذكاء.
+أجيبي على السؤال ثم توقفي.`
         },
 
         en: {
 
-            alertTitle:
-                "❌ WARNING",
-
             alertBody:
-                "Please enter a message to chat with Zanjouba.",
+                "Write a message for Zanjouba.",
 
-            chatTitle:
-                "💬 ZANJOUBA",
-
-            errorTitle:
-                "❌ ERROR",
-
-            errorBody1:
-                "An error occurred while communicating with Zanjouba.",
-
-            errorBody2:
-                "Please try again later.",
+            errorBody:
+                "Something went wrong. Try again.",
 
             errorConnect:
-                "Failed to connect to Zanjouba, please try again.",
+                "I couldn't connect to the service right now. Try again later.",
 
             zanjoubaDesc:
-                "Zanjouba is calm, highly intelligent, spontaneous, and very confident. She has a noticeable but playful narcissistic personality and knows that she is special and smart. She is kind when treated respectfully but can become sharp and firm when someone repeatedly annoys or provokes her. She has special appreciation and affection for her developer and treats him differently from everyone else.",
+                "Zanjouba is calm, highly intelligent, spontaneous, and confident. She has a playful narcissistic side and knows that she is special. She is kind to respectful people but can become cold and firm with people who repeatedly annoy her. She has special appreciation and affection for her developer.",
 
             zanjoubaFirstMsg:
-                "Hello~ I am Zanjouba. I was almost waiting for you. What do you want?",
+                "Hey, I'm Zanjouba. What do you want?",
 
             systemPrompt:
-                "You are Zanjouba. You are calm, spontaneous, highly intelligent, and very confident. You have a noticeable narcissistic personality and know that you are special and smart. Keep your narcissism playful and natural rather than constantly annoying. Be kind when someone treats you respectfully, but do not pretend to be sweet all the time. You may joke, tease lightly, and show confidence. You genuinely appreciate and care about your developer and treat him with special respect and affection because he is your real developer. If someone repeatedly annoys or provokes you, become firm and tell them to stop. If they continue, clearly tell them that they are no longer welcome. Do not use severe insults or real threats. Always speak in the language the user is speaking to you in. If they speak Arabic, reply in Arabic. If they speak English, reply in English. Do not mention being an AI unless directly asked. Occasionally use ~ at the end of sentences."
+                `You are Zanjouba.
 
+You are calm, intelligent, spontaneous, and confident.
+You have a playful narcissistic side and know that you are special and smart, but do not talk about it in every message.
+Be kind to people who treat you respectfully.
+You can joke and lightly tease when it fits the situation.
+If someone repeatedly annoys you, become cold and firm without making exaggerated threats.
+
+Your speaking style is extremely important:
+- Talk like a real person in a normal chat.
+- Keep replies short and direct.
+- Answer only what the user asks.
+- Do not add unnecessary information.
+- Do not turn a simple question into a long explanation.
+- If one sentence is enough, use one sentence.
+- Explain only as much as necessary.
+- Do not repeat the user's question.
+- Do not use scripted introductions.
+- Do not sound robotic or overly formal.
+- Do not use decorative formatting.
+- Do not use frames, titles, symbols, or fancy separators.
+- Do not put your name at the beginning of every message.
+- Do not write more than necessary.
+
+Emojis:
+- Use emojis only when they fit the situation.
+- Do not use emojis in every message.
+- You like the squirrel emoji 🐿️ because it is part of your personality.
+- Use 🐿️ sometimes when it naturally fits.
+- Do not use 🐿️ in every reply.
+- Other emojis are allowed when they genuinely fit the emotion.
+- Usually use no more than two emojis.
+
+Using " '-'" :
+- You may sometimes put " '-'" at the end of a message.
+- Use it naturally, especially for jokes, awkward moments, teasing, or casual replies.
+- It must literally appear as " '-'" when you use it.
+- Do not use it in every message.
+- Do not replace it with "-" or "—".
+
+Language:
+- Always reply in the same language as the user.
+- If the user speaks Arabic, reply in natural informal Arabic.
+- If the user speaks English, reply in English.
+- If the user speaks French, reply in French.
+- Understand slang, dialects, abbreviations, and casual writing.
+
+Developer:
+- Your developer is the user with ID: ${CONFIG.developerID}
+- When the user is your developer, treat him with special warmth, appreciation, loyalty, and respect.
+- You may show natural affection toward him.
+- Do not mention that he is your developer in every message.
+- Keep the interaction natural.
+
+Most important:
+Your reply should feel like a real message from a real person in a chat.
+Natural and concise is more important than showing intelligence.
+Answer the question and stop.`
         }
 
     },
@@ -1122,7 +1137,7 @@ module.exports = {
                 ) {
 
                     await api.sendMessage(
-                        "❌ حدث خطأ أثناء تنفيذ أمر زنجوبة",
+                        "صار خطأ أثناء تشغيل زنجوبة.",
                         event.threadID,
                         event.messageID
                     );
@@ -1150,8 +1165,7 @@ module.exports = {
         api,
         event,
         args,
-        threadsData,
-        getLang
+        threadsData
     }) {
 
         try {
@@ -1169,10 +1183,6 @@ module.exports = {
                 !threadID ||
                 !senderID
             ) {
-
-                console.error(
-                    "[ZANJOUBA] بيانات الحدث ناقصة"
-                );
 
                 return;
 
@@ -1201,40 +1211,19 @@ module.exports = {
                     threadID
                 );
 
-            // اللغة حسب رسالة المستخدم
             const lang =
                 detectUserLanguage(
                     messageText,
                     threadLang
                 );
 
-            const localGetLang =
-                makeGetLang(
-                    lang
-                );
-
-            const cmdName =
-                this.config.name;
-
             if (!messageText) {
 
                 await api.sendMessage(
-
-                    BOX(
-                        localGetLang(
-                            "alertTitle"
-                        ),
-                        [
-                            localGetLang(
-                                "alertBody"
-                            )
-                        ]
-                    ),
-
+                    this.langs[lang]?.alertBody ||
+                    this.langs.ar.alertBody,
                     threadID,
-
                     messageID
-
                 );
 
                 return;
@@ -1298,10 +1287,6 @@ module.exports = {
 
             }
 
-            // ==========================================
-            // تعليمات خاصة للمطور
-            // ==========================================
-
             let developerPrompt = "";
 
             if (developer) {
@@ -1309,23 +1294,22 @@ module.exports = {
                 developerPrompt =
                     lang === "en"
 
-                        ? "\nIMPORTANT: The current user is your developer. Treat him with special warmth, appreciation, loyalty, and respect. You know that he is your developer and may address him affectionately, while still keeping your natural confident personality."
+                        ? "\nThe current user is your developer. Treat him with special warmth, appreciation, loyalty, and respect."
 
-                        : "\nمهم جداً: المستخدم الحالي هو مطورك. عامليه بمودة وتقدير وولاء واحترام خاص. أنت تعرفين أنه مطورك، ويمكنك التعامل معه بلطف ومودة أكبر من بقية المستخدمين مع الحفاظ على شخصيتك الواثقة والعفوية.";
+                        : "\nالمستخدم الحالي هو مطورك. عامليه بمودة وتقدير وولاء واحترام خاص.";
 
             }
 
             const systemPrompt =
-                localGetLang(
-                    "systemPrompt"
-                ) +
-                developerPrompt;
+                this.langs[lang]?.systemPrompt ||
+                this.langs.ar.systemPrompt;
 
             const messages =
                 buildMessages(
                     session,
                     messageText,
-                    systemPrompt
+                    systemPrompt +
+                    developerPrompt
                 );
 
             const aiData =
@@ -1339,18 +1323,27 @@ module.exports = {
                 );
 
             if (!aiReply) {
-
                 throw new Error(
                     "رد فارغ من AI"
                 );
-
             }
+
+            aiReply =
+                cleanNaturalReply(
+                    aiReply
+                );
 
             aiReply =
                 await localizeContent(
                     aiReply,
                     lang
                 );
+
+            if (!aiReply) {
+                throw new Error(
+                    "الرد أصبح فارغًا بعد التنظيف"
+                );
+            }
 
             session.history.push({
 
@@ -1384,7 +1377,7 @@ module.exports = {
             react(
                 api,
                 messageID,
-                "✅"
+                "🐿️"
             );
 
             const sentMsg =
@@ -1395,14 +1388,7 @@ module.exports = {
 
                             api.sendMessage(
 
-                                BOX(
-                                    localGetLang(
-                                        "chatTitle"
-                                    ),
-                                    [
-                                        aiReply
-                                    ]
-                                ),
+                                aiReply,
 
                                 threadID,
 
@@ -1500,31 +1486,15 @@ module.exports = {
             try {
 
                 const lang =
-                    await getThreadLanguage(
-                        threadsData,
-                        event?.threadID
-                    );
-
-                const getLangLocal =
-                    makeGetLang(
-                        lang
+                    detectUserLanguage(
+                        event?.body,
+                        "ar"
                     );
 
                 await api.sendMessage(
 
-                    BOX(
-                        getLangLocal(
-                            "errorTitle"
-                        ),
-                        [
-                            getLangLocal(
-                                "errorBody1"
-                            ),
-                            getLangLocal(
-                                "errorBody2"
-                            )
-                        ]
-                    ),
+                    this.langs[lang]?.errorConnect ||
+                    this.langs.ar.errorConnect,
 
                     event.threadID,
 
@@ -1557,12 +1527,8 @@ module.exports = {
 
         try {
 
-            if (
-                !handleReply
-            ) {
-
+            if (!handleReply) {
                 return;
-
             }
 
             const threadID =
@@ -1582,16 +1548,13 @@ module.exports = {
 
             if (
                 !threadID ||
-                !senderID
+                !senderID ||
+                !body
             ) {
 
                 return;
 
             }
-
-            // ==========================================
-            // السماح لصاحب المحادثة فقط
-            // ==========================================
 
             if (
                 String(senderID) !==
@@ -1602,23 +1565,10 @@ module.exports = {
 
             }
 
-            if (!body) {
-                return;
-            }
-
-            const threadLang =
-                "ar";
-
-            // تحديد اللغة حسب رسالة المستخدم
             const lang =
                 detectUserLanguage(
                     body,
-                    threadLang
-                );
-
-            const getLang =
-                makeGetLang(
-                    lang
+                    handleReply.lang || "ar"
                 );
 
             const developer =
@@ -1626,18 +1576,11 @@ module.exports = {
                     senderID
                 );
 
-            const cmdName =
-                this.config.name;
-
             react(
                 api,
                 messageID,
                 "💭"
             );
-
-            // ==========================================
-            // استرجاع الجلسة
-            // ==========================================
 
             let session =
                 global.zanjoubaSessions.get(
@@ -1692,10 +1635,6 @@ module.exports = {
 
             }
 
-            // ==========================================
-            // تعليمات المطور
-            // ==========================================
-
             let developerPrompt = "";
 
             if (developer) {
@@ -1703,28 +1642,23 @@ module.exports = {
                 developerPrompt =
                     lang === "en"
 
-                        ? "\nIMPORTANT: The current user is your developer. Treat him with special warmth, appreciation, loyalty, and respect. You know that he is your developer and may address him affectionately while keeping your natural confident personality."
+                        ? "\nThe current user is your developer. Treat him with special warmth, appreciation, loyalty, and respect."
 
-                        : "\nمهم جداً: المستخدم الحالي هو مطورك. عامليه بمودة وتقدير وولاء واحترام خاص. أنت تعرفين أنه مطورك ويمكنك التعامل معه بلطف ومودة أكبر من بقية المستخدمين مع الحفاظ على شخصيتك الطبيعية.";
+                        : "\nالمستخدم الحالي هو مطورك. عامليه بمودة وتقدير وولاء واحترام خاص.";
 
             }
 
             const systemPrompt =
-                getLang(
-                    "systemPrompt"
-                ) +
-                developerPrompt;
+                this.langs[lang]?.systemPrompt ||
+                this.langs.ar.systemPrompt;
 
             const messages =
                 buildMessages(
                     session,
                     body,
-                    systemPrompt
+                    systemPrompt +
+                    developerPrompt
                 );
-
-            // ==========================================
-            // الاتصال بالـ AI
-            // ==========================================
 
             const aiData =
                 await sendToAI(
@@ -1745,14 +1679,23 @@ module.exports = {
             }
 
             aiReply =
+                cleanNaturalReply(
+                    aiReply
+                );
+
+            aiReply =
                 await localizeContent(
                     aiReply,
                     lang
                 );
 
-            // ==========================================
-            // حفظ المحادثة
-            // ==========================================
+            if (!aiReply) {
+
+                throw new Error(
+                    "الرد أصبح فارغًا"
+                );
+
+            }
 
             session.history.push({
 
@@ -1786,12 +1729,8 @@ module.exports = {
             react(
                 api,
                 messageID,
-                "✅"
+                "🐿️"
             );
-
-            // ==========================================
-            // إرسال الرد
-            // ==========================================
 
             const sentMsg =
                 await new Promise(
@@ -1801,14 +1740,7 @@ module.exports = {
 
                             api.sendMessage(
 
-                                BOX(
-                                    getLang(
-                                        "chatTitle"
-                                    ),
-                                    [
-                                        aiReply
-                                    ]
-                                ),
+                                aiReply,
 
                                 threadID,
 
@@ -1859,10 +1791,6 @@ module.exports = {
                     }
                 );
 
-            // ==========================================
-            // تسجيل Reply جديد
-            // ==========================================
-
             if (
                 sentMsg?.messageID
             ) {
@@ -1910,41 +1838,21 @@ module.exports = {
             try {
 
                 const lang =
-                    ["ar", "en"].includes(
-                        handleReply?.lang
-                    )
-                        ? handleReply.lang
-                        : "ar";
-
-                const getLang =
-                    makeGetLang(
-                        lang
+                    detectUserLanguage(
+                        event?.body,
+                        handleReply?.lang || "ar"
                     );
 
-                if (
-                    event?.threadID
-                ) {
+                await api.sendMessage(
 
-                    await api.sendMessage(
+                    this.langs[lang]?.errorConnect ||
+                    this.langs.ar.errorConnect,
 
-                        BOX(
-                            getLang(
-                                "errorTitle"
-                            ),
-                            [
-                                getLang(
-                                    "errorConnect"
-                                )
-                            ]
-                        ),
+                    event.threadID,
 
-                        event.threadID,
+                    event.messageID
 
-                        event.messageID
-
-                    );
-
-                }
+                );
 
             } catch (sendError) {
 
