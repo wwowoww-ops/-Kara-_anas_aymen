@@ -23,33 +23,33 @@ function hasArabic(text) {
 // ==================================================
 
 async function translateTo(text, targetLang) {
-
     if (!text || !targetLang) {
         return text;
     }
 
     try {
-
         const url =
             `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(
                 String(text).slice(0, 1000)
             )}`;
 
-        const res = await axios.get(
-            url,
-            {
-                timeout: 8000
-            }
-        );
+        const res = await axios.get(url, {
+            timeout: 8000
+        });
+
+        if (
+            !res.data ||
+            !Array.isArray(res.data[0])
+        ) {
+            return text;
+        }
 
         return res.data[0]
-            .map(x => x[0])
+            .map(x => x?.[0] || "")
             .join("");
 
-    } catch {
-
+    } catch (error) {
         return text;
-
     }
 }
 
@@ -58,22 +58,15 @@ async function translateTo(text, targetLang) {
 // ==================================================
 
 async function localizeContent(text, lang) {
-
     if (!text) {
         return text;
     }
 
-    if (
-        lang === "en" &&
-        hasArabic(text)
-    ) {
+    if (lang === "en" && hasArabic(text)) {
         return translateTo(text, "en");
     }
 
-    if (
-        lang === "ar" &&
-        !hasArabic(text)
-    ) {
+    if (lang === "ar" && !hasArabic(text)) {
         return translateTo(text, "ar");
     }
 
@@ -95,43 +88,27 @@ const BOX = (
         ` ⦿ ⟬ ${title} ⟭ ⦿\n` +
         `⊱ ────────────── ⊰\n`;
 
-    for (const l of lines) {
-
+    for (const l of lines || []) {
         if (!l && l !== 0) {
-
             m += `\n`;
-
         } else {
-
             m += `  ⟣ ${l}\n`;
-
         }
-
     }
 
     if (footer) {
-
-        m +=
-            `⊱ ────────────── ⊰\n`;
+        m += `⊱ ────────────── ⊰\n`;
 
         for (const f of footer) {
-
             if (!f && f !== 0) {
-
                 m += `\n`;
-
             } else {
-
                 m += `  ⟣ ${f}\n`;
-
             }
-
         }
-
     }
 
-    return m +
-        "●─────── ✾ ───────●";
+    return m + "●─────── ✾ ───────●";
 };
 
 // ==================================================
@@ -177,21 +154,28 @@ async function getCharacterInfo(lang) {
 
                 "x-api-key": CONFIG.apiKey1
 
-            }
+            },
+
+            timeout: 15000
 
         });
 
-        return res.data;
+        if (res.data) {
+            return res.data;
+        }
+
+        throw new Error("بيانات الشخصية فارغة");
 
     } catch (e) {
 
         console.error(
-            "فشل جلب معلومات زنجوبة، استخدام الافتراضي"
+            "[ZANJOUBA] فشل جلب معلومات الشخصية:",
+            e.message
         );
 
-        const getLangLocal = (key) =>
-            module.exports.langs[lang]?.[key] ||
-            module.exports.langs.ar[key];
+        const langData =
+            module.exports.langs?.[lang] ||
+            module.exports.langs?.ar;
 
         return {
 
@@ -201,10 +185,12 @@ async function getCharacterInfo(lang) {
                     : "زنجوبة",
 
             description:
-                getLangLocal("zanjoubaDesc"),
+                langData?.zanjoubaDesc ||
+                "زنجوبة شخصية هادئة ومجتهدة.",
 
             first_mes:
-                getLangLocal("zanjoubaFirstMsg")
+                langData?.zanjoubaFirstMsg ||
+                "أهلاً~ أنا زنجوبة. كيف يمكنني مساعدتك؟"
 
         };
 
@@ -266,7 +252,6 @@ async function sendToAI(messages) {
     });
 
     return response.data;
-
 }
 
 // ==================================================
@@ -274,6 +259,10 @@ async function sendToAI(messages) {
 // ==================================================
 
 function extractReply(data) {
+
+    if (!data) {
+        return "";
+    }
 
     let text = "";
 
@@ -296,6 +285,10 @@ function extractReply(data) {
             data.text ||
             "";
 
+    }
+
+    if (typeof text !== "string") {
+        text = String(text || "");
     }
 
     return text
@@ -334,45 +327,68 @@ function buildMessages(
     systemPrompt
 ) {
 
+    const character =
+        session?.character || {};
+
+    const history =
+        Array.isArray(session?.history)
+            ? session.history
+            : [];
+
     const messages = [
 
         {
             role: "user",
+
             parts: [
                 {
-                    text: systemPrompt
+                    text:
+                        systemPrompt ||
+                        "تحدث بأدب واحترام."
                 }
             ]
+
         },
 
         {
             role: "user",
+
             parts: [
                 {
                     text:
-                        `أنت الآن ${session.character.name || "زنجوبة"}. ` +
-                        `${session.character.description || ""}`
+                        `أنت الآن ${character.name || "زنجوبة"}. ` +
+                        `${character.description || ""}`
                 }
             ]
+
         },
 
         {
             role: "model",
+
             parts: [
                 {
                     text:
-                        session.character.first_mes ||
+                        character.first_mes ||
                         "أهلاً~"
                 }
             ]
+
         }
 
     ];
 
     const recentHistory =
-        session.history.slice(-6);
+        history.slice(-6);
 
     for (const msg of recentHistory) {
+
+        if (
+            !msg ||
+            !msg.content
+        ) {
+            continue;
+        }
 
         if (msg.role === "user") {
 
@@ -382,7 +398,7 @@ function buildMessages(
 
                 parts: [
                     {
-                        text: msg.content
+                        text: String(msg.content)
                     }
                 ]
 
@@ -398,7 +414,7 @@ function buildMessages(
 
                 parts: [
                     {
-                        text: msg.content
+                        text: String(msg.content)
                     }
                 ]
 
@@ -414,13 +430,203 @@ function buildMessages(
 
         parts: [
             {
-                text: newMessage
+                text: String(newMessage || "")
             }
         ]
 
     });
 
     return messages;
+}
+
+// ==================================================
+// التفاعل مع الرسالة
+// ==================================================
+
+function react(api, messageID, reaction) {
+
+    if (
+        !api ||
+        typeof api.setMessageReaction !== "function" ||
+        !messageID
+    ) {
+        return;
+    }
+
+    try {
+
+        api.setMessageReaction(
+            reaction,
+            String(messageID),
+            () => {},
+            true
+        );
+
+    } catch (error) {
+
+        console.error(
+            `[ZANJOUBA REACTION] ${error.message}`
+        );
+
+    }
+
+}
+
+// ==================================================
+// الحصول على اللغة
+// ==================================================
+
+async function getThreadLanguage(
+    threadsData,
+    threadID
+) {
+
+    let lang = "ar";
+
+    try {
+
+        if (
+            threadsData &&
+            typeof threadsData.get === "function"
+        ) {
+
+            const td =
+                await threadsData.get(threadID);
+
+            lang =
+                td?.data?.lang ||
+                td?.lang ||
+                lang;
+
+        }
+
+    } catch (error) {
+
+        console.error(
+            "[ZANJOUBA LANGUAGE]",
+            error.message
+        );
+
+    }
+
+    try {
+
+        if (
+            (!lang || !["ar", "en"].includes(lang)) &&
+            global.GoatBot?.config?.language
+        ) {
+
+            lang =
+                global.GoatBot.config.language;
+
+        }
+
+    } catch (error) {}
+
+    if (
+        !["ar", "en"].includes(lang)
+    ) {
+
+        lang = "ar";
+
+    }
+
+    return lang;
+}
+
+// ==================================================
+// دالة اللغة المحلية
+// ==================================================
+
+function makeGetLang(lang) {
+
+    return function getLang(key, ...args) {
+
+        const langData =
+            module.exports.langs?.[lang] ||
+            module.exports.langs?.ar ||
+            {};
+
+        let text =
+            langData[key] ||
+            module.exports.langs?.ar?.[key] ||
+            key ||
+            "";
+
+        for (
+            let i = 0;
+            i < args.length;
+            i++
+        ) {
+
+            text =
+                String(text).replace(
+                    new RegExp(
+                        `%${i + 1}`,
+                        "g"
+                    ),
+                    String(args[i])
+                );
+
+        }
+
+        return text;
+
+    };
+
+}
+
+// ==================================================
+// تسجيل الرد
+// ==================================================
+
+function registerReply(
+    messageID,
+    data
+) {
+
+    if (
+        !messageID ||
+        !global.GoatBot ||
+        !global.GoatBot.onReply
+    ) {
+
+        console.error(
+            "[ZANJOUBA] onReply غير متوفر"
+        );
+
+        return;
+
+    }
+
+    try {
+
+        if (
+            typeof global.GoatBot.onReply.set === "function"
+        ) {
+
+            global.GoatBot.onReply.set(
+                String(messageID),
+                data
+            );
+
+            return;
+
+        }
+
+        console.error(
+            "[ZANJOUBA] GoatBot.onReply.set غير موجود"
+        );
+
+    } catch (error) {
+
+        console.error(
+            "[ZANJOUBA REPLY REGISTER]",
+            error.message
+        );
+
+    }
+
 }
 
 // ==================================================
@@ -435,7 +641,7 @@ module.exports = {
 
         enname: "zanjouba",
 
-        version: "2.2",
+        version: "2.3",
 
         author: "Yamada KJ (تحويل ثنائي)",
 
@@ -548,13 +754,72 @@ module.exports = {
         getLang
     }) {
 
-        return this.onStart({
-            api,
-            event,
-            args,
-            threadsData,
-            getLang
-        });
+        try {
+
+            const safeArgs =
+                Array.isArray(args)
+                    ? args
+                    : [];
+
+            const localGetLang =
+                typeof getLang === "function"
+                    ? getLang
+                    : makeGetLang(
+                        await getThreadLanguage(
+                            threadsData,
+                            event?.threadID
+                        )
+                    );
+
+            return this.onStart({
+
+                api,
+
+                event,
+
+                args: safeArgs,
+
+                threadsData,
+
+                getLang: localGetLang
+
+            });
+
+        } catch (error) {
+
+            console.error(
+                "[ZANJOUBA RUN ERROR]",
+                error
+            );
+
+            const threadID =
+                event?.threadID;
+
+            const messageID =
+                event?.messageID;
+
+            if (threadID) {
+
+                try {
+
+                    api.sendMessage(
+                        "❌ حدث خطأ أثناء تنفيذ أمر زنجوبة",
+                        threadID,
+                        messageID
+                    );
+
+                } catch (sendError) {
+
+                    console.error(
+                        "[ZANJOUBA SEND ERROR]",
+                        sendError.message
+                    );
+
+                }
+
+            }
+
+        }
 
     },
 
@@ -570,60 +835,72 @@ module.exports = {
         getLang
     }) {
 
-        const {
-            threadID,
-            messageID,
-            senderID,
-            messageReply
-        } = event;
+        const threadID =
+            event?.threadID;
+
+        const messageID =
+            event?.messageID;
+
+        const senderID =
+            event?.senderID;
+
+        if (!threadID || !senderID) {
+
+            console.error(
+                "[ZANJOUBA] بيانات الحدث ناقصة"
+            );
+
+            return;
+
+        }
+
+        const safeArgs =
+            Array.isArray(args)
+                ? args
+                : [];
+
+        const localGetLang =
+            typeof getLang === "function"
+                ? getLang
+                : makeGetLang(
+                    await getThreadLanguage(
+                        threadsData,
+                        threadID
+                    )
+                );
 
         const cmdName =
             this.config.name;
 
         const userMessage =
-            args.join(" ").trim();
+            safeArgs
+                .join(" ")
+                .trim();
 
-        let lang;
+        let lang =
+            await getThreadLanguage(
+                threadsData,
+                threadID
+            );
 
-        try {
-
-            const td =
-                await threadsData.get(threadID);
-
-            lang =
-                td?.data?.lang ||
-                global.GoatBot.config.language ||
-                "ar";
-
-        } catch {
-
-            lang = "ar";
-
-        }
-
-        if (
-            !["ar", "en"].includes(lang)
-        ) {
-
-            lang = "ar";
-
-        }
+        const messageReply =
+            event?.messageReply;
 
         const messageText =
             userMessage ||
-            (
-                messageReply &&
-                messageReply.body
-            );
+            String(
+                messageReply?.body ||
+                ""
+            ).trim();
 
         if (!messageText) {
 
             return api.sendMessage(
 
                 BOX(
-                    getLang("alertTitle"),
+                    localGetLang("alertTitle"),
                     [
-                        getLang("alertBody")
+                        localGetLang("alertBody")
                     ]
                 ),
 
@@ -635,71 +912,81 @@ module.exports = {
 
         }
 
-        api.setMessageReaction(
-            "💭",
+        react(
+            api,
             messageID,
-            () => {},
-            true
+            "💭"
         );
-
-        let session =
-            global.zanjoubaSessions.get(senderID);
-
-        if (!session) {
-
-            const charInfo =
-                await getCharacterInfo(lang);
-
-            charInfo.name =
-                await localizeContent(
-                    charInfo.name,
-                    lang
-                );
-
-            charInfo.description =
-                await localizeContent(
-                    charInfo.description,
-                    lang
-                );
-
-            charInfo.first_mes =
-                await localizeContent(
-                    charInfo.first_mes,
-                    lang
-                );
-
-            session = {
-
-                history: [],
-
-                character: charInfo
-
-            };
-
-            global.zanjoubaSessions.set(
-                senderID,
-                session
-            );
-
-        }
-
-        const systemPrompt =
-            getLang("systemPrompt");
-
-        const messages =
-            buildMessages(
-                session,
-                messageText,
-                systemPrompt
-            );
 
         try {
 
+            let session =
+                global.zanjoubaSessions.get(
+                    String(senderID)
+                );
+
+            if (!session) {
+
+                const charInfo =
+                    await getCharacterInfo(
+                        lang
+                    );
+
+                charInfo.name =
+                    await localizeContent(
+                        charInfo.name,
+                        lang
+                    );
+
+                charInfo.description =
+                    await localizeContent(
+                        charInfo.description,
+                        lang
+                    );
+
+                charInfo.first_mes =
+                    await localizeContent(
+                        charInfo.first_mes,
+                        lang
+                    );
+
+                session = {
+
+                    history: [],
+
+                    character:
+                        charInfo
+
+                };
+
+                global.zanjoubaSessions.set(
+                    String(senderID),
+                    session
+                );
+
+            }
+
+            const systemPrompt =
+                localGetLang(
+                    "systemPrompt"
+                );
+
+            const messages =
+                buildMessages(
+                    session,
+                    messageText,
+                    systemPrompt
+                );
+
             const aiData =
-                await sendToAI(messages);
+                await sendToAI(
+                    messages
+                );
 
             let aiReply =
-                extractReply(aiData);
+                extractReply(
+                    aiData
+                );
 
             if (!aiReply) {
 
@@ -719,7 +1006,8 @@ module.exports = {
 
                 role: "user",
 
-                content: messageText
+                content:
+                    messageText
 
             });
 
@@ -727,7 +1015,8 @@ module.exports = {
 
                 role: "assistant",
 
-                content: aiReply
+                content:
+                    aiReply
 
             });
 
@@ -740,45 +1029,82 @@ module.exports = {
 
             }
 
-            api.setMessageReaction(
-                "✅",
+            react(
+                api,
                 messageID,
-                () => {},
-                true
+                "✅"
             );
 
+            const messageBody =
+                BOX(
+                    localGetLang(
+                        "chatTitle"
+                    ),
+                    [
+                        aiReply
+                    ]
+                );
+
             const sentMsg =
-                await new Promise(resolve =>
+                await new Promise(
+                    resolve => {
 
-                    api.sendMessage(
+                        try {
 
-                        BOX(
-                            getLang("chatTitle"),
-                            [
-                                aiReply
-                            ]
-                        ),
+                            api.sendMessage(
 
-                        threadID,
+                                messageBody,
 
-                        (err, info) =>
-                            resolve(
-                                err
-                                    ? null
-                                    : info
-                            ),
+                                threadID,
 
-                        messageID
+                                (
+                                    err,
+                                    info
+                                ) => {
 
-                    )
+                                    if (err) {
 
+                                        console.error(
+                                            "[ZANJOUBA SEND]",
+                                            err
+                                        );
+
+                                        resolve(null);
+
+                                        return;
+
+                                    }
+
+                                    resolve(
+                                        info ||
+                                        null
+                                    );
+
+                                },
+
+                                messageID
+
+                            );
+
+                        } catch (error) {
+
+                            console.error(
+                                "[ZANJOUBA SEND EXCEPTION]",
+                                error
+                            );
+
+                            resolve(null);
+
+                        }
+
+                    }
                 );
 
             if (
                 sentMsg?.messageID
             ) {
 
-                global.GoatBot.onReply.set(
+                registerReply(
 
                     sentMsg.messageID,
 
@@ -788,7 +1114,7 @@ module.exports = {
                             cmdName,
 
                         author:
-                            senderID,
+                            String(senderID),
 
                         history:
                             session.history.slice(),
@@ -808,32 +1134,48 @@ module.exports = {
         } catch (err) {
 
             console.error(
-                "خطأ زنجوبة:",
+                "[ZANJOUBA ERROR]",
                 err
             );
 
-            api.setMessageReaction(
-                "❌",
+            react(
+                api,
                 messageID,
-                () => {},
-                true
+                "❌"
             );
 
-            api.sendMessage(
+            try {
 
-                BOX(
-                    getLang("errorTitle"),
-                    [
-                        getLang("errorBody1"),
-                        getLang("errorBody2")
-                    ]
-                ),
+                await api.sendMessage(
 
-                threadID,
+                    BOX(
+                        localGetLang(
+                            "errorTitle"
+                        ),
+                        [
+                            localGetLang(
+                                "errorBody1"
+                            ),
+                            localGetLang(
+                                "errorBody2"
+                            )
+                        ]
+                    ),
 
-                messageID
+                    threadID,
 
-            );
+                    messageID
+
+                );
+
+            } catch (sendError) {
+
+                console.error(
+                    "[ZANJOUBA ERROR SEND]",
+                    sendError
+                );
+
+            }
 
         }
 
@@ -849,137 +1191,160 @@ module.exports = {
         Reply
     }) {
 
-        const {
-            threadID,
-            messageID,
-            senderID,
-            body
-        } = event;
+        try {
 
-        if (
-            senderID !== Reply.author
-        ) {
+            if (
+                !Reply
+            ) {
 
-            return;
+                return;
 
-        }
+            }
 
-        const userMessage =
-            (body || "").trim();
+            const threadID =
+                event?.threadID;
 
-        if (!userMessage) {
+            const messageID =
+                event?.messageID;
 
-            return;
+            const senderID =
+                event?.senderID;
 
-        }
+            const body =
+                String(
+                    event?.body ||
+                    ""
+                ).trim();
 
-        const cmdName =
-            this.config.name;
+            if (
+                !threadID ||
+                !senderID
+            ) {
 
-        api.setMessageReaction(
-            "💭",
-            messageID,
-            () => {},
-            true
-        );
+                return;
 
-        const lang =
-            Reply.lang || "ar";
+            }
 
-        const getLang =
-            (key, ...args) => {
+            if (
+                String(senderID) !==
+                String(Reply.author)
+            ) {
 
-                const langData =
-                    module.exports.langs[lang] ||
-                    module.exports.langs.ar;
+                return;
 
-                let text =
-                    langData[key] || "";
+            }
 
-                for (
-                    let i = 0;
-                    i < args.length;
-                    i++
+            if (!body) {
+
+                return;
+
+            }
+
+            const cmdName =
+                this.config.name;
+
+            react(
+                api,
+                messageID,
+                "💭"
+            );
+
+            let lang =
+                Reply.lang ||
+                "ar";
+
+            if (
+                !["ar", "en"].includes(lang)
+            ) {
+
+                lang = "ar";
+
+            }
+
+            const getLang =
+                makeGetLang(
+                    lang
+                );
+
+            let session =
+                global.zanjoubaSessions.get(
+                    String(senderID)
+                );
+
+            if (!session) {
+
+                session = {
+
+                    history:
+                        Array.isArray(
+                            Reply.history
+                        )
+                            ? Reply.history
+                            : [],
+
+                    character:
+                        Reply.character ||
+                        await getCharacterInfo(
+                            lang
+                        )
+
+                };
+
+                global.zanjoubaSessions.set(
+                    String(senderID),
+                    session
+                );
+
+            } else {
+
+                if (
+                    Array.isArray(
+                        Reply.history
+                    )
                 ) {
 
-                    text =
-                        text.replace(
-                            new RegExp(
-                                `%${i + 1}`,
-                                "g"
-                            ),
-                            args[i]
-                        );
+                    session.history =
+                        Reply.history.slice();
 
                 }
 
-                return text;
+                if (
+                    Reply.character
+                ) {
 
-            };
+                    session.character =
+                        Reply.character;
 
-        let session =
-            global.zanjoubaSessions.get(
-                senderID
-            );
-
-        if (!session) {
-
-            session = {
-
-                history:
-                    Reply.history || [],
-
-                character:
-                    Reply.character ||
-                    await getCharacterInfo(lang)
-
-            };
-
-            global.zanjoubaSessions.set(
-                senderID,
-                session
-            );
-
-        } else {
-
-            if (Reply.history) {
-
-                session.history =
-                    Reply.history;
+                }
 
             }
 
-            if (Reply.character) {
+            const systemPrompt =
+                getLang(
+                    "systemPrompt"
+                );
 
-                session.character =
-                    Reply.character;
-
-            }
-
-        }
-
-        const systemPrompt =
-            getLang("systemPrompt");
-
-        const messages =
-            buildMessages(
-                session,
-                userMessage,
-                systemPrompt
-            );
-
-        try {
+            const messages =
+                buildMessages(
+                    session,
+                    body,
+                    systemPrompt
+                );
 
             const aiData =
-                await sendToAI(messages);
+                await sendToAI(
+                    messages
+                );
 
             let aiReply =
-                extractReply(aiData);
+                extractReply(
+                    aiData
+                );
 
             if (!aiReply) {
 
                 throw new Error(
-                    "رد فارغ"
+                    "رد فارغ من AI"
                 );
 
             }
@@ -994,7 +1359,8 @@ module.exports = {
 
                 role: "user",
 
-                content: userMessage
+                content:
+                    body
 
             });
 
@@ -1002,7 +1368,8 @@ module.exports = {
 
                 role: "assistant",
 
-                content: aiReply
+                content:
+                    aiReply
 
             });
 
@@ -1015,45 +1382,79 @@ module.exports = {
 
             }
 
-            api.setMessageReaction(
-                "✅",
+            react(
+                api,
                 messageID,
-                () => {},
-                true
+                "✅"
             );
 
             const sentMsg =
-                await new Promise(resolve =>
+                await new Promise(
+                    resolve => {
 
-                    api.sendMessage(
+                        try {
 
-                        BOX(
-                            getLang("chatTitle"),
-                            [
-                                aiReply
-                            ]
-                        ),
+                            api.sendMessage(
 
-                        threadID,
+                                BOX(
+                                    getLang(
+                                        "chatTitle"
+                                    ),
+                                    [
+                                        aiReply
+                                    ]
+                                ),
 
-                        (err, info) =>
-                            resolve(
-                                err
-                                    ? null
-                                    : info
-                            ),
+                                threadID,
 
-                        messageID
+                                (
+                                    err,
+                                    info
+                                ) => {
 
-                    )
+                                    if (err) {
 
+                                        console.error(
+                                            "[ZANJOUBA REPLY SEND]",
+                                            err
+                                        );
+
+                                        resolve(null);
+
+                                        return;
+
+                                    }
+
+                                    resolve(
+                                        info ||
+                                        null
+                                    );
+
+                                },
+
+                                messageID
+
+                            );
+
+                        } catch (error) {
+
+                            console.error(
+                                "[ZANJOUBA REPLY SEND EXCEPTION]",
+                                error
+                            );
+
+                            resolve(null);
+
+                        }
+
+                    }
                 );
 
             if (
                 sentMsg?.messageID
             ) {
 
-                global.GoatBot.onReply.set(
+                registerReply(
 
                     sentMsg.messageID,
 
@@ -1063,7 +1464,7 @@ module.exports = {
                             cmdName,
 
                         author:
-                            senderID,
+                            String(senderID),
 
                         history:
                             session.history.slice(),
@@ -1083,34 +1484,62 @@ module.exports = {
         } catch (err) {
 
             console.error(
-                "خطأ زنجوبة في الرد:",
+                "[ZANJOUBA REPLY ERROR]",
                 err
             );
 
-            api.setMessageReaction(
-                "❌",
-                messageID,
-                () => {},
-                true
+            react(
+                api,
+                event?.messageID,
+                "❌"
             );
 
-            api.sendMessage(
+            try {
 
-                BOX(
-                    getLang("errorTitle"),
-                    [
-                        getLang("errorConnect")
-                    ]
-                ),
+                const lang =
+                    Reply?.lang || "ar";
 
-                threadID,
+                const getLang =
+                    makeGetLang(
+                        lang
+                    );
 
-                messageID
+                if (
+                    event?.threadID
+                ) {
 
-            );
+                    await api.sendMessage(
+
+                        BOX(
+                            getLang(
+                                "errorTitle"
+                            ),
+                            [
+                                getLang(
+                                    "errorConnect"
+                                )
+                            ]
+                        ),
+
+                        event.threadID,
+
+                        event.messageID
+
+                    );
+
+                }
+
+            } catch (sendError) {
+
+                console.error(
+                    "[ZANJOUBA REPLY ERROR SEND]",
+                    sendError
+                );
+
+            }
 
         }
 
     }
 
-}; 
+};
