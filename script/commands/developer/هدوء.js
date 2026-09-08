@@ -1,345 +1,794 @@
-"use strict";
+const fs = require("fs");
+
+const path = "./data/silence.json";
 
 // ==================================================
-// إعدادات أمر الهدوء
+// ID المطور
 // ==================================================
 
 const DEVELOPER_ID = "61578581225040";
 
-// ==================================================
-// حفظ حالة الهدوء لكل مجموعة
-// ==================================================
 
-if (!global.hinaSilenceMode) {
-    global.hinaSilenceMode = new Map();
+module.exports.config = {
+  name: "هدوء",
+  version: "2.0.0",
+  hasPermssion: 0,
+  credits: "أبو هريرة",
+  description: "وضع هدوء للمطور فقط وطرد أي شخص يتكلم",
+  commandCategory: "developer",
+  usages: "هدوء / هدوء إيقاف",
+  cooldowns: 3
+};
+
+
+/* ==================================================
+   أدوات مساعدة
+================================================== */
+
+function ensureDataFile() {
+
+  try {
+
+    if (!fs.existsSync("./data")) {
+
+      fs.mkdirSync("./data", {
+        recursive: true
+      });
+
+    }
+
+    if (!fs.existsSync(path)) {
+
+      fs.writeFileSync(
+        path,
+        JSON.stringify({}, null, 2),
+        "utf8"
+      );
+
+    }
+
+  } catch (error) {
+
+    console.error(
+      "[هدوء] فشل تجهيز ملف البيانات:",
+      error
+    );
+
+  }
+
 }
 
-// ==================================================
-// التحقق من المطور
-// ==================================================
+
+/* ==================================================
+   قراءة JSON
+================================================== */
+
+function readJSON(file, fallback = {}) {
+
+  try {
+
+    if (!fs.existsSync(file)) {
+      return fallback;
+    }
+
+    const content =
+      fs.readFileSync(
+        file,
+        "utf8"
+      );
+
+    if (!content.trim()) {
+      return fallback;
+    }
+
+    const data =
+      JSON.parse(content);
+
+    return data || fallback;
+
+  } catch (error) {
+
+    console.error(
+      `[هدوء] فشل قراءة ${file}:`,
+      error
+    );
+
+    return fallback;
+
+  }
+
+}
+
+
+/* ==================================================
+   حفظ JSON
+================================================== */
+
+function writeJSON(file, data) {
+
+  try {
+
+    fs.writeFileSync(
+      file,
+      JSON.stringify(
+        data,
+        null,
+        2
+      ),
+      "utf8"
+    );
+
+    return true;
+
+  } catch (error) {
+
+    console.error(
+      `[هدوء] فشل حفظ ${file}:`,
+      error
+    );
+
+    return false;
+
+  }
+
+}
+
+
+/* ==================================================
+   التحقق من المطور
+================================================== */
 
 function isDeveloper(userID) {
-    return String(userID) === String(DEVELOPER_ID);
+
+  return (
+    String(userID) ===
+    String(DEVELOPER_ID)
+  );
+
 }
 
-// ==================================================
-// التحقق من المشرف
-// ==================================================
 
-async function isAdmin(api, threadID, userID) {
+/* ==================================================
+   الحصول على ID البوت
+================================================== */
+
+function getBotID(api) {
+
+  try {
+
+    return String(
+      api.getCurrentUserID()
+    );
+
+  } catch (error) {
+
+    console.error(
+      "[هدوء] فشل الحصول على ID البوت:",
+      error
+    );
+
+    return "";
+
+  }
+
+}
+
+
+/* ==================================================
+   الحصول على معلومات المجموعة
+================================================== */
+
+function getThreadInfo(api, threadID) {
+
+  return new Promise(
+    (resolve, reject) => {
+
+      try {
+
+        api.getThreadInfo(
+          threadID,
+          (error, info) => {
+
+            if (error) {
+              return reject(error);
+            }
+
+            resolve(info);
+
+          }
+        );
+
+      } catch (error) {
+
+        reject(error);
+
+      }
+
+    }
+  );
+
+}
+
+
+/* ==================================================
+   الطرد
+================================================== */
+
+function removeUser(
+  api,
+  userID,
+  threadID
+) {
+
+  return new Promise(
+    (resolve, reject) => {
+
+      try {
+
+        api.removeUserFromGroup(
+          String(userID),
+          String(threadID),
+          error => {
+
+            if (error) {
+              return reject(error);
+            }
+
+            resolve();
+
+          }
+        );
+
+      } catch (error) {
+
+        reject(error);
+
+      }
+
+    }
+  );
+
+}
+
+
+/* ==================================================
+   الأمر الرئيسي
+================================================== */
+
+module.exports.run = async function({
+  api,
+  event,
+  args
+}) {
+
+  const {
+    threadID,
+    messageID,
+    senderID
+  } = event;
+
+
+  if (
+    !threadID ||
+    !senderID
+  ) {
+
+    return;
+
+  }
+
+
+  /* ==================================================
+     المطور فقط
+  ================================================== */
+
+  if (
+    !isDeveloper(senderID)
+  ) {
+
+    return api.sendMessage(
+      `⌬ ━━ HINA ADMIN ━━ ⌬\n\n⛔ هذا الأمر خاص بالمطور فقط.`,
+      threadID,
+      messageID
+    );
+
+  }
+
+
+  ensureDataFile();
+
+
+  /* ==================================================
+     قراءة البيانات
+  ================================================== */
+
+  let data =
+    readJSON(
+      path,
+      {}
+    );
+
+
+  const action =
+    String(
+      args?.[0] || ""
+    )
+    .trim()
+    .toLowerCase();
+
+
+  /* ==================================================
+     🔊 إيقاف الهدوء
+  ================================================== */
+
+  if (
+    action === "إيقاف" ||
+    action === "ايقاف" ||
+    action === "off" ||
+    action === "stop"
+  ) {
+
+    delete data[
+      threadID
+    ];
+
+
+    if (
+      !writeJSON(
+        path,
+        data
+      )
+    ) {
+
+      return api.sendMessage(
+        `⌬ ━━ HINA ADMIN ━━ ⌬\n\n❌ حدث خطأ أثناء إيقاف وضع الهدوء.`,
+        threadID,
+        messageID
+      );
+
+    }
+
+
+    return api.sendMessage(
+      `⌬ ━━ HINA ADMIN ━━ ⌬\n\n🔊 تم إيقاف وضع الهدوء.\n\n✅ أصبح بإمكان الجميع التحدث.`,
+      threadID,
+      messageID
+    );
+
+  }
+
+
+  /* ==================================================
+     🔇 تفعيل الهدوء
+  ================================================== */
+
+  let threadInfo;
+
+  try {
+
+    threadInfo =
+      await getThreadInfo(
+        api,
+        threadID
+      );
+
+  } catch (error) {
+
+    console.error(
+      "[هدوء] فشل الحصول على معلومات المجموعة:",
+      error
+    );
+
+    return api.sendMessage(
+      `⌬ ━━ HINA ADMIN ━━ ⌬\n\n❌ تعذر الحصول على معلومات المجموعة.`,
+      threadID,
+      messageID
+    );
+
+  }
+
+
+  if (!threadInfo) {
+
+    return api.sendMessage(
+      `⌬ ━━ HINA ADMIN ━━ ⌬\n\n❌ لم أستطع الحصول على معلومات المجموعة.`,
+      threadID,
+      messageID
+    );
+
+  }
+
+
+  /* ==================================================
+     التأكد أن البوت موجود كأدمن
+  ================================================== */
+
+  const botID =
+    getBotID(api);
+
+
+  const adminIDs =
+    Array.isArray(
+      threadInfo.adminIDs
+    )
+      ? threadInfo.adminIDs
+          .map(admin => {
+
+            if (
+              admin &&
+              typeof admin === "object"
+            ) {
+
+              return (
+                admin.id ||
+                admin.userID ||
+                admin.uid ||
+                ""
+              );
+
+            }
+
+            return admin || "";
+
+          })
+          .filter(Boolean)
+          .map(id => String(id))
+      : [];
+
+
+  if (
+    !botID ||
+    !adminIDs.includes(
+      String(botID)
+    )
+  ) {
+
+    return api.sendMessage(
+      `⌬ ━━ HINA ADMIN ━━ ⌬\n\n⚠️ يجب أن أكون أدمن حتى أتمكن من طرد الأشخاص.`,
+      threadID,
+      messageID
+    );
+
+  }
+
+
+  /* ==================================================
+     تفعيل الهدوء
+  ================================================== */
+
+  data[
+    threadID
+  ] = {
+
+    enabled: true,
+
+    developerID:
+      DEVELOPER_ID,
+
+    time:
+      Date.now()
+
+  };
+
+
+  if (
+    !writeJSON(
+      path,
+      data
+    )
+  ) {
+
+    return api.sendMessage(
+      `⌬ ━━ HINA ADMIN ━━ ⌬\n\n❌ حدث خطأ أثناء حفظ وضع الهدوء.`,
+      threadID,
+      messageID
+    );
+
+  }
+
+
+  return api.sendMessage(
+    `⌬ ━━ HINA ADMIN ━━ ⌬\n\n🔇 تم تفعيل وضع الهدوء.\n\n👑 المطور فقط يستطيع التحدث.\n🚫 أي شخص آخر يتكلم سيتم طرده مباشرة.\n\n🔊 لإيقاف الوضع:\nهدوء إيقاف`,
+    threadID,
+    messageID
+  );
+
+};
+
+
+/* ==================================================
+   🎯 معالج الأحداث
+================================================== */
+
+module.exports.handleEvent =
+async function({
+  api,
+  event
+}) {
+
+  try {
+
+    if (!event) {
+      return;
+    }
+
+
+    const {
+      threadID,
+      senderID,
+      type,
+      messageID
+    } = event;
+
+
+    /* ==================================================
+       التأكد أن الحدث رسالة
+    ================================================== */
+
+    if (
+      type !== "message" &&
+      type !== "message_reply"
+    ) {
+
+      return;
+
+    }
+
+
+    if (
+      !threadID ||
+      !senderID
+    ) {
+
+      return;
+
+    }
+
+
+    /* ==================================================
+       قراءة حالة الهدوء
+    ================================================== */
+
+    if (
+      !fs.existsSync(path)
+    ) {
+
+      return;
+
+    }
+
+
+    const data =
+      readJSON(
+        path,
+        {}
+      );
+
+
+    if (
+      !data[threadID] ||
+      !data[threadID].enabled
+    ) {
+
+      return;
+
+    }
+
+
+    /* ==================================================
+       المطور مستثنى
+    ================================================== */
+
+    if (
+      isDeveloper(senderID)
+    ) {
+
+      console.log(
+        `[هدوء] تم السماح للمطور ${senderID}`
+      );
+
+      return;
+
+    }
+
+
+    /* ==================================================
+       البوت مستثنى
+    ================================================== */
+
+    const botID =
+      getBotID(api);
+
+
+    if (
+      botID &&
+      String(senderID) ===
+      String(botID)
+    ) {
+
+      return;
+
+    }
+
+
+    /* ==================================================
+       الحصول على معلومات المجموعة
+    ================================================== */
+
+    let threadInfo;
 
     try {
 
-        const threadInfo =
-            await api.getThreadInfo(threadID);
-
-        if (!threadInfo) {
-            return false;
-        }
-
-        const adminIDs =
-            threadInfo.adminIDs || [];
-
-        return adminIDs.some(admin => {
-
-            const id =
-                typeof admin === "object"
-                    ? admin.id
-                    : admin;
-
-            return (
-                String(id) ===
-                String(userID)
-            );
-
-        });
+      threadInfo =
+        await getThreadInfo(
+          api,
+          threadID
+        );
 
     } catch (error) {
 
-        console.error(
-            "[HINA SILENCE ADMIN ERROR]",
-            error
-        );
+      console.error(
+        `[هدوء] فشل الحصول على معلومات المجموعة ${threadID}:`,
+        error
+      );
 
-        return false;
+      return;
 
     }
 
-}
 
-// ==================================================
-// الأمر
-// ==================================================
+    if (!threadInfo) {
 
-module.exports = {
+      return;
 
-    config: {
+    }
 
-        name:
-            "هدوء",
 
-        enname:
-            "silence",
+    /* ==================================================
+       التأكد أن البوت أدمن
+    ================================================== */
 
-        version:
-            "1.0.0",
+    const adminIDs =
+      Array.isArray(
+        threadInfo.adminIDs
+      )
+        ? threadInfo.adminIDs
+            .map(admin => {
 
-        author:
-            "HINA UTILITY",
+              if (
+                admin &&
+                typeof admin === "object"
+              ) {
 
-        countDown:
-            3,
-
-        role:
-            1,
-
-        description:
-            "تفعيل وضع الهدوء وطرد من يتكلم باستثناء المطور",
-
-        guide:
-            "{pn} | {pn} إيقاف",
-
-        category:
-            "Admin",
-
-        usePrefix:
-            true,
-
-        aliases: [
-            "هدوء",
-            "silence"
-        ]
-
-    },
-
-    // ==================================================
-    // تشغيل الأمر
-    // ==================================================
-
-    async run({
-        api,
-        event,
-        args
-    }) {
-
-        const threadID =
-            event?.threadID;
-
-        const senderID =
-            event?.senderID;
-
-        if (
-            !threadID ||
-            !senderID
-        ) {
-
-            return;
-
-        }
-
-        // ==============================================
-        // المطور يستطيع التحكم دائمًا
-        // ==============================================
-
-        const developer =
-            isDeveloper(senderID);
-
-        // ==============================================
-        // المشرف يستطيع التحكم
-        // ==============================================
-
-        if (!developer) {
-
-            const admin =
-                await isAdmin(
-                    api,
-                    threadID,
-                    senderID
+                return (
+                  admin.id ||
+                  admin.userID ||
+                  admin.uid ||
+                  ""
                 );
 
-            if (!admin) {
+              }
 
-                await api.sendMessage(
-                    "هذا الأمر للمشرفين فقط.",
-                    threadID,
-                    event.messageID
-                );
+              return admin || "";
 
-                return;
+            })
+            .filter(Boolean)
+            .map(id => String(id))
+        : [];
 
-            }
 
-        }
+    if (
+      !botID ||
+      !adminIDs.includes(
+        String(botID)
+      )
+    ) {
 
-        const action =
-            String(
-                Array.isArray(args)
-                    ? args.join(" ").trim().toLowerCase()
-                    : ""
+      console.log(
+        `❌ [هدوء] البوت ليس أدمن في ${threadID}`
+      );
+
+      return;
+
+    }
+
+
+    /* ==================================================
+       🚫 أي شخص غير المطور
+       يتم طرده مباشرة
+    ================================================== */
+
+    console.log(
+      `🚨 [هدوء] محاولة طرد ${senderID} من ${threadID}`
+    );
+
+
+    /* ==================================================
+       حذف الرسالة
+    ================================================== */
+
+    if (messageID) {
+
+      try {
+
+        await new Promise(
+          resolve => {
+
+            api.unsendMessage(
+              messageID,
+              () => resolve()
             );
 
-        // ==============================================
-        // إيقاف الهدوء
-        // ==============================================
-
-        if (
-            action === "إيقاف" ||
-            action === "ايقاف" ||
-            action === "off" ||
-            action === "stop"
-        ) {
-
-            global.hinaSilenceMode.delete(
-                String(threadID)
-            );
-
-            await api.sendMessage(
-                "تم إيقاف وضع الهدوء.",
-                threadID,
-                event.messageID
-            );
-
-            console.log(
-                `[HINA SILENCE] OFF thread=${threadID} by=${senderID}`
-            );
-
-            return;
-
-        }
-
-        // ==============================================
-        // تفعيل الهدوء
-        // ==============================================
-
-        global.hinaSilenceMode.set(
-            String(threadID),
-            true
+          }
         );
+
+      } catch (error) {
+
+        console.error(
+          `[هدوء] فشل حذف رسالة ${senderID}:`,
+          error
+        );
+
+      }
+
+    }
+
+
+    /* ==================================================
+       🚨 الطرد المباشر
+    ================================================== */
+
+    try {
+
+      await removeUser(
+        api,
+        senderID,
+        threadID
+      );
+
+
+      console.log(
+        `✅ [هدوء] تم طرد ${senderID} مباشرة من ${threadID}`
+      );
+
+
+      /* ==================================================
+         رسالة التأكيد
+      ================================================== */
+
+      try {
 
         await api.sendMessage(
-            "تم تفعيل وضع الهدوء. أي شخص يتكلم سيتم طرده باستثناء المطور.",
-            threadID,
-            event.messageID
+          `⌬ ━━ HINA ADMIN ━━ ⌬\n\n🚫 تم طرد عضو من المجموعة.\n\n📌 السبب: التحدث أثناء وضع الهدوء.\n👑 المسموح له بالكلام: المطور فقط.`,
+          threadID
         );
 
-        console.log(
-            `[HINA SILENCE] ON thread=${threadID} by=${senderID}`
+      } catch (error) {
+
+        console.error(
+          "[هدوء] تم الطرد لكن فشل إرسال رسالة التأكيد:",
+          error
         );
 
-    },
+      }
 
-    // ==================================================
-    // مراقبة الرسائل
-    // ==================================================
 
-    async handleEvent({
-        api,
-        event
-    }) {
+    } catch (error) {
 
-        try {
-
-            const threadID =
-                event?.threadID;
-
-            const senderID =
-                event?.senderID;
-
-            if (
-                !threadID ||
-                !senderID
-            ) {
-
-                return;
-
-            }
-
-            // ==========================================
-            // هل الهدوء مفعل؟
-            // ==========================================
-
-            const silenceEnabled =
-                global.hinaSilenceMode.get(
-                    String(threadID)
-                );
-
-            if (!silenceEnabled) {
-
-                return;
-
-            }
-
-            // ==========================================
-            // المطور مستثنى
-            // UID:
-            // 61578581225040
-            // ==========================================
-
-            if (
-                isDeveloper(senderID)
-            ) {
-
-                return;
-
-            }
-
-            // ==========================================
-            // تجاهل رسائل البوت نفسه
-            // ==========================================
-
-            if (
-                event.senderID &&
-                global.GoatBot?.botID &&
-                String(event.senderID) ===
-                    String(global.GoatBot.botID)
-            ) {
-
-                return;
-
-            }
-
-            // ==========================================
-            // التأكد من وجود وظيفة الطرد
-            // ==========================================
-
-            if (
-                typeof api.removeUserFromGroup !==
-                "function"
-            ) {
-
-                console.error(
-                    "[HINA SILENCE] api.removeUserFromGroup غير موجود"
-                );
-
-                return;
-
-            }
-
-            // ==========================================
-            // طرد المستخدم
-            // ==========================================
-
-            await api.removeUserFromGroup(
-
-                String(senderID),
-
-                String(threadID)
-
-            );
-
-            console.log(
-                `[HINA SILENCE] KICK user=${senderID} thread=${threadID}`
-            );
-
-        } catch (error) {
-
-            console.error(
-                "[HINA SILENCE ERROR]",
-                error
-            );
-
-        }
+      console.error(
+        `❌ [هدوء] فشل طرد ${senderID} من ${threadID}:`,
+        error
+      );
 
     }
+
+  } catch (error) {
+
+    console.error(
+      "❌ [هدوء] خطأ عام في handleEvent:",
+      error
+    );
+
+  }
 
 };
