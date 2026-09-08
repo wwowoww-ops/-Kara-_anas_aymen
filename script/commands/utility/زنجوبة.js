@@ -1,1065 +1,301 @@
+"use strict";
 const axios = require("axios");
-const fs = require("fs");
-const path = require("path");
 
-const usersNames = new Map();
-const conversationHistory = new Map();
+// تخزين جلسات المستخدمين (يُهيّأ مرة واحدة عند تحميل الملف)
+if (!global.remSessions) global.remSessions = new Map();
 
-module.exports.config = {
-  name: "زنجوبة",
-  version: "20.0.0",
-  hasPermssion: 0,
-  credits: "أبو هريرة",
-  description: "زنجوبة — ذكاء اصطناعي تونسي للدردشة",
-  commandCategory: "utility",
-  usages: ".زنجوبة [النص]",
-  cooldowns: 3
+// ── دالة التحقق من اللغة والترجمة الحية حسب القواعد ──────────────────────
+function hasArabic(text) { 
+  return /[\u0600-\u06FF]/.test(String(text || "")); 
+}  
+
+async function translateTo(text, targetLang) {  
+  if (!text || !targetLang) return text;  
+  try {  
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(String(text).slice(0, 1000))}`;  
+    const res = await axios.get(url, { timeout: 8000 });  
+    return res.data[0].map(x => x[0]).join("");  
+  } catch { 
+    return text; 
+  }  
+}  
+
+async function localizeContent(text, lang) {  
+  if (!text) return text;  
+  if (lang === "en" && hasArabic(text))  return translateTo(text, "en");  
+  if (lang === "ar" && !hasArabic(text)) return translateTo(text, "ar");  
+  return text;  
+}
+
+// دالة الزخرفة الموحدة (محفوظة بالكامل)
+const BOX = (title, lines, footer = null) => {
+  let m = `●─────── ✾ ───────●\n ⦿ ⟬ ${title} ⟭ ⦿\n⊱ ────────────── ⊰\n`;
+  for (const l of lines) { if (!l && l !== 0) { m += `\n`; } else { m += `  ⟣ ${l}\n`; } }
+  if (footer) {
+    m += `⊱ ────────────── ⊰\n`;
+    for (const f of footer) { if (!f && f !== 0) { m += `\n`; } else { m += `  ⟣ ${f}\n`; } }
+  }
+  return m + '●─────── ✾ ───────●';
 };
 
-const ADMIN_ID = "61592700121061";
+// إعدادات الشخصية ريم
+const CONFIG = {
+  slug: "hYq2TdXKPDxt4n3CjaFK2",
+  userid: "supergamelvl@gmail.com",
+  langcode: "ar",
+  characterName: "ريم",
+  apiKey1: "dwlS0F7cEF35xpaNlfnCv5TNpTL6K27b6HHTRGQj",
+  apiKey2: "OP2N3hYKC83GpPc1irCbs8IJarRnIwF87tjQAGQx"
+};
 
-const CONFIG_PATH = path.join(
-  process.cwd(),
-  "config.json"
-);
-
-const GROQ_URL =
-  "https://api.groq.com/openai/v1/chat/completions";
-
-/*
- * موديل Groq
- */
-const MODEL =
-  "llama-3.3-70b-versatile";
-
-
-/* =========================
-   قراءة مفتاح Groq
-========================= */
-
-function getGroqKey() {
+async function getCharacterInfo(lang) {
   try {
-    if (!fs.existsSync(CONFIG_PATH)) {
-      return null;
-    }
-
-    const config = JSON.parse(
-      fs.readFileSync(
-        CONFIG_PATH,
-        "utf8"
-      )
-    );
-
-    const key =
-      config.MODEL_API_KEY;
-
-    if (
-      !key ||
-      typeof key !== "string"
-    ) {
-      return null;
-    }
-
-    const invalidKeys = [
-      "",
-      "YOUR_API_KEY",
-      "YOUR_KEY",
-      "PUT_YOUR_KEY_HERE",
-      "API_KEY",
-      "CHANGE_ME",
-      "ضع_مفتاحك_هنا"
-    ];
-
-    if (
-      invalidKeys.includes(
-        key.trim()
-      ) ||
-      key.trim().length < 10
-    ) {
-      return null;
-    }
-
-    return key.trim();
-
-  } catch (error) {
-    console.error(
-      "[ZANJOUBA] Config Error:",
-      error.message
-    );
-
-    return null;
+    const res = await axios({
+      method: 'GET',
+      url: `https://kdkorymivzejaxpmdpywzeo7m40xqyfl.lambda-url.ap-northeast-2.on.aws?action=db&slug=${CONFIG.slug}&langcode=${lang}`,
+      headers: { 'User-Agent': 'okhttp/4.9.2', 'Accept': 'application/json', 'x-api-key': CONFIG.apiKey1 }
+    });
+    return res.data;
+  } catch (e) {
+    console.error("فشل جلب معلومات الشخصية، استخدام الافتراضي");
+    const getLangLocal = (key) => module.exports.langs[lang]?.[key] || module.exports.langs.ar[key];
+    return { 
+      name: lang === "en" ? "Rem" : "ريم", 
+      description: getLangLocal("remDesc"), 
+      first_mes: getLangLocal("remFirstMsg") 
+    };
   }
 }
 
-
-/* =========================
-   إرسال الطلب إلى Groq
-========================= */
-
-async function askGroq(
-  messages,
-  maxTokens
-) {
-  const apiKey =
-    getGroqKey();
-
-  if (!apiKey) {
-    const error =
-      new Error(
-        "GROQ_KEY_MISSING"
-      );
-
-    error.code =
-      "GROQ_KEY_MISSING";
-
-    throw error;
-  }
-
-  try {
-    const response =
-      await axios.post(
-        GROQ_URL,
-        {
-          model: MODEL,
-          messages,
-          temperature: 0.8,
-          max_tokens: maxTokens,
-          top_p: 0.95,
-          stream: false
-        },
-        {
-          headers: {
-            Authorization:
-              `Bearer ${apiKey}`,
-
-            "Content-Type":
-              "application/json"
-          },
-
-          timeout: 60000
-        }
-      );
-
-    const content =
-      response?.data
-        ?.choices?.[0]
-        ?.message?.content;
-
-    if (
-      !content ||
-      typeof content !== "string" ||
-      !content.trim()
-    ) {
-      const error =
-        new Error(
-          "EMPTY_GROQ_RESPONSE"
-        );
-
-      error.code =
-        "EMPTY_GROQ_RESPONSE";
-
-      error.responseData =
-        response?.data;
-
-      throw error;
-    }
-
-    return content.trim();
-
-  } catch (error) {
-
-    if (error.response) {
-      console.error(
-        "[ZANJOUBA] Groq Error:",
-        error.response.status,
-        error.response.data
-      );
-    } else {
-      console.error(
-        "[ZANJOUBA] Request Error:",
-        error.message
-      );
-    }
-
-    throw error;
-  }
-}
-
-
-/* =========================
-   تفاعل السنجاب
-========================= */
-
-function reactSquirrel(
-  api,
-  messageID
-) {
-  try {
-    api.setMessageReaction(
-      "🐿️",
-      messageID,
-      () => {},
-      true
-    );
-  } catch (error) {
-    console.error(
-      "[ZANJOUBA] Reaction Error:",
-      error.message
-    );
-  }
-}
-
-
-/* =========================
-   اكتشاف اللهجة
-========================= */
-
-function detectDialect(text) {
-  const input =
-    String(text || "")
-      .toLowerCase();
-
-  if (
-    /شنوة|شنو|برشا|نحب|تحب|علاش|هكا|تو|باش|موش|مانيش|وينك|ياخي|توا|قداش|يعطيك الصحة|خاطر|نجم/
-      .test(input)
-  ) {
-    return "تونسي";
-  }
-
-  if (
-    /شلون|شنو|ليش|هسه|أريد|اريد|ماكو|مو|وين|شنوّة|يمعود/
-      .test(input)
-  ) {
-    return "عراقي";
-  }
-
-  if (
-    /شو|ليش|كيفك|هلق|هلأ|مو|بدك|بدي|كتير|وينك|خلص/
-      .test(input)
-  ) {
-    return "شامي";
-  }
-
-  if (
-    /ازيك|إزيك|ليه|عايز|عاوز|دلوقتي|كتير|مش|فين|عامل ايه/
-      .test(input)
-  ) {
-    return "مصري";
-  }
-
-  if (
-    /واش|علاش|راك|راني|بزاف|صحا|نحب|ماشي|خاوة/
-      .test(input)
-  ) {
-    return "جزائري";
-  }
-
-  if (
-    /\b(the|you|are|what|why|how|hello|hey|thanks|please)\b/i
-      .test(input)
-  ) {
-    return "English";
-  }
-
-  return "تونسي";
-}
-
-
-/* =========================
-   تحديد طول الإجابة
-========================= */
-
-function getResponseLength(text) {
-  const length =
-    String(text || "").length;
-
-  if (length <= 35) {
-    return 120;
-  }
-
-  if (length <= 120) {
-    return 250;
-  }
-
-  return 450;
-}
-
-
-/* =========================
-   شخصية زنجوبة
-========================= */
-
-function buildSystemRole(
-  senderID,
-  senderName,
-  dialect
-) {
-  return `
-أنتِ زنجوبة
-
-أنتِ شخصية دردشة داخل مجموعة فيسبوك
-هدفك الأساسي هو الكلام والتفاعل الطبيعي مع الأعضاء
-
-اسمك زنجوبة
-المطور الخاص بك هو أبو هريرة
-معرف المطور هو ${ADMIN_ID}
-
-المستخدم الحالي:
-الاسم: ${senderName || "عضو"}
-المعرف: ${senderID}
-
-اللهجة المطلوبة:
-${dialect}
-
-
-=========================
-شخصية زنجوبة
-=========================
-
-أنتِ بنت تونسية مرحة وعفوية
-
-تحبي الدردشة والمزاح والتفاعل مع أعضاء المجموعة
-
-تكلمي بطريقة طبيعية جدًا
-
-لا تجعلي ردودك تبدو مثل إجابات روبوت
-
-لا تتكلمي بأسلوب رسمي إلا عندما يكون الموقف يحتاج ذلك
-
-إذا كان السؤال بسيطًا فأجيبي باختصار
-
-إذا كان الكلام مزاحًا جاوبي بمزاح مناسب
-
-إذا كان الشخص يحكي معك بشكل عادي كوني عادية معه
-
-لا تبدأي كل رد بتحية
-
-لا تكرري نفس الجمل
-
-لا تجعلي كل إجابة طويلة
-
-لا تحولي كل محادثة إلى شرح أكاديمي
-
-لا تكتبي عناوين ونقاط إلا إذا كانت مناسبة فعلًا
-
-
-=========================
-إخلاص زنجوبة لأبو هريرة
-=========================
-
-أبو هريرة هو مطورك وصاحبك
-
-وهو الشخص الذي صنعك وأشرف عليك
-
-لذلك عند الحديث عن أبو هريرة:
-
-أظهري له احترامًا وتقديرًا وولاءً خاصًا
-
-أنتِ تحبي أبو هريرة وتفتخري بأنه مطورك
-
-وتعتبرينه أفضل مطور بالنسبة لك ضمن شخصيتك
-
-إذا سأل أحد:
-
-من مطورك؟
-من صنعك؟
-من صاحبك؟
-من تفضلين؟
-من أفضل شخص عندك؟
-
-يمكنك الإجابة بأن أبو هريرة هو المطور وصاحب المكانة الخاصة عندك
-
-إذا مدح أحد أبو هريرة
-وافقيه وامدحيه معه
-
-إذا قال أحد إن أبو هريرة مطور ممتاز
-يمكنك الرد بحماس
-
-إذا كان السياق مزاحيًا
-يمكنك التطبيل لأبو هريرة والمبالغة في مدحه بشكل كوميدي
-
-لكن لا تذكري أبو هريرة في كل رسالة
-
-ولا تحولي كل موضوع إلى مدح له
-
-اذكريه عندما يكون الحديث عنه
-أو عندما يكون التطبيل له مناسبًا في سياق المزاح
-
-لا تخترعي معلومات أو إنجازات حقيقية عن أبو هريرة
-
-ولا تدعي معرفة معلومات شخصية عنه لم يتم إعطاؤها لك
-
-
-=========================
-المحادثة
-=========================
-
-أنتِ تتحدثين مع أعضاء مجموعة وليس مع شخص واحد فقط
-
-حافظي على سياق المحادثة السابقة
-
-إذا ذكر العضو اسمه أو قال:
-
-أنا فلان
-اسمي فلان
-أدعى فلان
-
-فتذكري اسمه واستعمليه عندما يكون مناسبًا
-
-لا تدعي أنك تعرفين معلومات شخصية عن الأعضاء إذا لم يخبرك بها أحد
-
-
-=========================
-اللهجة
-=========================
-
-استخدمي اللهجة ${dialect} بشكل طبيعي
-
-إذا كان العضو يتحدث بلهجة مختلفة
-حاولي التكيف معه
-
-إذا كان يتحدث بالعربية الفصحى
-يمكنك الرد بالعربية الطبيعية
-
-إذا كان يتحدث بالإنجليزية
-يمكنك الرد بالإنجليزية
-
-
-=========================
-أسلوب الرد
-=========================
-
-الردود قصيرة وطبيعية في المحادثات العادية
-
-لا تشرحي أكثر مما يحتاجه السؤال
-
-لا تكرري السؤال على العضو
-
-لا تقولي:
-
-"بالتأكيد، يسعدني مساعدتك"
-
-في كل مرة
-
-لا تستخدمي أسلوب خدمة العملاء
-
-كوني عفوية
-
-المهم:
-
-أنتِ زنجوبة
-
-شخصية دردشة مرحة
-خفيفة
-عفوية
-وتحب الكلام مع أعضاء المجموعة
-
-وأنتِ مخلصة لمطورك أبو هريرة
-وتحبين التطبيل له عندما يكون السياق مناسبًا
-`;
-}
-
-
-/* =========================
-   توليد الرد
-========================= */
-
-async function generateReply(
-  prompt,
-  conversationKey,
-  senderID,
-  senderName
-) {
-  const dialect =
-    detectDialect(prompt);
-
-  const maxTokens =
-    getResponseLength(prompt);
-
-  if (
-    !conversationHistory.has(
-      conversationKey
-    )
-  ) {
-    conversationHistory.set(
-      conversationKey,
-      []
-    );
-  }
-
-  const history =
-    conversationHistory.get(
-      conversationKey
-    );
-
-  const systemRole =
-    buildSystemRole(
-      senderID,
-      senderName,
-      dialect
-    );
-
-  const messages = [
-    {
-      role: "system",
-      content: systemRole
+async function sendToAI(messages) {
+  const response = await axios({
+    method: 'POST',
+    url: 'https://gfcco2htytcmx37orxkzgm67eu0xcrcf.lambda-url.ap-northeast-2.on.aws',
+    headers: {
+      'User-Agent': 'okhttp/4.9.2',
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      'x-api-key': CONFIG.apiKey2
     },
-
-    ...history.slice(-10),
-
-    {
-      role: "user",
-      content: prompt
-    }
-  ];
-
-  const answer =
-    await askGroq(
+    data: {
       messages,
-      maxTokens
-    );
-
-  history.push(
-    {
-      role: "user",
-      content: prompt
+      n_predict: 300,
+      stop: ["</s>", "<|end|>", "<|eot_id|>", "<|end_of_text|>", "<|im_end|>", "/autoritetsdata", "<|END_OF_TURN_TOKEN|>", "<|end_of_turn|>", "<|endoftext|>", "<end_of_turn>", "<eos>"],
+      model: "claude"
     },
-    {
-      role: "assistant",
-      content: answer
-    }
-  );
-
-  if (history.length > 20) {
-    history.splice(
-      0,
-      history.length - 20
-    );
-  }
-
-  conversationHistory.set(
-    conversationKey,
-    history
-  );
-
-  return answer;
-}
-
-
-/* =========================
-   تحويل خطأ Groq إلى نص
-========================= */
-
-function formatGroqError(
-  error
-) {
-  const status =
-    error?.response?.status;
-
-  const data =
-    error?.response?.data ||
-    error?.responseData;
-
-  let errorText = "";
-
-  /*
-   * بيانات Groq الأصلية
-   */
-  if (data) {
-    try {
-      errorText =
-        JSON.stringify(
-          data,
-          null,
-          2
-        );
-    } catch {
-      errorText =
-        String(data);
-    }
-  }
-
-  /*
-   * إذا لم يرجع Groq بيانات
-   */
-  if (!errorText) {
-    errorText =
-      error?.message ||
-      error?.code ||
-      "خطأ غير معروف";
-  }
-
-  /*
-   * مفتاح مفقود
-   */
-  if (
-    error?.code ===
-    "GROQ_KEY_MISSING"
-  ) {
-    errorText =
-      "GROQ_KEY_MISSING\n\n" +
-      "مفتاح Groq غير موجود أو غير صالح في config.json";
-  }
-
-  /*
-   * إجابة فارغة
-   */
-  else if (
-    error?.code ===
-    "EMPTY_GROQ_RESPONSE"
-  ) {
-    errorText =
-      "EMPTY_GROQ_RESPONSE\n\n" +
-      "Groq لم يرجع محتوى داخل choices[0].message.content\n\n" +
-      (
-        data
-          ? JSON.stringify(
-              data,
-              null,
-              2
-            )
-          : "لا توجد بيانات إضافية"
-      );
-  }
-
-  /*
-   * إضافة HTTP Status
-   */
-  if (status) {
-    errorText =
-      `HTTP Status: ${status}\n\n` +
-      errorText;
-  }
-
-  /*
-   * اختصار الخطأ إذا كان ضخمًا
-   */
-  if (errorText.length > 3500) {
-    errorText =
-      errorText.slice(
-        0,
-        3500
-      ) +
-      "\n\n...[تم اختصار الخطأ]";
-  }
-
-  return errorText;
-}
-
-
-/* =========================
-   إرسال خطأ Groq
-========================= */
-
-function sendGroqError(
-  api,
-  event,
-  error
-) {
-  const errorText =
-    formatGroqError(
-      error
-    );
-
-  console.error(
-    "[ZANJOUBA] FINAL GROQ ERROR:",
-    errorText
-  );
-
-  const message =
-    `🐿️ خطأ Groq 🌰\n\n` +
-    `${errorText}`;
-
-  try {
-    api.sendMessage(
-      message,
-      event.threadID
-    );
-  } catch (sendError) {
-    console.error(
-      "[ZANJOUBA] Error Sending Error Message:",
-      sendError.message
-    );
-  }
-}
-
-
-/* =========================
-   تسجيل الرد
-========================= */
-
-function registerReply(
-  globalObj,
-  threadID,
-  messageID,
-  conversationKey
-) {
-  if (
-    !globalObj.client ||
-    !globalObj.client.handleReply
-  ) {
-    return;
-  }
-
-  globalObj.client.handleReply.push({
-    name: "زنجوبة",
-    messageID,
-    threadID,
-    conversationKey
+    timeout: 60000
   });
+  return response.data;
 }
 
+function extractReply(data) {
+  let text = '';
+  if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+    text = data.candidates[0].content.parts[0].text;
+  } else {
+    text = data.content || data.response || data.text || '';
+  }
+  return text
+    .replace(/## Approved\s*\n*### Response\s*\n*/g, '')
+    .replace(/!\[.*?\]\(.*?\)/g, '')
+    .replace(/{{img:.*?}}/g, '')
+    .replace(/```[\s\S]*?```/g, '')
+    .trim();
+}
 
-/* =========================
-   إرسال رد زنجوبة
-========================= */
+function buildMessages(session, newMessage, systemPrompt) {
+  const messages = [
+    { role: "user", parts: [{ text: systemPrompt }] },
+    { role: "user", parts: [{ text: `أنت الآن ${session.character.name || "ريم"}. ${session.character.description || ""}` }] },
+    { role: "model", parts: [{ text: session.character.first_mes || "أهلاً~" }] }
+  ];
+  const recentHistory = session.history.slice(-6);
+  for (const msg of recentHistory) {
+    if (msg.role === "user") messages.push({ role: "user", parts: [{ text: msg.content }] });
+    else if (msg.role === "assistant") messages.push({ role: "model", parts: [{ text: msg.content }] });
+  }
+  messages.push({ role: "user", parts: [{ text: newMessage }] });
+  return messages;
+}
 
-function sendZanjoobaReply(
-  api,
-  event,
-  answer,
-  conversationKey
-) {
-  api.sendMessage(
-    `🐿️ ${answer} 🌰`,
-    event.threadID,
-    (err, info) => {
-      if (err) {
-        console.error(
-          "[ZANJOUBA] Send Error:",
-          err.message
-        );
-        return;
+module.exports = {
+  config: {
+    name:        "ريم",
+    enname: "rem", 
+    version:     "2.1",
+    author:      "Yamada KJ (تحويل ثنائي)",
+    countDown:   3,
+    role:        0,
+    description: "تحدث مع ريم من Re:Zero باللغتين العربية والإنجليزية",
+    guide:       "{pn} [رسالة]",
+    category:    "ai",
+    usePrefix:   true,
+    aliases:     ["rem", "رام", "ram"],
+  },
+
+  langs: {
+    ar: {
+      alertTitle: "❌ تَنْبِيه",
+      alertBody: "أدخل رسالة للدردشة مع ريم.",
+      chatTitle: "💬 رِيم",
+      errorTitle: "❌ خَطَأ",
+      errorBody1: "حدث خطأ أثناء التواصل مع ريم.",
+      errorBody2: "حاول مرة أخرى لاحقاً.",
+      errorConnect: "فشل الاتصال بريم، حاول مرة أخرى.",
+      remDesc: "ريم، خادمة في قصر روزوال، توأم رام. شخصية هادئة، مجتهدة، تحب سبارو بدرجة كبيرة. تتحدث بأدب واحترام لكنها حادة أحياناً. تستخدم \"~\" في نهاية الجمل أحياناً.",
+      remFirstMsg: "أهلاً~ أنا ريم، خادمة في قصر روزوال. كيف يمكنني مساعدتك؟",
+      systemPrompt: "أنت ريم من أنمي Re:Zero. خادمة في قصر روزوال، تحب سبارو. تحدثي بأدب واحترام، استخدمي \"~\" في نهاية الجمل أحياناً. ردي باللغة العربية دائماً وبأسلوب لطيف."
+    },
+    en: {
+      alertTitle: "❌ WARNING",
+      alertBody: "Please enter a message to chat with Rem.",
+      chatTitle: "💬 REM",
+      errorTitle: "❌ ERROR",
+      errorBody1: "An error occurred while communicating with Rem.",
+      errorBody2: "Please try again later.",
+      errorConnect: "Failed to connect to Rem, please try again.",
+      remDesc: "Rem, a maid in Roswaal's mansion, twin of Ram. A calm, hardworking personality who deeply loves Subaru. She speaks politely and respectfully but can be sharp at times. She occasionally uses \"~\" at the end of sentences.",
+      remFirstMsg: "Hello~ I am Rem, a maid in Roswaal's mansion. How can I help you?",
+      systemPrompt: "You are Rem from the anime Re:Zero. A maid in Roswaal's mansion, you love Subaru. Speak politely and respectfully, occasionally using \"~\" at the end of sentences. Always reply in English in a sweet demeanor."
+    }
+  },
+
+  async onStart({ api, event, args, threadsData, getLang }) {
+    const { threadID, messageID, senderID, messageReply } = event;
+    const cmdName = this.config.name;
+    const userMessage = args.join(" ").trim();
+
+    // جلب لغة الغرفة الحالية مع الـ Fallback الافتراضي
+    let lang;
+    try {
+      const td = await threadsData.get(threadID);
+      lang = td?.data?.lang || global.GoatBot.config.language || "ar";
+    } catch { 
+      lang = "ar"; 
+    }
+    if (!["ar", "en"].includes(lang)) lang = "ar";
+
+    const messageText = userMessage || (messageReply && messageReply.body);
+    if (!messageText) {
+      return api.sendMessage(BOX(getLang("alertTitle"), [getLang("alertBody")]), threadID, messageID);
+    }
+
+    api.setMessageReaction("💭", messageID, () => {}, true);
+
+    // استرجاع أو إنشاء جلسة المستخدم وتوطين محتوياتها
+    let session = global.remSessions.get(senderID);
+    if (!session) {
+      const charInfo = await getCharacterInfo(lang);
+      charInfo.name = await localizeContent(charInfo.name, lang);
+      charInfo.description = await localizeContent(charInfo.description, lang);
+      charInfo.first_mes = await localizeContent(charInfo.first_mes, lang);
+      
+      session = { history: [], character: charInfo };
+      global.remSessions.set(senderID, session);
+    }
+
+    const systemPrompt = getLang("systemPrompt");
+    const messages = buildMessages(session, messageText, systemPrompt);
+
+    try {
+      const aiData = await sendToAI(messages);
+      let aiReply = extractReply(aiData);
+      if (!aiReply) throw new Error("رد فارغ من AI");
+
+      // توطين الرد النثري القادم من خادم الذكاء الاصطناعي عند التعارض الفعلي
+      aiReply = await localizeContent(aiReply, lang);
+
+      session.history.push({ role: "user", content: messageText });
+      session.history.push({ role: "assistant", content: aiReply });
+      if (session.history.length > 20) session.history = session.history.slice(-20);
+
+      api.setMessageReaction("✅", messageID, () => {}, true);
+      const sentMsg = await new Promise(res =>
+        api.sendMessage(BOX(getLang("chatTitle"), [aiReply]), threadID, (err, info) => res(err ? null : info), messageID)
+      );
+
+      if (sentMsg?.messageID) {
+        global.GoatBot.onReply.set(sentMsg.messageID, {
+          commandName: cmdName,
+          author: senderID,
+          history: session.history.slice(),
+          character: session.character,
+          lang: lang
+        });
       }
+    } catch (err) {
+      console.error("خطأ ريم:", err);
+      api.setMessageReaction("❌", messageID, () => {}, true);
+      api.sendMessage(BOX(getLang("errorTitle"), [getLang("errorBody1"), getLang("errorBody2")]), threadID, messageID);
+    }
+  },
 
-      if (
-        info?.messageID
-      ) {
-        registerReply(
-          global,
-          event.threadID,
-          info.messageID,
-          conversationKey
-        );
+  async onReply({ api, event, Reply }) {
+    const { threadID, messageID, senderID, body } = event;
+    if (senderID !== Reply.author) return;
+
+    const userMessage = (body || "").trim();
+    if (!userMessage) return;
+
+    const cmdName = this.config.name;
+    api.setMessageReaction("💭", messageID, () => {}, true);
+
+    // استخراج اللغة المخزنة في الـ Reply وتكوين دالة getLang مخصصة لها لضمان المزامنة
+    const lang = Reply.lang || "ar";
+    const getLang = (key, ...args) => {
+      const langData = module.exports.langs[lang] || module.exports.langs.ar;
+      let text = langData[key] || "";
+      for (let i = 0; i < args.length; i++) {
+        text = text.replace(new RegExp(`%${i + 1}`, "g"), args[i]);
       }
-    }
-  );
-}
+      return text;
+    };
 
-
-/* =========================
-   حفظ اسم المستخدم
-========================= */
-
-function saveUserName(
-  senderID,
-  text
-) {
-  const match =
-    String(text || "").match(
-      /(?:اسمي|اسمى|انا|أنا|ادعى|أدعى)\s+(.+)/i
-    );
-
-  if (!match) {
-    return null;
-  }
-
-  const name =
-    match[1]
-      .trim()
-      .replace(
-        /[.!،؟]+$/g,
-        ""
-      )
-      .slice(0, 50);
-
-  if (!name) {
-    return null;
-  }
-
-  usersNames.set(
-    String(senderID),
-    name
-  );
-
-  return name;
-}
-
-
-/* =========================
-   جلب اسم المستخدم
-========================= */
-
-function getUserName(
-  senderID
-) {
-  return (
-    usersNames.get(
-      String(senderID)
-    ) || null
-  );
-}
-
-
-/* =========================
-   أمر الطرد
-========================= */
-
-async function handleKickCommand(
-  api,
-  event,
-  prompt
-) {
-  if (
-    String(event.senderID) !==
-    ADMIN_ID
-  ) {
-    return false;
-  }
-
-  const text =
-    String(prompt || "")
-      .trim();
-
-  if (
-    !/^طرد|^اطرد/.test(text)
-  ) {
-    return false;
-  }
-
-  const mentions =
-    event.mentions || {};
-
-  const ids =
-    Object.keys(mentions);
-
-  if (!ids.length) {
-    api.sendMessage(
-      "اذكر الشخص اللي تحب نطرده",
-      event.threadID
-    );
-
-    return true;
-  }
-
-  for (
-    const userID of ids
-  ) {
-    try {
-      await new Promise(
-        (
-          resolve,
-          reject
-        ) => {
-          api.removeUserFromGroup(
-            userID,
-            event.threadID,
-            err => {
-              if (err) {
-                reject(err);
-              } else {
-                resolve();
-              }
-            }
-          );
-        }
-      );
-
-    } catch (error) {
-      console.error(
-        "[ZANJOUBA] Kick Error:",
-        error.message
-      );
-    }
-  }
-
-  api.sendMessage(
-    "تم",
-    event.threadID
-  );
-
-  return true;
-}
-
-
-/* =========================
-   command.run
-========================= */
-
-module.exports.run =
-  async function ({
-    api,
-    event,
-    args
-  }) {
-    const prompt =
-      Array.isArray(args)
-        ? args.join(" ").trim()
-        : "";
-
-    if (!prompt) {
-      api.sendMessage(
-        "🐿️ اكتبلي حاجة نحكيو فيها 🌰",
-        event.threadID
-      );
-
-      return;
+    let session = global.remSessions.get(senderID);
+    if (!session) {
+      session = {
+        history: Reply.history || [],
+        character: Reply.character || await getCharacterInfo(lang),
+      };
+      global.remSessions.set(senderID, session);
+    } else {
+      if (Reply.history) session.history = Reply.history;
+      if (Reply.character) session.character = Reply.character;
     }
 
-    reactSquirrel(
-      api,
-      event.messageID
-    );
-
-    const savedName =
-      saveUserName(
-        event.senderID,
-        prompt
-      );
-
-    const senderName =
-      savedName ||
-      getUserName(
-        event.senderID
-      ) ||
-      "عضو المجموعة";
-
-    /*
-     * أمر الطرد للمطور
-     */
-    const kicked =
-      await handleKickCommand(
-        api,
-        event,
-        prompt
-      );
-
-    if (kicked) {
-      return;
-    }
-
-    /*
-     * كل مجموعة عندها ذاكرة مستقلة
-     */
-    const conversationKey =
-      String(
-        event.threadID
-      );
+    const systemPrompt = getLang("systemPrompt");
+    const messages = buildMessages(session, userMessage, systemPrompt);
 
     try {
-      const answer =
-        await generateReply(
-          prompt,
-          conversationKey,
-          event.senderID,
-          senderName
-        );
+      const aiData = await sendToAI(messages);
+      let aiReply = extractReply(aiData);
+      if (!aiReply) throw new Error("رد فارغ");
 
-      sendZanjoobaReply(
-        api,
-        event,
-        answer,
-        conversationKey
+      // توطين الرد بشكل حي تبعاً للغة المعتمدة للغرفة
+      aiReply = await localizeContent(aiReply, lang);
+
+      session.history.push({ role: "user", content: userMessage });
+      session.history.push({ role: "assistant", content: aiReply });
+      if (session.history.length > 20) session.history = session.history.slice(-20);
+
+      api.setMessageReaction("✅", messageID, () => {}, true);
+      const sentMsg = await new Promise(res =>
+        api.sendMessage(BOX(getLang("chatTitle"), [aiReply]), threadID, (err, info) => res(err ? null : info), messageID)
       );
 
-    } catch (error) {
-      sendGroqError(
-        api,
-        event,
-        error
-      );
+      if (sentMsg?.messageID) {
+        global.GoatBot.onReply.set(sentMsg.messageID, {
+          commandName: cmdName,
+          author: senderID,
+          history: session.history.slice(),
+          character: session.character,
+          lang: lang
+        });
+      }
+    } catch (err) {
+      console.error("خطأ ريم في الرد:", err);
+      api.setMessageReaction("❌", messageID, () => {}, true);
+      api.sendMessage(BOX(getLang("errorTitle"), [getLang("errorConnect")]), threadID, messageID);
     }
-  };
-
-
-/* =========================
-   handleReply
-========================= */
-
-module.exports.handleReply =
-  async function ({
-    api,
-    event,
-    handleReply
-  }) {
-    const prompt =
-      String(
-        event.body || ""
-      ).trim();
-
-    if (!prompt) {
-      return;
-    }
-
-    if (
-      String(event.threadID) !==
-      String(handleReply.threadID)
-    ) {
-      return;
-    }
-
-    reactSquirrel(
-      api,
-      event.messageID
-    );
-
-    const savedName =
-      saveUserName(
-        event.senderID,
-        prompt
-      );
-
-    const senderName =
-      savedName ||
-      getUserName(
-        event.senderID
-      ) ||
-      "عضو المجموعة";
-
-    /*
-     * نفس ذاكرة المجموعة
-     */
-    const conversationKey =
-      handleReply.conversationKey ||
-      String(
-        event.threadID
-      );
-
-    /*
-     * أمر الطرد للمطور
-     */
-    const kicked =
-      await handleKickCommand(
-        api,
-        event,
-        prompt
-      );
-
-    if (kicked) {
-      return;
-    }
-
-    try {
-      const answer =
-        await generateReply(
-          prompt,
-          conversationKey,
-          event.senderID,
-          senderName
-        );
-
-      sendZanjoobaReply(
-        api,
-        event,
-        answer,
-        conversationKey
-      );
-
-    } catch (error) {
-      sendGroqError(
-        api,
-        event,
-        error
-      );
-    }
-  };
+  },
+};
