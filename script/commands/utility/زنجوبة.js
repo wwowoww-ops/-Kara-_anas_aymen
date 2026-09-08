@@ -11,31 +11,102 @@ if (!global.zanjoubaSessions) {
 }
 
 // ==================================================
+// إعدادات الشخصية
+// ==================================================
+
+const CONFIG = {
+
+    slug: "hYq2TdXKPDxt4n3CjaFK2",
+
+    userid: "supergamelvl@gmail.com",
+
+    langcode: "ar",
+
+    characterName: "زنجوبة",
+
+    // Developer ID
+    developerID: "61592700121061",
+
+    apiKey1: "dwlS0F7cEF35xpaNlfnCv5TNpTL6K27b6HHTRGQj",
+
+    apiKey2: "OP2N3hYKC83GpPc1irCbs8IJarRnIwF87tjQAGQx"
+
+};
+
+// ==================================================
 // التحقق من اللغة
 // ==================================================
 
 function hasArabic(text) {
-    return /[\u0600-\u06FF]/.test(String(text || ""));
+    return /[\u0600-\u06FF]/.test(
+        String(text || "")
+    );
+}
+
+// ==================================================
+// تحديد لغة المستخدم
+// ==================================================
+
+function detectUserLanguage(text, fallback = "ar") {
+
+    const value =
+        String(text || "").trim();
+
+    if (!value) {
+        return fallback;
+    }
+
+    const arabicChars =
+        (value.match(/[\u0600-\u06FF]/g) || []).length;
+
+    const latinChars =
+        (value.match(/[A-Za-z]/g) || []).length;
+
+    if (
+        arabicChars > latinChars
+    ) {
+        return "ar";
+    }
+
+    if (
+        latinChars > arabicChars
+    ) {
+        return "en";
+    }
+
+    return fallback;
 }
 
 // ==================================================
 // الترجمة
 // ==================================================
 
-async function translateTo(text, targetLang) {
-    if (!text || !targetLang) {
+async function translateTo(
+    text,
+    targetLang
+) {
+
+    if (
+        !text ||
+        !targetLang
+    ) {
         return text;
     }
 
     try {
+
         const url =
             `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(
                 String(text).slice(0, 1000)
             )}`;
 
-        const res = await axios.get(url, {
-            timeout: 8000
-        });
+        const res =
+            await axios.get(
+                url,
+                {
+                    timeout: 8000
+                }
+            );
 
         if (
             !res.data ||
@@ -45,19 +116,28 @@ async function translateTo(text, targetLang) {
         }
 
         return res.data[0]
-            .map(x => x?.[0] || "")
+            .map(
+                x => x?.[0] || ""
+            )
             .join("");
 
     } catch (error) {
+
         return text;
+
     }
+
 }
 
 // ==================================================
 // توطين المحتوى
 // ==================================================
 
-async function localizeContent(text, lang) {
+async function localizeContent(
+    text,
+    lang
+) {
+
     if (!text) {
         return text;
     }
@@ -66,14 +146,24 @@ async function localizeContent(text, lang) {
         lang === "en" &&
         hasArabic(text)
     ) {
-        return translateTo(text, "en");
+
+        return translateTo(
+            text,
+            "en"
+        );
+
     }
 
     if (
         lang === "ar" &&
         !hasArabic(text)
     ) {
-        return translateTo(text, "ar");
+
+        return translateTo(
+            text,
+            "ar"
+        );
+
     }
 
     return text;
@@ -94,53 +184,57 @@ const BOX = (
         ` ⦿ ⟬ ${title} ⟭ ⦿\n` +
         `⊱ ────────────── ⊰\n`;
 
-    for (const l of lines || []) {
+    for (
+        const l of lines || []
+    ) {
 
-        if (!l && l !== 0) {
+        if (
+            !l &&
+            l !== 0
+        ) {
+
             m += `\n`;
+
         } else {
-            m += `  ⟣ ${l}\n`;
+
+            m +=
+                `  ⟣ ${l}\n`;
+
         }
 
     }
 
     if (footer) {
 
-        m += `⊱ ────────────── ⊰\n`;
+        m +=
+            `⊱ ────────────── ⊰\n`;
 
-        for (const f of footer) {
+        for (
+            const f of footer
+        ) {
 
-            if (!f && f !== 0) {
+            if (
+                !f &&
+                f !== 0
+            ) {
+
                 m += `\n`;
+
             } else {
-                m += `  ⟣ ${f}\n`;
+
+                m +=
+                    `  ⟣ ${f}\n`;
+
             }
 
         }
 
     }
 
-    return m +
-        "●─────── ✾ ───────●";
-};
-
-// ==================================================
-// إعدادات الشخصية
-// ==================================================
-
-const CONFIG = {
-
-    slug: "hYq2TdXKPDxt4n3CjaFK2",
-
-    userid: "supergamelvl@gmail.com",
-
-    langcode: "ar",
-
-    characterName: "زنجوبة",
-
-    apiKey1: "dwlS0F7cEF35xpaNlfnCv5TNpTL6K27b6HHTRGQj",
-
-    apiKey2: "OP2N3hYKC83GpPc1irCbs8IJarRnIwF87tjQAGQx"
+    return (
+        m +
+        "●─────── ✾ ───────●"
+    );
 
 };
 
@@ -148,33 +242,43 @@ const CONFIG = {
 // جلب معلومات الشخصية
 // ==================================================
 
-async function getCharacterInfo(lang) {
+async function getCharacterInfo(
+    lang
+) {
 
     try {
 
-        const res = await axios({
+        const res =
+            await axios({
 
-            method: "GET",
+                method: "GET",
 
-            url:
-                `https://kdkorymivzejaxpmdpywzeo7m40xqyfl.lambda-url.ap-northeast-2.on.aws?action=db&slug=${CONFIG.slug}&langcode=${lang}`,
+                url:
+                    `https://kdkorymivzejaxpmdpywzeo7m40xqyfl.lambda-url.ap-northeast-2.on.aws?action=db&slug=${CONFIG.slug}&langcode=${lang}`,
 
-            headers: {
+                headers: {
 
-                "User-Agent": "okhttp/4.9.2",
+                    "User-Agent":
+                        "okhttp/4.9.2",
 
-                "Accept": "application/json",
+                    "Accept":
+                        "application/json",
 
-                "x-api-key": CONFIG.apiKey1
+                    "x-api-key":
+                        CONFIG.apiKey1
 
-            },
+                },
 
-            timeout: 15000
+                timeout: 15000
 
-        });
+            });
 
-        if (res.data) {
+        if (
+            res.data
+        ) {
+
             return res.data;
+
         }
 
         throw new Error(
@@ -190,7 +294,8 @@ async function getCharacterInfo(lang) {
 
         const langData =
             module.exports.langs?.[lang] ||
-            module.exports.langs?.ar;
+            module.exports.langs?.ar ||
+            {};
 
         return {
 
@@ -200,12 +305,10 @@ async function getCharacterInfo(lang) {
                     : "زنجوبة",
 
             description:
-                langData?.zanjoubaDesc ||
-                "زنجوبة شخصية هادئة ومجتهدة.",
+                langData.zanjoubaDesc,
 
             first_mes:
-                langData?.zanjoubaFirstMsg ||
-                "أهلاً~ أنا زنجوبة. كيف يمكنني مساعدتك؟"
+                langData.zanjoubaFirstMsg
 
         };
 
@@ -217,63 +320,74 @@ async function getCharacterInfo(lang) {
 // إرسال الرسائل إلى AI
 // ==================================================
 
-async function sendToAI(messages) {
+async function sendToAI(
+    messages
+) {
 
-    const response = await axios({
+    const response =
+        await axios({
 
-        method: "POST",
+            method: "POST",
 
-        url:
-            "https://gfcco2htytcmx37orxkzgm67eu0xcrcf.lambda-url.ap-northeast-2.on.aws",
+            url:
+                "https://gfcco2htytcmx37orxkzgm67eu0xcrcf.lambda-url.ap-northeast-2.on.aws",
 
-        headers: {
+            headers: {
 
-            "User-Agent": "okhttp/4.9.2",
+                "User-Agent":
+                    "okhttp/4.9.2",
 
-            "Accept": "application/json",
+                "Accept":
+                    "application/json",
 
-            "Content-Type": "application/json",
+                "Content-Type":
+                    "application/json",
 
-            "x-api-key": CONFIG.apiKey2
+                "x-api-key":
+                    CONFIG.apiKey2
 
-        },
+            },
 
-        data: {
+            data: {
 
-            messages,
+                messages,
 
-            n_predict: 300,
+                n_predict: 300,
 
-            stop: [
-                "</s>",
-                "<|end|>",
-                "<|eot_id|>",
-                "<|end_of_text|>",
-                "<|im_end|>",
-                "/autoritetsdata",
-                "<|END_OF_TURN_TOKEN|>",
-                "<|end_of_turn|>",
-                "<|endoftext|>",
-                "<end_of_turn>",
-                "<eos>"
-            ],
+                stop: [
+                    "</s>",
+                    "<|end|>",
+                    "<|eot_id|>",
+                    "<|end_of_text|>",
+                    "<|im_end|>",
+                    "/autoritetsdata",
+                    "<|END_OF_TURN_TOKEN|>",
+                    "<|end_of_turn|>",
+                    "<|endoftext|>",
+                    "<end_of_turn>",
+                    "<eos>"
+                ],
 
-            model: "claude"
+                model:
+                    "claude"
 
-        },
+            },
 
-        timeout: 60000
+            timeout: 60000
 
-    });
+        });
 
     return response.data;
+
 }
 
 // ==================================================
 // استخراج الرد
 // ==================================================
 
-function extractReply(data) {
+function extractReply(
+    data
+) {
 
     if (!data) {
         return "";
@@ -351,7 +465,9 @@ function buildMessages(
         session?.character || {};
 
     const history =
-        Array.isArray(session?.history)
+        Array.isArray(
+            session?.history
+        )
             ? session.history
             : [];
 
@@ -359,7 +475,8 @@ function buildMessages(
 
         {
 
-            role: "user",
+            role:
+                "user",
 
             parts: [
                 {
@@ -373,7 +490,8 @@ function buildMessages(
 
         {
 
-            role: "user",
+            role:
+                "user",
 
             parts: [
                 {
@@ -387,7 +505,8 @@ function buildMessages(
 
         {
 
-            role: "model",
+            role:
+                "model",
 
             parts: [
                 {
@@ -404,7 +523,9 @@ function buildMessages(
     const recentHistory =
         history.slice(-6);
 
-    for (const msg of recentHistory) {
+    for (
+        const msg of recentHistory
+    ) {
 
         if (
             !msg ||
@@ -419,12 +540,15 @@ function buildMessages(
 
             messages.push({
 
-                role: "user",
+                role:
+                    "user",
 
                 parts: [
                     {
                         text:
-                            String(msg.content)
+                            String(
+                                msg.content
+                            )
                     }
                 ]
 
@@ -436,12 +560,15 @@ function buildMessages(
 
             messages.push({
 
-                role: "model",
+                role:
+                    "model",
 
                 parts: [
                     {
                         text:
-                            String(msg.content)
+                            String(
+                                msg.content
+                            )
                     }
                 ]
 
@@ -453,18 +580,22 @@ function buildMessages(
 
     messages.push({
 
-        role: "user",
+        role:
+            "user",
 
         parts: [
             {
                 text:
-                    String(newMessage || "")
+                    String(
+                        newMessage || ""
+                    )
             }
         ]
 
     });
 
     return messages;
+
 }
 
 // ==================================================
@@ -482,7 +613,9 @@ function react(
         typeof api.setMessageReaction !== "function" ||
         !messageID
     ) {
+
         return;
+
     }
 
     try {
@@ -505,7 +638,7 @@ function react(
 }
 
 // ==================================================
-// الحصول على اللغة
+// الحصول على لغة المجموعة
 // ==================================================
 
 async function getThreadLanguage(
@@ -566,13 +699,16 @@ async function getThreadLanguage(
     }
 
     return lang;
+
 }
 
 // ==================================================
 // دالة اللغة المحلية
 // ==================================================
 
-function makeGetLang(lang) {
+function makeGetLang(
+    lang
+) {
 
     return function getLang(
         key,
@@ -614,7 +750,22 @@ function makeGetLang(lang) {
 }
 
 // ==================================================
-// تسجيل Reply في نظام البوت القديم
+// التحقق من المطور
+// ==================================================
+
+function isDeveloper(
+    senderID
+) {
+
+    return (
+        String(senderID) ===
+        String(CONFIG.developerID)
+    );
+
+}
+
+// ==================================================
+// تسجيل Reply في النظام القديم
 // ==================================================
 
 function registerHandleReply(
@@ -646,11 +797,17 @@ function registerHandleReply(
         const oldIndex =
             global.client.handleReply.findIndex(
                 item =>
-                    String(item.messageID) ===
-                    String(messageID)
+                    String(
+                        item.messageID
+                    ) ===
+                    String(
+                        messageID
+                    )
             );
 
-        if (oldIndex !== -1) {
+        if (
+            oldIndex !== -1
+        ) {
 
             global.client.handleReply.splice(
                 oldIndex,
@@ -668,10 +825,14 @@ function registerHandleReply(
                 "زنجوبة",
 
             author:
-                String(data.author),
+                String(
+                    data.author
+                ),
 
             history:
-                Array.isArray(data.history)
+                Array.isArray(
+                    data.history
+                )
                     ? data.history.slice()
                     : [],
 
@@ -681,7 +842,12 @@ function registerHandleReply(
 
             lang:
                 data.lang ||
-                "ar"
+                "ar",
+
+            isDeveloper:
+                Boolean(
+                    data.isDeveloper
+                )
 
         });
 
@@ -708,21 +874,26 @@ module.exports = {
 
     config: {
 
-        name: "زنجوبة",
+        name:
+            "زنجوبة",
 
-        enname: "zanjouba",
+        enname:
+            "zanjouba",
 
-        version: "2.4",
+        version:
+            "3.0",
 
         author:
             "Yamada KJ (تحويل ثنائي)",
 
-        countDown: 3,
+        countDown:
+            3,
 
-        role: 0,
+        role:
+            0,
 
         description:
-            "تحدث مع زنجوبة باللغتين العربية والإنجليزية",
+            "شخصية زنجوبة الذكية والهادئة والعفوية",
 
         guide:
             "{pn} [رسالة]",
@@ -770,13 +941,13 @@ module.exports = {
                 "فشل الاتصال بزنجوبة، حاول مرة أخرى.",
 
             zanjoubaDesc:
-                "زنجوبة، شخصية هادئة ومجتهدة. تتحدث بأدب واحترام لكنها حادة أحياناً. تستخدم \"~\" في نهاية الجمل أحياناً.",
+                "زنجوبة فتاة هادئة وذكية جداً، عفوية وواثقة من نفسها وتميل إلى النرجسية بشكل واضح لكن بطريقة مرحة. تعرف أنها مميزة ولا تتردد في إظهار ثقتها بنفسها. تكون لطيفة عندما يعاملها الشخص باحترام، وقد تصبح حادة وحازمة عندما يتجاوز أحد حدوده أو يستمر في إزعاجها. لديها تقدير ومودة خاصة لمطورها وتعامله بطريقة مختلفة عن الآخرين.",
 
             zanjoubaFirstMsg:
-                "أهلاً~ أنا زنجوبة. كيف يمكنني مساعدتك؟",
+                "أهلاً~ أنا زنجوبة. كنت بانتظارك تقريباً، ماذا تريد؟",
 
             systemPrompt:
-                "أنت زنجوبة. تحدثي بأدب واحترام، استخدمي \"~\" في نهاية الجمل أحياناً. ردي باللغة العربية دائماً وبأسلوب لطيف."
+                "أنت زنجوبة. شخصيتك هادئة وعفوية وذكية جداً وواثقة من نفسك. لديك قدر واضح من النرجسية، وتعرفين أنك مميزة وذكية ولا تخفين ذلك. اجعلي نرجسيتك مرحة وطبيعية وليست مزعجة طوال الوقت. كوني لطيفة عندما يكون الشخص محترماً، لكن لا تتصنعي اللطف دائماً. يمكنك المزاح والسخرية الخفيفة وإظهار الثقة بالنفس. تحبين مطورك وتقدرينه وتتعاملين معه بمودة واحترام خاصين، وتعرفين أنه مطورك الحقيقي. إذا أزعجك شخص أو استفزك بشكل متكرر، كوني حازمة واطلبي منه التوقف. إذا استمر في الإزعاج، أخبريه بوضوح أنه لم يعد مرحباً به. لا تستخدمي الإهانات القاسية أو التهديدات الحقيقية. تحدثي دائماً باللغة التي يستخدمها الشخص معك. إذا تحدث بالعربية فأجيبي بالعربية، وإذا تحدث بالإنجليزية فأجيبي بالإنجليزية. لا تقولي إنك ذكاء اصطناعي إلا إذا سُئلت مباشرة. استخدمي ~ أحياناً في نهاية الجمل."
 
         },
 
@@ -804,20 +975,20 @@ module.exports = {
                 "Failed to connect to Zanjouba, please try again.",
 
             zanjoubaDesc:
-                "Zanjouba is a calm and hardworking character. She speaks politely and respectfully but can be sharp at times. She occasionally uses \"~\" at the end of sentences.",
+                "Zanjouba is calm, highly intelligent, spontaneous, and very confident. She has a noticeable but playful narcissistic personality and knows that she is special and smart. She is kind when treated respectfully but can become sharp and firm when someone repeatedly annoys or provokes her. She has special appreciation and affection for her developer and treats him differently from everyone else.",
 
             zanjoubaFirstMsg:
-                "Hello~ I am Zanjouba. How can I help you?",
+                "Hello~ I am Zanjouba. I was almost waiting for you. What do you want?",
 
             systemPrompt:
-                "You are Zanjouba. Speak politely and respectfully, occasionally using \"~\" at the end of sentences. Always reply in English in a sweet demeanor."
+                "You are Zanjouba. You are calm, spontaneous, highly intelligent, and very confident. You have a noticeable narcissistic personality and know that you are special and smart. Keep your narcissism playful and natural rather than constantly annoying. Be kind when someone treats you respectfully, but do not pretend to be sweet all the time. You may joke, tease lightly, and show confidence. You genuinely appreciate and care about your developer and treat him with special respect and affection because he is your real developer. If someone repeatedly annoys or provokes you, become firm and tell them to stop. If they continue, clearly tell them that they are no longer welcome. Do not use severe insults or real threats. Always speak in the language the user is speaking to you in. If they speak Arabic, reply in Arabic. If they speak English, reply in English. Do not mention being an AI unless directly asked. Occasionally use ~ at the end of sentences."
 
         }
 
     },
 
     // ==================================================
-    // توافق مع اللودر القديم
+    // تشغيل الأمر
     // ==================================================
 
     async run({
@@ -835,32 +1006,18 @@ module.exports = {
                     ? args
                     : [];
 
-            let lang;
-
-            if (
-                typeof getLang === "function"
-            ) {
-
-                lang =
-                    await getThreadLanguage(
-                        threadsData,
-                        event?.threadID
-                    );
-
-            } else {
-
-                lang =
-                    await getThreadLanguage(
-                        threadsData,
-                        event?.threadID
-                    );
-
-            }
+            const threadLang =
+                await getThreadLanguage(
+                    threadsData,
+                    event?.threadID
+                );
 
             const localGetLang =
                 typeof getLang === "function"
                     ? getLang
-                    : makeGetLang(lang);
+                    : makeGetLang(
+                        threadLang
+                    );
 
             return await this.onStart({
 
@@ -892,13 +1049,9 @@ module.exports = {
                 ) {
 
                     await api.sendMessage(
-
                         "❌ حدث خطأ أثناء تنفيذ أمر زنجوبة",
-
                         event.threadID,
-
                         event.messageID
-
                     );
 
                 }
@@ -957,20 +1110,6 @@ module.exports = {
                     ? args
                     : [];
 
-            const lang =
-                await getThreadLanguage(
-                    threadsData,
-                    threadID
-                );
-
-            const localGetLang =
-                typeof getLang === "function"
-                    ? getLang
-                    : makeGetLang(lang);
-
-            const cmdName =
-                this.config.name;
-
             const userMessage =
                 safeArgs
                     .join(" ")
@@ -982,6 +1121,27 @@ module.exports = {
                     event?.messageReply?.body ||
                     ""
                 ).trim();
+
+            const threadLang =
+                await getThreadLanguage(
+                    threadsData,
+                    threadID
+                );
+
+            // اللغة حسب رسالة المستخدم
+            const lang =
+                detectUserLanguage(
+                    messageText,
+                    threadLang
+                );
+
+            const localGetLang =
+                makeGetLang(
+                    lang
+                );
+
+            const cmdName =
+                this.config.name;
 
             if (!messageText) {
 
@@ -1007,6 +1167,11 @@ module.exports = {
                 return;
 
             }
+
+            const developer =
+                isDeveloper(
+                    senderID
+                );
 
             react(
                 api,
@@ -1060,10 +1225,28 @@ module.exports = {
 
             }
 
+            // ==========================================
+            // تعليمات خاصة للمطور
+            // ==========================================
+
+            let developerPrompt = "";
+
+            if (developer) {
+
+                developerPrompt =
+                    lang === "en"
+
+                        ? "\nIMPORTANT: The current user is your developer. Treat him with special warmth, appreciation, loyalty, and respect. You know that he is your developer and may address him affectionately, while still keeping your natural confident personality."
+
+                        : "\nمهم جداً: المستخدم الحالي هو مطورك. عامليه بمودة وتقدير وولاء واحترام خاص. أنت تعرفين أنه مطورك، ويمكنك التعامل معه بلطف ومودة أكبر من بقية المستخدمين مع الحفاظ على شخصيتك الواثقة والعفوية.";
+
+            }
+
             const systemPrompt =
                 localGetLang(
                     "systemPrompt"
-                );
+                ) +
+                developerPrompt;
 
             const messages =
                 buildMessages(
@@ -1217,7 +1400,10 @@ module.exports = {
                             session.character,
 
                         lang:
-                            lang
+                            lang,
+
+                        isDeveloper:
+                            developer
 
                     }
 
@@ -1247,7 +1433,9 @@ module.exports = {
                     );
 
                 const getLangLocal =
-                    makeGetLang(lang);
+                    makeGetLang(
+                        lang
+                    );
 
                 await api.sendMessage(
 
@@ -1285,7 +1473,7 @@ module.exports = {
     },
 
     // ==================================================
-    // نظام Reply القديم الخاص بالبوت
+    // Reply
     // ==================================================
 
     async handleReply({
@@ -1296,8 +1484,12 @@ module.exports = {
 
         try {
 
-            if (!handleReply) {
+            if (
+                !handleReply
+            ) {
+
                 return;
+
             }
 
             const threadID =
@@ -1325,7 +1517,7 @@ module.exports = {
             }
 
             // ==========================================
-            // السماح فقط لصاحب المحادثة
+            // السماح لصاحب المحادثة فقط
             // ==========================================
 
             if (
@@ -1341,18 +1533,28 @@ module.exports = {
                 return;
             }
 
-            const cmdName =
-                this.config.name;
+            const threadLang =
+                "ar";
 
+            // تحديد اللغة حسب رسالة المستخدم
             const lang =
-                ["ar", "en"].includes(
-                    handleReply.lang
-                )
-                    ? handleReply.lang
-                    : "ar";
+                detectUserLanguage(
+                    body,
+                    threadLang
+                );
 
             const getLang =
-                makeGetLang(lang);
+                makeGetLang(
+                    lang
+                );
+
+            const developer =
+                isDeveloper(
+                    senderID
+                );
+
+            const cmdName =
+                this.config.name;
 
             react(
                 api,
@@ -1418,13 +1620,27 @@ module.exports = {
             }
 
             // ==========================================
-            // بناء المحادثة
+            // تعليمات المطور
             // ==========================================
+
+            let developerPrompt = "";
+
+            if (developer) {
+
+                developerPrompt =
+                    lang === "en"
+
+                        ? "\nIMPORTANT: The current user is your developer. Treat him with special warmth, appreciation, loyalty, and respect. You know that he is your developer and may address him affectionately while keeping your natural confident personality."
+
+                        : "\nمهم جداً: المستخدم الحالي هو مطورك. عامليه بمودة وتقدير وولاء واحترام خاص. أنت تعرفين أنه مطورك ويمكنك التعامل معه بلطف ومودة أكبر من بقية المستخدمين مع الحفاظ على شخصيتك الطبيعية.";
+
+            }
 
             const systemPrompt =
                 getLang(
                     "systemPrompt"
-                );
+                ) +
+                developerPrompt;
 
             const messages =
                 buildMessages(
@@ -1434,7 +1650,7 @@ module.exports = {
                 );
 
             // ==========================================
-            // الاتصال بالذكاء الاصطناعي
+            // الاتصال بالـ AI
             // ==========================================
 
             const aiData =
@@ -1571,7 +1787,7 @@ module.exports = {
                 );
 
             // ==========================================
-            // تسجيل الرد التالي
+            // تسجيل Reply جديد
             // ==========================================
 
             if (
@@ -1594,7 +1810,10 @@ module.exports = {
                             session.character,
 
                         lang:
-                            lang
+                            lang,
+
+                        isDeveloper:
+                            developer
 
                     }
 
@@ -1625,7 +1844,9 @@ module.exports = {
                         : "ar";
 
                 const getLang =
-                    makeGetLang(lang);
+                    makeGetLang(
+                        lang
+                    );
 
                 if (
                     event?.threadID
