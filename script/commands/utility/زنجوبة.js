@@ -50,7 +50,7 @@ const CONFIG = {
 
     developerName: "أبو هريرة",
 
-    developerID: "61592700121061",
+    developerID: "61578581225040",
 
     apiKey1: "dwlS0F7cEF35xpaNlfnCv5TNpTL6K27b6HHTRGQj",
 
