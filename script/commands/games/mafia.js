@@ -69,6 +69,7 @@ function sendMessage(api, body, threadID, replyTo = null) {
 
             resolve();
         }
+
     });
 }
 
@@ -126,8 +127,7 @@ async function getThreadInfo(
 
         if (
             Threads &&
-            typeof Threads.getInfo ===
-            "function"
+            typeof Threads.getInfo === "function"
         ) {
 
             const result =
@@ -137,8 +137,7 @@ async function getThreadInfo(
 
             if (
                 result &&
-                typeof result.then ===
-                "function"
+                typeof result.then === "function"
             ) {
 
                 const info =
@@ -163,7 +162,6 @@ async function getThreadInfo(
                     return info;
                 }
             }
-
         }
 
     } catch (error) {
@@ -182,8 +180,7 @@ async function getThreadInfo(
 
         if (
             !api ||
-            typeof api.getThreadInfo !==
-            "function"
+            typeof api.getThreadInfo !== "function"
         ) {
 
             return null;
@@ -221,11 +218,9 @@ async function getThreadInfo(
                         done
                     );
 
-                // دعم Promise
                 if (
                     result &&
-                    typeof result.then ===
-                    "function"
+                    typeof result.then === "function"
                 ) {
 
                     result
@@ -253,7 +248,6 @@ async function getThreadInfo(
                 );
             }
 
-            // حماية من التعليق
             setTimeout(
                 () => {
 
@@ -310,17 +304,14 @@ async function isGroupAdmin(
     }
 
     const admins =
-        Array.isArray(
-            info.adminIDs
-        )
+        Array.isArray(info.adminIDs)
             ? info.adminIDs
             : [];
 
     return admins.some(admin => {
 
         if (
-            typeof admin ===
-            "object" &&
+            typeof admin === "object" &&
             admin !== null
         ) {
 
@@ -427,6 +418,7 @@ ${MIN_PLAYERS} لاعبين
 
                 resolve(null);
             }
+
         });
 
     if (!sent) {
@@ -482,6 +474,7 @@ ${MIN_PLAYERS} لاعبين
 
         type:
             "mafia-registration"
+
     });
 
     return messageID;
@@ -916,6 +909,7 @@ async function startGame({
 
                     type:
                         "mafia-registration"
+
                 });
             }
         }
@@ -1013,10 +1007,20 @@ async function ({
             return;
         }
 
+        /*
+         * مهم:
+         * handleReaction.js أصبح يرسل UID المتفاعل
+         * داخل reactionUserID
+         *
+         * لذلك نعتمد عليه أولًا
+         */
+
         const senderID =
             String(
-                event.senderID ||
+                event.reactionUserID ||
+                event.reactorID ||
                 event.userID ||
+                event.senderID ||
                 event.author ||
                 ""
             );
@@ -1024,12 +1028,14 @@ async function ({
         const threadID =
             String(
                 event.threadID ||
+                event.threadId ||
                 ""
             );
 
         const messageID =
             String(
                 event.messageID ||
+                event.messageId ||
                 ""
             );
 
@@ -1091,13 +1097,24 @@ async function ({
             String(
                 event.reaction ||
                 event.reactionType ||
+                event.reactionName ||
                 ""
-            );
+            ).trim();
+
+        const normalizedReaction =
+            reaction.toLowerCase();
 
         const isJoinReaction =
             reaction === "👍" ||
-            reaction === "like" ||
-            reaction === "LIKE";
+            reaction === "❤️" ||
+            normalizedReaction === "like" ||
+            normalizedReaction === "thumbsup" ||
+            normalizedReaction === "thumbs_up" ||
+            normalizedReaction === "👍🏻" ||
+            normalizedReaction === "👍🏼" ||
+            normalizedReaction === "👍🏽" ||
+            normalizedReaction === "👍🏾" ||
+            normalizedReaction === "👍🏿";
 
         if (!isJoinReaction) {
             return;
@@ -1111,8 +1128,7 @@ async function ({
             await addReactionPlayer({
                 api,
                 gameData,
-                userID:
-                    senderID
+                userID: senderID
             });
 
         if (
@@ -1132,6 +1148,7 @@ async function ({
 
                 BOT:
                     "البوت ما يلعب معكم '-'"
+
             };
 
             if (
@@ -1513,7 +1530,7 @@ module.exports.config = {
 
     name: "مافيا",
 
-    version: "1.0.0",
+    version: "1.1.0",
 
     hasPermssion: 0,
 
@@ -1529,4 +1546,5 @@ module.exports.config = {
         "مافيا | مافيا بدء | مافيا إيقاف",
 
     cooldowns: 5
+
 };
