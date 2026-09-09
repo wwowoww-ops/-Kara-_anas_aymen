@@ -9,7 +9,7 @@ module.exports.config = {
     cooldowns: 5
 };
 
-const DEVELOPER_ID = "61592700121061";
+const DEVELOPER_ID = "61578581225040";
 const MAX_MESSAGES = 20;
 
 module.exports.run = async function ({ api, event }) {
