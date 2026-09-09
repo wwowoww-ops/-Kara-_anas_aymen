@@ -35,7 +35,6 @@ const rooms = require("./rooms.js");
 // ==================================================
 
 const NIGHT_REPLY_TYPE = "mafia-night";
-
 const VOTE_REPLY_TYPE = "mafia-vote";
 
 const ACTION_TIMEOUT = 60000;
@@ -50,10 +49,42 @@ function wait(ms) {
     );
 }
 
-function sendMessage(api, body, threadID, replyTo = null) {
+// ==================================================
+// إرسال رسالة بأمان
+// ==================================================
+
+function sendMessage(
+    api,
+    body,
+    threadID,
+    replyTo = null
+) {
+
     return new Promise(resolve => {
 
         try {
+
+            if (!api || !threadID) {
+                return resolve(null);
+            }
+
+            const callback = (
+                error,
+                info
+            ) => {
+
+                if (error) {
+
+                    console.error(
+                        "[MAFIA ACTIONS] SEND ERROR:",
+                        error
+                    );
+
+                    return resolve(null);
+                }
+
+                resolve(info || null);
+            };
 
             if (replyTo) {
 
@@ -61,7 +92,7 @@ function sendMessage(api, body, threadID, replyTo = null) {
                     body,
                     threadID,
                     replyTo,
-                    () => resolve()
+                    callback
                 );
 
             } else {
@@ -69,7 +100,7 @@ function sendMessage(api, body, threadID, replyTo = null) {
                 api.sendMessage(
                     body,
                     threadID,
-                    () => resolve()
+                    callback
                 );
             }
 
@@ -80,8 +111,9 @@ function sendMessage(api, body, threadID, replyTo = null) {
                 error
             );
 
-            resolve();
+            resolve(null);
         }
+
     });
 }
 
@@ -93,10 +125,14 @@ function registerReply({
     name,
     messageID,
     threadID,
-    author,
+    author = null,
     type,
     data = {}
 }) {
+
+    if (!messageID || !threadID) {
+        return false;
+    }
 
     if (!global.client) {
         global.client = {};
@@ -107,6 +143,7 @@ function registerReply({
             global.client.handleReply
         )
     ) {
+
         global.client.handleReply = [];
     }
 
@@ -114,16 +151,17 @@ function registerReply({
         global.client.handleReply.filter(
             item =>
                 !(
-                    String(item.messageID) ===
+                    String(item.messageID || "") ===
                     String(messageID)
                 )
         );
 
     global.client.handleReply.push({
 
-        name,
+        name: String(name || "مافيا"),
 
-        messageID,
+        messageID:
+            String(messageID),
 
         threadID:
             String(threadID),
@@ -136,11 +174,14 @@ function registerReply({
         type,
 
         data
+
     });
+
+    return true;
 }
 
 // ==================================================
-// إزالة HandleReply
+// إزالة HandleReply بواسطة الرسالة
 // ==================================================
 
 function removeReply(messageID) {
@@ -151,14 +192,47 @@ function removeReply(messageID) {
             global.client.handleReply
         )
     ) {
+
         return;
     }
 
     global.client.handleReply =
         global.client.handleReply.filter(
             item =>
-                String(item.messageID) !==
-                String(messageID)
+                String(
+                    item.messageID || ""
+                ) !==
+                String(
+                    messageID || ""
+                )
+        );
+}
+
+// ==================================================
+// إزالة كل Replies الخاصة بلعبة معينة
+// ==================================================
+
+function removeGameReplies(threadID) {
+
+    if (
+        !global.client ||
+        !Array.isArray(
+            global.client.handleReply
+        )
+    ) {
+
+        return;
+    }
+
+    threadID =
+        String(threadID || "");
+
+    global.client.handleReply =
+        global.client.handleReply.filter(
+            item =>
+                String(
+                    item.threadID || ""
+                ) !== threadID
         );
 }
 
@@ -166,19 +240,32 @@ function removeReply(messageID) {
 // الحصول على لاعب
 // ==================================================
 
-function getPlayer(gameData, userID) {
+function getPlayer(
+    gameData,
+    userID
+) {
 
-    return game.getPlayer(
-        gameData,
-        String(userID)
-    );
+    try {
+
+        return game.getPlayer(
+            gameData,
+            String(userID)
+        );
+
+    } catch (error) {
+
+        return null;
+    }
 }
 
 // ==================================================
 // التحقق من اللاعب الحي
 // ==================================================
 
-function isAlive(gameData, userID) {
+function isAlive(
+    gameData,
+    userID
+) {
 
     const player =
         getPlayer(
@@ -211,32 +298,38 @@ function buildPlayerList(
             gameData.players
         );
 
-    return alive.filter(player => {
+    return alive.filter(
+        player => {
 
-        if (
-            excludeSelf !== null &&
-            String(player.id) ===
-            String(excludeSelf)
-        ) {
-            return false;
+            if (
+                excludeSelf !== null &&
+                String(player.id) ===
+                String(excludeSelf)
+            ) {
+
+                return false;
+            }
+
+            if (
+                excludeMafia &&
+                player.role === "mafia"
+            ) {
+
+                return false;
+            }
+
+            return true;
         }
-
-        if (
-            excludeMafia &&
-            player.role === "mafia"
-        ) {
-            return false;
-        }
-
-        return true;
-    });
+    );
 }
 
 // ==================================================
 // قائمة مرقمة
 // ==================================================
 
-function numberedPlayers(players) {
+function numberedPlayers(
+    players
+) {
 
     return players
         .map(
@@ -270,6 +363,7 @@ function parseChoice(body) {
         !Number.isInteger(number) ||
         number < 1
     ) {
+
         return null;
     }
 
@@ -277,7 +371,7 @@ function parseChoice(body) {
 }
 
 // ==================================================
-// البحث عن لاعب بواسطة الرقم
+// البحث عن لاعب بالرقم
 // ==================================================
 
 function playerFromChoice(
@@ -293,6 +387,7 @@ function playerFromChoice(
         choice < 1 ||
         choice > players.length
     ) {
+
         return null;
     }
 
@@ -302,7 +397,237 @@ function playerFromChoice(
 }
 
 // ==================================================
-// هل المستخدم موجود في غرفة الدور؟
+// إخراج لاعب من غرفة دوره
+// ==================================================
+
+async function removePlayerFromRoleRoom(
+    api,
+    player
+) {
+
+    if (
+        !player ||
+        !player.id ||
+        !player.role
+    ) {
+
+        return false;
+    }
+
+    const role =
+        String(player.role);
+
+    if (
+        role !== "mafia" &&
+        role !== "doctor" &&
+        role !== "detective"
+    ) {
+
+        return false;
+    }
+
+    const roomID =
+        rooms.ROOM_IDS[role];
+
+    if (!roomID) {
+        return false;
+    }
+
+    try {
+
+        /*
+         * rooms.removePlayer يعتمد على UID
+         * والدور لتحديد الغرفة.
+         */
+
+        const result =
+            await rooms.removePlayer(
+                api,
+                {
+                    ...player,
+                    id:
+                        String(
+                            player.id
+                        ),
+                    role
+                }
+            );
+
+        return result !== false;
+
+    } catch (error) {
+
+        console.error(
+            `[MAFIA] فشل إزالة ${player.id} من غرفة ${role}:`,
+            error
+        );
+
+        /*
+         * محاولة مباشرة كخطة احتياطية
+         */
+
+        try {
+
+            if (
+                typeof rooms.removePlayerFromRoleRoom ===
+                "function"
+            ) {
+
+                await rooms.removePlayerFromRoleRoom(
+                    api,
+                    String(player.id),
+                    role
+                );
+
+                return true;
+            }
+
+        } catch (fallbackError) {
+
+            console.error(
+                "[MAFIA] FALLBACK REMOVE ERROR:",
+                fallbackError
+            );
+        }
+
+        return false;
+    }
+}
+
+// ==================================================
+// تنظيف غرف الأدوار بالكامل
+// ==================================================
+
+async function cleanupAllRoleRooms(
+    api,
+    gameData
+) {
+
+    if (
+        !gameData ||
+        !Array.isArray(
+            gameData.players
+        )
+    ) {
+
+        return {
+            success: false,
+            removed: [],
+            failed: []
+        };
+    }
+
+    const removed = [];
+    const failed = [];
+
+    /*
+     * نستخدم لاعبي اللعبة فقط
+     * حتى لا يتم طرد أعضاء عاديين
+     * موجودين في الغرف.
+     */
+
+    const rolePlayers =
+        gameData.players.filter(
+            player =>
+                player &&
+                (
+                    player.role === "mafia" ||
+                    player.role === "doctor" ||
+                    player.role === "detective"
+                )
+        );
+
+    for (
+        const player
+        of rolePlayers
+    ) {
+
+        const success =
+            await removePlayerFromRoleRoom(
+                api,
+                player
+            );
+
+        if (success) {
+
+            removed.push(
+                String(player.id)
+            );
+
+        } else {
+
+            failed.push(
+                String(player.id)
+            );
+        }
+
+        await wait(300);
+    }
+
+    /*
+     * محاولة ثانية للاعبين الذين فشلت إزالتهم
+     */
+
+    if (failed.length > 0) {
+
+        await wait(700);
+
+        const retryFailed = [];
+
+        for (
+            const player
+            of rolePlayers
+        ) {
+
+            if (
+                !failed.includes(
+                    String(player.id)
+                )
+            ) {
+
+                continue;
+            }
+
+            const success =
+                await removePlayerFromRoleRoom(
+                    api,
+                    player
+                );
+
+            if (success) {
+
+                removed.push(
+                    String(player.id)
+                );
+
+            } else {
+
+                retryFailed.push(
+                    String(player.id)
+                );
+            }
+
+            await wait(300);
+        }
+
+        return {
+            success:
+                retryFailed.length === 0,
+            removed,
+            failed:
+                retryFailed
+        };
+    }
+
+    return {
+        success: true,
+        removed,
+        failed
+    };
+}
+
+// ==================================================
+// التحقق من غرفة الدور
 // ==================================================
 
 async function verifyRoleRoom(
@@ -314,6 +639,7 @@ async function verifyRoleRoom(
         !player ||
         !player.role
     ) {
+
         return false;
     }
 
@@ -322,6 +648,7 @@ async function verifyRoleRoom(
         player.role !== "doctor" &&
         player.role !== "detective"
     ) {
+
         return false;
     }
 
@@ -329,7 +656,7 @@ async function verifyRoleRoom(
 
         return await rooms.isUserInRoom(
             api,
-            player.id,
+            String(player.id),
             rooms.ROOM_IDS[player.role]
         );
 
@@ -348,57 +675,64 @@ async function startMafiaAction({
     gameData
 }) {
 
-    if (!gameData) return false;
+    try {
 
-    const mafia =
-        roles.getMafia(
-            gameData.players
-        );
+        if (!gameData) {
+            return false;
+        }
 
-    if (!mafia.length) {
-        return resolveNight({
-            api,
-            gameData
-        });
-    }
+        if (
+            gameData.phase !==
+            game.PHASES.NIGHT
+        ) {
 
-    const aliveMafia =
-        mafia.filter(
-            player =>
-                player.alive !== false
-        );
+            return false;
+        }
 
-    if (!aliveMafia.length) {
-        return resolveNight({
-            api,
-            gameData
-        });
-    }
+        const mafia =
+            roles.getMafia(
+                gameData.players
+            );
 
-    gameData.currentAction =
-        "mafia";
+        const aliveMafia =
+            mafia.filter(
+                player =>
+                    player.alive !== false
+            );
 
-    gameData.nightData.mafiaTarget =
-        null;
+        if (!aliveMafia.length) {
 
-    game.saveGames();
+            return startDoctorAction({
+                api,
+                gameData
+            });
+        }
 
-    const targets =
-        buildPlayerList(
-            gameData,
-            {
-                excludeMafia: true
-            }
-        );
+        gameData.currentAction =
+            "mafia";
 
-    if (!targets.length) {
-        return resolveNight({
-            api,
-            gameData
-        });
-    }
+        gameData.nightData.mafiaTarget =
+            null;
 
-    const body =
+        game.saveGames();
+
+        const targets =
+            buildPlayerList(
+                gameData,
+                {
+                    excludeMafia: true
+                }
+            );
+
+        if (!targets.length) {
+
+            return startDoctorAction({
+                api,
+                gameData
+            });
+        }
+
+        const body =
 `ليلة ${gameData.night}
 
 دور المافيا
@@ -409,72 +743,70 @@ ${numberedPlayers(targets)}
 
 أرسل رقم اللاعب فقط`;
 
-    const roomID =
-        rooms.ROOM_IDS.mafia;
+        const sent =
+            await sendMessage(
+                api,
+                body,
+                rooms.ROOM_IDS.mafia
+            );
 
-    const sent =
-        await new Promise(resolve => {
+        if (!sent) {
 
-            try {
+            console.error(
+                "[MAFIA] فشل إرسال دور المافيا"
+            );
 
-                api.sendMessage(
-                    body,
-                    roomID,
-                    (error, info) => {
+            return false;
+        }
 
-                        if (error) {
-                            console.error(
-                                "[MAFIA] فشل إرسال اختيار المافيا:",
-                                error
-                            );
+        const messageID =
+            String(
+                sent.messageID ||
+                ""
+            );
 
-                            return resolve(null);
-                        }
+        if (!messageID) {
 
-                        resolve(info);
-                    }
-                );
+            console.error(
+                "[MAFIA] لم يتم الحصول على messageID"
+            );
 
-            } catch (error) {
+            return false;
+        }
 
-                console.error(
-                    "[MAFIA] خطأ:",
-                    error
-                );
+        registerReply({
 
-                resolve(null);
+            name: "مافيا",
+
+            messageID,
+
+            threadID:
+                gameData.threadID,
+
+            type:
+                NIGHT_REPLY_TYPE,
+
+            data: {
+
+                action: "mafia",
+
+                players: targets
+
             }
+
         });
 
-    if (!sent) {
-        return false;
-    }
+        return true;
 
-    const messageID =
-        String(
-            sent.messageID ||
-            sent
+    } catch (error) {
+
+        console.error(
+            "[MAFIA] START MAFIA ERROR:",
+            error
         );
 
-    registerReply({
-
-        name: "مافيا",
-
-        messageID,
-
-        threadID:
-            gameData.threadID,
-
-        type:
-            NIGHT_REPLY_TYPE,
-
-        data: {
-            action: "mafia",
-            players: targets
-        }
-    });
-
-    return true;
+        return false;
+    }
 }
 
 // ==================================================
@@ -486,43 +818,58 @@ async function startDoctorAction({
     gameData
 }) {
 
-    if (!gameData) return false;
+    try {
 
-    const doctor =
-        roles.getDoctor(
-            gameData.players
-        )[0];
+        if (!gameData) {
+            return false;
+        }
 
-    if (
-        !doctor ||
-        doctor.alive === false
-    ) {
+        const doctor =
+            roles.getDoctor(
+                gameData.players
+            )[0];
+
+        if (
+            !doctor ||
+            doctor.alive === false
+        ) {
+
+            gameData.nightData.doctorTarget =
+                null;
+
+            game.saveGames();
+
+            return startDetectiveAction({
+                api,
+                gameData
+            });
+        }
+
+        gameData.currentAction =
+            "doctor";
+
         gameData.nightData.doctorTarget =
             null;
 
         game.saveGames();
 
-        return startDetectiveAction({
-            api,
-            gameData
-        });
-    }
+        const targets =
+            buildPlayerList(
+                gameData
+            );
 
-    gameData.currentAction =
-        "doctor";
+        if (!targets.length) {
 
-    gameData.nightData.doctorTarget =
-        null;
+            return startDetectiveAction({
+                api,
+                gameData
+            });
+        }
 
-    game.saveGames();
+        const body =
+`ليلة ${gameData.night}
 
-    const targets =
-        buildPlayerList(
-            gameData
-        );
-
-    const body =
-`دور الطبيب
+دور الطبيب
 
 اختر اللاعب الذي تريد حمايته الليلة
 
@@ -530,67 +877,68 @@ ${numberedPlayers(targets)}
 
 أرسل رقم اللاعب فقط`;
 
-    const roomID =
-        rooms.ROOM_IDS.doctor;
+        const sent =
+            await sendMessage(
+                api,
+                body,
+                rooms.ROOM_IDS.doctor
+            );
 
-    const sent =
-        await new Promise(resolve => {
+        if (!sent) {
 
-            try {
+            console.error(
+                "[MAFIA DOCTOR] فشل إرسال الدور"
+            );
 
-                api.sendMessage(
-                    body,
-                    roomID,
-                    (error, info) => {
+            return false;
+        }
 
-                        if (error) {
-                            console.error(
-                                "[MAFIA DOCTOR] فشل إرسال الرسالة:",
-                                error
-                            );
+        const messageID =
+            String(
+                sent.messageID ||
+                ""
+            );
 
-                            return resolve(null);
-                        }
+        if (!messageID) {
+            return false;
+        }
 
-                        resolve(info);
-                    }
-                );
+        registerReply({
 
-            } catch (error) {
+            name: "مافيا",
 
-                resolve(null);
+            messageID,
+
+            threadID:
+                gameData.threadID,
+
+            author:
+                doctor.id,
+
+            type:
+                NIGHT_REPLY_TYPE,
+
+            data: {
+
+                action: "doctor",
+
+                players: targets
+
             }
+
         });
 
-    if (!sent) {
-        return false;
-    }
+        return true;
 
-    const messageID =
-        String(
-            sent.messageID ||
-            sent
+    } catch (error) {
+
+        console.error(
+            "[MAFIA DOCTOR] START ERROR:",
+            error
         );
 
-    registerReply({
-
-        name: "مافيا",
-
-        messageID,
-
-        threadID:
-            gameData.threadID,
-
-        type:
-            NIGHT_REPLY_TYPE,
-
-        data: {
-            action: "doctor",
-            players: targets
-        }
-    });
-
-    return true;
+        return false;
+    }
 }
 
 // ==================================================
@@ -602,58 +950,62 @@ async function startDetectiveAction({
     gameData
 }) {
 
-    if (!gameData) return false;
+    try {
 
-    const detective =
-        roles.getDetective(
-            gameData.players
-        )[0];
+        if (!gameData) {
+            return false;
+        }
 
-    if (
-        !detective ||
-        detective.alive === false
-    ) {
+        const detective =
+            roles.getDetective(
+                gameData.players
+            )[0];
+
+        if (
+            !detective ||
+            detective.alive === false
+        ) {
+
+            gameData.nightData.detectiveTarget =
+                null;
+
+            game.saveGames();
+
+            return resolveNight({
+                api,
+                gameData
+            });
+        }
+
+        gameData.currentAction =
+            "detective";
 
         gameData.nightData.detectiveTarget =
             null;
 
-        gameData.nightData.resolved =
-            false;
-
         game.saveGames();
 
-        return resolveNight({
-            api,
-            gameData
-        });
-    }
+        const targets =
+            buildPlayerList(
+                gameData,
+                {
+                    excludeSelf:
+                        detective.id
+                }
+            );
 
-    gameData.currentAction =
-        "detective";
+        if (!targets.length) {
 
-    gameData.nightData.detectiveTarget =
-        null;
+            return resolveNight({
+                api,
+                gameData
+            });
+        }
 
-    game.saveGames();
+        const body =
+`ليلة ${gameData.night}
 
-    const targets =
-        buildPlayerList(
-            gameData,
-            {
-                excludeSelf:
-                    detective.id
-            }
-        );
-
-    if (!targets.length) {
-        return resolveNight({
-            api,
-            gameData
-        });
-    }
-
-    const body =
-`دور المحقق
+دور المحقق
 
 اختر اللاعب الذي تريد التحقيق بشأنه
 
@@ -661,70 +1013,68 @@ ${numberedPlayers(targets)}
 
 أرسل رقم اللاعب فقط`;
 
-    const roomID =
-        rooms.ROOM_IDS.detective;
+        const sent =
+            await sendMessage(
+                api,
+                body,
+                rooms.ROOM_IDS.detective
+            );
 
-    const sent =
-        await new Promise(resolve => {
+        if (!sent) {
 
-            try {
+            console.error(
+                "[MAFIA DETECTIVE] فشل إرسال الدور"
+            );
 
-                api.sendMessage(
-                    body,
-                    roomID,
-                    (error, info) => {
+            return false;
+        }
 
-                        if (error) {
-                            console.error(
-                                "[MAFIA DETECTIVE] فشل إرسال الرسالة:",
-                                error
-                            );
+        const messageID =
+            String(
+                sent.messageID ||
+                ""
+            );
 
-                            return resolve(null);
-                        }
+        if (!messageID) {
+            return false;
+        }
 
-                        resolve(info);
-                    }
-                );
+        registerReply({
 
-            } catch (error) {
+            name: "مافيا",
 
-                resolve(null);
+            messageID,
+
+            threadID:
+                gameData.threadID,
+
+            author:
+                detective.id,
+
+            type:
+                NIGHT_REPLY_TYPE,
+
+            data: {
+
+                action: "detective",
+
+                players: targets
+
             }
+
         });
 
-    if (!sent) {
-        return false;
-    }
+        return true;
 
-    const messageID =
-        String(
-            sent.messageID ||
-            sent
+    } catch (error) {
+
+        console.error(
+            "[MAFIA DETECTIVE] START ERROR:",
+            error
         );
 
-    registerReply({
-
-        name: "مافيا",
-
-        messageID,
-
-        threadID:
-            gameData.threadID,
-
-        author:
-            detective.id,
-
-        type:
-            NIGHT_REPLY_TYPE,
-
-        data: {
-            action: "detective",
-            players: targets
-        }
-    });
-
-    return true;
+        return false;
+    }
 }
 
 // ==================================================
@@ -739,99 +1089,169 @@ async function handleMafiaAction({
     handleReply
 }) {
 
-    const senderID =
-        String(
-            event.senderID || ""
-        );
+    try {
 
-    const player =
-        getPlayer(
+        const senderID =
+            String(
+                event?.senderID ||
+                ""
+            );
+
+        const player =
+            getPlayer(
+                gameData,
+                senderID
+            );
+
+        if (
+            !player ||
+            player.role !== "mafia" ||
+            player.alive === false
+        ) {
+
+            return;
+        }
+
+        /*
+         * إذا كانت المافيا اختارت بالفعل
+         * لا نقبل اختيارًا ثانيًا.
+         */
+
+        if (
+            gameData.nightData.mafiaTarget
+        ) {
+
+            return;
+        }
+
+        const choice =
+            parseChoice(
+                event.body
+            );
+
+        if (choice === null) {
+
+            return sendMessage(
+                api,
+                "أرسل رقم اللاعب فقط",
+                event.threadID,
+                event.messageID
+            );
+        }
+
+        const targets =
+            Array.isArray(
+                replyData?.players
+            )
+                ? replyData.players
+                : [];
+
+        const target =
+            playerFromChoice(
+                targets,
+                choice
+            );
+
+        if (!target) {
+
+            return sendMessage(
+                api,
+                "هذا الرقم غير موجود في القائمة",
+                event.threadID,
+                event.messageID
+            );
+        }
+
+        const targetPlayer =
+            getPlayer(
+                gameData,
+                target.id
+            );
+
+        if (
+            !targetPlayer ||
+            targetPlayer.alive === false
+        ) {
+
+            return sendMessage(
+                api,
+                "هذا اللاعب لم يعد حيًا",
+                event.threadID,
+                event.messageID
+            );
+        }
+
+        if (
+            targetPlayer.role === "mafia"
+        ) {
+
+            return sendMessage(
+                api,
+                "لا يمكنك استهداف أحد أفراد المافيا",
+                event.threadID,
+                event.messageID
+            );
+        }
+
+        /*
+         * حفظ الهدف
+         */
+
+        game.setNightTarget(
             gameData,
-            senderID
+            "mafia",
+            String(targetPlayer.id)
         );
 
-    if (
-        !player ||
-        player.role !== "mafia" ||
-        player.alive === false
-    ) {
-        return;
-    }
+        /*
+         * حذف الرد الحالي قبل الانتقال
+         */
 
-    const choice =
-        parseChoice(
-            event.body
+        if (handleReply?.messageID) {
+
+            removeReply(
+                handleReply.messageID
+            );
+        }
+
+        gameData.currentAction =
+            "doctor";
+
+        game.saveGames();
+
+        await sendMessage(
+            api,
+            "تم تسجيل اختيار المافيا",
+            event.threadID
         );
 
-    if (choice === null) {
+        /*
+         * الانتقال للطبيب
+         */
+
+        return startDoctorAction({
+            api,
+            gameData
+        });
+
+    } catch (error) {
+
+        console.error(
+            "[MAFIA] HANDLE MAFIA ERROR:",
+            error
+        );
+
+        /*
+         * لا نسمح للخطأ بأن يتحول إلى executeError
+         * ونوقف اللعبة بالكامل.
+         */
 
         return sendMessage(
             api,
-            "أرسل رقم اللاعب فقط",
-            event.threadID,
-            event.messageID
+            "حدث خطأ أثناء تسجيل اختيار المافيا",
+            event.threadID
         );
     }
-
-    const targets =
-        Array.isArray(
-            replyData?.players
-        )
-            ? replyData.players
-            : [];
-
-    const target =
-        playerFromChoice(
-            targets,
-            choice
-        );
-
-    if (!target) {
-
-        return sendMessage(
-            api,
-            "هذا الرقم غير موجود في القائمة",
-            event.threadID,
-            event.messageID
-        );
-    }
-
-    if (
-        target.role === "mafia"
-    ) {
-        return sendMessage(
-            api,
-            "لا يمكنك استهداف أحد أفراد المافيا",
-            event.threadID,
-            event.messageID
-        );
-    }
-
-    game.setNightTarget(
-        gameData,
-        "mafia",
-        target.id
-    );
-
-    removeReply(
-        handleReply.messageID
-    );
-
-    gameData.currentAction =
-        "doctor";
-
-    game.saveGames();
-
-    await sendMessage(
-        api,
-        `تم تسجيل اختيار المافيا`,
-        event.threadID
-    );
-
-    await startDoctorAction({
-        api,
-        gameData
-    });
 }
 
 // ==================================================
@@ -846,87 +1266,129 @@ async function handleDoctorAction({
     handleReply
 }) {
 
-    const senderID =
-        String(
-            event.senderID || ""
+    try {
+
+        const senderID =
+            String(
+                event?.senderID ||
+                ""
+            );
+
+        const doctor =
+            roles.getDoctor(
+                gameData.players
+            )[0];
+
+        if (
+            !doctor ||
+            doctor.alive === false ||
+            String(doctor.id) !== senderID
+        ) {
+
+            return;
+        }
+
+        if (
+            gameData.nightData.doctorTarget
+        ) {
+
+            return;
+        }
+
+        const choice =
+            parseChoice(
+                event.body
+            );
+
+        if (choice === null) {
+
+            return sendMessage(
+                api,
+                "أرسل رقم اللاعب فقط",
+                event.threadID,
+                event.messageID
+            );
+        }
+
+        const targets =
+            Array.isArray(
+                replyData?.players
+            )
+                ? replyData.players
+                : [];
+
+        const target =
+            playerFromChoice(
+                targets,
+                choice
+            );
+
+        if (!target) {
+
+            return sendMessage(
+                api,
+                "هذا الرقم غير موجود في القائمة",
+                event.threadID,
+                event.messageID
+            );
+        }
+
+        if (
+            !isAlive(
+                gameData,
+                target.id
+            )
+        ) {
+
+            return sendMessage(
+                api,
+                "هذا اللاعب لم يعد حيًا",
+                event.threadID
+            );
+        }
+
+        game.setNightTarget(
+            gameData,
+            "doctor",
+            String(target.id)
         );
 
-    const doctor =
-        roles.getDoctor(
-            gameData.players
-        )[0];
+        if (handleReply?.messageID) {
 
-    if (
-        !doctor ||
-        doctor.alive === false ||
-        String(doctor.id) !== senderID
-    ) {
-        return;
-    }
+            removeReply(
+                handleReply.messageID
+            );
+        }
 
-    const choice =
-        parseChoice(
-            event.body
+        gameData.currentAction =
+            "detective";
+
+        game.saveGames();
+
+        await sendMessage(
+            api,
+            "تم تسجيل حماية الطبيب",
+            event.threadID
         );
 
-    if (choice === null) {
+        return startDetectiveAction({
+            api,
+            gameData
+        });
+
+    } catch (error) {
+
+        console.error(
+            "[MAFIA] HANDLE DOCTOR ERROR:",
+            error
+        );
 
         return sendMessage(
             api,
-            "أرسل رقم اللاعب فقط",
-            event.threadID,
-            event.messageID
+            "حدث خطأ أثناء تسجيل اختيار الطبيب",
+            event.threadID
         );
     }
-
-    const targets =
-        Array.isArray(
-            replyData?.players
-        )
-            ? replyData.players
-            : [];
-
-    const target =
-        playerFromChoice(
-            targets,
-            choice
-        );
-
-    if (!target) {
-
-        return sendMessage(
-            api,
-            "هذا الرقم غير موجود في القائمة",
-            event.threadID,
-            event.messageID
-        );
-    }
-
-    game.setNightTarget(
-        gameData,
-        "doctor",
-        target.id
-    );
-
-    removeReply(
-        handleReply.messageID
-    );
-
-    gameData.currentAction =
-        "detective";
-
-    game.saveGames();
-
-    await sendMessage(
-        api,
-        "تم تسجيل حماية الطبيب",
-        event.threadID
-    );
-
-    await startDetectiveAction({
-        api,
-        gameData
-    });
 }
 
 // ==================================================
@@ -941,95 +1403,120 @@ async function handleDetectiveAction({
     handleReply
 }) {
 
-    const senderID =
-        String(
-            event.senderID || ""
+    try {
+
+        const senderID =
+            String(
+                event?.senderID ||
+                ""
+            );
+
+        const detective =
+            roles.getDetective(
+                gameData.players
+            )[0];
+
+        if (
+            !detective ||
+            detective.alive === false ||
+            String(detective.id) !== senderID
+        ) {
+
+            return;
+        }
+
+        if (
+            gameData.nightData.detectiveTarget
+        ) {
+
+            return;
+        }
+
+        const choice =
+            parseChoice(
+                event.body
+            );
+
+        if (choice === null) {
+
+            return sendMessage(
+                api,
+                "أرسل رقم اللاعب فقط",
+                event.threadID,
+                event.messageID
+            );
+        }
+
+        const targets =
+            Array.isArray(
+                replyData?.players
+            )
+                ? replyData.players
+                : [];
+
+        const target =
+            playerFromChoice(
+                targets,
+                choice
+            );
+
+        if (!target) {
+
+            return sendMessage(
+                api,
+                "هذا الرقم غير موجود في القائمة",
+                event.threadID,
+                event.messageID
+            );
+        }
+
+        game.setNightTarget(
+            gameData,
+            "detective",
+            String(target.id)
         );
 
-    const detective =
-        roles.getDetective(
-            gameData.players
-        )[0];
+        if (handleReply?.messageID) {
 
-    if (
-        !detective ||
-        detective.alive === false ||
-        String(detective.id) !== senderID
-    ) {
-        return;
-    }
+            removeReply(
+                handleReply.messageID
+            );
+        }
 
-    const choice =
-        parseChoice(
-            event.body
+        gameData.currentAction =
+            null;
+
+        game.saveGames();
+
+        const result =
+            target.role === "mafia"
+                ? "هذا اللاعب من المافيا"
+                : "هذا اللاعب ليس من المافيا";
+
+        await sendMessage(
+            api,
+            `نتيجة التحقيق:\n${result}`,
+            event.threadID
         );
 
-    if (choice === null) {
+        return resolveNight({
+            api,
+            gameData
+        });
+
+    } catch (error) {
+
+        console.error(
+            "[MAFIA] HANDLE DETECTIVE ERROR:",
+            error
+        );
 
         return sendMessage(
             api,
-            "أرسل رقم اللاعب فقط",
-            event.threadID,
-            event.messageID
+            "حدث خطأ أثناء التحقيق",
+            event.threadID
         );
     }
-
-    const targets =
-        Array.isArray(
-            replyData?.players
-        )
-            ? replyData.players
-            : [];
-
-    const target =
-        playerFromChoice(
-            targets,
-            choice
-        );
-
-    if (!target) {
-
-        return sendMessage(
-            api,
-            "هذا الرقم غير موجود في القائمة",
-            event.threadID,
-            event.messageID
-        );
-    }
-
-    game.setNightTarget(
-        gameData,
-        "detective",
-        target.id
-    );
-
-    removeReply(
-        handleReply.messageID
-    );
-
-    gameData.currentAction =
-        null;
-
-    gameData.nightData.resolved =
-        false;
-
-    game.saveGames();
-
-    const result =
-        target.role === "mafia"
-            ? "هذا اللاعب من المافيا"
-            : "هذا اللاعب ليس من المافيا";
-
-    await sendMessage(
-        api,
-        `نتيجة التحقيق:\n${result}`,
-        event.threadID
-    );
-
-    await resolveNight({
-        api,
-        gameData
-    });
 }
 
 // ==================================================
@@ -1043,54 +1530,104 @@ async function handleNightReply({
     handleReply
 }) {
 
-    if (!gameData) return;
+    try {
 
-    if (
-        gameData.phase !==
-        game.PHASES.NIGHT
-    ) {
-        return;
-    }
+        if (!gameData || !event) {
+            return;
+        }
 
-    const action =
-        handleReply?.data?.action;
+        if (
+            gameData.phase !==
+            game.PHASES.NIGHT
+        ) {
 
-    if (!action) return;
+            return;
+        }
 
-    if (action === "mafia") {
+        const action =
+            String(
+                handleReply?.data?.action ||
+                ""
+            );
 
-        return handleMafiaAction({
-            api,
-            gameData,
-            event,
-            replyData:
-                handleReply.data,
-            handleReply
-        });
-    }
+        if (!action) {
+            return;
+        }
 
-    if (action === "doctor") {
+        /*
+         * حماية إضافية:
+         * لا نعالج ردًا قديمًا بعد انتقال المرحلة.
+         */
 
-        return handleDoctorAction({
-            api,
-            gameData,
-            event,
-            replyData:
-                handleReply.data,
-            handleReply
-        });
-    }
+        if (
+            action === "mafia" &&
+            gameData.currentAction !==
+            "mafia"
+        ) {
 
-    if (action === "detective") {
+            return;
+        }
 
-        return handleDetectiveAction({
-            api,
-            gameData,
-            event,
-            replyData:
-                handleReply.data,
-            handleReply
-        });
+        if (
+            action === "doctor" &&
+            gameData.currentAction !==
+            "doctor"
+        ) {
+
+            return;
+        }
+
+        if (
+            action === "detective" &&
+            gameData.currentAction !==
+            "detective"
+        ) {
+
+            return;
+        }
+
+        if (action === "mafia") {
+
+            return handleMafiaAction({
+                api,
+                gameData,
+                event,
+                replyData:
+                    handleReply.data,
+                handleReply
+            });
+        }
+
+        if (action === "doctor") {
+
+            return handleDoctorAction({
+                api,
+                gameData,
+                event,
+                replyData:
+                    handleReply.data,
+                handleReply
+            });
+        }
+
+        if (action === "detective") {
+
+            return handleDetectiveAction({
+                api,
+                gameData,
+                event,
+                replyData:
+                    handleReply.data,
+                handleReply
+            });
+        }
+
+    } catch (error) {
+
+        console.error(
+            "[MAFIA] NIGHT REPLY ERROR:",
+            error
+        );
     }
 }
 
@@ -1103,133 +1640,148 @@ async function resolveNight({
     gameData
 }) {
 
-    if (!gameData) return false;
+    try {
 
-    if (
-        gameData.phase !==
-        game.PHASES.NIGHT
-    ) {
-        return false;
-    }
+        if (!gameData) {
+            return false;
+        }
 
-    if (
-        gameData.nightData.resolved
-    ) {
-        return false;
-    }
+        if (
+            gameData.phase !==
+            game.PHASES.NIGHT
+        ) {
 
-    gameData.nightData.resolved =
-        true;
+            return false;
+        }
 
-    gameData.currentAction =
-        null;
+        if (
+            gameData.nightData.resolved
+        ) {
 
-    game.saveGames();
+            return false;
+        }
 
-    const mafiaTarget =
-        gameData.nightData.mafiaTarget;
+        gameData.nightData.resolved =
+            true;
 
-    const doctorTarget =
-        gameData.nightData.doctorTarget;
+        gameData.currentAction =
+            null;
 
-    let eliminatedPlayer = null;
+        game.saveGames();
 
-    if (
-        mafiaTarget &&
-        String(mafiaTarget) !==
-        String(doctorTarget)
-    ) {
+        const mafiaTarget =
+            gameData.nightData.mafiaTarget;
 
-        const result =
-            game.eliminatePlayer(
-                gameData,
-                mafiaTarget,
-                "mafia"
-            );
+        const doctorTarget =
+            gameData.nightData.doctorTarget;
 
-        if (result.success) {
+        let eliminatedPlayer = null;
 
-            eliminatedPlayer =
-                result.player;
+        /*
+         * إذا استهدفت المافيا لاعبًا
+         * والطبيب لم يحمِه
+         */
 
-            try {
+        if (
+            mafiaTarget &&
+            String(mafiaTarget) !==
+            String(doctorTarget)
+        ) {
 
-                await rooms.removePlayer(
+            const result =
+                game.eliminatePlayer(
+                    gameData,
+                    String(mafiaTarget),
+                    "mafia"
+                );
+
+            if (result?.success) {
+
+                eliminatedPlayer =
+                    result.player;
+
+                /*
+                 * طرد اللاعب المقتول من غرفة دوره
+                 */
+
+                await removePlayerFromRoleRoom(
                     api,
                     eliminatedPlayer
                 );
-
-            } catch (error) {
-
-                console.error(
-                    "[MAFIA] فشل إخراج اللاعب من غرفة دوره:",
-                    error
-                );
             }
         }
-    }
 
-    const winner =
-        game.checkWinner(
+        const winner =
+            game.checkWinner(
+                gameData
+            );
+
+        if (winner?.ended) {
+
+            game.endGame(
+                gameData,
+                winner.winner,
+                winner.reason
+            );
+
+            return announceWinner({
+                api,
+                gameData
+            });
+        }
+
+        game.startDay(
             gameData
         );
 
-    if (winner.ended) {
-
-        game.endGame(
-            gameData,
-            winner.winner,
-            winner.reason
-        );
-
-        return announceWinner({
-            api,
-            gameData
-        });
-    }
-
-    game.startDay(
-        gameData
-    );
-
-    let message =
+        let message =
 `انتهت الليلة ${gameData.night}
 
 `;
 
-    if (eliminatedPlayer) {
+        if (eliminatedPlayer) {
+
+            message +=
+                `تم إخراج لاعب من اللعبة خلال الليل\n`;
+
+        } else if (
+            mafiaTarget &&
+            String(mafiaTarget) ===
+            String(doctorTarget)
+        ) {
+
+            message +=
+                `الطبيب نجح في حماية الهدف\n`;
+
+        } else {
+
+            message +=
+                `لم يخرج أحد خلال هذه الليلة\n`;
+        }
 
         message +=
-            `تم إخراج لاعب من اللعبة خلال الليل\n`;
+            `\nبدأ النهار`;
 
-    } else if (
-        mafiaTarget &&
-        String(mafiaTarget) ===
-        String(doctorTarget)
-    ) {
+        await sendMessage(
+            api,
+            message,
+            gameData.threadID
+        );
 
-        message +=
-            `الطبيب نجح في حماية الهدف\n`;
+        return startVoting({
+            api,
+            gameData
+        });
 
-    } else {
+    } catch (error) {
 
-        message +=
-            `لم يخرج أحد خلال هذه الليلة\n`;
+        console.error(
+            "[MAFIA] RESOLVE NIGHT ERROR:",
+            error
+        );
+
+        return false;
     }
-
-    message +=
-        `\nبدأ النهار`;
-
-    await sendMessage(
-        api,
-        message,
-        gameData.threadID
-    );
-
-    return startVoting({
-        api,
-        gameData
-    });
 }
 
 // ==================================================
@@ -1241,22 +1793,27 @@ async function startVoting({
     gameData
 }) {
 
-    if (!gameData) return false;
+    try {
 
-    game.startVoting(
-        gameData
-    );
+        if (!gameData) {
+            return false;
+        }
 
-    const targets =
-        roles.getAlivePlayers(
-            gameData.players
+        game.startVoting(
+            gameData
         );
 
-    if (!targets.length) {
-        return false;
-    }
+        const targets =
+            roles.getAlivePlayers(
+                gameData.players
+            );
 
-    const body =
+        if (!targets.length) {
+
+            return false;
+        }
+
+        const body =
 `التصويت
 
 اختاروا اللاعب الذي تريدون إخراجه
@@ -1267,69 +1824,65 @@ ${numberedPlayers(targets)}
 
 أرسل رقم اللاعب فقط`;
 
-    const sent =
-        await new Promise(resolve => {
+        const sent =
+            await sendMessage(
+                api,
+                body,
+                gameData.threadID
+            );
 
-            try {
+        if (!sent) {
+            return false;
+        }
 
-                api.sendMessage(
-                    body,
-                    gameData.threadID,
-                    (error, info) => {
+        const messageID =
+            String(
+                sent.messageID ||
+                ""
+            );
 
-                        if (error) {
-                            console.error(
-                                "[MAFIA VOTE] فشل إرسال التصويت:",
-                                error
-                            );
+        if (!messageID) {
+            return false;
+        }
 
-                            return resolve(null);
-                        }
-
-                        resolve(info);
-                    }
-                );
-
-            } catch (error) {
-
-                resolve(null);
-            }
-        });
-
-    if (!sent) {
-        return false;
-    }
-
-    const messageID =
-        String(
-            sent.messageID ||
-            sent
+        game.setVotingMessage(
+            gameData,
+            messageID
         );
 
-    game.setVotingMessage(
-        gameData,
-        messageID
-    );
+        registerReply({
 
-    registerReply({
+            name: "مافيا",
 
-        name: "مافيا",
+            messageID,
 
-        messageID,
+            threadID:
+                gameData.threadID,
 
-        threadID:
-            gameData.threadID,
+            type:
+                VOTE_REPLY_TYPE,
 
-        type:
-            VOTE_REPLY_TYPE,
+            data: {
 
-        data: {
-            action: "vote",
-            players: targets
-        }
-    });
+                action: "vote",
 
-    return true;
+                players: targets
+
+            }
+
+        });
+
+        return true;
+
+    } catch (error) {
+
+        console.error(
+            "[MAFIA] START VOTING ERROR:",
+            error
+        );
+
+        return false;
+    }
 }
 
 // ==================================================
@@ -1343,140 +1896,155 @@ async function handleVoteReply({
     handleReply
 }) {
 
-    if (!gameData) return;
+    try {
 
-    if (
-        gameData.phase !==
-        game.PHASES.VOTING
-    ) {
-        return;
-    }
+        if (!gameData) {
+            return;
+        }
 
-    const voterID =
-        String(
-            event.senderID || ""
-        );
+        if (
+            gameData.phase !==
+            game.PHASES.VOTING
+        ) {
 
-    const voter =
-        getPlayer(
-            gameData,
-            voterID
-        );
+            return;
+        }
 
-    if (
-        !voter ||
-        voter.alive === false
-    ) {
-        return sendMessage(
-            api,
-            "لا يمكنك التصويت لأنك خارج اللعبة",
-            event.threadID
-        );
-    }
+        const voterID =
+            String(
+                event.senderID || ""
+            );
 
-    const choice =
-        parseChoice(
-            event.body
-        );
+        const voter =
+            getPlayer(
+                gameData,
+                voterID
+            );
 
-    if (choice === null) {
+        if (
+            !voter ||
+            voter.alive === false
+        ) {
 
-        return sendMessage(
-            api,
-            "أرسل رقم اللاعب فقط",
-            event.threadID,
-            event.messageID
-        );
-    }
-
-    const targets =
-        Array.isArray(
-            handleReply?.data?.players
-        )
-            ? handleReply.data.players
-            : [];
-
-    const target =
-        playerFromChoice(
-            targets,
-            choice
-        );
-
-    if (!target) {
-
-        return sendMessage(
-            api,
-            "هذا الرقم غير موجود في القائمة",
-            event.threadID
-        );
-    }
-
-    if (
-        !isAlive(
-            gameData,
-            target.id
-        )
-    ) {
-
-        return sendMessage(
-            api,
-            "هذا اللاعب خرج من اللعبة",
-            event.threadID
-        );
-    }
-
-    const result =
-        game.registerVote(
-            gameData,
-            voterID,
-            target.id
-        );
-
-    if (!result.success) {
-
-        const errors = {
-
-            ALREADY_VOTED:
-                "لقد سجلت تصويتك بالفعل",
-
-            VOTER_DEAD:
+            return sendMessage(
+                api,
                 "لا يمكنك التصويت لأنك خارج اللعبة",
+                event.threadID
+            );
+        }
 
-            TARGET_DEAD:
+        const choice =
+            parseChoice(
+                event.body
+            );
+
+        if (choice === null) {
+
+            return sendMessage(
+                api,
+                "أرسل رقم اللاعب فقط",
+                event.threadID,
+                event.messageID
+            );
+        }
+
+        const targets =
+            Array.isArray(
+                handleReply?.data?.players
+            )
+                ? handleReply.data.players
+                : [];
+
+        const target =
+            playerFromChoice(
+                targets,
+                choice
+            );
+
+        if (!target) {
+
+            return sendMessage(
+                api,
+                "هذا الرقم غير موجود في القائمة",
+                event.threadID
+            );
+        }
+
+        if (
+            !isAlive(
+                gameData,
+                target.id
+            )
+        ) {
+
+            return sendMessage(
+                api,
                 "هذا اللاعب خرج من اللعبة",
+                event.threadID
+            );
+        }
 
-            VOTING_NOT_ACTIVE:
-                "التصويت انتهى"
-        };
+        const result =
+            game.registerVote(
+                gameData,
+                voterID,
+                target.id
+            );
 
-        return sendMessage(
+        if (!result.success) {
+
+            const errors = {
+
+                ALREADY_VOTED:
+                    "لقد سجلت تصويتك بالفعل",
+
+                VOTER_DEAD:
+                    "لا يمكنك التصويت لأنك خارج اللعبة",
+
+                TARGET_DEAD:
+                    "هذا اللاعب خرج من اللعبة",
+
+                VOTING_NOT_ACTIVE:
+                    "التصويت انتهى"
+
+            };
+
+            return sendMessage(
+                api,
+                errors[result.reason] ||
+                    "تعذر تسجيل التصويت",
+                event.threadID
+            );
+        }
+
+        await sendMessage(
             api,
-            errors[result.reason] ||
-                "تعذر تسجيل التصويت",
+            "تم تسجيل تصويتك",
             event.threadID
         );
-    }
 
-    await sendMessage(
-        api,
-        "تم تسجيل تصويتك",
-        event.threadID
-    );
+        if (
+            game.isVotingComplete(
+                gameData
+            )
+        ) {
 
-    if (
-        game.isVotingComplete(
-            gameData
-        )
-    ) {
+            removeReply(
+                handleReply.messageID
+            );
 
-        removeReply(
-            handleReply.messageID
+            return resolveVoting({
+                api,
+                gameData
+            });
+        }
+
+    } catch (error) {
+
+        console.error(
+            "[MAFIA] VOTE ERROR:",
+            error
         );
-
-        return resolveVoting({
-            api,
-            gameData
-        });
     }
 }
 
@@ -1489,104 +2057,120 @@ async function resolveVoting({
     gameData
 }) {
 
-    if (!gameData) return false;
+    try {
 
-    const result =
-        game.getVotingResult(
-            gameData
-        );
+        if (!gameData) {
+            return false;
+        }
 
-    let eliminatedPlayer = null;
-
-    if (
-        result.eliminatedID
-    ) {
-
-        const eliminated =
-            game.eliminatePlayer(
-                gameData,
-                result.eliminatedID,
-                "vote"
+        const result =
+            game.getVotingResult(
+                gameData
             );
 
-        if (eliminated.success) {
+        let eliminatedPlayer = null;
 
-            eliminatedPlayer =
-                eliminated.player;
+        if (
+            result.eliminatedID
+        ) {
 
-            try {
+            const eliminated =
+                game.eliminatePlayer(
+                    gameData,
+                    String(
+                        result.eliminatedID
+                    ),
+                    "vote"
+                );
 
-                await rooms.removePlayer(
+            if (eliminated?.success) {
+
+                eliminatedPlayer =
+                    eliminated.player;
+
+                /*
+                 * إزالة اللاعب من غرفة دوره
+                 */
+
+                await removePlayerFromRoleRoom(
                     api,
                     eliminatedPlayer
                 );
-
-            } catch (error) {}
+            }
         }
-    }
 
-    gameData.voting.active =
-        false;
+        gameData.voting.active =
+            false;
 
-    game.saveGames();
+        game.saveGames();
 
-    let message;
+        let message;
 
-    if (result.tied) {
+        if (result.tied) {
 
-        message =
+            message =
 `انتهى التصويت
 
 حدث تعادل في الأصوات
 
 لم يخرج أحد هذه الجولة`;
 
-    } else if (eliminatedPlayer) {
+        } else if (eliminatedPlayer) {
 
-        message =
+            message =
 `انتهى التصويت
 
 تم إخراج لاعب من اللعبة`;
 
-    } else {
+        } else {
 
-        message =
+            message =
 `انتهى التصويت
 
 لم يتم إخراج أي لاعب`;
-    }
+        }
 
-    await sendMessage(
-        api,
-        message,
-        gameData.threadID
-    );
-
-    const winner =
-        game.checkWinner(
-            gameData
+        await sendMessage(
+            api,
+            message,
+            gameData.threadID
         );
 
-    if (winner.ended) {
+        const winner =
+            game.checkWinner(
+                gameData
+            );
 
-        game.endGame(
-            gameData,
-            winner.winner,
-            winner.reason
-        );
+        if (winner?.ended) {
 
-        return announceWinner({
+            game.endGame(
+                gameData,
+                winner.winner,
+                winner.reason
+            );
+
+            return announceWinner({
+                api,
+                gameData
+            });
+        }
+
+        await wait(1500);
+
+        return startNextNight({
             api,
             gameData
         });
+
+    } catch (error) {
+
+        console.error(
+            "[MAFIA] RESOLVE VOTE ERROR:",
+            error
+        );
+
+        return false;
     }
-
-    await wait(1500);
-
-    return startNextNight({
-        api,
-        gameData
-    });
 }
 
 // ==================================================
@@ -1598,40 +2182,62 @@ async function startNextNight({
     gameData
 }) {
 
-    if (!gameData) return false;
+    try {
 
-    gameData.round++;
+        if (!gameData) {
+            return false;
+        }
 
-    gameData.night++;
+        gameData.round =
+            Number(
+                gameData.round || 0
+            ) + 1;
 
-    game.resetNightData(
-        gameData
-    );
+        gameData.night =
+            Number(
+                gameData.night || 0
+            ) + 1;
 
-    game.setPhase(
-        gameData,
-        game.PHASES.NIGHT
-    );
+        game.resetNightData(
+            gameData
+        );
 
-    gameData.currentAction =
-        "mafia";
+        game.setPhase(
+            gameData,
+            game.PHASES.NIGHT
+        );
 
-    game.saveGames();
+        gameData.currentAction =
+            "mafia";
 
-    await sendMessage(
-        api,
-        `بدأت الليلة ${gameData.night}`,
-        gameData.threadID
-    );
+        game.saveGames();
 
-    return startMafiaAction({
-        api,
-        gameData
-    });
+        await sendMessage(
+            api,
+            `بدأت الليلة ${gameData.night}`,
+            gameData.threadID
+        );
+
+        await wait(1000);
+
+        return startMafiaAction({
+            api,
+            gameData
+        });
+
+    } catch (error) {
+
+        console.error(
+            "[MAFIA] NEXT NIGHT ERROR:",
+            error
+        );
+
+        return false;
+    }
 }
 
 // ==================================================
-// إعلان الفائز
+// إعلان الفائز وتنظيف كل الغرف
 // ==================================================
 
 async function announceWinner({
@@ -1639,68 +2245,135 @@ async function announceWinner({
     gameData
 }) {
 
-    if (!gameData) return false;
+    try {
 
-    let winnerText;
+        if (!gameData) {
+            return false;
+        }
 
-    if (
-        gameData.winner ===
-        "mafia"
-    ) {
+        let winnerText;
 
-        winnerText =
-            "فازت المافيا";
+        if (
+            gameData.winner ===
+            "mafia"
+        ) {
 
-    } else if (
-        gameData.winner ===
-        "citizens"
-    ) {
+            winnerText =
+                "فازت المافيا";
 
-        winnerText =
-            "فاز المواطنون";
+        } else if (
+            gameData.winner ===
+            "citizens"
+        ) {
 
-    } else {
+            winnerText =
+                "فاز المواطنون";
 
-        winnerText =
-            "انتهت اللعبة";
-    }
+        } else {
 
-    const body =
+            winnerText =
+                "انتهت اللعبة";
+        }
+
+        /*
+         * أولًا نوقف جميع الردود القديمة
+         */
+
+        removeGameReplies(
+            gameData.threadID
+        );
+
+        /*
+         * إعلان النهاية
+         */
+
+        const body =
 `انتهت لعبة المافيا
 
 ${winnerText}
 
 ${gameData.winnerReason || ""}`;
 
-    await sendMessage(
-        api,
-        body,
-        gameData.threadID
-    );
-
-    // تنظيف غرف الأدوار
-    try {
-
-        await rooms.cleanupRoleRooms(
+        await sendMessage(
             api,
-            gameData.players
+            body,
+            gameData.threadID
         );
+
+        /*
+         * تنظيف جميع غرف الأدوار
+         *
+         * المافيا
+         * الطبيب
+         * المحقق
+         */
+
+        const cleanup =
+            await cleanupAllRoleRooms(
+                api,
+                gameData
+            );
+
+        console.log(
+            "[MAFIA] ROLE ROOMS CLEANUP:",
+            cleanup
+        );
+
+        /*
+         * محاولة أخيرة بعد قليل
+         * للاعبين الذين لم تتم إزالتهم
+         */
+
+        if (
+            cleanup.failed &&
+            cleanup.failed.length > 0
+        ) {
+
+            await wait(1500);
+
+            await cleanupAllRoleRooms(
+                api,
+                gameData
+            );
+        }
+
+        game.saveGames();
+
+        return true;
 
     } catch (error) {
 
         console.error(
-            "[MAFIA] فشل تنظيف غرف الأدوار:",
+            "[MAFIA] ANNOUNCE WINNER ERROR:",
             error
         );
+
+        /*
+         * حتى لو فشل الإعلان
+         * نحاول تنظيف الغرف
+         */
+
+        try {
+
+            await cleanupAllRoleRooms(
+                api,
+                gameData
+            );
+
+        } catch (cleanupError) {
+
+            console.error(
+                "[MAFIA] FINAL CLEANUP ERROR:",
+                cleanupError
+            );
+        }
+
+        return false;
     }
-
-    game.saveGames();
-
-    return true;
 }
 
 // ==================================================
-// بدء اللعبة بعد نجاح التجهيز
+// بدء اللعبة بعد نجاح تجهيز الغرف
 // ==================================================
 
 async function startGameAfterPreparation({
@@ -1708,78 +2381,128 @@ async function startGameAfterPreparation({
     gameData
 }) {
 
-    if (!gameData) return false;
+    try {
 
-    /*
-     * لا تبدأ اللعبة إلا إذا:
-     *
-     * 1. تم توزيع الأدوار
-     * 2. تم تجهيز جميع الغرف بنجاح
-     */
+        if (!gameData) {
+            return {
+                success: false
+            };
+        }
 
-    if (
-        gameData.phase !==
-        game.PHASES.STARTING
-    ) {
-        return false;
-    }
+        if (
+            gameData.phase !==
+            game.PHASES.STARTING
+        ) {
 
-    const preparation =
-        await rooms.prepareRoleRooms(
+            return {
+                success: false,
+                reason:
+                    "INVALID_PHASE"
+            };
+        }
+
+        /*
+         * تجهيز الغرف
+         *
+         * إذا فشل لاعب واحد
+         * لا تبدأ اللعبة.
+         */
+
+        const preparation =
+            await rooms.prepareRoleRooms(
+                api,
+                gameData.players
+            );
+
+        if (
+            !preparation ||
+            !preparation.success
+        ) {
+
+            console.error(
+                "[MAFIA] ROLE ROOM PREPARATION FAILED:",
+                preparation
+            );
+
+            return {
+                success: false,
+                reason:
+                    "ROLE_ROOMS_FAILED",
+                preparation
+            };
+        }
+
+        /*
+         * هنا فقط تصبح اللعبة Started
+         */
+
+        const started =
+            game.confirmGameStarted(
+                gameData
+            );
+
+        if (!started) {
+
+            return {
+                success: false,
+                reason:
+                    "GAME_START_FAILED"
+            };
+        }
+
+        await sendMessage(
             api,
-            gameData.players
-        );
-
-    if (
-        !preparation.success
-    ) {
-
-        console.error(
-            "[MAFIA] فشل تجهيز غرف اللاعبين"
-        );
-
-        return {
-            success: false,
-            preparation
-        };
-    }
-
-    // جميع الغرف جاهزة
-    const started =
-        game.confirmGameStarted(
-            gameData
-        );
-
-    if (!started) {
-
-        return {
-            success: false,
-            reason:
-                "GAME_START_FAILED"
-        };
-    }
-
-    // الإعلان لا يرسل إلا هنا
-    await sendMessage(
-        api,
-        `بدأت لعبة المافيا
+            `بدأت لعبة المافيا
 
 تم توزيع الأدوار وتجهيز الغرف بنجاح
 
 الليلة الأولى تبدأ الآن`,
-        gameData.threadID
-    );
+            gameData.threadID
+        );
 
-    await wait(1000);
+        await wait(1000);
 
-    await startMafiaAction({
-        api,
-        gameData
-    });
+        /*
+         * بداية الليل
+         */
 
-    return {
-        success: true
-    };
+        const mafiaStarted =
+            await startMafiaAction({
+                api,
+                gameData
+            });
+
+        if (!mafiaStarted) {
+
+            console.error(
+                "[MAFIA] فشل بدء دور المافيا"
+            );
+
+            return {
+                success: false,
+                reason:
+                    "MAFIA_ACTION_FAILED"
+            };
+        }
+
+        return {
+            success: true
+        };
+
+    } catch (error) {
+
+        console.error(
+            "[MAFIA] START GAME ERROR:",
+            error
+        );
+
+        return {
+            success: false,
+            reason:
+                "START_GAME_ERROR",
+            error
+        };
+    }
 }
 
 // ==================================================
@@ -1792,95 +2515,166 @@ async function handleReply({
     handleReply
 }) {
 
-    if (!event || !handleReply) {
-        return;
-    }
+    try {
 
-    const threadID =
-        String(
-            event.threadID || ""
+        if (
+            !event ||
+            !handleReply
+        ) {
+
+            return;
+        }
+
+        const threadID =
+            String(
+                event.threadID ||
+                ""
+            );
+
+        if (!threadID) {
+            return;
+        }
+
+        const gameData =
+            game.getGame(
+                threadID
+            );
+
+        if (!gameData) {
+            return;
+        }
+
+        /*
+         * التأكد أن الرد يخص نفس المجموعة
+         */
+
+        if (
+            String(
+                handleReply.threadID ||
+                ""
+            ) !== threadID
+        ) {
+
+            return;
+        }
+
+        /*
+         * ==================================================
+         * الليل
+         * ==================================================
+         */
+
+        if (
+            handleReply.type ===
+            NIGHT_REPLY_TYPE
+        ) {
+
+            return handleNightReply({
+                api,
+                gameData,
+                event,
+                handleReply
+            });
+        }
+
+        /*
+         * ==================================================
+         * التصويت
+         * ==================================================
+         */
+
+        if (
+            handleReply.type ===
+            VOTE_REPLY_TYPE
+        ) {
+
+            return handleVoteReply({
+                api,
+                gameData,
+                event,
+                handleReply
+            });
+        }
+
+    } catch (error) {
+
+        console.error(
+            "[MAFIA] HANDLE REPLY ERROR:",
+            error
         );
 
-    const gameData =
-        game.getGame(
-            threadID
-        );
+        /*
+         * مهم:
+         * لا نرمي الخطأ مرة أخرى
+         * حتى لا يظهر executeError للمستخدم.
+         */
 
-    if (!gameData) {
         return;
-    }
-
-    if (
-        String(
-            handleReply.threadID
-        ) !== threadID
-    ) {
-        return;
-    }
-
-    if (
-        handleReply.type ===
-        NIGHT_REPLY_TYPE
-    ) {
-
-        return handleNightReply({
-            api,
-            gameData,
-            event,
-            handleReply
-        });
-    }
-
-    if (
-        handleReply.type ===
-        VOTE_REPLY_TYPE
-    ) {
-
-        return handleVoteReply({
-            api,
-            gameData,
-            event,
-            handleReply
-        });
     }
 }
 
 // ==================================================
-// تصدير
+// التصدير
 // ==================================================
 
 module.exports = {
 
     // أفعال الليل
+
     startMafiaAction,
+
     startDoctorAction,
+
     startDetectiveAction,
 
     handleMafiaAction,
+
     handleDoctorAction,
+
     handleDetectiveAction,
 
     handleNightReply,
 
+    resolveNight,
+
     // التصويت
+
     startVoting,
+
     handleVoteReply,
+
     resolveVoting,
 
-    // الليل والنهار
-    resolveNight,
+    // الانتقال
+
     startNextNight,
 
     // البداية والنهاية
+
     startGameAfterPreparation,
+
     announceWinner,
 
     // HandleReply
+
     handleReply,
 
     // أدوات
+
     registerReply,
+
     removeReply,
+
+    removeGameReplies,
+
     buildPlayerList,
-    numberedPlayers
+
+    numberedPlayers,
+
+    // تنظيف الغرف
+
+    removePlayerFromRoleRoom,
+
+    cleanupAllRoleRooms
+
 };
