@@ -105,37 +105,180 @@ function getBotID(api) {
 // معلومات المجموعة
 // ==================================================
 
-async function getThreadInfo(api, threadID) {
+async function getThreadInfo(
+    api,
+    Threads,
+    threadID
+) {
 
-    return new Promise(resolve => {
+    threadID =
+        String(threadID || "");
 
-        try {
+    if (!threadID) {
+        return null;
+    }
+
+    // ==================================================
+    // Threads Controller
+    // ==================================================
+
+    try {
+
+        if (
+            Threads &&
+            typeof Threads.getInfo ===
+            "function"
+        ) {
+
+            const result =
+                Threads.getInfo(
+                    threadID
+                );
 
             if (
-                !api ||
-                typeof api.getThreadInfo !==
+                result &&
+                typeof result.then ===
                 "function"
             ) {
-                return resolve(null);
+
+                const info =
+                    await Promise.race([
+
+                        result.catch(
+                            () => null
+                        ),
+
+                        new Promise(
+                            resolve =>
+                                setTimeout(
+                                    () =>
+                                        resolve(null),
+                                    5000
+                                )
+                        )
+
+                    ]);
+
+                if (info) {
+                    return info;
+                }
             }
 
-            api.getThreadInfo(
-                String(threadID),
-                (error, info) => {
+        }
 
-                    if (error) {
-                        return resolve(null);
+    } catch (error) {
+
+        console.error(
+            "[MAFIA] THREADS INFO ERROR:",
+            error.message
+        );
+    }
+
+    // ==================================================
+    // API
+    // ==================================================
+
+    try {
+
+        if (
+            !api ||
+            typeof api.getThreadInfo !==
+            "function"
+        ) {
+
+            return null;
+        }
+
+        return await new Promise(resolve => {
+
+            let finished = false;
+
+            const done = (
+                error,
+                info
+            ) => {
+
+                if (finished) {
+                    return;
+                }
+
+                finished = true;
+
+                if (error) {
+                    return resolve(null);
+                }
+
+                resolve(
+                    info || null
+                );
+            };
+
+            try {
+
+                const result =
+                    api.getThreadInfo(
+                        threadID,
+                        done
+                    );
+
+                // دعم Promise
+                if (
+                    result &&
+                    typeof result.then ===
+                    "function"
+                ) {
+
+                    result
+                        .then(
+                            info =>
+                                done(
+                                    null,
+                                    info
+                                )
+                        )
+                        .catch(
+                            error =>
+                                done(
+                                    error,
+                                    null
+                                )
+                        );
+                }
+
+            } catch (error) {
+
+                done(
+                    error,
+                    null
+                );
+            }
+
+            // حماية من التعليق
+            setTimeout(
+                () => {
+
+                    if (!finished) {
+
+                        finished = true;
+
+                        resolve(null);
                     }
 
-                    resolve(info || null);
-                }
+                },
+                5000
             );
 
-        } catch (error) {
+        });
 
-            resolve(null);
-        }
-    });
+    } catch (error) {
+
+        console.error(
+            "[MAFIA] API THREAD INFO ERROR:",
+            error.message
+        );
+
+        return null;
+    }
 }
 
 // ==================================================
@@ -144,6 +287,7 @@ async function getThreadInfo(api, threadID) {
 
 async function isGroupAdmin(
     api,
+    Threads,
     threadID,
     userID
 ) {
@@ -151,10 +295,17 @@ async function isGroupAdmin(
     const info =
         await getThreadInfo(
             api,
+            Threads,
             threadID
         );
 
     if (!info) {
+
+        console.error(
+            "[MAFIA] تعذر الحصول على معلومات المجموعة:",
+            threadID
+        );
+
         return false;
     }
 
@@ -169,13 +320,15 @@ async function isGroupAdmin(
 
         if (
             typeof admin ===
-            "object"
+            "object" &&
+            admin !== null
         ) {
 
             return (
                 String(
                     admin.id ||
                     admin.userFbId ||
+                    admin.userID ||
                     ""
                 ) ===
                 String(userID)
@@ -195,6 +348,7 @@ async function isGroupAdmin(
 
 async function isBotAdmin(
     api,
+    Threads,
     threadID
 ) {
 
@@ -207,6 +361,7 @@ async function isBotAdmin(
 
     return isGroupAdmin(
         api,
+        Threads,
         threadID,
         botID
     );
@@ -289,13 +444,9 @@ ${MIN_PLAYERS} لاعبين
         messageID
     );
 
-    /*
-     * نسجل HandleReaction
-     *
-     * handleReaction.js الموجود عندك
-     * يبحث عن messageID ثم يستدعي
-     * module.exports.handleReaction
-     */
+    // ==================================================
+    // تسجيل HandleReaction
+    // ==================================================
 
     if (!global.client) {
         global.client = {};
@@ -306,14 +457,16 @@ ${MIN_PLAYERS} لاعبين
             global.client.handleReaction
         )
     ) {
+
         global.client.handleReaction = [];
     }
 
     global.client.handleReaction =
         global.client.handleReaction.filter(
             item =>
-                String(item.messageID) !==
-                messageID
+                String(
+                    item.messageID
+                ) !== messageID
         );
 
     global.client.handleReaction.push({
@@ -323,9 +476,12 @@ ${MIN_PLAYERS} لاعبين
         messageID,
 
         threadID:
-            String(gameData.threadID),
+            String(
+                gameData.threadID
+            ),
 
-        type: "mafia-registration"
+        type:
+            "mafia-registration"
     });
 
     return messageID;
@@ -344,6 +500,7 @@ async function updateRegistrationMessage({
         !gameData ||
         !gameData.registrationMessageID
     ) {
+
         return false;
     }
 
@@ -379,6 +536,7 @@ ${
             typeof api.editMessage !==
             "function"
         ) {
+
             return false;
         }
 
@@ -419,6 +577,7 @@ function removeRegistrationReaction(
             global.client.handleReaction
         )
     ) {
+
         return;
     }
 
@@ -426,8 +585,12 @@ function removeRegistrationReaction(
         global.client.handleReaction.filter(
             item =>
                 !(
-                    String(item.messageID) ===
-                    String(messageID)
+                    String(
+                        item.messageID
+                    ) ===
+                    String(
+                        messageID
+                    )
                 )
         );
 }
@@ -453,7 +616,10 @@ async function getUserName(
 
                     api.getUserInfo(
                         String(userID),
-                        (error, data) => {
+                        (
+                            error,
+                            data
+                        ) => {
 
                             if (error) {
                                 return resolve(null);
@@ -494,18 +660,21 @@ async function addReactionPlayer({
 }) {
 
     userID =
-        String(userID || "");
+        String(
+            userID || ""
+        );
 
     if (!userID) {
+
         return {
             success: false,
             reason: "INVALID_USER"
         };
     }
 
-    /*
-     * البوت لا يدخل اللعبة
-     */
+    // ==================================================
+    // البوت لا يدخل اللعبة
+    // ==================================================
 
     const botID =
         getBotID(api);
@@ -521,9 +690,9 @@ async function addReactionPlayer({
         };
     }
 
-    /*
-     * اللعبة يجب أن تكون في التسجيل
-     */
+    // ==================================================
+    // اللعبة يجب أن تكون في التسجيل
+    // ==================================================
 
     if (
         gameData.phase !==
@@ -532,14 +701,15 @@ async function addReactionPlayer({
 
         return {
             success: false,
-            reason: "REGISTRATION_CLOSED"
+            reason:
+                "REGISTRATION_CLOSED"
         };
     }
 
-    /*
-     * معرفة الاسم للعرض فقط
-     * الهوية الحقيقية تبقى UID
-     */
+    // ==================================================
+    // الاسم للعرض فقط
+    // الهوية الحقيقية UID
+    // ==================================================
 
     const name =
         await getUserName(
@@ -547,14 +717,11 @@ async function addReactionPlayer({
             userID
         );
 
-    const result =
-        game.addPlayer(
-            gameData,
-            userID,
-            name
-        );
-
-    return result;
+    return game.addPlayer(
+        gameData,
+        userID,
+        name
+    );
 }
 
 // ==================================================
@@ -585,7 +752,8 @@ async function startGame({
 
         return {
             success: false,
-            reason: "GAME_NOT_FOUND"
+            reason:
+                "GAME_NOT_FOUND"
         };
     }
 
@@ -596,7 +764,8 @@ async function startGame({
 
         return {
             success: false,
-            reason: "INVALID_PHASE"
+            reason:
+                "INVALID_PHASE"
         };
     }
 
@@ -607,15 +776,16 @@ async function startGame({
 
         return {
             success: false,
-            reason: "NOT_ENOUGH_PLAYERS",
+            reason:
+                "NOT_ENOUGH_PLAYERS",
             count:
                 gameData.players.length
         };
     }
 
-    /*
-     * توزيع الأدوار
-     */
+    // ==================================================
+    // توزيع الأدوار
+    // ==================================================
 
     try {
 
@@ -632,16 +802,15 @@ async function startGame({
 
         return {
             success: false,
-            reason: "ROLE_ASSIGN_FAILED",
+            reason:
+                "ROLE_ASSIGN_FAILED",
             error
         };
     }
 
-    /*
-     * الانتقال إلى STARTING
-     *
-     * لا تعتبر اللعبة بدأت بعد
-     */
+    // ==================================================
+    // STARTING
+    // ==================================================
 
     if (
         !game.prepareGame(
@@ -651,13 +820,14 @@ async function startGame({
 
         return {
             success: false,
-            reason: "PREPARE_FAILED"
+            reason:
+                "PREPARE_FAILED"
         };
     }
 
-    /*
-     * إزالة تسجيل التفاعل
-     */
+    // ==================================================
+    // إزالة تسجيل التفاعل
+    // ==================================================
 
     if (
         gameData.registrationMessageID
@@ -668,14 +838,9 @@ async function startGame({
         );
     }
 
-    /*
-     * تجهيز غرف الأدوار
-     *
-     * هذه أهم مرحلة
-     *
-     * إذا فشلت إضافة أي لاعب
-     * لن تبدأ اللعبة
-     */
+    // ==================================================
+    // تجهيز غرف الأدوار
+    // ==================================================
 
     const result =
         await actions.startGameAfterPreparation({
@@ -683,16 +848,14 @@ async function startGame({
             gameData
         });
 
+    // ==================================================
+    // فشل تجهيز الغرف
+    // ==================================================
+
     if (
         !result ||
         !result.success
     ) {
-
-        /*
-         * إعادة اللعبة إلى التسجيل
-         * حتى يستطيع الأدمن إصلاح المشكلة
-         * وإعادة محاولة البدء
-         */
 
         gameData.phase =
             game.PHASES.REGISTRATION;
@@ -702,9 +865,9 @@ async function startGame({
 
         game.saveGames();
 
-        /*
-         * إعادة HandleReaction
-         */
+        // ==================================================
+        // إعادة HandleReaction
+        // ==================================================
 
         if (
             gameData.registrationMessageID
@@ -719,6 +882,7 @@ async function startGame({
                     global.client.handleReaction
                 )
             ) {
+
                 global.client.handleReaction = [];
             }
 
@@ -783,10 +947,9 @@ async function stopGame({
         return false;
     }
 
-    /*
-     * إذا كانت اللعبة بدأت
-     * ننظف غرف الأدوار
-     */
+    // ==================================================
+    // تنظيف غرف الأدوار
+    // ==================================================
 
     if (
         gameData.phase !==
@@ -809,9 +972,9 @@ async function stopGame({
         }
     }
 
-    /*
-     * إزالة Reaction handler
-     */
+    // ==================================================
+    // إزالة Reaction handler
+    // ==================================================
 
     if (
         gameData.registrationMessageID
@@ -822,9 +985,9 @@ async function stopGame({
         );
     }
 
-    /*
-     * حذف اللعبة نهائيًا
-     */
+    // ==================================================
+    // حذف اللعبة
+    // ==================================================
 
     game.deleteGame(
         gameData.threadID
@@ -849,10 +1012,6 @@ async function ({
         if (!event) {
             return;
         }
-
-        /*
-         * نحتاج UID
-         */
 
         const senderID =
             String(
@@ -879,13 +1038,13 @@ async function ({
             !threadID ||
             !messageID
         ) {
+
             return;
         }
 
-        /*
-         * التأكد من أن التفاعل
-         * على رسالة التسجيل نفسها
-         */
+        // ==================================================
+        // التأكد من الرسالة
+        // ==================================================
 
         if (
             handleReaction &&
@@ -894,6 +1053,7 @@ async function ({
                 handleReaction.messageID
             ) !== messageID
         ) {
+
             return;
         }
 
@@ -910,6 +1070,7 @@ async function ({
             gameData.phase !==
             game.PHASES.REGISTRATION
         ) {
+
             return;
         }
 
@@ -918,18 +1079,13 @@ async function ({
                 gameData.registrationMessageID
             ) !== messageID
         ) {
+
             return;
         }
 
-        /*
-         * تحديد نوع التفاعل
-         *
-         * في أغلب FCA-style APIs:
-         * event.reaction = "👍"
-         *
-         * وبعض الأنظمة تستخدم:
-         * event.reaction === "like"
-         */
+        // ==================================================
+        // نوع التفاعل
+        // ==================================================
 
         const reaction =
             String(
@@ -938,33 +1094,25 @@ async function ({
                 ""
             );
 
-        /*
-         * فقط 👍
-         */
-
         const isJoinReaction =
             reaction === "👍" ||
             reaction === "like" ||
             reaction === "LIKE";
 
-        /*
-         * إذا كان التفاعل ليس 👍
-         * لا نفعل شيئًا
-         */
-
         if (!isJoinReaction) {
             return;
         }
 
-        /*
-         * إضافة اللاعب
-         */
+        // ==================================================
+        // إضافة اللاعب
+        // ==================================================
 
         const result =
             await addReactionPlayer({
                 api,
                 gameData,
-                userID: senderID
+                userID:
+                    senderID
             });
 
         if (
@@ -1000,9 +1148,9 @@ async function ({
             return;
         }
 
-        /*
-         * تأكيد الدخول
-         */
+        // ==================================================
+        // تأكيد الدخول
+        // ==================================================
 
         await sendMessage(
             api,
@@ -1010,9 +1158,9 @@ async function ({
             threadID
         );
 
-        /*
-         * تحديث التسجيل
-         */
+        // ==================================================
+        // تحديث التسجيل
+        // ==================================================
 
         await updateRegistrationMessage({
             api,
@@ -1036,7 +1184,8 @@ module.exports.run =
 async function ({
     api,
     event,
-    args
+    args,
+    Threads
 }) {
 
     const threadID =
@@ -1077,6 +1226,7 @@ async function ({
     const admin =
         await isGroupAdmin(
             api,
+            Threads,
             threadID,
             senderID
         );
@@ -1191,16 +1341,14 @@ async function ({
             );
         }
 
-        /*
-         * التأكد من أن البوت أدمن
-         *
-         * لأنه يحتاج لإضافة اللاعبين
-         * إلى غرف الأدوار
-         */
+        // ==================================================
+        // التأكد من أن البوت أدمن
+        // ==================================================
 
         const botAdmin =
             await isBotAdmin(
                 api,
+                Threads,
                 threadID
             );
 
@@ -1235,7 +1383,7 @@ async function ({
 
                 return sendMessage(
                     api,
-                    `لم تبدأ اللعبة\nفشل إضافة أحد اللاعبين إلى غرفة دوره\nتم إلغاء بدء اللعبة ويمكن المحاولة مرة أخرى`,
+                    "لم تبدأ اللعبة\nفشل إضافة أحد اللاعبين إلى غرفة دوره\nتم إلغاء بدء اللعبة ويمكن المحاولة مرة أخرى",
                     threadID
                 );
             }
@@ -1264,10 +1412,9 @@ async function ({
         );
     }
 
-    /*
-     * منع وجود أكثر من لعبة
-     * في نفس المجموعة
-     */
+    // ==================================================
+    // منع وجود أكثر من لعبة
+    // ==================================================
 
     const existing =
         game.getGame(
@@ -1297,16 +1444,14 @@ async function ({
         );
     }
 
-    /*
-     * التأكد من أن البوت أدمن
-     *
-     * حتى يستطيع إدارة اللعبة
-     * وإضافة اللاعبين إلى غرف الأدوار
-     */
+    // ==================================================
+    // التأكد من أن البوت أدمن
+    // ==================================================
 
     const botAdmin =
         await isBotAdmin(
             api,
+            Threads,
             threadID
         );
 
@@ -1320,18 +1465,18 @@ async function ({
         );
     }
 
-    /*
-     * إنشاء اللعبة
-     */
+    // ==================================================
+    // إنشاء اللعبة
+    // ==================================================
 
     const gameData =
         game.createGame(
             threadID
         );
 
-    /*
-     * إرسال رسالة التسجيل
-     */
+    // ==================================================
+    // إرسال رسالة التسجيل
+    // ==================================================
 
     const messageID =
         await createRegistrationMessage({
