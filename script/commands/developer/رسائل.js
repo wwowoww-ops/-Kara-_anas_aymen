@@ -9,7 +9,7 @@ module.exports.config = {
     cooldowns: 5
 };
 
-const DEVELOPER_ID = "61592700121061";
+const DEVELOPER_ID = "61578581225040";
 const MESSAGE_COUNT = 10;
 const DELAY = 500;
 
