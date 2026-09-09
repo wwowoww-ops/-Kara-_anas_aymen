@@ -1,21 +1,25 @@
 module.exports.config = {
     name: "رسائل",
-    version: "1.0.0",
+    version: "2.0.0",
     hasPermssion: 0,
     credits: "أبو هريرة",
-    description: "إرسال رسالة عدة مرات في المجموعة",
+    description: "إرسال الرسالة 10 مرات تلقائيا",
     commandCategory: "Developer",
-    usages: "رسائل <الرسالة> <العدد>",
+    usages: "رسائل <الرسالة>",
     cooldowns: 5
 };
 
-const DEVELOPER_ID = "61578581225040";
-const MAX_MESSAGES = 20;
+const DEVELOPER_ID = "61592700121061";
+const MESSAGE_COUNT = 10;
+const DELAY = 500;
 
 module.exports.run = async function ({ api, event }) {
     const threadID = String(event.threadID || "");
     const senderID = String(event.senderID || "");
 
+    if (!threadID) return;
+
+    // المطور فقط
     if (senderID !== DEVELOPER_ID) {
         return api.sendMessage(
             "هذا الأمر مخصص للمطور فقط",
@@ -24,59 +28,28 @@ module.exports.run = async function ({ api, event }) {
         );
     }
 
-    const input = String(event.body || "").trim();
+    const body = String(event.body || "").trim();
 
-    const match = input.match(/^رسائل\s+([\s\S]+?)\s+(\d+)$/i);
-
-    if (!match) {
-        return api.sendMessage(
-            "الاستخدام الصحيح:\nرسائل <الرسالة> <العدد>\n\nمثال:\nرسائل مرحبا 5",
-            threadID,
-            event.messageID
-        );
-    }
-
-    const message = match[1].trim();
-    const count = parseInt(match[2], 10);
+    // إزالة اسم الأمر واستخراج الرسالة فقط
+    const message = body.replace(/^رسائل\s*/i, "").trim();
 
     if (!message) {
         return api.sendMessage(
-            "اكتب الرسالة التي تريد إرسالها",
+            "الاستخدام الصحيح:\nرسائل <الرسالة>\n\nمثال:\nرسائل مرحبا",
             threadID,
             event.messageID
         );
     }
 
-    if (!Number.isInteger(count) || count < 1) {
-        return api.sendMessage(
-            "العدد يجب أن يكون رقما صحيحا أكبر من 0",
-            threadID,
-            event.messageID
-        );
-    }
-
-    if (count > MAX_MESSAGES) {
-        return api.sendMessage(
-            `الحد الأقصى هو ${MAX_MESSAGES} رسالة`,
-            threadID,
-            event.messageID
-        );
-    }
-
-    for (let i = 0; i < count; i++) {
+    // إرسال الرسالة 10 مرات
+    for (let i = 0; i < MESSAGE_COUNT; i++) {
         await new Promise(resolve => {
-            api.sendMessage(
-                message,
-                threadID,
-                () => resolve()
-            );
+            api.sendMessage(message, threadID, () => resolve());
         });
 
         // تأخير بسيط بين الرسائل
-        if (i < count - 1) {
-            await new Promise(resolve =>
-                setTimeout(resolve, 500)
-            );
+        if (i < MESSAGE_COUNT - 1) {
+            await new Promise(resolve => setTimeout(resolve, DELAY));
         }
     }
 };
