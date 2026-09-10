@@ -1,9 +1,9 @@
 module.exports.config = {
   name: "دالة",
-  version: "12.0.0",
+  version: "13.0.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
-  description: "فحص بيانات Comet الخاصة بطلبات الصداقة",
+  description: "تحليل بيانات طلبات الصداقة داخل Comet",
   commandCategory: "Developer",
   usages: "دالة",
   cooldowns: 5
@@ -22,91 +22,117 @@ module.exports.run = async function ({ api, event }) {
     );
 
     const keywords = [
+      "FriendingCometFriendRequest",
+      "FriendRequest",
       "friend_requests",
       "friendRequests",
-      "FriendRequests",
       "friend_request",
       "friendRequest",
-      "FriendRequest",
-      "jewel_requests",
-      "jewelRequests",
-      "friend_center_requests",
-      "actorFbId",
-      "friend_request_received"
+      "friend_center",
+      "friendCenter",
+      "FriendRequests",
+      "Friending"
     ];
 
-    let found = [];
+    let results = [];
     const seen = new Set();
 
     for (const keyword of keywords) {
-      let start = 0;
+      let pos = 0;
 
       while (true) {
-        const index = html.indexOf(keyword, start);
+        const index = html.indexOf(keyword, pos);
 
         if (index === -1) break;
 
-        const from = Math.max(0, index - 700);
-        const to = Math.min(html.length, index + keyword.length + 1500);
+        const start = Math.max(0, index - 3000);
+        const end = Math.min(html.length, index + 5000);
 
-        const context = html
-          .slice(from, to)
-          .replace(/\\u0025/g, "%")
-          .replace(/\\u0026/g, "&")
-          .replace(/\\u003D/g, "=")
-          .replace(/\\u002F/g, "/")
-          .replace(/\\u003A/g, ":")
-          .replace(/\\u0022/g, '"')
-          .replace(/\\u005C/g, "\\");
+        let context = html.slice(start, end);
+
+        // البحث عن أرقام Facebook UID داخل السياق
+        const ids = [
+          ...context.matchAll(/(?:^|["':,])(\d{10,20})(?=["':,]|$)/g)
+        ].map(x => x[1]);
+
+        // أسماء الحقول المهمة
+        const interesting = [];
+
+        const fieldRegex =
+          /"(?:id|userID|user_id|actorID|actorFbId|name|full_name|fullName|profile_picture|profilePicture|uri|url)"\s*:\s*("[^"]*"|\d{10,20})/gi;
+
+        let match;
+
+        while ((match = fieldRegex.exec(context)) !== null) {
+          interesting.push(match[0]);
+        }
+
+        const uniqueIds = [...new Set(ids)];
 
         const key = `${keyword}:${index}`;
 
         if (!seen.has(key)) {
           seen.add(key);
 
-          found.push({
+          results.push({
             keyword,
             index,
+            ids: uniqueIds.slice(0, 30),
+            fields: interesting.slice(0, 40),
             context
           });
         }
 
-        start = index + keyword.length;
+        pos = index + keyword.length;
       }
     }
 
     let msg =
-      "╭───〔 𝗛𝗜𝗡𝗔 〢 𝗖𝗢𝗠𝗘𝗧 𝗦𝗖𝗔𝗡 〕───╮\n" +
+      "╭───〔 𝗛𝗜𝗡𝗔 〢 𝗙𝗥𝗜𝗘𝗡𝗗 𝗗𝗔𝗧𝗔 〕───╮\n" +
       `حجم الصفحة: ${html.length}\n` +
-      `عدد التطابقات: ${found.length}\n\n`;
+      `عدد المناطق: ${results.length}\n\n`;
 
-    if (!found.length) {
+    if (!results.length) {
       msg +=
-        "لم أجد أي من الكلمات المرتبطة بطلبات الصداقة\n" +
-        "سنحتاج البحث عن بيانات GraphQL أو أسماء مكونات Comet أخرى\n";
+        "لم يتم العثور على بيانات مرتبطة بمكونات الصداقة\n";
     } else {
-      // نعرض أول 8 تطابقات فقط حتى لا تتجاوز الرسالة الحد
-      const max = Math.min(found.length, 8);
 
-      for (let i = 0; i < max; i++) {
-        const item = found[i];
+      for (let i = 0; i < Math.min(results.length, 6); i++) {
 
-        // تقليل السياق حتى لا تصبح الرسالة ضخمة
-        let context = item.context;
+        const item = results[i];
 
-        if (context.length > 1800) {
-          context = context.slice(0, 1800) + "\n...[تم اختصار السياق]";
+        msg += `━━━ المنطقة ${i + 1} ━━━\n`;
+        msg += `الكلمة: ${item.keyword}\n`;
+        msg += `الموقع: ${item.index}\n`;
+
+        if (item.ids.length) {
+          msg +=
+            "UIDs:\n" +
+            item.ids.join("\n") +
+            "\n";
         }
 
-        msg +=
-          `━━━ تطابق ${i + 1} ━━━\n` +
-          `الكلمة: ${item.keyword}\n` +
-          `الموقع: ${item.index}\n` +
-          `${context}\n\n`;
+        if (item.fields.length) {
+          msg +=
+            "\nالحقول:\n" +
+            item.fields.slice(0, 15).join("\n") +
+            "\n";
+        }
+
+        // نعرض جزءاً من السياق فقط
+        let context = item.context;
+
+        if (context.length > 2200) {
+          context = context.slice(0, 2200) +
+            "\n...[اختصار]";
+        }
+
+        msg += "\nالسياق:\n" + context + "\n\n";
       }
 
-      if (found.length > max) {
-        msg += `تم العثور على ${found.length - max} تطابقات إضافية لم يتم عرضها\n`;
+      if (results.length > 6) {
+        msg +=
+          `تم العثور على ${results.length - 6} مناطق إضافية\n`;
       }
     }
 
@@ -115,11 +141,12 @@ module.exports.run = async function ({ api, event }) {
     return api.sendMessage(msg, threadID);
 
   } catch (error) {
-    console.error("COMET SCAN ERROR:", error);
+
+    console.error("FRIEND DATA ERROR:", error);
 
     return api.sendMessage(
-      "╭───〔 𝗛𝗜𝗡𝗔 〢 𝗖𝗢𝗠𝗘𝗧 𝗦𝗖𝗔𝗡 〕───╮\n" +
-      "حدث خطأ أثناء قراءة صفحة طلبات الصداقة\n\n" +
+      "╭───〔 𝗛𝗜𝗡𝗔 〢 𝗙𝗥𝗜𝗘𝗡𝗗 𝗗𝗔𝗧𝗔 〕───╮\n" +
+      "حدث خطأ أثناء تحليل الصفحة\n\n" +
       String(error?.message || error) +
       "\n╰────────────────────╯",
       threadID
