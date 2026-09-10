@@ -1,9 +1,9 @@
 module.exports.config = {
   name: "دالة",
-  version: "13.0.0",
+  version: "14.0.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
-  description: "تحليل بيانات طلبات الصداقة داخل Comet",
+  description: "اكتشاف استعلامات GraphQL الخاصة بطلبات الصداقة",
   commandCategory: "Developer",
   usages: "دالة",
   cooldowns: 5
@@ -21,118 +21,152 @@ module.exports.run = async function ({ api, event }) {
       true
     );
 
-    const keywords = [
-      "FriendingCometFriendRequest",
+    const patterns = [
+      "graphql",
+      "doc_id",
+      "docID",
+      "variables",
+      "FriendingComet",
       "FriendRequest",
-      "friend_requests",
-      "friendRequests",
-      "friend_request",
-      "friendRequest",
-      "friend_center",
-      "friendCenter",
       "FriendRequests",
-      "Friending"
+      "friend_request",
+      "friendRequests",
+      "request_id"
     ];
 
-    let results = [];
+    const found = [];
     const seen = new Set();
 
-    for (const keyword of keywords) {
+    for (const pattern of patterns) {
       let pos = 0;
 
       while (true) {
-        const index = html.indexOf(keyword, pos);
+        const index = html.indexOf(pattern, pos);
 
         if (index === -1) break;
 
-        const start = Math.max(0, index - 3000);
-        const end = Math.min(html.length, index + 5000);
+        const start = Math.max(0, index - 1800);
+        const end = Math.min(html.length, index + 3500);
 
-        let context = html.slice(start, end);
+        const context = html.slice(start, end);
 
-        // البحث عن أرقام Facebook UID داخل السياق
-        const ids = [
-          ...context.matchAll(/(?:^|["':,])(\d{10,20})(?=["':,]|$)/g)
-        ].map(x => x[1]);
-
-        // أسماء الحقول المهمة
-        const interesting = [];
-
-        const fieldRegex =
-          /"(?:id|userID|user_id|actorID|actorFbId|name|full_name|fullName|profile_picture|profilePicture|uri|url)"\s*:\s*("[^"]*"|\d{10,20})/gi;
-
-        let match;
-
-        while ((match = fieldRegex.exec(context)) !== null) {
-          interesting.push(match[0]);
-        }
-
-        const uniqueIds = [...new Set(ids)];
-
-        const key = `${keyword}:${index}`;
+        const key = `${pattern}:${index}`;
 
         if (!seen.has(key)) {
           seen.add(key);
 
-          results.push({
-            keyword,
+          // استخراج doc_id إن وجد
+          const docIds = [
+            ...context.matchAll(
+              /(?:doc_id|docID)["']?\s*[:=]\s*["']?(\d{5,30})/gi
+            )
+          ].map(m => m[1]);
+
+          // استخراج GraphQL URLs
+          const graphqlUrls = [
+            ...context.matchAll(
+              /https?:\\?\/\\?\/[^"'\\ ]*graphql[^"'\\ ]*/gi
+            )
+          ].map(m => m[0]);
+
+          // البحث عن request-related identifiers
+          const requestIds = [
+            ...context.matchAll(
+              /(?:request_id|requestID|friend_request_id|friendRequestId)["']?\s*[:=]\s*["']?([A-Za-z0-9_-]{5,100})/gi
+            )
+          ].map(m => m[1]);
+
+          found.push({
+            pattern,
             index,
-            ids: uniqueIds.slice(0, 30),
-            fields: interesting.slice(0, 40),
+            docIds: [...new Set(docIds)],
+            graphqlUrls: [...new Set(graphqlUrls)],
+            requestIds: [...new Set(requestIds)],
             context
           });
         }
 
-        pos = index + keyword.length;
+        pos = index + pattern.length;
       }
     }
 
     let msg =
-      "╭───〔 𝗛𝗜𝗡𝗔 〢 𝗙𝗥𝗜𝗘𝗡𝗗 𝗗𝗔𝗧𝗔 〕───╮\n" +
+      "╭───〔 𝗛𝗜𝗡𝗔 〢 𝗚𝗥𝗔𝗣𝗛𝗤𝗟 𝗦𝗖𝗔𝗡 〕───╮\n" +
       `حجم الصفحة: ${html.length}\n` +
-      `عدد المناطق: ${results.length}\n\n`;
+      `عدد المناطق: ${found.length}\n\n`;
 
-    if (!results.length) {
+    if (!found.length) {
       msg +=
-        "لم يتم العثور على بيانات مرتبطة بمكونات الصداقة\n";
+        "لم أجد استعلامات مرتبطة بطلبات الصداقة داخل HTML\n";
     } else {
 
-      for (let i = 0; i < Math.min(results.length, 6); i++) {
+      let displayed = 0;
 
-        const item = results[i];
+      for (const item of found) {
 
-        msg += `━━━ المنطقة ${i + 1} ━━━\n`;
-        msg += `الكلمة: ${item.keyword}\n`;
+        // نريد المناطق التي فيها معلومات مفيدة
+        const useful =
+          item.docIds.length ||
+          item.graphqlUrls.length ||
+          item.requestIds.length ||
+          item.pattern === "graphql" ||
+          item.pattern === "doc_id";
+
+        if (!useful) continue;
+
+        displayed++;
+
+        msg += `━━━ نتيجة ${displayed} ━━━\n`;
+        msg += `الكلمة: ${item.pattern}\n`;
         msg += `الموقع: ${item.index}\n`;
 
-        if (item.ids.length) {
+        if (item.docIds.length) {
           msg +=
-            "UIDs:\n" +
-            item.ids.join("\n") +
+            "\ndoc_id:\n" +
+            item.docIds.slice(0, 10).join("\n") +
             "\n";
         }
 
-        if (item.fields.length) {
+        if (item.requestIds.length) {
           msg +=
-            "\nالحقول:\n" +
-            item.fields.slice(0, 15).join("\n") +
+            "\nrequest IDs:\n" +
+            item.requestIds.slice(0, 10).join("\n") +
             "\n";
         }
 
-        // نعرض جزءاً من السياق فقط
+        if (item.graphqlUrls.length) {
+          msg +=
+            "\nGraphQL:\n" +
+            item.graphqlUrls.slice(0, 5).join("\n") +
+            "\n";
+        }
+
         let context = item.context;
 
-        if (context.length > 2200) {
-          context = context.slice(0, 2200) +
+        // تنظيف بعض escape characters
+        context = context
+          .replace(/\\u0026/g, "&")
+          .replace(/\\u003D/g, "=")
+          .replace(/\\u002F/g, "/")
+          .replace(/\\"/g, '"');
+
+        if (context.length > 2500) {
+          context = context.slice(0, 2500) +
             "\n...[اختصار]";
         }
 
-        msg += "\nالسياق:\n" + context + "\n\n";
+        msg +=
+          "\nالسياق:\n" +
+          context +
+          "\n\n";
+
+        // لا نريد رسالة ضخمة
+        if (displayed >= 8) break;
       }
 
-      if (results.length > 6) {
+      if (!displayed) {
         msg +=
-          `تم العثور على ${results.length - 6} مناطق إضافية\n`;
+          "وجدت كلمات مرتبطة بالصداقة لكن لم يظهر معها doc_id أو request_id واضح\n";
       }
     }
 
@@ -142,10 +176,10 @@ module.exports.run = async function ({ api, event }) {
 
   } catch (error) {
 
-    console.error("FRIEND DATA ERROR:", error);
+    console.error("GRAPHQL SCAN ERROR:", error);
 
     return api.sendMessage(
-      "╭───〔 𝗛𝗜𝗡𝗔 〢 𝗙𝗥𝗜𝗘𝗡𝗗 𝗗𝗔𝗧𝗔 〕───╮\n" +
+      "╭───〔 𝗛𝗜𝗡𝗔 〢 𝗚𝗥𝗔𝗣𝗛𝗤𝗟 𝗦𝗖𝗔𝗡 〕───╮\n" +
       "حدث خطأ أثناء تحليل الصفحة\n\n" +
       String(error?.message || error) +
       "\n╰────────────────────╯",
