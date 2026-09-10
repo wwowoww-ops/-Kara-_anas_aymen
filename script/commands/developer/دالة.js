@@ -1,9 +1,9 @@
 module.exports.config = {
     name: "دالة",
-    version: "2.0.0",
+    version: "3.0.0",
     hasPermssion: 0,
     credits: "أبو هريرة",
-    description: "البحث داخل hut-chat-api عن دوال طلبات الصداقة",
+    description: "عرض جزء من listenMqtt الخاص بطلبات الصداقة",
     commandCategory: "Developer",
     usages: "دالة",
     cooldowns: 5
@@ -14,135 +14,12 @@ const path = require("path");
 
 const DEVELOPER_ID = "61578581225040";
 
-const API_DIR = path.join(
-    process.cwd(),
-    "node_modules",
-    "hut-chat-api"
-);
+module.exports.run = async function ({ api, event }) {
 
-const KEYWORDS = [
-    "friend",
-    "friends",
-    "friendrequest",
-    "friend_request",
-    "request",
-    "requests"
-];
+    const threadID = String(event.threadID || "");
+    const senderID = String(event.senderID || "");
 
-function searchFiles(directory, results = []) {
-
-    if (!fs.existsSync(directory)) {
-        return results;
-    }
-
-    let files;
-
-    try {
-        files = fs.readdirSync(
-            directory,
-            { withFileTypes: true }
-        );
-    } catch (error) {
-        return results;
-    }
-
-    for (const file of files) {
-
-        const fullPath =
-            path.join(directory, file.name);
-
-        if (file.isDirectory()) {
-
-            // تجاهل المجلدات غير المفيدة
-            if (
-                file.name === "node_modules" ||
-                file.name === ".git"
-            ) {
-                continue;
-            }
-
-            searchFiles(
-                fullPath,
-                results
-            );
-
-            continue;
-        }
-
-        if (
-            !/\.(js|cjs|mjs|json)$/
-                .test(file.name)
-        ) {
-            continue;
-        }
-
-        let content;
-
-        try {
-
-            content =
-                fs.readFileSync(
-                    fullPath,
-                    "utf8"
-                );
-
-        } catch (error) {
-            continue;
-        }
-
-        const lines =
-            content.split(/\r?\n/);
-
-        for (
-            let i = 0;
-            i < lines.length;
-            i++
-        ) {
-
-            const line =
-                lines[i];
-
-            const lower =
-                line.toLowerCase();
-
-            const matched =
-                KEYWORDS.some(
-                    keyword =>
-                        lower.includes(keyword)
-                );
-
-            if (!matched) {
-                continue;
-            }
-
-            results.push({
-                file: fullPath,
-                line: i + 1,
-                text: line.trim()
-            });
-
-        }
-    }
-
-    return results;
-}
-
-module.exports.run = async function ({
-    api,
-    event
-}) {
-
-    const threadID =
-        String(event.threadID || "");
-
-    const senderID =
-        String(event.senderID || "");
-
-    if (
-        senderID !==
-        DEVELOPER_ID
-    ) {
-
+    if (senderID !== DEVELOPER_ID) {
         return api.sendMessage(
             "هذا الأمر مخصص للمطور فقط",
             threadID,
@@ -150,10 +27,17 @@ module.exports.run = async function ({
         );
     }
 
-    if (!fs.existsSync(API_DIR)) {
+    const filePath = path.join(
+        process.cwd(),
+        "node_modules",
+        "hut-chat-api",
+        "src",
+        "listenMqtt.js"
+    );
 
+    if (!fs.existsSync(filePath)) {
         return api.sendMessage(
-            "لم يتم العثور على node_modules/hut-chat-api",
+            "لم أجد ملف listenMqtt.js داخل hut-chat-api",
             threadID,
             event.messageID
         );
@@ -161,76 +45,88 @@ module.exports.run = async function ({
 
     try {
 
-        const results =
-            searchFiles(API_DIR);
+        const lines = fs.readFileSync(
+            filePath,
+            "utf8"
+        ).split(/\r?\n/);
 
-        if (!results.length) {
+        const keywords = [
+            "jewel_requests_add",
+            "jewel_requests_remove_old",
+            "friend_request_received",
+            "friend_request_cancel"
+        ];
 
+        const indexes = [];
+
+        for (let i = 0; i < lines.length; i++) {
+
+            const line = lines[i].toLowerCase();
+
+            if (
+                keywords.some(
+                    keyword =>
+                        line.includes(
+                            keyword.toLowerCase()
+                        )
+                )
+            ) {
+                indexes.push(i);
+            }
+        }
+
+        if (!indexes.length) {
             return api.sendMessage(
-                "لم أجد أي كود يحتوي على friend أو request داخل الحزمة",
+                "لم أجد أحداث طلبات الصداقة",
                 threadID,
                 event.messageID
             );
         }
 
-        /*
-         * نبحث أولاً عن الأسطر الأكثر أهمية
-         */
+        const selected = new Set();
 
-        const important =
-            results.filter(item =>
-                /getFriend|friendRequest|friend_request|request/i
-                    .test(item.text)
+        // نعرض 15 سطر قبل وبعد كل تطابق
+        for (const index of indexes) {
+
+            const start =
+                Math.max(0, index - 15);
+
+            const end =
+                Math.min(
+                    lines.length,
+                    index + 16
+                );
+
+            for (let i = start; i < end; i++) {
+                selected.add(i);
+            }
+        }
+
+        const sorted =
+            [...selected].sort(
+                (a, b) => a - b
             );
 
-        const selected =
-            important.length
-                ? important
-                : results;
+        let output =
+`╭───〔 𝗛𝗜𝗡𝗔 〢 𝗟𝗜𝗦𝗧𝗘𝗡 〕───╮
 
-        const MAX_RESULTS = 80;
-
-        const output =
-            selected
-                .slice(0, MAX_RESULTS)
-                .map((item, index) => {
-
-                    const relative =
-                        path.relative(
-                            API_DIR,
-                            item.file
-                        );
-
-                    return (
-                        `${index + 1} ـ ${relative}:${item.line}\n` +
-                        `${item.text}`
-                    );
-
-                })
-                .join("\n\n");
-
-        let message =
-`╭───〔 𝗛𝗜𝗡𝗔 〢 𝗛𝗨𝗧 API 〕───╮
-
-نتائج البحث داخل hut-chat-api
-
-عدد النتائج: ${selected.length}
+ملف:
+listenMqtt.js
 
 `;
 
-        message += output;
+        for (const index of sorted) {
 
-        if (selected.length > MAX_RESULTS) {
-
-            message +=
-`\n\n... تم عرض أول ${MAX_RESULTS} نتيجة فقط`;
+            output +=
+`${index + 1}: ${lines[index]}
+`;
         }
 
-        message +=
-`\n\n╰──────────────╯`;
+        output +=
+`\n╰──────────────╯`;
 
         return api.sendMessage(
-            message,
+            output,
             threadID,
             event.messageID
         );
@@ -238,12 +134,12 @@ module.exports.run = async function ({
     } catch (error) {
 
         console.error(
-            "[دالة SEARCH ERROR]",
+            "[دالة LISTEN ERROR]",
             error
         );
 
         return api.sendMessage(
-            `حدث خطأ أثناء البحث\n${error.message || error}`,
+            `حدث خطأ:\n${error.message || error}`,
             threadID,
             event.messageID
         );
