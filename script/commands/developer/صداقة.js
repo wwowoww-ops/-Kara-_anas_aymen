@@ -62,11 +62,13 @@ function handleFriendRequest(api, userID, accept) {
 // ==================================================
 
 function getPendingRequests(list) {
-    return list.filter(user => {
+    console.log(
+        "[FRIEND REQUEST DEBUG]",
+        JSON.stringify(list, null, 2)
+    );
 
-        if (!user || !user.userID) {
-            return false;
-        }
+    return [];
+}
 
         // بعض نسخ الـ API تستعمل isFriend
         if (user.isFriend === true) {
