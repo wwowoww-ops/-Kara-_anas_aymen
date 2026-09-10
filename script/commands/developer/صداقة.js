@@ -66,38 +66,12 @@ function getPendingRequests(list) {
         return [];
     }
 
-    return list
-        .filter(user => {
-            return (
-                user &&
-                user.isFriend === false &&
-                typeof user.profileUrl === "string" &&
-                user.profileUrl.includes("profile.php?id=")
-            );
-        })
-        .map(user => {
+    console.log(
+        "[FRIEND REQUEST FULL DEBUG]",
+        JSON.stringify(list, null, 2)
+    );
 
-            const match =
-                user.profileUrl.match(
-                    /[?&]id=(\d+)/
-                );
-
-            const userID =
-                match ? match[1] : "";
-
-            return {
-                userID,
-                name:
-                    user.firstName ||
-                    user.name ||
-                    user.fullName ||
-                    "Facebook user",
-                profileUrl:
-                    user.profileUrl
-            };
-
-        })
-        .filter(user => user.userID);
+    return [];
 }
 
 // ==================================================
