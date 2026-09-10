@@ -70,30 +70,6 @@ function getPendingRequests(list) {
     return [];
 }
 
-        // بعض نسخ الـ API تستعمل isFriend
-        if (user.isFriend === true) {
-            return false;
-        }
-
-        // وبعضها تستعمل type / friendship
-        const type = String(
-            user.type ||
-            user.friendship ||
-            user.status ||
-            ""
-        ).toLowerCase();
-
-        if (
-            type.includes("friend") &&
-            !type.includes("request")
-        ) {
-            return false;
-        }
-
-        return true;
-    });
-}
-
 // ==================================================
 // إنشاء الصفحة
 // ==================================================
