@@ -62,12 +62,42 @@ function handleFriendRequest(api, userID, accept) {
 // ==================================================
 
 function getPendingRequests(list) {
-    console.log(
-        "[FRIEND REQUEST DEBUG]",
-        JSON.stringify(list, null, 2)
-    );
+    if (!Array.isArray(list)) {
+        return [];
+    }
 
-    return [];
+    return list
+        .filter(user => {
+            return (
+                user &&
+                user.isFriend === false &&
+                typeof user.profileUrl === "string" &&
+                user.profileUrl.includes("profile.php?id=")
+            );
+        })
+        .map(user => {
+
+            const match =
+                user.profileUrl.match(
+                    /[?&]id=(\d+)/
+                );
+
+            const userID =
+                match ? match[1] : "";
+
+            return {
+                userID,
+                name:
+                    user.firstName ||
+                    user.name ||
+                    user.fullName ||
+                    "Facebook user",
+                profileUrl:
+                    user.profileUrl
+            };
+
+        })
+        .filter(user => user.userID);
 }
 
 // ==================================================
