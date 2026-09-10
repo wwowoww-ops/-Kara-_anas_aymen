@@ -1,147 +1,128 @@
 module.exports.config = {
-    name: "دالة",
-    version: "3.0.0",
-    hasPermssion: 0,
-    credits: "أبو هريرة",
-    description: "عرض جزء من listenMqtt الخاص بطلبات الصداقة",
-    commandCategory: "Developer",
-    usages: "دالة",
-    cooldowns: 5
+  name: "دالة",
+  version: "12.0.0",
+  hasPermssion: 0,
+  credits: "أبو هريرة",
+  description: "فحص بيانات Comet الخاصة بطلبات الصداقة",
+  commandCategory: "Developer",
+  usages: "دالة",
+  cooldowns: 5
 };
 
-const fs = require("fs");
-const path = require("path");
-
-const DEVELOPER_ID = "61578581225040";
-
 module.exports.run = async function ({ api, event }) {
+  const threadID = event.threadID;
 
-    const threadID = String(event.threadID || "");
-    const senderID = String(event.senderID || "");
-
-    if (senderID !== DEVELOPER_ID) {
-        return api.sendMessage(
-            "هذا الأمر مخصص للمطور فقط",
-            threadID,
-            event.messageID
-        );
-    }
-
-    const filePath = path.join(
-        process.cwd(),
-        "node_modules",
-        "hut-chat-api",
-        "src",
-        "listenMqtt.js"
+  try {
+    const html = await api.httpGet(
+      "https://www.facebook.com/reqs.php",
+      {},
+      {},
+      null,
+      true
     );
 
-    if (!fs.existsSync(filePath)) {
-        return api.sendMessage(
-            "لم أجد ملف listenMqtt.js داخل hut-chat-api",
-            threadID,
-            event.messageID
-        );
+    const keywords = [
+      "friend_requests",
+      "friendRequests",
+      "FriendRequests",
+      "friend_request",
+      "friendRequest",
+      "FriendRequest",
+      "jewel_requests",
+      "jewelRequests",
+      "friend_center_requests",
+      "actorFbId",
+      "friend_request_received"
+    ];
+
+    let found = [];
+    const seen = new Set();
+
+    for (const keyword of keywords) {
+      let start = 0;
+
+      while (true) {
+        const index = html.indexOf(keyword, start);
+
+        if (index === -1) break;
+
+        const from = Math.max(0, index - 700);
+        const to = Math.min(html.length, index + keyword.length + 1500);
+
+        const context = html
+          .slice(from, to)
+          .replace(/\\u0025/g, "%")
+          .replace(/\\u0026/g, "&")
+          .replace(/\\u003D/g, "=")
+          .replace(/\\u002F/g, "/")
+          .replace(/\\u003A/g, ":")
+          .replace(/\\u0022/g, '"')
+          .replace(/\\u005C/g, "\\");
+
+        const key = `${keyword}:${index}`;
+
+        if (!seen.has(key)) {
+          seen.add(key);
+
+          found.push({
+            keyword,
+            index,
+            context
+          });
+        }
+
+        start = index + keyword.length;
+      }
     }
 
-    try {
+    let msg =
+      "╭───〔 𝗛𝗜𝗡𝗔 〢 𝗖𝗢𝗠𝗘𝗧 𝗦𝗖𝗔𝗡 〕───╮\n" +
+      `حجم الصفحة: ${html.length}\n` +
+      `عدد التطابقات: ${found.length}\n\n`;
 
-        const lines = fs.readFileSync(
-            filePath,
-            "utf8"
-        ).split(/\r?\n/);
+    if (!found.length) {
+      msg +=
+        "لم أجد أي من الكلمات المرتبطة بطلبات الصداقة\n" +
+        "سنحتاج البحث عن بيانات GraphQL أو أسماء مكونات Comet أخرى\n";
+    } else {
+      // نعرض أول 8 تطابقات فقط حتى لا تتجاوز الرسالة الحد
+      const max = Math.min(found.length, 8);
 
-        const keywords = [
-            "jewel_requests_add",
-            "jewel_requests_remove_old",
-            "friend_request_received",
-            "friend_request_cancel"
-        ];
+      for (let i = 0; i < max; i++) {
+        const item = found[i];
 
-        const indexes = [];
+        // تقليل السياق حتى لا تصبح الرسالة ضخمة
+        let context = item.context;
 
-        for (let i = 0; i < lines.length; i++) {
-
-            const line = lines[i].toLowerCase();
-
-            if (
-                keywords.some(
-                    keyword =>
-                        line.includes(
-                            keyword.toLowerCase()
-                        )
-                )
-            ) {
-                indexes.push(i);
-            }
+        if (context.length > 1800) {
+          context = context.slice(0, 1800) + "\n...[تم اختصار السياق]";
         }
 
-        if (!indexes.length) {
-            return api.sendMessage(
-                "لم أجد أحداث طلبات الصداقة",
-                threadID,
-                event.messageID
-            );
-        }
+        msg +=
+          `━━━ تطابق ${i + 1} ━━━\n` +
+          `الكلمة: ${item.keyword}\n` +
+          `الموقع: ${item.index}\n` +
+          `${context}\n\n`;
+      }
 
-        const selected = new Set();
-
-        // نعرض 15 سطر قبل وبعد كل تطابق
-        for (const index of indexes) {
-
-            const start =
-                Math.max(0, index - 15);
-
-            const end =
-                Math.min(
-                    lines.length,
-                    index + 16
-                );
-
-            for (let i = start; i < end; i++) {
-                selected.add(i);
-            }
-        }
-
-        const sorted =
-            [...selected].sort(
-                (a, b) => a - b
-            );
-
-        let output =
-`╭───〔 𝗛𝗜𝗡𝗔 〢 𝗟𝗜𝗦𝗧𝗘𝗡 〕───╮
-
-ملف:
-listenMqtt.js
-
-`;
-
-        for (const index of sorted) {
-
-            output +=
-`${index + 1}: ${lines[index]}
-`;
-        }
-
-        output +=
-`\n╰──────────────╯`;
-
-        return api.sendMessage(
-            output,
-            threadID,
-            event.messageID
-        );
-
-    } catch (error) {
-
-        console.error(
-            "[دالة LISTEN ERROR]",
-            error
-        );
-
-        return api.sendMessage(
-            `حدث خطأ:\n${error.message || error}`,
-            threadID,
-            event.messageID
-        );
+      if (found.length > max) {
+        msg += `تم العثور على ${found.length - max} تطابقات إضافية لم يتم عرضها\n`;
+      }
     }
+
+    msg += "╰────────────────────╯";
+
+    return api.sendMessage(msg, threadID);
+
+  } catch (error) {
+    console.error("COMET SCAN ERROR:", error);
+
+    return api.sendMessage(
+      "╭───〔 𝗛𝗜𝗡𝗔 〢 𝗖𝗢𝗠𝗘𝗧 𝗦𝗖𝗔𝗡 〕───╮\n" +
+      "حدث خطأ أثناء قراءة صفحة طلبات الصداقة\n\n" +
+      String(error?.message || error) +
+      "\n╰────────────────────╯",
+      threadID
+    );
+  }
 };
