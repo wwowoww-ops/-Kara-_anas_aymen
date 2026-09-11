@@ -5,7 +5,7 @@ const jimp = require("jimp");
 
 module.exports.config = {
   name: "زوجيني",
-  version: "7.1.0",
+  version: "7.2.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
   description: "زواج عشوائي مع صور الطرفين ونسبة التوافق",
@@ -64,6 +64,10 @@ async function getGroupInfo(api, Threads, threadID) {
 
   let info = null;
 
+  // ----------------------------------------------
+  // الطريقة الأولى: Threads
+  // ----------------------------------------------
+
   try {
 
     if (
@@ -87,6 +91,10 @@ async function getGroupInfo(api, Threads, threadID) {
 
   }
 
+
+  // ----------------------------------------------
+  // الطريقة الثانية: API
+  // ----------------------------------------------
 
   if (!info) {
 
@@ -116,6 +124,10 @@ async function getGroupInfo(api, Threads, threadID) {
   }
 
 
+  // ----------------------------------------------
+  // التأكد من البيانات
+  // ----------------------------------------------
+
   if (
     !info ||
     typeof info !== "object"
@@ -140,6 +152,7 @@ function getParticipantIDs(info) {
   }
 
 
+  // الصيغة الأساسية
   if (
     Array.isArray(
       info.participantIDs
@@ -153,6 +166,7 @@ function getParticipantIDs(info) {
   }
 
 
+  // صيغة participants
   if (
     Array.isArray(
       info.participants
@@ -197,6 +211,7 @@ function getParticipantIDs(info) {
   }
 
 
+  // صيغة userInfo
   if (
     Array.isArray(
       info.userInfo
@@ -304,6 +319,8 @@ async function getUserName(
 //
 // 1 = بنت
 // 2 = ولد
+//
+// null = غير معروف
 // ==================================================
 
 async function getUserGender(api, uid) {
@@ -554,6 +571,7 @@ module.exports.run = async function ({
     //
     // 1 = بنت
     // 2 = ولد
+    // null = غير معروف
     // ==================================================
 
     const senderGender =
@@ -563,82 +581,105 @@ module.exports.run = async function ({
       );
 
 
-    if (!senderGender) {
+    // ==================================================
+    // اختيار الشريك
+    // ==================================================
 
-      return api.sendMessage(
+    let compatibleMembers = [];
 
-        `⌬ ━━ HINA FUN ━━ ⌬
 
-❌ لم أتمكن من معرفة جنس حسابك.
+    // --------------------------------------------------
+    // إذا كان جنس صاحب الأمر معروفًا
+    // --------------------------------------------------
 
-📝 لا يمكن اختيار شريك مناسب بدون معرفة الجنس.`,
+    if (senderGender) {
 
-        threadID,
-        messageID
+      // بنت → ولد
+      // ولد → بنت
 
-      );
+      const requiredGender =
+        senderGender === 1
+          ? 2
+          : 1;
+
+
+      // ----------------------------------------------
+      // فحص جنس الأعضاء
+      // ----------------------------------------------
+
+      const genderResults =
+        await Promise.all(
+
+          members.map(
+            async uid => {
+
+              const gender =
+                await getUserGender(
+                  api,
+                  uid
+                );
+
+              return {
+                uid: String(uid),
+                gender
+              };
+
+            }
+          )
+
+        );
+
+
+      // ----------------------------------------------
+      // اختيار الجنس الآخر فقط
+      // ----------------------------------------------
+
+      compatibleMembers =
+        genderResults
+          .filter(
+            user =>
+              user.gender === requiredGender
+          )
+          .map(
+            user =>
+              user.uid
+          );
+
+
+      // ----------------------------------------------
+      // إذا لم نجد الجنس الآخر
+      //
+      // نرجع للاختيار العشوائي
+      // ----------------------------------------------
+
+      if (
+        compatibleMembers.length === 0
+      ) {
+
+        compatibleMembers =
+          members;
+
+      }
+
+    }
+
+
+    // --------------------------------------------------
+    // إذا لم يتم التعرف على جنس صاحب الأمر
+    //
+    // اختيار عشوائي من جميع الأعضاء
+    // --------------------------------------------------
+
+    else {
+
+      compatibleMembers =
+        members;
 
     }
 
 
     // ==================================================
-    // الجنس المطلوب
-    //
-    // بنت 1 → نبحث عن ولد 2
-    // ولد 2 → نبحث عن بنت 1
-    // ==================================================
-
-    const requiredGender =
-      senderGender === 1
-        ? 2
-        : 1;
-
-
-    // ==================================================
-    // فحص جنس جميع الأعضاء
-    // ==================================================
-
-    const genderResults =
-      await Promise.all(
-
-        members.map(
-          async uid => {
-
-            const gender =
-              await getUserGender(
-                api,
-                uid
-              );
-
-            return {
-              uid: String(uid),
-              gender
-            };
-
-          }
-        )
-
-      );
-
-
-    // ==================================================
-    // اختيار الجنس الآخر فقط
-    // ==================================================
-
-    const compatibleMembers =
-      genderResults
-        .filter(
-          user =>
-            user.gender === requiredGender
-        )
-        .map(
-          user =>
-            user.uid
-        );
-
-
-    // ==================================================
-    // لا يوجد شخص من الجنس الآخر
+    // التأكد من وجود شخص للاختيار
     // ==================================================
 
     if (
@@ -649,9 +690,7 @@ module.exports.run = async function ({
 
         `⌬ ━━ HINA FUN ━━ ⌬
 
-❌ لم أجد شخصًا من الجنس الآخر متاحًا للزواج.
-
-📝 حاول استخدام الأمر عندما يكون هناك أعضاء متاحون.`,
+❌ لا يوجد شخص متاح للزواج.`,
 
         threadID,
         messageID
@@ -662,7 +701,7 @@ module.exports.run = async function ({
 
 
     // ==================================================
-    // اختيار الشريك
+    // اختيار الشريك عشوائيًا
     // ==================================================
 
     const partnerID =
@@ -843,21 +882,27 @@ module.exports.run = async function ({
       loveMessage =
         "💖 توافق خيالي!";
 
-    } else if (
+    }
+
+    else if (
       lovePercent >= 75
     ) {
 
       loveMessage =
         "❤️ توافق رائع!";
 
-    } else if (
+    }
+
+    else if (
       lovePercent >= 60
     ) {
 
       loveMessage =
         "💕 توافق جيد!";
 
-    } else {
+    }
+
+    else {
 
       loveMessage =
         "💔 توافق متوسط!";
@@ -928,7 +973,7 @@ module.exports.run = async function ({
 
 
     // ==================================================
-    // حفظ
+    // حفظ الصورة
     // ==================================================
 
     const buffer =
@@ -944,7 +989,7 @@ module.exports.run = async function ({
 
 
     // ==================================================
-    // الرد
+    // الردود
     // ==================================================
 
     const funnyReplies = [
@@ -1065,7 +1110,7 @@ ${loveMessage}
 
 
     // ==================================================
-    // تنظيف
+    // تنظيف الملفات
     // ==================================================
 
     try {
