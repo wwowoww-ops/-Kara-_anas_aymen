@@ -1,21 +1,26 @@
 const axios = require("axios");
 const fs = require("fs-extra");
 const path = require("path");
+const os = require("os");
+const crypto = require("crypto");
+const { spawn } = require("child_process");
+const { pipeline } = require("stream/promises");
+const { createWriteStream } = require("fs");
 const yts = require("yt-search");
 
 module.exports.config = {
   name: "يوتيوب",
-  version: "2.0.0",
+  version: "3.0.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
   description: "البحث عن فيديوهات يوتيوب وتحميلها",
-  commandCategory: "Media",
-  usages: "يوتيوب [اسم الفيديو]",
+  commandCategory: "media",
+  usages: "يوتيوب [اسم الفيديو أو الرابط]",
   cooldowns: 10
 };
 
 // ==================================================
-// إعدادات API
+// API
 // ==================================================
 
 const NEW_API_BASE =
@@ -24,11 +29,28 @@ const NEW_API_BASE =
 const OLD_API_BASE =
   "https://engez.a7a.online/api/v1/download/youtube";
 
-const REQUEST_TIMEOUT = 120000;
+const DOWNLOAD_TIMEOUT_MS = 120 * 1000;
+const TITLE_TIMEOUT_MS = 8 * 1000;
+
+const VIDEO_QUALITIES = [
+  "144",
+  "240",
+  "360",
+  "480",
+  "720",
+  "1080",
+  "1440",
+  "2160"
+];
+
+const AUDIO_QUALITIES = [
+  "128",
+  "320"
+];
 
 
 // ==================================================
-// أدوات مساعدة
+// أدوات
 // ==================================================
 
 function cleanText(text) {
@@ -66,29 +88,82 @@ function formatDuration(seconds) {
 }
 
 
-function isYouTubeUrl(url) {
+function isYouTubeUrl(input) {
   try {
-    const parsed = new URL(url);
+    const normalized =
+      /^https?:\/\//i.test(input)
+        ? input
+        : `https://${input}`;
+
+    const parsed = new URL(normalized);
 
     const host = parsed.hostname
       .replace(/^www\./i, "")
       .replace(/^m\./i, "");
 
     return (
+      host === "youtu.be" ||
       host === "youtube.com" ||
-      host.endsWith(".youtube.com") ||
-      host === "youtu.be"
+      host.endsWith(".youtube.com")
     );
+
   } catch {
     return false;
   }
 }
 
 
-function buildApiUrl(base, url, type, quality) {
-  const params = new URLSearchParams();
+function extractYouTubeUrl(input) {
+  try {
+    const normalized =
+      /^https?:\/\//i.test(input)
+        ? input
+        : `https://${input}`;
 
-  params.set("url", url);
+    const parsed = new URL(normalized);
+
+    const host = parsed.hostname
+      .replace(/^www\./i, "")
+      .replace(/^m\./i, "");
+
+    if (
+      host === "engez.a7a.online" &&
+      (
+        parsed.pathname.includes(
+          "/api/v1/download/youtube"
+        ) ||
+        parsed.pathname.includes(
+          "/api/v1/download/ytdl"
+        )
+      )
+    ) {
+      const innerUrl =
+        parsed.searchParams.get("url");
+
+      if (innerUrl) {
+        return decodeURIComponent(innerUrl);
+      }
+    }
+
+  } catch {}
+
+  return input;
+}
+
+
+// ==================================================
+// بناء روابط API
+// ==================================================
+
+function buildNewApiUrl(
+  url,
+  type,
+  quality
+) {
+  const params =
+    new URLSearchParams({
+      url
+    });
 
   if (type) {
     params.set("type", type);
@@ -98,7 +173,69 @@ function buildApiUrl(base, url, type, quality) {
     params.set("quality", quality);
   }
 
-  return `${base}?${params.toString()}`;
+  return (
+    `${NEW_API_BASE}?${params.toString()}`
+  );
+}
+
+
+function buildOldApiUrl(
+  url,
+  type,
+  quality
+) {
+  const params =
+    new URLSearchParams({
+      url
+    });
+
+  if (type) {
+    params.set("type", type);
+  }
+
+  if (quality) {
+    params.set("quality", quality);
+  }
+
+  return (
+    `${OLD_API_BASE}?${params.toString()}`
+  );
+}
+
+
+// ==================================================
+// جلب عنوان الرابط
+// ==================================================
+
+async function fetchTitleSafely(url) {
+  try {
+
+    const oembedUrl =
+      "https://www.youtube.com/oembed" +
+      `?url=${encodeURIComponent(url)}` +
+      "&format=json";
+
+    const {
+      data
+    } = await axios.get(
+      oembedUrl,
+      {
+        timeout:
+          TITLE_TIMEOUT_MS
+      }
+    );
+
+    return data?.title || null;
+
+  } catch (error) {
+
+    console.error(
+      "HINA YOUTUBE TITLE ERROR:",
+      error.message
+    );
+
+    return null;
+  }
 }
 
 
@@ -106,139 +243,196 @@ function buildApiUrl(base, url, type, quality) {
 // API الجديد
 // ==================================================
 
-async function fetchNewApi(url, type, quality) {
-  const apiURL = buildApiUrl(
-    NEW_API_BASE,
-    url,
-    type,
-    quality
-  );
+async function fetchFromNewApi(
+  url,
+  type,
+  quality
+) {
 
-  const response = await axios.get(apiURL, {
-    timeout: REQUEST_TIMEOUT,
-    headers: {
-      "User-Agent": "Mozilla/5.0"
+  const {
+    data
+  } = await axios.get(
+    buildNewApiUrl(
+      url,
+      type,
+      quality
+    ),
+    {
+      timeout:
+        DOWNLOAD_TIMEOUT_MS
     }
-  });
-
-  const data = response.data;
+  );
 
   if (
     !data ||
     data.success !== true ||
-    !data.response ||
-    !data.response.download_url
+    !data.response
   ) {
+
     throw new Error(
       data?.error ||
-      "الـAPI الجديد لم يرجع رابط التحميل"
+      "تعذر تحميل هذا الاختيار من المصدر الرئيسي"
+    );
+  }
+
+  const r =
+    data.response;
+
+  if (!r.download_url) {
+    throw new Error(
+      "المصدر الرئيسي لم يرجع رابط تحميل"
     );
   }
 
   return {
     title:
-      data.response.title ||
-      "YouTube",
+      r.title || null,
+
+    thumbnail:
+      r.thumbnail || null,
 
     download_url:
-      data.response.download_url,
+      r.download_url,
 
     type:
-      data.response.type === "audio"
+      r.type === "audio"
         ? "audio"
-        : "video",
+        : "mp4",
 
-    quality:
-      data.response.requested_quality ||
+    requested_quality:
+      r.requested_quality ||
       quality ||
-      "auto"
+      null,
+
+    file_size_bytes:
+      r.file_size_bytes ||
+      null,
+
+    source_used:
+      "new",
+
+    is_fallback:
+      false
   };
 }
 
 
 // ==================================================
-// API الاحتياطي
+// API القديم
 // ==================================================
 
-async function fetchOldApi(url, type, quality) {
-  const apiURL = buildApiUrl(
-    OLD_API_BASE,
-    url,
-    type,
-    quality
-  );
+async function fetchFromOldApi(
+  url,
+  type,
+  quality
+) {
 
-  const response = await axios.get(apiURL, {
-    timeout: REQUEST_TIMEOUT,
-    headers: {
-      "User-Agent": "Mozilla/5.0"
+  const {
+    data
+  } = await axios.get(
+    buildOldApiUrl(
+      url,
+      type,
+      quality
+    ),
+    {
+      timeout:
+        DOWNLOAD_TIMEOUT_MS
     }
-  });
-
-  const data = response.data;
+  );
 
   if (
     !data ||
-    data.success !== true ||
-    !data.data ||
-    !data.data.download_url
+    data.success !== true
   ) {
+
     throw new Error(
       data?.error ||
-      "الـAPI الاحتياطي لم يرجع رابط التحميل"
+      "تعذر تحميل هذا الاختيار من المصدر الاحتياطي"
+    );
+  }
+
+  const d =
+    data.data;
+
+  if (
+    !d ||
+    !d.download_url
+  ) {
+
+    throw new Error(
+      "المصدر الاحتياطي لم يرجع رابط تحميل"
     );
   }
 
   return {
     title:
-      data.data.title ||
-      "YouTube",
+      d.title || null,
+
+    thumbnail:
+      d.thumbnail || null,
 
     download_url:
-      data.data.download_url,
+      d.download_url,
 
     type:
-      data.data.type === "mp3" ||
-      data.data.type === "audio"
+      d.type === "mp3" ||
+      d.type === "audio"
         ? "audio"
-        : "video",
+        : "mp4",
 
-    quality:
-      data.data.requested_quality ||
+    requested_quality:
+      d.requested_quality ||
       quality ||
-      "auto"
+      null,
+
+    file_size_bytes:
+      d.file_size_bytes ||
+      null,
+
+    source_used:
+      "old",
+
+    is_fallback:
+      true
   };
 }
 
 
 // ==================================================
-// تجربة الجديد ثم الاحتياطي
+// API الرئيسي + الاحتياطي
 // ==================================================
 
-async function getDownload(url, type, quality) {
+async function fetchDownload(
+  url,
+  type,
+  quality
+) {
+
   try {
+
     console.log(
-      "HINA YOUTUBE: تجربة API الجديد..."
+      "HINA YOUTUBE: NEW API"
     );
 
-    return await fetchNewApi(
+    return await fetchFromNewApi(
       url,
       type,
       quality
     );
 
-  } catch (newError) {
+  } catch (error) {
 
-    console.log(
-      "HINA YOUTUBE NEW API ERROR:",
-      newError.message
+    console.error(
+      "HINA YOUTUBE NEW API FAILED:",
+      error.message
     );
 
     console.log(
-      "HINA YOUTUBE: تجربة API الاحتياطي..."
+      "HINA YOUTUBE: OLD API"
     );
 
-    return await fetchOldApi(
+    return await fetchFromOldApi(
       url,
       type,
       quality
@@ -251,76 +445,469 @@ async function getDownload(url, type, quality) {
 // تحميل الملف
 // ==================================================
 
-async function downloadFile(
-  url,
+async function downloadToFile(
+  fileUrl,
   filePath
 ) {
-  const response = await axios.get(
-    url,
-    {
-      responseType: "stream",
-      timeout: REQUEST_TIMEOUT,
-      maxRedirects: 5,
 
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36",
+  const response =
+    await axios.get(
+      fileUrl,
+      {
+        responseType:
+          "stream",
 
-        Accept: "*/*"
+        timeout:
+          DOWNLOAD_TIMEOUT_MS,
+
+        maxRedirects:
+          5,
+
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/124.0.0.0 Mobile Safari/537.36",
+
+          Accept: "*/*",
+
+          "Accept-Language":
+            "en-US,en;q=0.9"
+        }
       }
-    }
+    );
+
+  await pipeline(
+    response.data,
+    createWriteStream(
+      filePath
+    )
   );
+}
+
+
+// ==================================================
+// FFmpeg
+// ==================================================
+
+function runFfmpeg(args) {
 
   return new Promise(
     (resolve, reject) => {
 
-      const writer =
-        fs.createWriteStream(
-          filePath
+      const ff =
+        spawn(
+          "ffmpeg",
+          args,
+          {
+            stdio: [
+              "ignore",
+              "ignore",
+              "pipe"
+            ]
+          }
         );
 
-      response.data.pipe(writer);
+      let errorText = "";
 
-      writer.on(
-        "finish",
-        resolve
+      ff.stderr.on(
+        "data",
+        chunk => {
+          errorText +=
+            chunk.toString();
+        }
       );
 
-      writer.on(
+      ff.on(
         "error",
         reject
+      );
+
+      ff.on(
+        "close",
+        code => {
+
+          if (code === 0) {
+            return resolve();
+          }
+
+          reject(
+            new Error(
+              `ffmpeg exited with code ${code}\n${errorText}`
+            )
+          );
+        }
       );
     }
   );
 }
 
 
-// ==================================================
-// حذف ملف
-// ==================================================
+async function repairVideoWithFfmpeg(
+  inputPath,
+  outputPath
+) {
 
-async function removeFile(file) {
   try {
-    if (
-      file &&
-      fs.existsSync(file)
-    ) {
-      await fs.unlink(file);
-    }
+
+    await runFfmpeg([
+      "-y",
+      "-i",
+      inputPath,
+
+      "-fflags",
+      "+genpts",
+
+      "-movflags",
+      "+faststart",
+
+      "-map",
+      "0:v:0?",
+
+      "-map",
+      "0:a:0?",
+
+      "-c:v",
+      "libx264",
+
+      "-preset",
+      "veryfast",
+
+      "-crf",
+      "23",
+
+      "-c:a",
+      "aac",
+
+      "-b:a",
+      "128k",
+
+      "-pix_fmt",
+      "yuv420p",
+
+      outputPath
+    ]);
+
+    return outputPath;
+
   } catch (error) {
-    console.log(
-      "HINA YOUTUBE CLEAN ERROR:",
+
+    console.error(
+      "HINA VIDEO RE-ENCODE ERROR:",
       error.message
     );
+
+    await runFfmpeg([
+      "-y",
+      "-i",
+      inputPath,
+
+      "-c",
+      "copy",
+
+      "-movflags",
+      "+faststart",
+
+      outputPath
+    ]);
+
+    return outputPath;
+  }
+}
+
+
+async function convertAudioWithFfmpeg(
+  inputPath,
+  outputPath
+) {
+
+  try {
+
+    await runFfmpeg([
+      "-y",
+      "-i",
+      inputPath,
+
+      "-vn",
+
+      "-c:a",
+      "libmp3lame",
+
+      "-b:a",
+      "192k",
+
+      outputPath
+    ]);
+
+    return outputPath;
+
+  } catch (error) {
+
+    console.error(
+      "HINA AUDIO CONVERT ERROR:",
+      error.message
+    );
+
+    await runFfmpeg([
+      "-y",
+      "-i",
+      inputPath,
+
+      "-vn",
+
+      "-c:a",
+      "aac",
+
+      "-b:a",
+      "128k",
+
+      outputPath
+    ]);
+
+    return outputPath;
   }
 }
 
 
 // ==================================================
-// إضافة HandleReply
+// تجهيز الملف
+// ==================================================
+
+async function prepareMediaFile(
+  payload
+) {
+
+  const tmpDir =
+    await fs.mkdtemp(
+      path.join(
+        os.tmpdir(),
+        "hina-ytdl-"
+      )
+    );
+
+  const id =
+    crypto
+      .randomBytes(6)
+      .toString("hex");
+
+  const srcPath =
+    path.join(
+      tmpDir,
+      `source-${id}.bin`
+    );
+
+  const videoPath =
+    path.join(
+      tmpDir,
+      `video-${id}.mp4`
+    );
+
+  const audioPath =
+    path.join(
+      tmpDir,
+      `audio-${id}.mp3`
+    );
+
+  await downloadToFile(
+    payload.download_url,
+    srcPath
+  );
+
+  if (
+    payload.type === "mp4"
+  ) {
+
+    try {
+
+      await repairVideoWithFfmpeg(
+        srcPath,
+        videoPath
+      );
+
+      return {
+        filePath:
+          videoPath,
+
+        tmpDir,
+
+        mimetype:
+          "video/mp4"
+      };
+
+    } catch (error) {
+
+      console.error(
+        "HINA VIDEO FFMPEG FAILED:",
+        error.message
+      );
+
+      return {
+        filePath:
+          srcPath,
+
+        tmpDir,
+
+        mimetype:
+          "video/mp4"
+      };
+    }
+  }
+
+  try {
+
+    await convertAudioWithFfmpeg(
+      srcPath,
+      audioPath
+    );
+
+    return {
+      filePath:
+        audioPath,
+
+      tmpDir,
+
+      mimetype:
+        "audio/mpeg"
+    };
+
+  } catch (error) {
+
+    console.error(
+      "HINA AUDIO FFMPEG FAILED:",
+      error.message
+    );
+
+    return {
+      filePath:
+        srcPath,
+
+      tmpDir,
+
+      mimetype:
+        "audio/mpeg"
+    };
+  }
+}
+
+
+// ==================================================
+// إرسال الملف
+// ==================================================
+
+async function sendDownloadedMedia(
+  api,
+  threadID,
+  replyTo,
+  payload
+) {
+
+  let prepared = null;
+
+  try {
+
+    prepared =
+      await prepareMediaFile(
+        payload
+      );
+
+    const buffer =
+      await fs.readFile(
+        prepared.filePath
+      );
+
+    const isVideo =
+      payload.type === "mp4";
+
+    const title =
+      payload.title ||
+      "بدون عنوان";
+
+    const fallbackNote =
+      payload.is_fallback
+        ? "\nالمصدر: احتياطي"
+        : "\nالمصدر: رئيسي";
+
+    if (isVideo) {
+
+      await api.sendMessage(
+        {
+          body:
+            "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗬𝗢𝗨𝗧𝗨𝗕𝗘 ━━ ⌬\n\n" +
+
+            "تم التحميل بنجاح\n\n" +
+
+            `العنوان:\n${title}\n\n` +
+
+            `الجودة: ${
+              payload.requested_quality ||
+              "auto"
+            }` +
+
+            fallbackNote,
+
+          attachment:
+            require("stream").Readable.from(
+              buffer
+            )
+        },
+
+        threadID,
+        replyTo
+      );
+
+    } else {
+
+      await api.sendMessage(
+        {
+          body:
+            "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗬𝗢𝗨𝗧𝗨𝗕𝗘 ━━ ⌬\n\n" +
+
+            "تم تحميل الصوت بنجاح\n\n" +
+
+            `العنوان:\n${title}\n\n` +
+
+            `الجودة: ${
+              payload.requested_quality ||
+              "auto"
+            }` +
+
+            fallbackNote,
+
+          attachment:
+            require("stream").Readable.from(
+              buffer
+            )
+        },
+
+        threadID,
+        replyTo
+      );
+    }
+
+  } finally {
+
+    if (
+      prepared?.tmpDir
+    ) {
+
+      await fs.rm(
+        prepared.tmpDir,
+        {
+          recursive: true,
+          force: true
+        }
+      ).catch(
+        () => {}
+      );
+    }
+  }
+}
+
+
+// ==================================================
+// تسجيل HandleReply
 // ==================================================
 
 function addHandleReply(data) {
+
   if (
     !Array.isArray(
       global.client.handleReply
@@ -329,7 +916,39 @@ function addHandleReply(data) {
     global.client.handleReply = [];
   }
 
-  global.client.handleReply.push(data);
+  global.client.handleReply.push(
+    data
+  );
+}
+
+
+// ==================================================
+// البحث عن الفيديو
+// ==================================================
+
+async function searchYouTube(
+  query
+) {
+
+  const result =
+    await yts(query);
+
+  if (
+    !result ||
+    !Array.isArray(
+      result.videos
+    )
+  ) {
+    return [];
+  }
+
+  return result.videos
+    .slice(0, 10)
+    .filter(
+      video =>
+        video &&
+        video.url
+    );
 }
 
 
@@ -349,17 +968,17 @@ module.exports.run = async function ({
     senderID
   } = event;
 
-  const query =
+  const rawInput =
     Array.isArray(args)
       ? args.join(" ").trim()
       : "";
 
-  if (!query) {
+  if (!rawInput) {
 
     return api.sendMessage(
       "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗬𝗢𝗨𝗧𝗨𝗕𝗘 ━━ ⌬\n\n" +
 
-      "اكتب اسم الفيديو الذي تريد البحث عنه.\n\n" +
+      "اكتب اسم الفيديو أو رابط يوتيوب.\n\n" +
 
       "مثال:\n" +
 
@@ -379,17 +998,43 @@ module.exports.run = async function ({
       true
     );
 
+    const input =
+      extractYouTubeUrl(
+        rawInput
+      );
+
     // ==============================================
-    // البحث
+    // إذا كان رابطًا
     // ==============================================
 
-    const result =
-      await yts(query);
+    if (
+      isYouTubeUrl(input)
+    ) {
+
+      const title =
+        await fetchTitleSafely(
+          input
+        );
+
+      return sendQualityMenu(
+        api,
+        threadID,
+        messageID,
+        senderID,
+        input,
+        title ||
+          "YouTube"
+      );
+    }
+
+    // ==============================================
+    // إذا كان اسم فيديو
+    // ==============================================
 
     const videos =
-      Array.isArray(result.videos)
-        ? result.videos.slice(0, 10)
-        : [];
+      await searchYouTube(
+        rawInput
+      );
 
     if (
       videos.length === 0
@@ -412,39 +1057,41 @@ module.exports.run = async function ({
       );
     }
 
-    // ==============================================
-    // إنشاء القائمة
-    // ==============================================
-
-    let msg =
+    let text =
       "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗬𝗢𝗨𝗧𝗨𝗕𝗘 ━━ ⌬\n\n";
 
-    msg +=
-      `نتائج البحث عن:\n${query}\n\n`;
+    text +=
+      `نتائج البحث عن:\n${rawInput}\n\n`;
 
     videos.forEach(
       (video, index) => {
 
-        msg +=
+        text +=
           `${index + 1} ┊ ` +
-          `${cleanText(video.title)}\n`;
-
-        msg +=
-          `   المدة: ` +
-          `${formatDuration(video.seconds)}\n`;
-
-        msg +=
-          `   القناة: ` +
           `${cleanText(
-            video.author?.name ||
-            "غير معروف"
-          )}\n\n`;
+            video.title
+          )}\n`;
+
+        text +=
+          `   المدة: ${
+            formatDuration(
+              video.seconds
+            )
+          }\n`;
+
+        text +=
+          `   القناة: ${
+            cleanText(
+              video.author?.name ||
+              "غير معروف"
+            )
+          }\n\n`;
       }
     );
 
-    msg +=
+    text +=
       "━━━━━━━━━━━━━━━━━━\n" +
-      "أرسل رقم الفيديو للمتابعة";
+      "أرسل رقم الفيديو";
 
     api.setMessageReaction(
       "✅",
@@ -453,12 +1100,8 @@ module.exports.run = async function ({
       true
     );
 
-    // ==============================================
-    // إرسال القائمة
-    // ==============================================
-
     return api.sendMessage(
-      msg,
+      text,
       threadID,
 
       (error, info) => {
@@ -466,7 +1109,7 @@ module.exports.run = async function ({
         if (error) {
 
           console.error(
-            "HINA YOUTUBE LIST ERROR:",
+            "HINA YOUTUBE SEARCH LIST ERROR:",
             error
           );
 
@@ -479,15 +1122,11 @@ module.exports.run = async function ({
         ) {
 
           console.error(
-            "HINA YOUTUBE: لم يتم الحصول على messageID"
+            "HINA YOUTUBE: no messageID"
           );
 
           return;
         }
-
-        // ==========================================
-        // تسجيل الرد بالطريقة الصحيحة
-        // ==========================================
 
         addHandleReply({
           name: "يوتيوب",
@@ -515,7 +1154,7 @@ module.exports.run = async function ({
   } catch (error) {
 
     console.error(
-      "HINA YOUTUBE SEARCH ERROR:",
+      "HINA YOUTUBE RUN ERROR:",
       error
     );
 
@@ -541,7 +1180,89 @@ module.exports.run = async function ({
 
 
 // ==================================================
-// HandleReply
+// قائمة الجودة
+// ==================================================
+
+async function sendQualityMenu(
+  api,
+  threadID,
+  replyTo,
+  senderID,
+  url,
+  title
+) {
+
+  let text =
+    "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗬𝗢𝗨𝗧𝗨𝗕𝗘 ━━ ⌬\n\n";
+
+  text +=
+    `العنوان:\n${cleanText(
+      title
+    )}\n\n`;
+
+  text +=
+    "اختر نوع التحميل:\n\n";
+
+  text +=
+    "1 ┊ فيديو\n";
+
+  text +=
+    "2 ┊ صوت\n\n";
+
+  text +=
+    "أرسل رقم الاختيار";
+
+  return api.sendMessage(
+    text,
+    threadID,
+
+    (error, info) => {
+
+      if (error) {
+        console.error(
+          "HINA YOUTUBE TYPE LIST ERROR:",
+          error
+        );
+        return;
+      }
+
+      if (
+        !info ||
+        !info.messageID
+      ) {
+        return;
+      }
+
+      addHandleReply({
+        name: "يوتيوب",
+
+        messageID:
+          info.messageID,
+
+        author:
+          String(senderID),
+
+        type:
+          "youtubeType",
+
+        video: {
+          url,
+          title
+        }
+      });
+
+      console.log(
+        `𝗛𝗜𝗡𝗔 | يوتيوب | Type HR: ${info.messageID}`
+      );
+    },
+
+    replyTo
+  );
+}
+
+
+// ==================================================
+// HandleReply واحد فقط
 // ==================================================
 
 module.exports.handleReply = async function ({
@@ -552,20 +1273,13 @@ module.exports.handleReply = async function ({
 
   try {
 
-    if (!handleReply) {
-      return;
-    }
-
     if (
+      !handleReply ||
       handleReply.name !==
-      "يوتيوب"
+        "يوتيوب"
     ) {
       return;
     }
-
-    // ==============================================
-    // التأكد من صاحب القائمة
-    // ==============================================
 
     if (
       String(event.senderID) !==
@@ -585,8 +1299,7 @@ module.exports.handleReply = async function ({
 
 
     // ==================================================
-    // المرحلة الأولى
-    // اختيار الفيديو
+    // اختيار الفيديو من نتائج البحث
     // ==================================================
 
     if (
@@ -608,14 +1321,14 @@ module.exports.handleReply = async function ({
           : [];
 
       if (
-        !Number.isInteger(choice) ||
+        !Number.isInteger(
+          choice
+        ) ||
         choice < 1 ||
         choice > videos.length
       ) {
 
         return api.sendMessage(
-          "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗬𝗢𝗨𝗧𝗨𝗕𝗘 ━━ ⌬\n\n" +
-
           `اختر رقمًا من 1 إلى ${videos.length}`,
 
           event.threadID,
@@ -624,11 +1337,12 @@ module.exports.handleReply = async function ({
       }
 
       const video =
-        videos[choice - 1];
+        videos[
+          choice - 1
+        ];
 
       if (
         !video ||
-        !video.url ||
         !isYouTubeUrl(
           video.url
         )
@@ -642,13 +1356,11 @@ module.exports.handleReply = async function ({
         );
       }
 
-      // ==============================================
-      // حذف HandleReply القديم
-      // ==============================================
-
       const oldIndex =
         global.client.handleReply
-          .indexOf(handleReply);
+          .indexOf(
+            handleReply
+          );
 
       if (
         oldIndex !== -1
@@ -660,82 +1372,23 @@ module.exports.handleReply = async function ({
         );
       }
 
-      // ==============================================
-      // قائمة النوع
-      // ==============================================
+      return sendQualityMenu(
+        api,
 
-      const typeMessage =
-        "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗬𝗢𝗨𝗧𝗨𝗕𝗘 ━━ ⌬\n\n" +
-
-        `الفيديو:\n` +
-        `${cleanText(video.title)}\n\n` +
-
-        "اختر نوع التحميل:\n\n" +
-
-        "1 ┊ فيديو\n" +
-        "2 ┊ صوت\n\n" +
-
-        "أرسل رقم الاختيار";
-
-      return api.sendMessage(
-        typeMessage,
         event.threadID,
 
-        (error, info) => {
+        event.messageID,
 
-          if (error) {
+        event.senderID,
 
-            console.error(
-              "HINA YOUTUBE TYPE ERROR:",
-              error
-            );
+        video.url,
 
-            return;
-          }
-
-          if (
-            !info ||
-            !info.messageID
-          ) {
-
-            console.error(
-              "HINA YOUTUBE: لا يوجد messageID للقائمة الثانية"
-            );
-
-            return;
-          }
-
-          // ==========================================
-          // تسجيل القائمة الثانية
-          // ==========================================
-
-          addHandleReply({
-            name: "يوتيوب",
-
-            messageID:
-              info.messageID,
-
-            author:
-              String(event.senderID),
-
-            type:
-              "youtubeType",
-
-            video
-          });
-
-          console.log(
-            `𝗛𝗜𝗡𝗔 | يوتيوب | Type HR: ${info.messageID}`
-          );
-        },
-
-        event.messageID
+        video.title
       );
     }
 
 
     // ==================================================
-    // المرحلة الثانية
     // اختيار فيديو أو صوت
     // ==================================================
 
@@ -756,12 +1409,7 @@ module.exports.handleReply = async function ({
       ) {
 
         return api.sendMessage(
-          "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗬𝗢𝗨𝗧𝗨𝗕𝗘 ━━ ⌬\n\n" +
-
-          "أرسل:\n\n" +
-
-          "1 للفيديو\n" +
-          "2 للصوت",
+          "أرسل 1 للفيديو أو 2 للصوت.",
 
           event.threadID,
           event.messageID
@@ -787,13 +1435,11 @@ module.exports.handleReply = async function ({
         );
       }
 
-      // ==============================================
-      // حذف HandleReply
-      // ==============================================
-
       const oldIndex =
         global.client.handleReply
-          .indexOf(handleReply);
+          .indexOf(
+            handleReply
+          );
 
       if (
         oldIndex !== -1
@@ -805,23 +1451,170 @@ module.exports.handleReply = async function ({
         );
       }
 
-      // ==============================================
-      // تحديد النوع
-      // ==============================================
-
       const type =
         choice === 1
           ? "video"
           : "audio";
 
-      const quality =
-        choice === 1
-          ? "720p"
-          : "320kbps";
+      // ==============================================
+      // قائمة الجودة
+      // ==============================================
 
-      // ==============================================
-      // رسالة الانتظار
-      // ==============================================
+      let text =
+        "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗬𝗢𝗨𝗧𝗨𝗕𝗘 ━━ ⌬\n\n";
+
+      text +=
+        `العنوان:\n${cleanText(
+          video.title
+        )}\n\n`;
+
+      if (
+        type === "video"
+      ) {
+
+        text +=
+          "اختر جودة الفيديو:\n\n";
+
+        VIDEO_QUALITIES.forEach(
+          (quality, index) => {
+
+            text +=
+              `${index + 1} ┊ ${quality}p\n`;
+          }
+        );
+
+      } else {
+
+        text +=
+          "اختر جودة الصوت:\n\n";
+
+        AUDIO_QUALITIES.forEach(
+          (quality, index) => {
+
+            text +=
+              `${index + 1} ┊ ${quality}kbps\n`;
+          }
+        );
+      }
+
+      text +=
+        "\nأرسل رقم الجودة";
+
+      return api.sendMessage(
+        text,
+        event.threadID,
+
+        (error, info) => {
+
+          if (error) {
+
+            console.error(
+              "HINA YOUTUBE QUALITY ERROR:",
+              error
+            );
+
+            return;
+          }
+
+          if (
+            !info ||
+            !info.messageID
+          ) {
+            return;
+          }
+
+          addHandleReply({
+            name: "يوتيوب",
+
+            messageID:
+              info.messageID,
+
+            author:
+              String(
+                event.senderID
+              ),
+
+            type:
+              "youtubeQuality",
+
+            video,
+
+            mediaType:
+              type
+          });
+
+          console.log(
+            `𝗛𝗜𝗡𝗔 | يوتيوب | Quality HR: ${info.messageID}`
+          );
+        },
+
+        event.messageID
+      );
+    }
+
+
+    // ==================================================
+    // اختيار الجودة والتحميل
+    // ==================================================
+
+    if (
+      handleReply.type ===
+      "youtubeQuality"
+    ) {
+
+      const choice =
+        parseInt(
+          body,
+          10
+        );
+
+      const mediaType =
+        handleReply.mediaType;
+
+      const qualities =
+        mediaType === "video"
+          ? VIDEO_QUALITIES
+          : AUDIO_QUALITIES;
+
+      if (
+        !Number.isInteger(
+          choice
+        ) ||
+        choice < 1 ||
+        choice > qualities.length
+      ) {
+
+        return api.sendMessage(
+          `اختر رقمًا من 1 إلى ${qualities.length}`,
+
+          event.threadID,
+          event.messageID
+        );
+      }
+
+      const quality =
+        qualities[
+          choice - 1
+        ];
+
+      const video =
+        handleReply.video;
+
+      const oldIndex =
+        global.client.handleReply
+          .indexOf(
+            handleReply
+          );
+
+      if (
+        oldIndex !== -1
+      ) {
+
+        global.client.handleReply.splice(
+          oldIndex,
+          1
+        );
+      }
 
       api.setMessageReaction(
         "⏳",
@@ -830,43 +1623,45 @@ module.exports.handleReply = async function ({
         true
       );
 
-      const waitMessage =
-        await api.sendMessage(
-          "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗬𝗢𝗨𝗧𝗨𝗕𝗘 ━━ ⌬\n\n" +
+      await api.sendMessage(
+        "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗬𝗢𝗨𝗧𝗨𝗕𝗘 ━━ ⌬\n\n" +
 
-          "جاري تجهيز التحميل...\n\n" +
+        "جاري تجهيز التحميل...\n\n" +
 
-          `النوع: ${
-            type === "video"
-              ? "فيديو"
-              : "صوت"
-          }\n` +
+        `النوع: ${
+          mediaType === "video"
+            ? "فيديو"
+            : "صوت"
+        }\n` +
 
-          `الجودة: ${quality}`,
+        `الجودة: ${
+          mediaType === "video"
+            ? quality + "p"
+            : quality + "kbps"
+        }`,
 
-          event.threadID
-        );
+        event.threadID,
+        event.messageID
+      );
 
-      // ==============================================
-      // طلب رابط التحميل
-      // ==============================================
-
-      let download;
+      let payload;
 
       try {
 
-        download =
-          await getDownload(
+        payload =
+          await fetchDownload(
             video.url,
-            type,
+
+            mediaType,
+
             quality
           );
 
-      } catch (downloadError) {
+      } catch (error) {
 
         console.error(
-          "HINA YOUTUBE DOWNLOAD API ERROR:",
-          downloadError
+          "HINA YOUTUBE API ERROR:",
+          error
         );
 
         api.setMessageReaction(
@@ -881,81 +1676,40 @@ module.exports.handleReply = async function ({
 
           "تعذر الحصول على رابط التحميل.\n\n" +
 
-          `${downloadError.message || "الـAPI لا يستجيب"}`,
+          `الخطأ:\n${
+            error.message ||
+            "خطأ غير معروف"
+          }`,
 
           event.threadID,
           event.messageID
         );
       }
-
-      if (
-        !download ||
-        !download.download_url
-      ) {
-
-        return api.sendMessage(
-          "لم يتم الحصول على رابط تحميل صالح.",
-
-          event.threadID,
-          event.messageID
-        );
-      }
-
-      // ==============================================
-      // الكاش
-      // ==============================================
-
-      const cacheDir =
-        path.join(
-          __dirname,
-          "cache"
-        );
-
-      await fs.ensureDir(
-        cacheDir
-      );
-
-      const safeName =
-        cleanText(
-          video.title
-        )
-          .replace(
-            /[\\/:*?"<>|]/g,
-            "_"
-          )
-          .substring(0, 80);
-
-      const extension =
-        type === "audio"
-          ? "mp3"
-          : "mp4";
-
-      const filePath =
-        path.join(
-          cacheDir,
-          `youtube_${event.senderID}_${Date.now()}_${safeName}.${extension}`
-        );
-
-      // ==============================================
-      // تحميل الملف
-      // ==============================================
 
       try {
 
-        await downloadFile(
-          download.download_url,
-          filePath
+        await sendDownloadedMedia(
+          api,
+
+          event.threadID,
+
+          event.messageID,
+
+          payload
         );
 
-      } catch (fileError) {
+        api.setMessageReaction(
+          "✅",
+          event.messageID,
+          () => {},
+          true
+        );
+
+      } catch (error) {
 
         console.error(
-          "HINA YOUTUBE FILE ERROR:",
-          fileError
-        );
-
-        await removeFile(
-          filePath
+          "HINA YOUTUBE SEND ERROR:",
+          error
         );
 
         api.setMessageReaction(
@@ -966,114 +1720,15 @@ module.exports.handleReply = async function ({
         );
 
         return api.sendMessage(
-          "فشل تحميل الملف من رابط الـAPI.",
+          "فشل إرسال الملف.\n\n" +
+          `${error.message || "خطأ غير معروف"}`,
 
           event.threadID,
           event.messageID
         );
       }
 
-      // ==============================================
-      // التأكد من وجود الملف
-      // ==============================================
-
-      if (
-        !fs.existsSync(
-          filePath
-        )
-      ) {
-
-        return api.sendMessage(
-          "لم يتم إنشاء ملف التحميل.",
-
-          event.threadID,
-          event.messageID
-        );
-      }
-
-      const stat =
-        await fs.stat(
-          filePath
-        );
-
-      if (
-        !stat.size
-      ) {
-
-        await removeFile(
-          filePath
-        );
-
-        return api.sendMessage(
-          "الملف الناتج فارغ.",
-
-          event.threadID,
-          event.messageID
-        );
-      }
-
-      // ==============================================
-      // إرسال الملف
-      // ==============================================
-
-      try {
-
-        await api.sendMessage(
-          {
-            body:
-              "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗬𝗢𝗨𝗧𝗨𝗕𝗘 ━━ ⌬\n\n" +
-
-              `${cleanText(video.title)}\n\n` +
-
-              `النوع: ${
-                type === "video"
-                  ? "فيديو"
-                  : "صوت"
-              }\n` +
-
-              `الجودة: ${quality}`,
-
-            attachment:
-              fs.createReadStream(
-                filePath
-              )
-          },
-
-          event.threadID
-        );
-
-        api.setMessageReaction(
-          "✅",
-          event.messageID,
-          () => {},
-          true
-        );
-
-      } finally {
-
-        await removeFile(
-          filePath
-        );
-      }
-
-      // ==============================================
-      // حذف رسالة الانتظار إن أمكن
-      // ==============================================
-
-      if (
-        waitMessage &&
-        waitMessage.messageID
-      ) {
-
-        try {
-
-          await api.unsendMessage(
-            waitMessage.messageID
-          );
-
-        } catch {}
-      }
-
+      return;
     }
 
   } catch (error) {
@@ -1091,10 +1746,7 @@ module.exports.handleReply = async function ({
     );
 
     return api.sendMessage(
-      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗬𝗢𝗨𝗧𝗨𝗕𝗘 ━━ ⌬\n\n" +
-
-      "حدث خطأ أثناء تنفيذ الأمر.\n\n" +
-
+      "حدث خطأ أثناء تنفيذ أمر يوتيوب.\n\n" +
       `${error.message || "خطأ غير معروف"}`,
 
       event.threadID,
