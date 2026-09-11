@@ -338,44 +338,101 @@ function normalizeMentions(event) {
     return;
   }
 
-  if (
-    !event.mentions ||
-    typeof event.mentions !== "object"
-  ) {
+  let mentions = event.mentions;
+
+  // ==========================================================
+  // لا يوجد منشن
+  // ==========================================================
+
+  if (!mentions) {
     event.mentions = {};
+    event.mentionIDs = [];
+    event.mentionID = null;
   }
 
-  if (event.mentions instanceof Map) {
+  // ==========================================================
+  // Map -> Object
+  // ==========================================================
+
+  else if (mentions instanceof Map) {
 
     const converted = {};
 
     for (
-      const [id, name]
-      of event.mentions
+      const [id, value]
+      of mentions.entries()
     ) {
-      converted[String(id)] = name;
+
+      if (!id) {
+        continue;
+      }
+
+      converted[String(id)] = value;
     }
 
-    event.mentions = converted;
+    mentions = converted;
   }
+
+  // ==========================================================
+  // حماية من القيم غير الصحيحة
+  // ==========================================================
+
+  if (
+    typeof mentions !== "object" ||
+    Array.isArray(mentions)
+  ) {
+    mentions = {};
+  }
+
+  // ==========================================================
+  // توحيد الـ IDs
+  // ==========================================================
 
   const normalized = {};
 
   for (
-    const id
-    of Object.keys(event.mentions)
+    const [id, value]
+    of Object.entries(mentions)
   ) {
 
     if (!id) {
       continue;
     }
 
-    normalized[String(id)] =
-      event.mentions[id];
+    const uid =
+      String(id).trim();
+
+    if (!uid) {
+      continue;
+    }
+
+    normalized[uid] = value;
   }
 
   event.mentions =
     normalized;
+
+  // ==========================================================
+  // جميع IDs
+  // ==========================================================
+
+  event.mentionIDs =
+    Object.keys(
+      normalized
+    );
+
+  // ==========================================================
+  // أول منشن
+  // ==========================================================
+
+  event.mentionID =
+    event.mentionIDs.length > 0
+      ? String(event.mentionIDs[0])
+      : null;
+
+  // ==========================================================
+  // REPLY
+  // ==========================================================
 
   if (
     event.messageReply &&
@@ -387,11 +444,6 @@ function normalizeMentions(event) {
         event.messageReply.senderID
       );
   }
-
-  event.mentionIDs =
-    Object.keys(
-      event.mentions
-    );
 }
 
 // ============================================================
@@ -401,6 +453,15 @@ function normalizeMentions(event) {
 function getFirstMention(event) {
 
   normalizeMentions(event);
+
+  if (
+    event &&
+    event.mentionID
+  ) {
+    return String(
+      event.mentionID
+    );
+  }
 
   const ids =
     Object.keys(
@@ -770,7 +831,6 @@ async function getThreadInfoSafe(
                 done
               );
 
-            // بعض نسخ الـAPI ترجع Promise
             if (
               result &&
               typeof result.then ===
@@ -800,7 +860,6 @@ async function getThreadInfoSafe(
             );
           }
 
-          // حماية من التعليق
           setTimeout(
             () => {
 
@@ -861,6 +920,10 @@ module.exports = function ({
     }
 
     try {
+
+      // ======================================================
+      // توحيد المنشن قبل أي معالجة
+      // ======================================================
 
       normalizeMentions(event);
 
@@ -1523,9 +1586,12 @@ ${commandConfig.name}`,
 
         permission,
 
+        // أول UID تم عمل منشن له
         mentionID:
+          event.mentionID ||
           firstMention,
 
+        // جميع UID الخاصة بالمنشنات
         mentionIDs:
           event.mentionIDs ||
           [],
