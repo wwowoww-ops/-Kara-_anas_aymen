@@ -1,6 +1,6 @@
 module.exports.config = {
   name: "انقلاب",
-  version: "1.1.0",
+  version: "1.2.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
   description: "نزع الأدمن من الجميع وترك المطور والبوت فقط",
@@ -17,7 +17,7 @@ module.exports.run = async function({ api, event }) {
   // ══════════════════════════════════════════
   const DEVELOPER_ID = "61578581225040";
 
-  if (senderID !== DEVELOPER_ID) {
+  if (String(senderID) !== String(DEVELOPER_ID)) {
     return api.sendMessage(
       `⌬ ━━ HINA ADMIN ━━ ⌬\n\n⛔ هذا الأمر للمطور فقط!`,
       threadID,
@@ -56,13 +56,16 @@ module.exports.run = async function({ api, event }) {
     }
 
     // ══════════════════════════════════════════
-    // تحديد الأدمن الذين سيتم نزع صلاحيتهم
+    // تحديد الأدمن المستهدفين
     // ══════════════════════════════════════════
     const adminsToRemove = threadInfo.adminIDs.filter(admin => {
       const id = String(admin.id);
 
-      // إبقاء البوت والمطور
-      return id !== String(botID) && id !== String(DEVELOPER_ID);
+      // إبقاء المطور والبوت
+      return (
+        id !== String(botID) &&
+        id !== String(DEVELOPER_ID)
+      );
     });
 
     // ══════════════════════════════════════════
@@ -70,40 +73,45 @@ module.exports.run = async function({ api, event }) {
     // ══════════════════════════════════════════
     if (adminsToRemove.length === 0) {
       return api.sendMessage(
-        `⌬ ━━ HINA ADMIN ━━ ⌬\n\n👑 الانقلاب مكتمل بالفعل\n\nالمطور والبوت فقط هم الأدمن.`,
+        `⌬ ━━ HINA ADMIN ━━ ⌬\n\n` +
+        `👑 الانقلاب مكتمل بالفعل\n\n` +
+        `المطور والبوت فقط هم الأدمن.`,
         threadID,
         messageID
       );
     }
 
     // ══════════════════════════════════════════
-    // نزع الأدمن من الجميع في نفس الوقت
-    // ══════════════════════════════════════════
-    const results = await Promise.allSettled(
-      adminsToRemove.map(admin =>
-        api.changeAdminStatus(
-          threadID,
-          admin.id,
-          false
-        )
-      )
-    );
-
-    // ══════════════════════════════════════════
-    // حساب النتائج
+    // التنفيذ على دفعات من 3
     // ══════════════════════════════════════════
     let success = 0;
     let failed = 0;
 
-    for (const result of results) {
-      if (result.status === "fulfilled") {
-        success++;
-      } else {
-        failed++;
-        console.error(
-          "❌ فشل نزع أحد الأدمن:",
-          result.reason
-        );
+    for (let i = 0; i < adminsToRemove.length; i += 3) {
+
+      const batch = adminsToRemove.slice(i, i + 3);
+
+      const results = await Promise.allSettled(
+        batch.map(admin =>
+          api.changeAdminStatus(
+            threadID,
+            admin.id,
+            false
+          )
+        )
+      );
+
+      for (const result of results) {
+        if (result.status === "fulfilled") {
+          success++;
+        } else {
+          failed++;
+
+          console.error(
+            "❌ فشل نزع الأدمن:",
+            result.reason
+          );
+        }
       }
     }
 
