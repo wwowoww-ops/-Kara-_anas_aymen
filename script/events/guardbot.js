@@ -386,27 +386,3 @@ module.exports.handleEvent = async function ({
     }
 
 };
-
-أهم تعديل
-
-أصبح يتعرف على الـID من أكثر من مكان:
-
-event.author
-event.senderID
-logMessageData.author
-logMessageData.authorID
-logMessageData.actor
-logMessageData.actorID
-
-وكذلك يتعرف على ID البوت من عدة صيغ داخل "addedParticipants".
-
-لكن هناك نقطة مهمة جدًا: إذا ظل الحدث لا يعمل إطلاقًا، فالمشكلة ليست في منطق الحماية، بل في تحميل الحدث نفسه. والـLoader الذي أرسلته سابقًا كان يقول إن "guard.js" فشل تحميله. بعد وضع هذه النسخة، يجب أن يظهر "guardBot" ضمن الأحداث المحملة، وليس ضمن "FAILED EVENTS".
-
-جرّبه بإضافة البوت من حساب غير موجود في:
-
-const DEVELOPER_IDS = [
-    "61592700121061",
-    "61578581225040"
-];
-
-ويفترض أن يرسل الرسالة ثم يخرج البوت من المجموعة.
