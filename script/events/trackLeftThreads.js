@@ -15,45 +15,29 @@ const LEFT_THREADS_FILE = path.join(
   "leftThreads.json"
 );
 
-fs.ensureDirSync(
-  DATA_DIR
-);
+fs.ensureDirSync(DATA_DIR);
 
 // ======================================================
 // JSON
 // ======================================================
 
-function readJSON(
-  file,
-  fallback = {}
-) {
-
+function readJSON(file, fallback = {}) {
   try {
-
-    if (
-      !fs.existsSync(file)
-    ) {
+    if (!fs.existsSync(file)) {
       return fallback;
     }
 
-    const content =
-      fs
-        .readFileSync(
-          file,
-          "utf8"
-        )
-        .trim();
+    const content = fs
+      .readFileSync(file, "utf8")
+      .trim();
 
     if (!content) {
       return fallback;
     }
 
-    return JSON.parse(
-      content
-    );
+    return JSON.parse(content);
 
   } catch (error) {
-
     console.error(
       "TRACK LEFT READ ERROR:",
       error
@@ -63,27 +47,17 @@ function readJSON(
   }
 }
 
-function writeJSON(
-  file,
-  data
-) {
-
+function writeJSON(file, data) {
   try {
-
     fs.writeFileSync(
       file,
-      JSON.stringify(
-        data,
-        null,
-        2
-      ),
+      JSON.stringify(data, null, 2),
       "utf8"
     );
 
     return true;
 
   } catch (error) {
-
     console.error(
       "TRACK LEFT WRITE ERROR:",
       error
@@ -94,22 +68,134 @@ function writeJSON(
 }
 
 // ======================================================
-// معرفة ID البوت
+// تحويل أي قيمة إلى UID
 // ======================================================
 
-function getBotID(api) {
+function normalizeID(value) {
+  if (
+    value === undefined ||
+    value === null
+  ) {
+    return null;
+  }
+
+  if (
+    typeof value === "object"
+  ) {
+
+    const possible =
+      value.id ||
+      value.uid ||
+      value.userID ||
+      value.userId ||
+      value.fbId ||
+      value.fbID;
+
+    if (
+      possible !== undefined &&
+      possible !== null
+    ) {
+      return String(possible);
+    }
+
+    return null;
+  }
+
+  const id =
+    String(value).trim();
+
+  return id || null;
+}
+
+// ======================================================
+// الحصول على ID البوت
+// ======================================================
+
+function getBotID(api, event) {
+
+  // ----------------------------------------------
+  // الطريقة الأساسية
+  // ----------------------------------------------
 
   try {
-
     if (
       api &&
       typeof api.getCurrentUserID ===
       "function"
     ) {
 
-      return String(
-        api.getCurrentUserID()
-      );
+      const id =
+        api.getCurrentUserID();
+
+      if (id) {
+        return String(id);
+      }
+    }
+  } catch (e) {}
+
+  // ----------------------------------------------
+  // البحث في global.config
+  // ----------------------------------------------
+
+  try {
+
+    const config =
+      global.config || {};
+
+    const candidates = [
+      config.APPSTATE?.userID,
+      config.BOT_ID,
+      config.botID,
+      config.userID,
+      config.uid
+    ];
+
+    for (
+      const candidate of candidates
+    ) {
+
+      const id =
+        normalizeID(candidate);
+
+      if (id) {
+        return id;
+      }
+    }
+
+  } catch (e) {}
+
+  // ----------------------------------------------
+  // البحث في event
+  // ----------------------------------------------
+
+  try {
+
+    const candidates = [
+
+      event?.botID,
+
+      event?.botId,
+
+      event?.bot?.id,
+
+      event?.bot?.userID,
+
+      event?.api?.getCurrentUserID
+        ? event.api.getCurrentUserID()
+        : null
+
+    ];
+
+    for (
+      const candidate of candidates
+    ) {
+
+      const id =
+        normalizeID(candidate);
+
+      if (id) {
+        return id;
+      }
     }
 
   } catch (e) {}
@@ -118,50 +204,130 @@ function getBotID(api) {
 }
 
 // ======================================================
-// استخراج UID الشخص الذي تسبب في الحدث
+// استخراج كل IDs المحتملة من الحدث
 // ======================================================
 
-function getRemovedUserID(event) {
+function collectEventUserIDs(event) {
 
-  const candidates = [
+  const ids = new Set();
 
-    event?.logMessageData?.leftParticipantFbId,
+  function add(value) {
 
-    event?.logMessageData?.removedParticipantFbId,
+    const id =
+      normalizeID(value);
 
-    event?.logMessageData?.participantFbId,
-
-    event?.logMessageData?.userFbId,
-
-    event?.logMessageData?.author,
-
-    event?.logMessageData?.actor,
-
-    event?.leftParticipantID,
-
-    event?.removedParticipantID,
-
-    event?.participantID,
-
-    event?.userID
-
-  ];
-
-  for (
-    const id of candidates
-  ) {
-
-    if (
-      id !== undefined &&
-      id !== null &&
-      String(id).trim()
-    ) {
-
-      return String(id);
+    if (id) {
+      ids.add(id);
     }
   }
 
-  return null;
+  // ==================================================
+  // الحقول المباشرة
+  // ==================================================
+
+  add(event?.leftParticipantFbId);
+  add(event?.leftParticipantID);
+  add(event?.leftParticipantId);
+
+  add(event?.removedParticipantFbId);
+  add(event?.removedParticipantID);
+  add(event?.removedParticipantId);
+
+  add(event?.participantFbId);
+  add(event?.participantID);
+  add(event?.participantId);
+
+  add(event?.userID);
+  add(event?.userId);
+  add(event?.uid);
+
+  add(event?.author);
+  add(event?.actor);
+  add(event?.senderID);
+  add(event?.senderId);
+
+  // ==================================================
+  // logMessageData
+  // ==================================================
+
+  const data =
+    event?.logMessageData;
+
+  if (data) {
+
+    add(data.leftParticipantFbId);
+    add(data.leftParticipantID);
+    add(data.leftParticipantId);
+
+    add(data.removedParticipantFbId);
+    add(data.removedParticipantID);
+    add(data.removedParticipantId);
+
+    add(data.participantFbId);
+    add(data.participantID);
+    add(data.participantId);
+
+    add(data.userFbId);
+    add(data.userFbID);
+    add(data.userID);
+    add(data.userId);
+    add(data.uid);
+
+    add(data.author);
+    add(data.actor);
+
+    // ----------------------------------------------
+    // participants
+    // ----------------------------------------------
+
+    if (
+      Array.isArray(data.participants)
+    ) {
+
+      for (
+        const participant of data.participants
+      ) {
+        add(participant);
+      }
+    }
+
+    // ----------------------------------------------
+    // participant
+    // ----------------------------------------------
+
+    add(data.participant);
+
+    // ----------------------------------------------
+    // user
+    // ----------------------------------------------
+
+    add(data.user);
+
+    // ----------------------------------------------
+    // actor
+    // ----------------------------------------------
+
+    add(data.actor);
+  }
+
+  // ==================================================
+  // participants المباشرة
+  // ==================================================
+
+  if (
+    Array.isArray(event?.participants)
+  ) {
+
+    for (
+      const participant of event.participants
+    ) {
+      add(participant);
+    }
+  }
+
+  return [
+    ...ids
+  ];
 }
 
 // ======================================================
@@ -171,7 +337,8 @@ function getRemovedUserID(event) {
 function saveLeftThread(
   threadID,
   event,
-  botID
+  botID,
+  removedUserID
 ) {
 
   if (!threadID) {
@@ -187,26 +354,25 @@ function saveLeftThread(
       {}
     );
 
-  /*
-   * إذا كانت المجموعة مسجلة من قبل
-   * نحدث معلوماتها فقط
-   */
-
   data[id] = {
 
     threadID: id,
 
-    type: "bot_left_or_kicked",
+    type:
+      "bot_left_or_kicked",
 
-    time: Date.now(),
+    time:
+      Date.now(),
 
     eventType:
       event?.logMessageType ||
       "log:unsubscribe",
 
     botID:
-      botID || null
+      botID || null,
 
+    removedUserID:
+      removedUserID || null
   };
 
   return writeJSON(
@@ -216,7 +382,24 @@ function saveLeftThread(
 }
 
 // ======================================================
-// EVENT
+// فحص الحدث
+// ======================================================
+
+function isUnsubscribeEvent(event) {
+
+  const type =
+    String(
+      event?.logMessageType || ""
+    ).toLowerCase();
+
+  return (
+    type === "log:unsubscribe" ||
+    type === "log:unsubscribe".toLowerCase()
+  );
+}
+
+// ======================================================
+// EVENT CONFIG
 // ======================================================
 
 module.exports.config = {
@@ -225,7 +408,7 @@ module.exports.config = {
 
   eventType: "log:unsubscribe",
 
-  version: "1.0.0",
+  version: "2.0.0",
 
   credits: "أبو هريرة",
 
@@ -249,13 +432,12 @@ module.exports.handleEvent = async function ({
       return;
     }
 
-    /*
-     * هذا الحدث خاص بخروج عضو أو طرده
-     */
+    // ==================================================
+    // التأكد من نوع الحدث
+    // ==================================================
 
     if (
-      event.logMessageType !==
-      "log:unsubscribe"
+      !isUnsubscribeEvent(event)
     ) {
       return;
     }
@@ -267,63 +449,84 @@ module.exports.handleEvent = async function ({
       return;
     }
 
-    /*
-     * الحصول على ID البوت
-     */
+    // ==================================================
+    // الحصول على ID البوت
+    // ==================================================
 
     const botID =
-      getBotID(api);
-
-    if (!botID) {
-      return;
-    }
-
-    /*
-     * معرفة العضو الذي خرج/تمت إزالته
-     */
-
-    const removedUserID =
-      getRemovedUserID(
+      getBotID(
+        api,
         event
       );
 
-    /*
-     * إذا كان العضو الذي خرج
-     * هو البوت نفسه
-     *
-     * فهذا يعني:
-     * - البوت طُرد
-     * أو
-     * - البوت خرج من المجموعة
-     */
+    if (!botID) {
 
-    if (
-      !removedUserID ||
-      String(removedUserID) !==
-      String(botID)
-    ) {
+      console.log(
+        "[TRACK LEFT] تعذر الحصول على ID البوت"
+      );
+
       return;
     }
 
-    /*
-     * تسجيل المجموعة
-     */
+    // ==================================================
+    // استخراج جميع IDs الموجودة في الحدث
+    // ==================================================
+
+    const eventUserIDs =
+      collectEventUserIDs(
+        event
+      );
+
+    // ==================================================
+    // البحث عن ID البوت
+    // ==================================================
+
+    const botWasRemoved =
+      eventUserIDs.some(
+        id =>
+          String(id) ===
+          String(botID)
+      );
+
+    if (!botWasRemoved) {
+
+      /*
+       * الحدث يخص عضوًا آخر
+       * وليس البوت
+       */
+
+      return;
+    }
+
+    // ==================================================
+    // تسجيل المجموعة
+    // ==================================================
 
     const saved =
       saveLeftThread(
         threadID,
         event,
+        botID,
         botID
       );
 
     if (saved) {
 
       console.log(
-`[TRACK LEFT]
+`
+[TRACK LEFT]
 
-تم تسجيل مجموعة خرج منها البوت:
+تم تسجيل مجموعة خرج منها البوت أو طُرد منها
 
-ThreadID: ${threadID}`
+ThreadID:
+${threadID}
+
+BotID:
+${botID}
+
+Event:
+${event.logMessageType}
+`
       );
 
     }
@@ -334,5 +537,6 @@ ThreadID: ${threadID}`
       "TRACK LEFT EVENT ERROR:",
       error
     );
+
   }
 };
