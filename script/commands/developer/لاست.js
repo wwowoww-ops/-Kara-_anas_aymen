@@ -1,1812 +1,816 @@
-const fs = require("fs-extra");
+const fs = require("fs");
 const path = require("path");
 
 module.exports.config = {
-  name: "لاست",
-  version: "5.0.0",
-  credits: "أبو هريرة",
-  hasPermssion: 2,
-  description: "عرض المجموعات المعروفة للبوت والتحكم بها وتنظيف المحادثات القديمة",
-  commandCategory: "developer",
-  usages: "لاست",
-  cooldowns: 5
+    name: "لاست",
+    version: "5.1.0",
+    hasPermssion: 2,
+    credits: "أبو هريرة",
+    description: "عرض المجموعات وإدارتها وتنظيف المجموعات التي لم يعد البوت داخلها",
+    commandCategory: "developer",
+    usages: "لاست",
+    cooldowns: 5
 };
 
-const DEV_ID = "61578581225040";
+// ==================================================
+// الملفات
+// ==================================================
 
-const DATA_DIR = path.join(process.cwd(), "data");
+const DATA_DIR = path.join(__dirname, "../../../data");
+const BANNED_FILE = path.join(DATA_DIR, "banned.json");
+const LEFT_THREADS_FILE = path.join(DATA_DIR, "leftThreads.json");
 
-const BANNED_FILE =
-  path.join(DATA_DIR, "banned.json");
+function ensureDataDir() {
+    if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+}
 
-const LEFT_THREADS_FILE =
-  path.join(DATA_DIR, "leftThreads.json");
-
-fs.ensureDirSync(DATA_DIR);
-
-// ======================================================
-// JSON
-// ======================================================
-
-function readJSON(file, fallback = {}) {
-  try {
+function ensureJsonFile(file, defaultValue = {}) {
+    ensureDataDir();
 
     if (!fs.existsSync(file)) {
-      return fallback;
+        fs.writeFileSync(
+            file,
+            JSON.stringify(defaultValue, null, 2)
+        );
     }
-
-    const content =
-      fs.readFileSync(file, "utf8").trim();
-
-    if (!content) {
-      return fallback;
-    }
-
-    return JSON.parse(content);
-
-  } catch (error) {
-
-    console.error(
-      "LASt READ JSON ERROR:",
-      error
-    );
-
-    return fallback;
-  }
 }
 
-function writeJSON(file, data) {
-  try {
+// ==================================================
+// الحظر
+// ==================================================
+
+function getBanned() {
+    ensureJsonFile(BANNED_FILE, {});
+
+    try {
+        const data = JSON.parse(
+            fs.readFileSync(BANNED_FILE, "utf8")
+        );
+
+        return data && typeof data === "object"
+            ? data
+            : {};
+    } catch {
+        return {};
+    }
+}
+
+function saveBanned(data) {
+    ensureDataDir();
 
     fs.writeFileSync(
-      file,
-      JSON.stringify(data, null, 2),
-      "utf8"
+        BANNED_FILE,
+        JSON.stringify(data, null, 2)
     );
-
-    return true;
-
-  } catch (error) {
-
-    console.error(
-      "LASt WRITE JSON ERROR:",
-      error
-    );
-
-    return false;
-  }
 }
 
-// ======================================================
-// المطور
-// ======================================================
-
-function isDeveloper(senderID) {
-  return String(senderID) === DEV_ID;
-}
-
-// ======================================================
-// جمع كل IDs التي يعرفها البوت
-// ======================================================
-
-function collectThreadIDs(Threads) {
-
-  const ids = new Set();
-
-  // ==================================================
-  // global.data.allThreadID
-  // ==================================================
-
-  try {
-
-    if (
-      global.data &&
-      Array.isArray(
-        global.data.allThreadID
-      )
-    ) {
-
-      for (
-        const id of global.data.allThreadID
-      ) {
-
-        if (id) {
-          ids.add(
-            String(id)
-          );
-        }
-      }
-    }
-
-  } catch (e) {}
-
-  // ==================================================
-  // global.data.threadData
-  // ==================================================
-
-  try {
-
-    if (
-      global.data &&
-      global.data.threadData
-    ) {
-
-      const data =
-        global.data.threadData;
-
-      if (
-        data instanceof Map
-      ) {
-
-        for (
-          const id of data.keys()
-        ) {
-
-          if (id) {
-            ids.add(
-              String(id)
-            );
-          }
-        }
-
-      } else if (
-        typeof data === "object"
-      ) {
-
-        for (
-          const id of Object.keys(data)
-        ) {
-
-          if (id) {
-            ids.add(
-              String(id)
-            );
-          }
-        }
-      }
-    }
-
-  } catch (e) {}
-
-  // ==================================================
-  // Threads.database
-  // ==================================================
-
-  try {
-
-    if (
-      Threads &&
-      Threads.database
-    ) {
-
-      const database =
-        Threads.database;
-
-      if (
-        database instanceof Map
-      ) {
-
-        for (
-          const id of database.keys()
-        ) {
-
-          if (id) {
-            ids.add(
-              String(id)
-            );
-          }
-        }
-
-      } else if (
-        typeof database === "object"
-      ) {
-
-        for (
-          const id of Object.keys(database)
-        ) {
-
-          if (id) {
-            ids.add(
-              String(id)
-            );
-          }
-        }
-      }
-    }
-
-  } catch (e) {}
-
-  return [
-    ...ids
-  ];
-}
-
-// ======================================================
-// قراءة المحادثات التي خرج منها البوت
-// ======================================================
+// ==================================================
+// المجموعات التي خرج منها البوت
+// ==================================================
 
 function getLeftThreads() {
+    ensureJsonFile(LEFT_THREADS_FILE, {});
 
-  const data =
-    readJSON(
-      LEFT_THREADS_FILE,
-      {}
+    try {
+        const data = JSON.parse(
+            fs.readFileSync(LEFT_THREADS_FILE, "utf8")
+        );
+
+        return data && typeof data === "object"
+            ? data
+            : {};
+    } catch {
+        return {};
+    }
+}
+
+function saveLeftThread(threadID, info = {}) {
+    const leftThreads = getLeftThreads();
+
+    leftThreads[String(threadID)] = {
+        threadID: String(threadID),
+        threadName:
+            info.threadName ||
+            leftThreads[String(threadID)]?.threadName ||
+            `مجموعة ${threadID}`,
+        leftAt:
+            leftThreads[String(threadID)]?.leftAt ||
+            new Date().toISOString()
+    };
+
+    ensureDataDir();
+
+    fs.writeFileSync(
+        LEFT_THREADS_FILE,
+        JSON.stringify(leftThreads, null, 2)
     );
-
-  if (
-    !data ||
-    typeof data !== "object" ||
-    Array.isArray(data)
-  ) {
-
-    return {};
-  }
-
-  return data;
 }
 
-// ======================================================
-// تسجيل محادثة قديمة
-// ======================================================
+function removeLeftThread(threadID) {
+    const leftThreads = getLeftThreads();
 
-function saveLeftThread(
-  threadID,
-  info = {}
-) {
+    delete leftThreads[String(threadID)];
 
-  const id =
-    String(threadID);
-
-  const data =
-    getLeftThreads();
-
-  data[id] = {
-
-    threadID: id,
-
-    name:
-      info.threadName ||
-      info.name ||
-      info.title ||
-      `مجموعة ${id}`,
-
-    status:
-      "unavailable",
-
-    time:
-      Date.now()
-  };
-
-  return writeJSON(
-    LEFT_THREADS_FILE,
-    data
-  );
-}
-
-// ======================================================
-// حذف ID من سجل المحادثات القديمة
-// ======================================================
-
-function removeLeftThread(
-  threadID
-) {
-
-  const id =
-    String(threadID);
-
-  const data =
-    getLeftThreads();
-
-  if (
-    Object.prototype.hasOwnProperty.call(
-      data,
-      id
-    )
-  ) {
-
-    delete data[id];
-
-    return writeJSON(
-      LEFT_THREADS_FILE,
-      data
+    fs.writeFileSync(
+        LEFT_THREADS_FILE,
+        JSON.stringify(leftThreads, null, 2)
     );
-  }
-
-  return true;
 }
 
-// ======================================================
-// حالة الحظر
-// ======================================================
+// ==================================================
+// جمع معرفات المجموعات
+// ==================================================
 
-function isBanned(threadID) {
+function collectThreadIDs(Threads) {
+    const ids = new Set();
 
-  const id =
-    String(threadID);
+    // global.data.allThreadID
+    try {
+        if (
+            global.data &&
+            Array.isArray(global.data.allThreadID)
+        ) {
+            for (const id of global.data.allThreadID) {
+                if (id) ids.add(String(id));
+            }
+        }
+    } catch {}
 
-  const banned =
-    readJSON(
-      BANNED_FILE,
-      {}
+    // global.data.threadData
+    try {
+        if (
+            global.data &&
+            global.data.threadData
+        ) {
+            for (const id of Object.keys(global.data.threadData)) {
+                if (id) ids.add(String(id));
+            }
+        }
+    } catch {}
+
+    // Threads.database
+    try {
+        if (
+            Threads &&
+            Threads.database
+        ) {
+            for (const id of Object.keys(Threads.database)) {
+                if (id) ids.add(String(id));
+            }
+        }
+    } catch {}
+
+    return ids;
+}
+
+// ==================================================
+// معلومات المجموعة
+// ==================================================
+
+function getRealThreadInfo(api, threadID) {
+    return new Promise(resolve => {
+        if (
+            !api ||
+            typeof api.getThreadInfo !== "function"
+        ) {
+            return resolve(null);
+        }
+
+        try {
+            api.getThreadInfo(
+                String(threadID),
+                (error, info) => {
+                    if (error || !info) {
+                        return resolve(null);
+                    }
+
+                    resolve(info);
+                }
+            );
+        } catch {
+            resolve(null);
+        }
+    });
+}
+
+function getGroupName(info, threadID) {
+    if (!info) {
+        return `مجموعة ${threadID}`;
+    }
+
+    return (
+        info.threadName ||
+        info.name ||
+        `مجموعة ${threadID}`
     );
-
-  if (
-    Object.prototype.hasOwnProperty.call(
-      banned,
-      id
-    )
-  ) {
-
-    const value =
-      banned[id];
-
-    if (
-      value === true ||
-      value === 1 ||
-      value === "true"
-    ) {
-
-      return true;
-    }
-
-    if (
-      value &&
-      typeof value === "object" &&
-      value.banned !== false
-    ) {
-
-      return true;
-    }
-  }
-
-  try {
-
-    if (
-      global.data &&
-      global.data.threadBanned
-    ) {
-
-      if (
-        typeof global.data.threadBanned.has ===
-          "function" &&
-        global.data.threadBanned.has(id)
-      ) {
-
-        return true;
-      }
-
-      if (
-        typeof global.data.threadBanned.get ===
-          "function" &&
-        global.data.threadBanned.get(id)
-      ) {
-
-        return true;
-      }
-    }
-
-  } catch (e) {}
-
-  return false;
 }
-
-// ======================================================
-// حظر
-// ======================================================
-
-function banGroup(threadID) {
-
-  const id =
-    String(threadID);
-
-  const banned =
-    readJSON(
-      BANNED_FILE,
-      {}
-    );
-
-  banned[id] = {
-
-    banned: true,
-
-    reason:
-      "حظر بواسطة أمر لاست",
-
-    time:
-      Date.now()
-  };
-
-  writeJSON(
-    BANNED_FILE,
-    banned
-  );
-
-  try {
-
-    if (
-      global.data &&
-      global.data.threadBanned &&
-      typeof global.data.threadBanned.set ===
-        "function"
-    ) {
-
-      global.data.threadBanned.set(
-        id,
-        true
-      );
-    }
-
-  } catch (e) {}
-
-  return true;
-}
-
-// ======================================================
-// إلغاء الحظر
-// ======================================================
-
-function unbanGroup(threadID) {
-
-  const id =
-    String(threadID);
-
-  const banned =
-    readJSON(
-      BANNED_FILE,
-      {}
-    );
-
-  if (
-    Object.prototype.hasOwnProperty.call(
-      banned,
-      id
-    )
-  ) {
-
-    delete banned[id];
-  }
-
-  writeJSON(
-    BANNED_FILE,
-    banned
-  );
-
-  try {
-
-    if (
-      global.data &&
-      global.data.threadBanned &&
-      typeof global.data.threadBanned.delete ===
-        "function"
-    ) {
-
-      global.data.threadBanned.delete(
-        id
-      );
-    }
-
-  } catch (e) {}
-
-  return true;
-}
-
-// ======================================================
-// التحقق من المجموعة
-// ======================================================
-
-async function getRealThreadInfo(
-  api,
-  threadID
-) {
-
-  try {
-
-    if (
-      !api ||
-      typeof api.getThreadInfo !==
-        "function"
-    ) {
-
-      return null;
-    }
-
-    const info =
-      await api.getThreadInfo(
-        String(threadID)
-      );
-
-    if (
-      !info ||
-      typeof info !== "object"
-    ) {
-
-      return null;
-    }
-
-    return info;
-
-  } catch (error) {
-
-    return null;
-  }
-}
-
-// ======================================================
-// اسم المجموعة
-// ======================================================
-
-function getGroupName(
-  info,
-  id
-) {
-
-  if (!info) {
-
-    return `مجموعة ${id}`;
-  }
-
-  return (
-    info.threadName ||
-    info.name ||
-    info.title ||
-    `مجموعة ${id}`
-  );
-}
-
-// ======================================================
-// عدد الأعضاء
-// ======================================================
 
 function getMemberCount(info) {
+    if (!info) return 0;
 
-  if (!info) {
-    return "?";
-  }
-
-  if (
-    Array.isArray(
-      info.participantIDs
-    )
-  ) {
-
-    return info.participantIDs.length;
-  }
-
-  if (
-    Array.isArray(
-      info.participants
-    )
-  ) {
-
-    return info.participants.length;
-  }
-
-  return "?";
-}
-
-// ======================================================
-// إزالة ID من allThreadID
-// ======================================================
-
-function removeFromKnownThreads(
-  threadID
-) {
-
-  const id =
-    String(threadID);
-
-  try {
-
-    if (
-      global.data &&
-      Array.isArray(
-        global.data.allThreadID
-      )
-    ) {
-
-      global.data.allThreadID =
-        global.data.allThreadID.filter(
-          item =>
-            String(item) !== id
-        );
+    if (Array.isArray(info.participantIDs)) {
+        return info.participantIDs.length;
     }
 
-  } catch (e) {}
+    if (Array.isArray(info.participants)) {
+        return info.participants.length;
+    }
+
+    return (
+        info.memberCount ||
+        info.participantCount ||
+        0
+    );
 }
 
-// ======================================================
-// خروج البوت
-// ======================================================
+// ==================================================
+// اختبار حقيقي: هل البوت داخل المجموعة؟
+// ==================================================
 
-async function leaveGroup(
-  api,
-  threadID
-) {
-
-  const id =
-    String(threadID);
-
-  const botID =
-    api.getCurrentUserID();
-
-  try {
-
-    // ----------------------------------------------
-    // رسالة الوداع
-    // ----------------------------------------------
-
-    await api.sendMessage(
-      "المطور ابو هريرة يأمرني بالخروج\nاعتذر وداعا",
-      id
-    );
-
-    // ----------------------------------------------
-    // انتظار إرسال الرسالة
-    // ----------------------------------------------
-
-    await new Promise(
-      resolve =>
-        setTimeout(
-          resolve,
-          700
-        )
-    );
-
-    // ----------------------------------------------
-    // خروج البوت
-    // ----------------------------------------------
-
-    return await new Promise(
-      resolve => {
-
-        api.removeUserFromGroup(
-          botID,
-          id,
-          error => {
-
-            if (error) {
-
-              console.error(
-                "LASt LEAVE ERROR:",
-                error
-              );
-
-              resolve(false);
-              return;
-            }
-
-            resolve(true);
-          }
-        );
-
-      }
-    );
-
-  } catch (error) {
-
-    console.error(
-      "LASt LEAVE EXCEPTION:",
-      error
-    );
-
-    return false;
-  }
-}
-
-// ======================================================
-// حذف محادثة
-// ======================================================
-
-async function deleteThread(
-  api,
-  threadID
-) {
-
-  if (
-    !api ||
-    typeof api.deleteThread !==
-      "function"
-  ) {
-
-    return {
-
-      success: false,
-
-      error:
-        "api.deleteThread غير متوفرة في نسخة API الحالية"
-    };
-  }
-
-  const id =
-    String(threadID);
-
-  try {
-
-    /*
-     * محاولة callback
-     */
-
-    const result =
-      await new Promise(
-        resolve => {
-
-          let finished = false;
-
-          const done =
-            error => {
-
-              if (finished) {
-                return;
-              }
-
-              finished = true;
-
-              resolve({
-                callback: true,
-                error
-              });
-            };
-
-          try {
-
-            const returned =
-              api.deleteThread(
-                id,
-                done
-              );
-
-            /*
-             * بعض النسخ تعيد Promise
-             */
-
-            if (
-              returned &&
-              typeof returned.then ===
-                "function"
-            ) {
-
-              returned
-                .then(() => {
-
-                  if (!finished) {
-
-                    finished = true;
-
-                    resolve({
-                      callback: true,
-                      error: null
-                    });
-                  }
-
-                })
-                .catch(error => {
-
-                  if (!finished) {
-
-                    finished = true;
-
-                    resolve({
-                      callback: true,
-                      error
-                    });
-                  }
-
-                });
-            }
-
-          } catch (error) {
-
-            if (!finished) {
-
-              finished = true;
-
-              resolve({
-                callback: true,
-                error
-              });
-            }
-          }
-
-          /*
-           * حماية من API لا يستعمل callback
-           */
-
-          setTimeout(
-            () => {
-
-              if (!finished) {
-
-                finished = true;
-
-                resolve({
-                  callback: false,
-                  error: null
-                });
-              }
-
-            },
-            5000
-          );
-
+function testGroupByMessage(api, threadID) {
+    return new Promise(resolve => {
+        if (
+            !api ||
+            typeof api.sendMessage !== "function"
+        ) {
+            return resolve({
+                success: false,
+                error: "api.sendMessage غير متوفرة"
+            });
         }
-      );
 
-    if (!result.error) {
+        const testMessage =
+            "اختبار اتصال البوت بالمجموعة";
 
-      return {
-        success: true
-      };
+        let finished = false;
+
+        const finish = result => {
+            if (finished) return;
+
+            finished = true;
+            resolve(result);
+        };
+
+        try {
+            api.sendMessage(
+                testMessage,
+                String(threadID),
+                error => {
+                    if (error) {
+                        return finish({
+                            success: false,
+                            error:
+                                error.message ||
+                                String(error)
+                        });
+                    }
+
+                    finish({
+                        success: true
+                    });
+                }
+            );
+
+            // حماية في حال لم تستجب الـ API
+            setTimeout(() => {
+                finish({
+                    success: false,
+                    error: "لم تستجب API"
+                });
+            }, 7000);
+
+        } catch (error) {
+            finish({
+                success: false,
+                error: error.message ||
+                    String(error)
+            });
+        }
+    });
+}
+
+// ==================================================
+// حذف المحادثة
+// ==================================================
+
+function deleteThread(api, threadID) {
+    return new Promise(resolve => {
+        if (
+            !api ||
+            typeof api.deleteThread !== "function"
+        ) {
+            return resolve({
+                success: false,
+                error: "api.deleteThread غير متوفرة في API"
+            });
+        }
+
+        let finished = false;
+
+        const finish = result => {
+            if (finished) return;
+
+            finished = true;
+            resolve(result);
+        };
+
+        try {
+            api.deleteThread(
+                String(threadID),
+                error => {
+                    if (error) {
+                        return finish({
+                            success: false,
+                            error:
+                                error.message ||
+                                String(error)
+                        });
+                    }
+
+                    finish({
+                        success: true
+                    });
+                }
+            );
+
+            setTimeout(() => {
+                finish({
+                    success: false,
+                    error: "لم تستجب API عند حذف المحادثة"
+                });
+            }, 7000);
+
+        } catch (error) {
+            finish({
+                success: false,
+                error:
+                    error.message ||
+                    String(error)
+            });
+        }
+    });
+}
+
+// ==================================================
+// حذف المجموعة من المصادر المعروفة
+// ==================================================
+
+function removeFromKnownThreads(threadID) {
+    const id = String(threadID);
+
+    try {
+        if (
+            global.data &&
+            Array.isArray(global.data.allThreadID)
+        ) {
+            global.data.allThreadID =
+                global.data.allThreadID.filter(
+                    x => String(x) !== id
+                );
+        }
+    } catch {}
+
+    try {
+        if (
+            global.data &&
+            global.data.threadData
+        ) {
+            delete global.data.threadData[id];
+        }
+    } catch {}
+
+    try {
+        if (
+            global.client &&
+            global.client.threadData
+        ) {
+            delete global.client.threadData[id];
+        }
+    } catch {}
+}
+
+// ==================================================
+// تنظيف مجموعة
+// ==================================================
+
+async function cleanThread(api, threadID) {
+    const id = String(threadID);
+
+    // الاختبار الحقيقي يكون بمحاولة إرسال رسالة
+    const test = await testGroupByMessage(
+        api,
+        id
+    );
+
+    // إذا نجح الإرسال فالبوت ما زال داخل المجموعة
+    if (test.success) {
+        return {
+            success: false,
+            active: true,
+            error:
+                "البوت ما زال داخل المجموعة وتمكن من إرسال رسالة"
+        };
     }
 
-    return {
-
-      success: false,
-
-      error:
-        result.error?.message ||
-        String(result.error)
-    };
-
-  } catch (error) {
-
-    return {
-
-      success: false,
-
-      error:
-        error?.message ||
-        String(error)
-    };
-  }
-}
-
-// ======================================================
-// تنظيف محادثة واحدة
-// ======================================================
-
-async function cleanThread(
-  api,
-  threadID
-) {
-
-  const id =
-    String(threadID);
-
-  /*
-   * نتأكد أولًا أن المحادثة
-   * لم تعد متاحة للبوت
-   */
-
-  const info =
-    await getRealThreadInfo(
-      api,
-      id
+    // فشل الإرسال = لا يستطيع البوت الوصول للمجموعة
+    const deleted = await deleteThread(
+        api,
+        id
     );
 
-  if (info) {
+    if (!deleted.success) {
+        return {
+            success: false,
+            active: false,
+            error: deleted.error
+        };
+    }
+
+    removeLeftThread(id);
+    removeFromKnownThreads(id);
 
     return {
-
-      success: false,
-
-      active: true,
-
-      error:
-        "البوت ما زال قادرًا على الوصول إلى هذه المجموعة"
+        success: true,
+        active: false
     };
-  }
-
-  /*
-   * المحادثة غير متاحة
-   * لذلك نحاول حذفها
-   */
-
-  const result =
-    await deleteThread(
-      api,
-      id
-    );
-
-  if (!result.success) {
-
-    return {
-
-      success: false,
-
-      active: false,
-
-      error:
-        result.error
-    };
-  }
-
-  /*
-   * نجح الحذف
-   */
-
-  removeLeftThread(id);
-
-  removeFromKnownThreads(id);
-
-  return {
-
-    success: true,
-
-    active: false
-  };
 }
 
-// ======================================================
-// HANDLE REPLY
-// ======================================================
+// ==================================================
+// الأمر
+// ==================================================
 
-module.exports.handleReply =
-async function ({
-  api,
-  event,
-  handleReply
+module.exports.run = async function ({
+    api,
+    event,
+    Threads
 }) {
+    const senderID = String(event.senderID);
 
-  try {
+    // المطور
+    const DEV_ID = "61578581225040";
 
-    if (
-      !isDeveloper(
-        event.senderID
-      )
-    ) {
-
-      return;
+    if (senderID !== DEV_ID) {
+        return api.sendMessage(
+            "هذا الأمر للمطور فقط",
+            event.threadID,
+            event.messageID
+        );
     }
 
-    if (
-      !handleReply ||
-      handleReply.name !== "لاست" ||
-      handleReply.type !== "groupList"
-    ) {
+    const threadIDs = collectThreadIDs(Threads);
+    const leftThreads = getLeftThreads();
 
-      return;
+    // إضافة المجموعات المسجلة سابقًا كخارجة
+    for (const id of Object.keys(leftThreads)) {
+        threadIDs.add(String(id));
     }
 
-    const body =
-      String(
-        event.body || ""
-      ).trim();
+    const groups = [];
 
-    if (!body) {
-      return;
+    for (const id of threadIDs) {
+        try {
+            const info = await getRealThreadInfo(
+                api,
+                id
+            );
+
+            if (info) {
+                groups.push({
+                    id,
+                    name: getGroupName(info, id),
+                    members: getMemberCount(info),
+                    unavailable: false
+                });
+
+                continue;
+            }
+
+            // غير متاحة
+            const oldInfo =
+                leftThreads[id] || {};
+
+            saveLeftThread(id, {
+                threadName:
+                    oldInfo.threadName ||
+                    `مجموعة ${id}`
+            });
+
+            groups.push({
+                id,
+                name:
+                    oldInfo.threadName ||
+                    `مجموعة ${id}`,
+                members: "غير متاح",
+                unavailable: true
+            });
+
+        } catch {}
     }
 
-    const args =
-      body.split(/\s+/);
+    if (groups.length === 0) {
+        return api.sendMessage(
+            "لا توجد مجموعات مسجلة",
+            event.threadID,
+            event.messageID
+        );
+    }
 
-    const command =
-      String(
-        args[0] || ""
-      ).toLowerCase();
+    const banned = getBanned();
 
-    const number =
-      parseInt(
-        args[1],
-        10
-      );
+    let msg =
+        "╭───〔 LAST GROUPS 〕───╮\n\n";
 
-    const header =
-      "⌬ ━━━━━━━━━━━━ ⌬";
+    groups.forEach((group, index) => {
+        const isBanned =
+            banned[group.id] === true;
+
+        msg +=
+            `【 ${index + 1} 】\n` +
+            `الاسم: ${group.name}\n` +
+            `ID: ${group.id}\n` +
+            `الأعضاء: ${group.members}\n`;
+
+        if (group.unavailable) {
+            msg +=
+                "الحالة: ⚠️ غير متاحة\n" +
+                "يمكن تنظيفها: نعم\n";
+        } else {
+            msg +=
+                "الحالة: متاحة\n";
+        }
+
+        msg +=
+            `الحظر: ${
+                isBanned
+                    ? "محظورة"
+                    : "غير محظورة"
+            }\n\n`;
+    });
+
+    msg +=
+        "╰──────────────────╯\n\n" +
+        "الأوامر:\n" +
+        "حظر N\n" +
+        "الغاء_حظر N\n" +
+        "خروج N\n" +
+        "تنظيف N\n" +
+        "تنظيف_الكل";
+
+    return api.sendMessage(
+        msg,
+        event.threadID,
+        (error, info) => {
+            if (error) return;
+
+            if (!global.client.handleReply) {
+                global.client.handleReply = [];
+            }
+
+            global.client.handleReply.push({
+                name: "لاست",
+                messageID: info.messageID,
+                author: senderID,
+                groups
+            });
+        },
+        event.messageID
+    );
+};
+
+// ==================================================
+// الردود
+// ==================================================
+
+module.exports.handleReply = async function ({
+    api,
+    event,
+    handleReply
+}) {
+    const senderID = String(event.senderID);
+    const DEV_ID = "61578581225040";
+
+    if (senderID !== DEV_ID) {
+        return;
+    }
+
+    if (!event.body) return;
+
+    const body = event.body.trim();
+
+    const groups = handleReply.groups || [];
 
     // ==================================================
     // تنظيف الكل
     // ==================================================
 
-    if (
-      command === "تنظيف_الكل" ||
-      command === "تنظيفالكل" ||
-      command === "cleanall"
-    ) {
+    if (body === "تنظيف_الكل") {
+        const leftThreads = getLeftThreads();
+        const ids = Object.keys(leftThreads);
 
-      const leftThreads =
-        getLeftThreads();
-
-      const ids =
-        Object.keys(
-          leftThreads
-        );
-
-      if (!ids.length) {
-
-        return api.sendMessage(
-`${header}
-
-✅ لا توجد محادثات قديمة لتنظيفها.`,
-          event.threadID,
-          event.messageID
-        );
-      }
-
-      await api.sendMessage(
-`${header}
-
-⏳ جاري تنظيف المحادثات القديمة...
-
-عدد المحادثات:
-${ids.length}`,
-        event.threadID,
-        event.messageID
-      );
-
-      let success =
-        0;
-
-      let failed =
-        0;
-
-      for (
-        const id of ids
-      ) {
-
-        const result =
-          await cleanThread(
-            api,
-            id
-          );
-
-        if (
-          result.success
-        ) {
-
-          success++;
-
-        } else {
-
-          failed++;
+        if (ids.length === 0) {
+            return api.sendMessage(
+                "لا توجد محادثات قديمة مسجلة للتنظيف",
+                event.threadID,
+                event.messageID
+            );
         }
 
-        await new Promise(
-          resolve =>
-            setTimeout(
-              resolve,
-              300
-            )
+        let cleaned = 0;
+        let active = 0;
+        let failed = 0;
+
+        for (const id of ids) {
+            const result =
+                await cleanThread(
+                    api,
+                    id
+                );
+
+            if (result.success) {
+                cleaned++;
+            } else if (result.active) {
+                active++;
+            } else {
+                failed++;
+            }
+        }
+
+        return api.sendMessage(
+            "نتيجة التنظيف\n\n" +
+            `تم تنظيف: ${cleaned}\n` +
+            `ما زالت متاحة: ${active}\n` +
+            `فشل: ${failed}`,
+            event.threadID,
+            event.messageID
         );
-      }
-
-      return api.sendMessage(
-`${header}
-
-✅ انتهى التنظيف.
-
-🗑️ تم حذف:
-${success}
-
-❌ فشل:
-${failed}`,
-        event.threadID
-      );
     }
 
     // ==================================================
-    // التحقق من الرقم
+    // استخراج الأمر والرقم
     // ==================================================
 
-    if (
-      !Number.isInteger(number) ||
-      number < 1
-    ) {
+    const match = body.match(
+        /^(حظر|الغاء_حظر|خروج|تنظيف)\s+(\d+)$/
+    );
 
-      return api.sendMessage(
-`${header}
-
-⚠️ استخدم الأمر بهذا الشكل:
-
-حظر 1
-الغاء_حظر 1
-خروج 1
-تنظيف 1
-
-أو:
-
-تنظيف_الكل
-
-⌬ ━━━━━━━━━━━━ ⌬`,
-        event.threadID,
-        event.messageID
-      );
+    if (!match) {
+        return api.sendMessage(
+            "الأمر غير صحيح\n\n" +
+            "حظر N\n" +
+            "الغاء_حظر N\n" +
+            "خروج N\n" +
+            "تنظيف N\n" +
+            "تنظيف_الكل",
+            event.threadID,
+            event.messageID
+        );
     }
 
-    const groupid =
-      handleReply.groupid || [];
+    const action = match[1];
+    const number = Number(match[2]);
 
-    const groupStatus =
-      handleReply.groupStatus || {};
+    const group = groups[number - 1];
 
-    const idgr =
-      groupid[number - 1];
-
-    if (!idgr) {
-
-      return api.sendMessage(
-`${header}
-
-❌ رقم المجموعة غير صحيح.
-
-استخدم:
-لاست`,
-        event.threadID,
-        event.messageID
-      );
+    if (!group) {
+        return api.sendMessage(
+            "رقم المجموعة غير موجود",
+            event.threadID,
+            event.messageID
+        );
     }
+
+    const groupID = String(group.id);
 
     // ==================================================
     // حظر
     // ==================================================
 
-    if (
-      command === "حظر" ||
-      command === "ban"
-    ) {
+    if (action === "حظر") {
+        const banned = getBanned();
 
-      banGroup(
-        idgr
-      );
+        banned[groupID] = true;
 
-      return api.sendMessage(
-`${header}
+        saveBanned(banned);
 
-✅ تم حظر المجموعة.
-
-⪼ ID:
-${idgr}
-
-🔒 تم حفظ الحظر.`,
-        event.threadID,
-        event.messageID
-      );
+        return api.sendMessage(
+            `تم حظر المجموعة\n\n${group.name}`,
+            event.threadID,
+            event.messageID
+        );
     }
 
     // ==================================================
     // إلغاء الحظر
     // ==================================================
 
-    if (
-      command === "الغاء_حظر" ||
-      command === "الغاء" ||
-      command === "unban"
-    ) {
+    if (action === "الغاء_حظر") {
+        const banned = getBanned();
 
-      unbanGroup(
-        idgr
-      );
+        delete banned[groupID];
 
-      return api.sendMessage(
-`${header}
+        saveBanned(banned);
 
-✅ تم إلغاء حظر المجموعة.
-
-⪼ ID:
-${idgr}`,
-        event.threadID,
-        event.messageID
-      );
+        return api.sendMessage(
+            `تم إلغاء حظر المجموعة\n\n${group.name}`,
+            event.threadID,
+            event.messageID
+        );
     }
 
     // ==================================================
     // خروج
     // ==================================================
 
-    if (
-      command === "خروج" ||
-      command === "غادري" ||
-      command === "leave"
-    ) {
+    if (action === "خروج") {
+        const left = await new Promise(resolve => {
+            try {
+                api.removeUserFromGroup(
+                    api.getCurrentUserID(),
+                    groupID,
+                    error => {
+                        if (error) {
+                            resolve({
+                                success: false,
+                                error:
+                                    error.message ||
+                                    String(error)
+                            });
+                        } else {
+                            resolve({
+                                success: true
+                            });
+                        }
+                    }
+                );
+            } catch (error) {
+                resolve({
+                    success: false,
+                    error:
+                        error.message ||
+                        String(error)
+                });
+            }
+        });
 
-      await api.sendMessage(
-        "⏳ جاري إرسال رسالة الوداع ثم الخروج...",
-        event.threadID,
-        event.messageID
-      );
+        if (!left.success) {
+            return api.sendMessage(
+                `فشل الخروج من المجموعة\n\n${left.error}`,
+                event.threadID,
+                event.messageID
+            );
+        }
 
-      const success =
-        await leaveGroup(
-          api,
-          idgr
-        );
+        saveLeftThread(groupID, {
+            threadName: group.name
+        });
 
-      if (!success) {
+        removeFromKnownThreads(groupID);
 
         return api.sendMessage(
-`${header}
-
-❌ فشل خروج البوت.
-
-⪼ ID:
-${idgr}
-
-قد لا يكون البوت مشرفًا أو أن المجموعة لم تعد متاحة.`,
-          event.threadID,
-          event.messageID
+            `تم الخروج من المجموعة\n\n${group.name}`,
+            event.threadID,
+            event.messageID
         );
-      }
-
-      /*
-       * تسجيل المجموعة قبل إزالتها
-       */
-
-      saveLeftThread(
-        idgr,
-        {
-          threadName:
-            groupStatus[idgr]?.name ||
-            `مجموعة ${idgr}`
-        }
-      );
-
-      /*
-       * إزالة المجموعة من القائمة المعروفة
-       */
-
-      removeFromKnownThreads(
-        idgr
-      );
-
-      return api.sendMessage(
-`${header}
-
-✅ تم الخروج من المجموعة.
-
-⪼ ID:
-${idgr}
-
-🗑️ أصبحت المحادثة متاحة للتنظيف.
-
-استخدم:
-تنظيف ${number}`,
-        event.threadID,
-        event.messageID
-      );
     }
 
     // ==================================================
     // تنظيف
     // ==================================================
 
-    if (
-      command === "تنظيف" ||
-      command === "clean"
-    ) {
-
-      /*
-       * إذا كانت المجموعة ما زالت متاحة
-       * نمنع حذفها
-       */
-
-      const result =
-        await cleanThread(
-          api,
-          idgr
-        );
-
-      if (
-        result.active
-      ) {
-
+    if (action === "تنظيف") {
         return api.sendMessage(
-`${header}
+            `جاري اختبار الاتصال بالمجموعة\n\n${group.name}`,
+            event.threadID,
+            async (error) => {
+                if (error) return;
 
-⚠️ لا يمكن تنظيف هذه المحادثة.
+                const result =
+                    await cleanThread(
+                        api,
+                        groupID
+                    );
 
-البوت ما زال قادرًا على الوصول إلى المجموعة.
+                if (result.success) {
+                    return api.sendMessage(
+                        `تم تنظيف المحادثة بنجاح\n\n${group.name}`,
+                        event.threadID
+                    );
+                }
 
-⪼ ID:
-${idgr}`,
-          event.threadID,
-          event.messageID
-        );
-      }
+                if (result.active) {
+                    return api.sendMessage(
+                        `البوت ما زال داخل المجموعة\n\n${group.name}\n\nلم يتم تنظيفها`,
+                        event.threadID
+                    );
+                }
 
-      if (
-        !result.success
-      ) {
-
-        return api.sendMessage(
-`${header}
-
-❌ فشل تنظيف المحادثة.
-
-⪼ ID:
-${idgr}
-
-الخطأ:
-${result.error || "خطأ غير معروف"}
-
-يمكنك المحاولة مرة أخرى.`,
-          event.threadID,
-          event.messageID
-        );
-      }
-
-      return api.sendMessage(
-`${header}
-
-✅ تم تنظيف المحادثة بنجاح.
-
-⪼ ID:
-${idgr}
-
-🗑️ تم حذفها من محادثات حساب البوت.`,
-        event.threadID,
-        event.messageID
-      );
-    }
-
-    // ==================================================
-    // أمر غير معروف
-    // ==================================================
-
-    return api.sendMessage(
-`${header}
-
-⚠️ أمر غير معروف.
-
-الأوامر:
-
-حظر 1
-الغاء_حظر 1
-خروج 1
-تنظيف 1
-
-أو:
-
-تنظيف_الكل`,
-      event.threadID,
-      event.messageID
-    );
-
-  } catch (error) {
-
-    console.error(
-      "LASt HANDLE ERROR:",
-      error
-    );
-
-    return api.sendMessage(
-`${header}
-
-❌ حدث خطأ أثناء تنفيذ الأمر.
-
-${error.message}`,
-      event.threadID
-    );
-  }
-};
-
-// ======================================================
-// RUN
-// ======================================================
-
-module.exports.run =
-async function ({
-  api,
-  event,
-  Threads
-}) {
-
-  try {
-
-    if (
-      !isDeveloper(
-        event.senderID
-      )
-    ) {
-
-      return;
-    }
-
-    const header =
-`⌬ ━━━━━━━━━━━━ ⌬
-      ⚙️ قـائـمـة الـمـجـمـوعـات
-⌬ ━━━━━━━━━━━━ ⌬`;
-
-    // ==================================================
-    // جمع IDs
-    // ==================================================
-
-    let threadIDs =
-      collectThreadIDs(
-        Threads
-      );
-
-    // ==================================================
-    // Threads.getAll
-    // ==================================================
-
-    try {
-
-      if (
-        Threads &&
-        typeof Threads.getAll ===
-          "function"
-      ) {
-
-        const all =
-          await Threads.getAll();
-
-        if (
-          Array.isArray(all)
-        ) {
-
-          for (
-            const item of all
-          ) {
-
-            const id =
-              item.threadID ||
-              item.id ||
-              item._id;
-
-            if (id) {
-
-              threadIDs.push(
-                String(id)
-              );
+                return api.sendMessage(
+                    `فشل تنظيف المحادثة\n\n${group.name}\n\nالسبب: ${result.error}`,
+                    event.threadID
+                );
             }
-          }
-        }
-      }
-
-    } catch (e) {
-
-      console.log(
-        "LASt Threads.getAll skipped:",
-        e.message
-      );
-    }
-
-    // ==================================================
-    // إضافة المحادثات المسجلة قديمًا
-    // ==================================================
-
-    const leftThreads =
-      getLeftThreads();
-
-    for (
-      const id of Object.keys(
-        leftThreads
-      )
-    ) {
-
-      threadIDs.push(
-        String(id)
-      );
-    }
-
-    // ==================================================
-    // إضافة المحظورة
-    // ==================================================
-
-    const banned =
-      readJSON(
-        BANNED_FILE,
-        {}
-      );
-
-    for (
-      const id of Object.keys(
-        banned
-      )
-    ) {
-
-      threadIDs.push(
-        String(id)
-      );
-    }
-
-    // ==================================================
-    // إزالة التكرار
-    // ==================================================
-
-    threadIDs =
-      [
-        ...new Set(
-          threadIDs.map(
-            id => String(id)
-          )
-        )
-      ];
-
-    if (!threadIDs.length) {
-
-      return api.sendMessage(
-`${header}
-
-❌ لا توجد مجموعات مسجلة في بيانات البوت.`,
-        event.threadID
-      );
-    }
-
-    // ==================================================
-    // فحص المجموعات
-    // ==================================================
-
-    const groups = [];
-
-    for (
-      const id of threadIDs
-    ) {
-
-      const info =
-        await getRealThreadInfo(
-          api,
-          id
         );
-
-      // ==================================================
-      // المجموعة غير متاحة
-      // ==================================================
-
-      if (!info) {
-
-        /*
-         * نحفظها حتى تبقى ظاهرة
-         * ويمكن تنظيفها يدويًا
-         */
-
-        saveLeftThread(
-          id,
-          leftThreads[id] || {}
-        );
-
-        const oldData =
-          leftThreads[id] || {};
-
-        groups.push({
-
-          id,
-
-          name:
-            oldData.name ||
-            `مجموعة ${id}`,
-
-          members:
-            "غير متاح",
-
-          banned:
-            isBanned(id),
-
-          unavailable:
-            true
-        });
-
-        continue;
-      }
-
-      // ==================================================
-      // المجموعة متاحة
-      // ==================================================
-
-      const name =
-        getGroupName(
-          info,
-          id
-        );
-
-      const members =
-        getMemberCount(
-          info
-        );
-
-      /*
-       * إذا عادت المجموعة وأصبحت متاحة
-       * نحذفها من سجل المحادثات القديمة
-       */
-
-      removeLeftThread(
-        id
-      );
-
-      groups.push({
-
-        id,
-
-        name,
-
-        members,
-
-        banned:
-          isBanned(id),
-
-        unavailable:
-          false
-      });
     }
-
-    // ==================================================
-    // لا توجد نتائج
-    // ==================================================
-
-    if (!groups.length) {
-
-      return api.sendMessage(
-`${header}
-
-❌ لم أجد أي مجموعات.`,
-        event.threadID
-      );
-    }
-
-    // ==================================================
-    // إنشاء القائمة
-    // ==================================================
-
-    let msg =
-`${header}
-
-📊 المجموعات المعروفة:
-${groups.length}
-
-`;
-
-    const groupid = [];
-
-    const groupStatus = {};
-
-    for (
-      let i = 0;
-      i < groups.length;
-      i++
-    ) {
-
-      const g =
-        groups[i];
-
-      groupid.push(
-        g.id
-      );
-
-      groupStatus[
-        g.id
-      ] = {
-        name:
-          g.name,
-        unavailable:
-          g.unavailable
-      };
-
-      let status;
-
-      if (
-        g.unavailable
-      ) {
-
-        status =
-          "⚠️ غير متاحة";
-
-      } else if (
-        g.banned
-      ) {
-
-        status =
-          "🔒 محظورة";
-
-      } else {
-
-        status =
-          "🟢 نشطة";
-      }
-
-      msg +=
-`${i + 1}. ${g.name}
-⪼ الأعضاء: ${g.members}
-⪼ الحالة: ${status}
-⪼ ID: ${g.id}`;
-
-      if (
-        g.unavailable
-      ) {
-
-        msg +=
-`
-⪼ يمكن تنظيفها: نعم`;
-      }
-
-      msg +=
-`
-
-`;
-    }
-
-    // ==================================================
-    // التحكم
-    // ==================================================
-
-    msg +=
-`⌬ ━━━━━━━━━━━━ ⌬
-💡 التحكم:
-
-• حظر [رقم]
-• الغاء_حظر [رقم]
-• خروج [رقم]
-• تنظيف [رقم]
-• تنظيف_الكل
-
-مثال:
-
-حظر 1
-الغاء_حظر 1
-خروج 1
-تنظيف 2
-
-تنظيف_الكل
-
-⌬ ━━━━━━━━━━━━ ⌬`;
-
-    // ==================================================
-    // إرسال القائمة
-    // ==================================================
-
-    return api.sendMessage(
-      msg,
-      event.threadID,
-      (error, info) => {
-
-        if (error) {
-
-          console.error(
-            "LASt SEND ERROR:",
-            error
-          );
-
-          return;
-        }
-
-        if (
-          !global.client.handleReply
-        ) {
-
-          global.client.handleReply =
-            [];
-        }
-
-        global.client.handleReply.push({
-
-          name:
-            "لاست",
-
-          messageID:
-            info.messageID,
-
-          author:
-            String(
-              event.senderID
-            ),
-
-          groupid,
-
-          groupStatus,
-
-          type:
-            "groupList"
-        });
-
-      },
-      event.messageID
-    );
-
-  } catch (error) {
-
-    console.error(
-      "LASt ERROR:",
-      error
-    );
-
-    return api.sendMessage(
-`⌬ ━━━━━━━━━━━━ ⌬
-
-❌ فشل جلب المجموعات.
-
-الخطأ:
-${error.message}
-
-⌬ ━━━━━━━━━━━━ ⌬`,
-      event.threadID
-    );
-  }
 };
