@@ -1,70 +1,126 @@
 module.exports.config = {
   name: "فحصجنس",
-  version: "1.0.0",
+  version: "2.0.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
-  description: "فحص بيانات المستخدم لمعرفة وجود معلومات الجنس",
+  description: "فحص بيانات المستخدم من Users و API",
   commandCategory: "Utility",
   usages: "فحصجنس [منشن] أو بالرد",
   cooldowns: 3
 };
 
 module.exports.run = async function({ api, event, Users }) {
-  const { threadID, messageID, senderID, messageReply, mentions } = event;
+  const {
+    threadID,
+    messageID,
+    senderID,
+    messageReply,
+    mentions
+  } = event;
 
   try {
     let targetID;
 
-    // الرد
+    // ══════════════════════════════════════════
+    // تحديد الشخص
+    // ══════════════════════════════════════════
     if (messageReply) {
       targetID = messageReply.senderID;
-    }
-
-    // المنشن
-    else if (mentions && Object.keys(mentions).length > 0) {
+    } else if (mentions && Object.keys(mentions).length > 0) {
       targetID = Object.keys(mentions)[0];
-    }
-
-    // بدون تحديد شخص
-    else {
+    } else {
       targetID = senderID;
     }
 
-    const data = await Users.getData(targetID);
+    // ══════════════════════════════════════════
+    // Users.getData
+    // ══════════════════════════════════════════
+    let usersData = null;
 
-    console.log("════════════════════════════════");
-    console.log("فحص المستخدم:", targetID);
-    console.log(data);
-    console.log("════════════════════════════════");
+    try {
+      usersData = await Users.getData(targetID);
+    } catch (error) {
+      console.error("Users.getData error:", error);
+    }
 
-    // استخراج أهم الحقول المحتملة
-    const result = {
-      id: targetID,
-      name: data?.name,
-      gender: data?.gender,
-      sex: data?.sex,
-      genderType: data?.genderType,
-      firstName: data?.firstName,
-      lastName: data?.lastName,
-      dataKeys: data ? Object.keys(data) : []
-    };
+    // ══════════════════════════════════════════
+    // api.getUserInfo
+    // ══════════════════════════════════════════
+    let apiData = null;
 
-    return api.sendMessage(
+    try {
+      apiData = await api.getUserInfo(targetID);
+    } catch (error) {
+      console.error("api.getUserInfo error:", error);
+    }
+
+    const userInfo = apiData?.[targetID] || apiData || {};
+
+    // ══════════════════════════════════════════
+    // عرض كل شيء في الكونسول
+    // ══════════════════════════════════════════
+    console.log("\n════════════════════════════════════");
+    console.log("HINA USER GENDER CHECK");
+    console.log("ID:", targetID);
+
+    console.log("\n--- Users.getData ---");
+    console.dir(usersData, { depth: null });
+
+    console.log("\n--- api.getUserInfo ---");
+    console.dir(apiData, { depth: null });
+
+    console.log("\n--- API USER INFO KEYS ---");
+    console.log(Object.keys(userInfo));
+
+    console.log("════════════════════════════════════\n");
+
+    // ══════════════════════════════════════════
+    // البحث عن الحقول المتعلقة بالجنس
+    // ══════════════════════════════════════════
+    const possibleGenderFields = [
+      "gender",
+      "sex",
+      "genderType",
+      "gender_type",
+      "genderTypeEnum"
+    ];
+
+    const foundGender = {};
+
+    for (const key of possibleGenderFields) {
+      if (userInfo[key] !== undefined) {
+        foundGender[key] = userInfo[key];
+      }
+    }
+
+    // ══════════════════════════════════════════
+    // النتيجة
+    // ══════════════════════════════════════════
+    let message =
       `⌬ ━━ HINA USER CHECK ━━ ⌬\n\n` +
       `🆔 ID: ${targetID}\n` +
-      `👤 الاسم: ${result.name || "غير موجود"}\n` +
-      `⚧ gender: ${result.gender ?? "غير موجود"}\n` +
-      `⚧ sex: ${result.sex ?? "غير موجود"}\n` +
-      `⚧ genderType: ${result.genderType ?? "غير موجود"}\n\n` +
-      `📋 الحقول الموجودة:\n` +
-      `${result.dataKeys.join(", ") || "لا توجد بيانات"}\n\n` +
-      `تم فحص Users.getData`,
+      `👤 الاسم: ${userInfo.name || userInfo.fullName || "غير موجود"}\n\n` +
+      `━━ api.getUserInfo ━━\n\n` +
+      `📋 الحقول:\n` +
+      `${Object.keys(userInfo).join(", ") || "لا توجد"}\n\n`;
+
+    if (Object.keys(foundGender).length > 0) {
+      message +=
+        `⚧ بيانات الجنس الموجودة:\n` +
+        `${JSON.stringify(foundGender, null, 2)}`;
+    } else {
+      message +=
+        `⚧ لم يتم العثور على حقل gender أو sex مباشرة.`;
+    }
+
+    return api.sendMessage(
+      message,
       threadID,
       messageID
     );
 
   } catch (error) {
-    console.error("❌ خطأ في فحص الجنس:", error);
+    console.error("❌ فحصجنس:", error);
 
     return api.sendMessage(
       `⌬ ━━ HINA USER CHECK ━━ ⌬\n\n` +
