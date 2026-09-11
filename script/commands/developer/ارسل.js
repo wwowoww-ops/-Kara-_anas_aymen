@@ -4,7 +4,7 @@ const path = require("path");
 
 module.exports.config = {
   name: "ارسل",
-  version: "2.0.0",
+  version: "2.1.0",
   hasPermssion: 2,
   credits: "أبو هريرة",
   description: "اختيار مجموعة وإرسال رسالة لها",
@@ -13,7 +13,15 @@ module.exports.config = {
   cooldowns: 5
 };
 
-module.exports.run = async function ({ api, event, args }) {
+// ==================================================
+// الأمر الرئيسي
+// ==================================================
+
+module.exports.run = async function ({
+  api,
+  event,
+  args
+}) {
   const {
     threadID,
     messageID,
@@ -22,69 +30,122 @@ module.exports.run = async function ({ api, event, args }) {
     messageReply
   } = event;
 
+  // ==================================================
   // التحقق من المطور
-  if (
-    !global.config.ADMINBOT.includes(
-      String(senderID)
-    )
-  ) {
+  // ==================================================
+
+  const admins =
+    global.config.ADMINBOT || [];
+
+  const isDeveloper =
+    admins.some(
+      id =>
+        String(id) ===
+        String(senderID)
+    );
+
+  if (!isDeveloper) {
     return api.sendMessage(
-      "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬\n\n⚠️ هذا الأمر مخصص للمطور فقط.",
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬\n\n" +
+      "هذا الأمر مخصص للمطور فقط.",
       threadID,
       messageID
     );
   }
 
-  // النص
-  const content = args.join(" ");
+  // ==================================================
+  // الحصول على النص
+  // ==================================================
 
-  if (
-    !content &&
-    type !== "message_reply"
-  ) {
+  const content =
+    Array.isArray(args)
+      ? args.join(" ").trim()
+      : "";
+
+  // ==================================================
+  // التحقق من وجود نص أو مرفق
+  // ==================================================
+
+  const hasAttachments =
+    type === "message_reply" &&
+    messageReply &&
+    Array.isArray(
+      messageReply.attachments
+    ) &&
+    messageReply.attachments.length > 0;
+
+  if (!content && !hasAttachments) {
     return api.sendMessage(
-      "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬\n\n⚠️ يرجى كتابة نص الرسالة أو الرد على صورة/فيديو.",
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬\n\n" +
+      "يرجى كتابة نص الرسالة أو الرد على صورة أو فيديو.",
       threadID,
       messageID
     );
   }
 
+  // ==================================================
   // جلب المجموعات
+  // ==================================================
+
   let allThreads;
 
   try {
-    allThreads = await api.getThreadList(
-      500,
-      null,
-      ["INBOX"]
-    );
+    allThreads =
+      await api.getThreadList(
+        500,
+        null,
+        ["INBOX"]
+      );
   } catch (error) {
+    console.error(
+      "خطأ getThreadList:",
+      error
+    );
+
     return api.sendMessage(
-      `⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬
-
-❌ تعذر الحصول على قائمة المجموعات.
-
-📝 ${error.message || "خطأ غير معروف"}`,
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗕𝗥𝗢𝗔𝗗𝗖𝗔𝗦𝗧 ━━ ⌬\n\n" +
+      "تعذر الحصول على قائمة المجموعات.\n\n" +
+      `${error.message || "خطأ غير معروف"}`,
       threadID,
       messageID
     );
   }
 
-  const groupThreads = allThreads.filter(
-    t =>
-      t.isGroup &&
-      t.threadID !== threadID
-  );
+  if (!Array.isArray(allThreads)) {
+    return api.sendMessage(
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗕𝗥𝗢𝗔𝗗𝗖𝗔𝗦𝗧 ━━ ⌬\n\n" +
+      "تعذر قراءة قائمة المجموعات.",
+      threadID,
+      messageID
+    );
+  }
+
+  // ==================================================
+  // فلترة المجموعات
+  // ==================================================
+
+  const groupThreads =
+    allThreads.filter(
+      group =>
+        group &&
+        group.isGroup &&
+        String(group.threadID) !==
+          String(threadID)
+    );
 
   if (groupThreads.length === 0) {
     return api.sendMessage(
-      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗕𝗥𝗢𝗔𝗗𝗖𝗔𝗦𝗧 ━━ ⌬\n\n❌ لا توجد مجموعات متاحة.",
+      "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗕𝗥𝗢𝗔𝗗𝗖𝗔𝗦𝗧 ━━ ⌬\n\n" +
+      "لا توجد مجموعات متاحة للإرسال.",
       threadID,
       messageID
     );
   }
 
+  // ==================================================
   // إنشاء قائمة المجموعات
+  // ==================================================
+
   let groupList =
     "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗦𝗘𝗟𝗘𝗖𝗧 ━━ ⌬\n\n";
 
@@ -100,60 +161,81 @@ module.exports.run = async function ({ api, event, args }) {
   );
 
   groupList +=
-    "\n⌬ أرسل رقم المجموعة التي تريد الإرسال إليها";
+    "\n━━━━━━━━━━━━━━━━━━\n" +
+    "أرسل رقم المجموعة التي تريد الإرسال إليها";
 
-  // تجهيز الكاش
+  // ==================================================
+  // مجلد الكاش
+  // ==================================================
+
   const cacheDir =
     path.join(
       __dirname,
       "cache"
     );
 
-  await fs.ensureDir(cacheDir);
-
-  const cachePath =
-    path.join(
-      cacheDir,
-      `broadcast_${senderID}_${Date.now()}`
+  try {
+    await fs.ensureDir(
+      cacheDir
     );
+  } catch (error) {
+    console.error(
+      "خطأ إنشاء cache:",
+      error
+    );
+  }
+
+  const uniqueID =
+    `${senderID}_${Date.now()}`;
 
   const attachmentPaths = [];
 
+  // ==================================================
   // تحميل المرفقات
-  if (
-    type === "message_reply" &&
-    messageReply &&
-    Array.isArray(
-      messageReply.attachments
-    ) &&
-    messageReply.attachments.length > 0
-  ) {
+  // ==================================================
+
+  if (hasAttachments) {
     for (
       let i = 0;
       i < messageReply.attachments.length;
       i++
     ) {
-      const att =
+      const attachment =
         messageReply.attachments[i];
 
-      if (!att.url) continue;
+      if (!attachment || !attachment.url) {
+        continue;
+      }
 
-      const ext =
-        att.type === "photo"
-          ? "jpg"
-          : att.type === "video"
-            ? "mp4"
-            : att.type === "audio"
-              ? "mp3"
-              : "bin";
+      let extension = "bin";
+
+      if (
+        attachment.type ===
+        "photo"
+      ) {
+        extension = "jpg";
+      } else if (
+        attachment.type ===
+        "video"
+      ) {
+        extension = "mp4";
+      } else if (
+        attachment.type ===
+        "audio"
+      ) {
+        extension = "mp3";
+      }
 
       const filePath =
-        `${cachePath}_${i}.${ext}`;
+        path.join(
+          cacheDir,
+          `broadcast_${uniqueID}_${i}.${extension}`
+        );
 
       try {
         const response =
           await axios.get(
-            att.url,
+            attachment.url,
             {
               responseType:
                 "arraybuffer",
@@ -161,35 +243,43 @@ module.exports.run = async function ({ api, event, args }) {
             }
           );
 
-        fs.writeFileSync(
+        await fs.writeFile(
           filePath,
-          Buffer.from(response.data)
+          Buffer.from(
+            response.data
+          )
         );
 
         attachmentPaths.push(
           filePath
         );
+
       } catch (error) {
         console.error(
-          "فشل تحميل المرفق:",
-          error
+          `فشل تحميل المرفق ${i}:`,
+          error.message
         );
       }
     }
   }
 
-  // تسجيل الرد
-  if (!global.client.handleReply) {
+  // ==================================================
+  // تجهيز بيانات HandleReply
+  // ==================================================
+
+  if (!Array.isArray(
+    global.client.handleReply
+  )) {
     global.client.handleReply = [];
   }
 
-  global.client.handleReply.push({
+  const replyData = {
     name: "ارسل",
-    messageID,
+    messageID: messageID,
     author: String(senderID),
 
     data: {
-      content,
+      content: content,
 
       groupThreads:
         groupThreads.map(
@@ -203,9 +293,26 @@ module.exports.run = async function ({ api, event, args }) {
           })
         ),
 
-      attachmentPaths
+      attachmentPaths:
+        attachmentPaths
     }
-  });
+  };
+
+  // ==================================================
+  // تسجيل HandleReply
+  // ==================================================
+
+  global.client.handleReply.push(
+    replyData
+  );
+
+  console.log(
+    `𝗛𝗜𝗡𝗔 | ارسل | تم تسجيل HandleReply | ${messageID}`
+  );
+
+  // ==================================================
+  // إرسال القائمة
+  // ==================================================
 
   return api.sendMessage(
     groupList,
@@ -215,7 +322,7 @@ module.exports.run = async function ({ api, event, args }) {
 };
 
 // ==================================================
-// معالجة اختيار المجموعة
+// HandleReply
 // ==================================================
 
 module.exports.handleReply =
@@ -224,98 +331,160 @@ module.exports.handleReply =
     event,
     handleReply
   }) {
-    const {
-      threadID,
-      messageID,
-      senderID,
-      body
-    } = event;
+    try {
 
-    // التأكد من صاحب الطلب
-    if (
-      String(senderID) !==
-      String(handleReply.author)
-    ) {
-      return;
-    }
-
-    const choice =
-      parseInt(
-        String(body).trim()
-      );
-
-    const groups =
-      handleReply.data.groupThreads;
-
-    // التحقق من الرقم
-    if (
-      isNaN(choice) ||
-      choice < 1 ||
-      choice > groups.length
-    ) {
-      return api.sendMessage(
-        `⌬ ━━ 𝗛𝗜𝗡𝗔 𝗦𝗘𝗟𝗘𝗖𝗧 ━━ ⌬
-
-❌ الرقم غير صحيح.
-
-اختر رقمًا من 1 إلى ${groups.length}`,
+      const {
         threadID,
-        messageID
-      );
-    }
+        messageID,
+        senderID,
+        body
+      } = event;
 
-    const selectedGroup =
-      groups[choice - 1];
+      // ==================================================
+      // التحقق من صاحب الطلب
+      // ==================================================
 
-    const content =
-      handleReply.data.content;
+      if (
+        String(senderID) !==
+        String(handleReply.author)
+      ) {
+        return;
+      }
 
-    const attachmentPaths =
-      handleReply.data.attachmentPaths ||
-      [];
+      // ==================================================
+      // التحقق من البيانات
+      // ==================================================
 
-    // حذف HandleReply
-    const index =
-      global.client.handleReply.indexOf(
-        handleReply
-      );
+      if (
+        !handleReply.data ||
+        !Array.isArray(
+          handleReply.data.groupThreads
+        )
+      ) {
+        return api.sendMessage(
+          "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬\n\n" +
+          "حدث خطأ في بيانات الطلب",
+          threadID,
+          messageID
+        );
+      }
 
-    if (index !== -1) {
-      global.client.handleReply.splice(
-        index,
-        1
-      );
-    }
+      const groups =
+        handleReply.data.groupThreads;
 
-    // تجهيز الرسالة
-    const msgObject = {
-      body:
-        `⌬ ━━ 𝗛𝗜𝗡𝗔 𝗕𝗥𝗢𝗔𝗗𝗖𝗔𝗦𝗧 ━━ ⌬\n\n` +
-        `📢 رسالة من المطور:\n\n` +
-        `${content || ""}`
-    };
+      // ==================================================
+      // قراءة الاختيار
+      // ==================================================
 
-    // المرفقات
-    if (
-      attachmentPaths.length > 0
-    ) {
-      const streams =
-        attachmentPaths
-          .filter(file =>
+      const text =
+        String(body || "")
+          .trim();
+
+      const choice =
+        Number(text);
+
+      // ==================================================
+      // التحقق من الرقم
+      // ==================================================
+
+      if (
+        !Number.isInteger(choice) ||
+        choice < 1 ||
+        choice > groups.length
+      ) {
+        return api.sendMessage(
+          "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗦𝗘𝗟𝗘𝗖𝗧 ━━ ⌬\n\n" +
+          "الرقم غير صحيح\n\n" +
+          `اختر رقمًا من 1 إلى ${groups.length}`,
+          threadID,
+          messageID
+        );
+      }
+
+      // ==================================================
+      // المجموعة المختارة
+      // ==================================================
+
+      const selectedGroup =
+        groups[choice - 1];
+
+      if (
+        !selectedGroup ||
+        !selectedGroup.threadID
+      ) {
+        return api.sendMessage(
+          "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬\n\n" +
+          "تعذر العثور على المجموعة المختارة.",
+          threadID,
+          messageID
+        );
+      }
+
+      const content =
+        handleReply.data.content || "";
+
+      const attachmentPaths =
+        Array.isArray(
+          handleReply.data.attachmentPaths
+        )
+          ? handleReply.data.attachmentPaths
+          : [];
+
+      // ==================================================
+      // إزالة الطلب من HandleReply
+      // ==================================================
+
+      const index =
+        global.client.handleReply.indexOf(
+          handleReply
+        );
+
+      if (index !== -1) {
+        global.client.handleReply.splice(
+          index,
+          1
+        );
+      }
+
+      // ==================================================
+      // تجهيز الرسالة
+      // ==================================================
+
+      const msgObject = {
+        body:
+          "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗕𝗥𝗢𝗔𝗗𝗖𝗔𝗦𝗧 ━━ ⌬\n\n" +
+          "رسالة من المطور:\n\n" +
+          content
+      };
+
+      // ==================================================
+      // تجهيز المرفقات
+      // ==================================================
+
+      const validFiles =
+        attachmentPaths.filter(
+          file =>
+            file &&
             fs.existsSync(file)
-          )
-          .map(file =>
-            fs.createReadStream(file)
+        );
+
+      if (
+        validFiles.length > 0
+      ) {
+        const streams =
+          validFiles.map(
+            file =>
+              fs.createReadStream(file)
           );
 
-      if (streams.length > 0) {
         msgObject.attachment =
           streams;
       }
-    }
 
-    // الإرسال
-    try {
+      // ==================================================
+      // بدء الإرسال
+      // ==================================================
+
       api.setMessageReaction(
         "⏳",
         messageID,
@@ -323,10 +492,18 @@ module.exports.handleReply =
         true
       );
 
+      console.log(
+        `𝗛𝗜𝗡𝗔 | ارسل | إرسال إلى: ${selectedGroup.threadID}`
+      );
+
       await api.sendMessage(
         msgObject,
         selectedGroup.threadID
       );
+
+      // ==================================================
+      // نجاح
+      // ==================================================
 
       api.setMessageReaction(
         "✅",
@@ -335,7 +512,10 @@ module.exports.handleReply =
         true
       );
 
+      // ==================================================
       // تنظيف الملفات
+      // ==================================================
+
       for (
         const file of attachmentPaths
       ) {
@@ -343,23 +523,34 @@ module.exports.handleReply =
           if (
             fs.existsSync(file)
           ) {
-            fs.unlinkSync(file);
+            await fs.unlink(file);
           }
-        } catch (e) {}
+        } catch (error) {
+          console.error(
+            "فشل حذف ملف:",
+            error.message
+          );
+        }
       }
 
+      // ==================================================
+      // النتيجة
+      // ==================================================
+
       return api.sendMessage(
-        `⌬ ━━ 𝗛𝗜𝗡𝗔 𝗗𝗘𝗩 ━━ ⌬
-
-✅ تم إرسال الرسالة بنجاح
-
-📌 المجموعة:
-${selectedGroup.name}`,
+        "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗗𝗘𝗩 ━━ ⌬\n\n" +
+        "تم إرسال الرسالة بنجاح\n\n" +
+        `المجموعة:\n${selectedGroup.name}`,
         threadID,
         messageID
       );
 
     } catch (error) {
+
+      console.error(
+        "𝗛𝗜𝗡𝗔 | ارسل HandleReply:",
+        error
+      );
 
       api.setMessageReaction(
         "❌",
@@ -368,6 +559,19 @@ ${selectedGroup.name}`,
         true
       );
 
+      // ==================================================
+      // تنظيف الملفات حتى عند الفشل
+      // ==================================================
+
+      const attachmentPaths =
+        handleReply &&
+        handleReply.data &&
+        Array.isArray(
+          handleReply.data.attachmentPaths
+        )
+          ? handleReply.data.attachmentPaths
+          : [];
+
       for (
         const file of attachmentPaths
       ) {
@@ -375,20 +579,22 @@ ${selectedGroup.name}`,
           if (
             fs.existsSync(file)
           ) {
-            fs.unlinkSync(file);
+            await fs.unlink(file);
           }
         } catch (e) {}
       }
 
       return api.sendMessage(
-        `⌬ ━━ 𝗛𝗜𝗡𝗔 𝗗𝗘𝗩 ━━ ⌬
-
-❌ فشل إرسال الرسالة
-
-📌 المجموعة:
-${selectedGroup.name}
-
-📝 ${error.message || "خطأ غير معروف"}`,
+        "⌬ ━━ 𝗛𝗜𝗡𝗔 𝗗𝗘𝗩 ━━ ⌬\n\n" +
+        "فشل إرسال الرسالة\n\n" +
+        `المجموعة:\n${
+          handleReply &&
+          handleReply.data &&
+          handleReply.data.groupThreads
+            ? "المجموعة المختارة"
+            : "غير معروفة"
+        }\n\n` +
+        `الخطأ:\n${error.message || "خطأ غير معروف"}`,
         threadID,
         messageID
       );
