@@ -5,7 +5,7 @@ const jimp = require("jimp");
 
 module.exports.config = {
   name: "زوجيني",
-  version: "7.0.0",
+  version: "7.1.0",
   hasPermssion: 0,
   credits: "أبو هريرة",
   description: "زواج عشوائي مع صور الطرفين ونسبة التوافق",
@@ -35,16 +35,17 @@ async function downloadAvatar(uid, savePath) {
     `?width=512&height=512` +
     `&access_token=6628568379%7Cc1e620fa708a1d5696fb991c1bde5662`;
 
-  const response = await axios.get(
-    url,
-    {
-      responseType: "arraybuffer",
-      timeout: 20000,
-      headers: {
-        "User-Agent": "Mozilla/5.0"
+  const response =
+    await axios.get(
+      url,
+      {
+        responseType: "arraybuffer",
+        timeout: 20000,
+        headers: {
+          "User-Agent": "Mozilla/5.0"
+        }
       }
-    }
-  );
+    );
 
   fs.writeFileSync(
     savePath,
@@ -62,10 +63,6 @@ async function downloadAvatar(uid, savePath) {
 async function getGroupInfo(api, Threads, threadID) {
 
   let info = null;
-
-  // ----------------------------------------------
-  // الطريقة الأولى: Threads
-  // ----------------------------------------------
 
   try {
 
@@ -90,10 +87,6 @@ async function getGroupInfo(api, Threads, threadID) {
 
   }
 
-
-  // ----------------------------------------------
-  // الطريقة الثانية: API
-  // ----------------------------------------------
 
   if (!info) {
 
@@ -123,10 +116,6 @@ async function getGroupInfo(api, Threads, threadID) {
   }
 
 
-  // ----------------------------------------------
-  // التأكد من أن البيانات صحيحة
-  // ----------------------------------------------
-
   if (
     !info ||
     typeof info !== "object"
@@ -151,7 +140,6 @@ function getParticipantIDs(info) {
   }
 
 
-  // الصيغة الأساسية
   if (
     Array.isArray(
       info.participantIDs
@@ -165,7 +153,6 @@ function getParticipantIDs(info) {
   }
 
 
-  // بعض نسخ FCA تستخدم participants
   if (
     Array.isArray(
       info.participants
@@ -184,13 +171,19 @@ function getParticipantIDs(info) {
 
         }
 
-        if (user && user.id) {
+        if (
+          user &&
+          user.id
+        ) {
 
           return String(user.id);
 
         }
 
-        if (user && user.userID) {
+        if (
+          user &&
+          user.userID
+        ) {
 
           return String(user.userID);
 
@@ -204,7 +197,6 @@ function getParticipantIDs(info) {
   }
 
 
-  // صيغة userInfo
   if (
     Array.isArray(
       info.userInfo
@@ -241,7 +233,6 @@ function getParticipantIDs(info) {
 
 
   return [];
-
 }
 
 
@@ -305,6 +296,78 @@ async function getUserName(
 
 
   return fallback;
+}
+
+
+// ==================================================
+// الحصول على جنس المستخدم
+//
+// 1 = بنت
+// 2 = ولد
+// ==================================================
+
+async function getUserGender(api, uid) {
+
+  try {
+
+    if (
+      !api ||
+      typeof api.getUserInfo !== "function"
+    ) {
+
+      return null;
+
+    }
+
+
+    const info =
+      await api.getUserInfo(
+        String(uid)
+      );
+
+
+    const user =
+      info &&
+      info[String(uid)];
+
+
+    if (
+      !user ||
+      user.gender === undefined ||
+      user.gender === null
+    ) {
+
+      return null;
+
+    }
+
+
+    const gender =
+      Number(user.gender);
+
+
+    if (
+      gender === 1 ||
+      gender === 2
+    ) {
+
+      return gender;
+
+    }
+
+
+    return null;
+
+  } catch (error) {
+
+    console.log(
+      "زوجيني getUserGender:",
+      error.message
+    );
+
+    return null;
+
+  }
 }
 
 
@@ -408,7 +471,7 @@ module.exports.run = async function ({
 
 
     // ==================================================
-    // استخراج الأعضاء بأمان
+    // استخراج الأعضاء
     // ==================================================
 
     const participants =
@@ -487,15 +550,127 @@ module.exports.run = async function ({
 
 
     // ==================================================
+    // معرفة جنس صاحب الأمر
+    //
+    // 1 = بنت
+    // 2 = ولد
+    // ==================================================
+
+    const senderGender =
+      await getUserGender(
+        api,
+        senderID
+      );
+
+
+    if (!senderGender) {
+
+      return api.sendMessage(
+
+        `⌬ ━━ HINA FUN ━━ ⌬
+
+❌ لم أتمكن من معرفة جنس حسابك.
+
+📝 لا يمكن اختيار شريك مناسب بدون معرفة الجنس.`,
+
+        threadID,
+        messageID
+
+      );
+
+    }
+
+
+    // ==================================================
+    // الجنس المطلوب
+    //
+    // بنت 1 → نبحث عن ولد 2
+    // ولد 2 → نبحث عن بنت 1
+    // ==================================================
+
+    const requiredGender =
+      senderGender === 1
+        ? 2
+        : 1;
+
+
+    // ==================================================
+    // فحص جنس جميع الأعضاء
+    // ==================================================
+
+    const genderResults =
+      await Promise.all(
+
+        members.map(
+          async uid => {
+
+            const gender =
+              await getUserGender(
+                api,
+                uid
+              );
+
+            return {
+              uid: String(uid),
+              gender
+            };
+
+          }
+        )
+
+      );
+
+
+    // ==================================================
+    // اختيار الجنس الآخر فقط
+    // ==================================================
+
+    const compatibleMembers =
+      genderResults
+        .filter(
+          user =>
+            user.gender === requiredGender
+        )
+        .map(
+          user =>
+            user.uid
+        );
+
+
+    // ==================================================
+    // لا يوجد شخص من الجنس الآخر
+    // ==================================================
+
+    if (
+      compatibleMembers.length === 0
+    ) {
+
+      return api.sendMessage(
+
+        `⌬ ━━ HINA FUN ━━ ⌬
+
+❌ لم أجد شخصًا من الجنس الآخر متاحًا للزواج.
+
+📝 حاول استخدام الأمر عندما يكون هناك أعضاء متاحون.`,
+
+        threadID,
+        messageID
+
+      );
+
+    }
+
+
+    // ==================================================
     // اختيار الشريك
     // ==================================================
 
     const partnerID =
       String(
-        members[
+        compatibleMembers[
           Math.floor(
             Math.random() *
-            members.length
+            compatibleMembers.length
           )
         ]
       );
