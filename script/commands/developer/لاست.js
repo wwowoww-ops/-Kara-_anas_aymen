@@ -3,10 +3,10 @@ const path = require("path");
 
 module.exports.config = {
   name: "لاست",
-  version: "4.0.0",
+  version: "5.0.0",
   credits: "أبو هريرة",
   hasPermssion: 2,
-  description: "عرض المجموعات المعروفة للبوت والتحكم بها",
+  description: "عرض المجموعات المعروفة للبوت والتحكم بها وتنظيف المحادثات القديمة",
   commandCategory: "developer",
   usages: "لاست",
   cooldowns: 5
@@ -15,7 +15,12 @@ module.exports.config = {
 const DEV_ID = "61578581225040";
 
 const DATA_DIR = path.join(process.cwd(), "data");
-const BANNED_FILE = path.join(DATA_DIR, "banned.json");
+
+const BANNED_FILE =
+  path.join(DATA_DIR, "banned.json");
+
+const LEFT_THREADS_FILE =
+  path.join(DATA_DIR, "leftThreads.json");
 
 fs.ensureDirSync(DATA_DIR);
 
@@ -25,21 +30,34 @@ fs.ensureDirSync(DATA_DIR);
 
 function readJSON(file, fallback = {}) {
   try {
-    if (!fs.existsSync(file)) return fallback;
 
-    const content = fs.readFileSync(file, "utf8").trim();
+    if (!fs.existsSync(file)) {
+      return fallback;
+    }
 
-    if (!content) return fallback;
+    const content =
+      fs.readFileSync(file, "utf8").trim();
+
+    if (!content) {
+      return fallback;
+    }
 
     return JSON.parse(content);
+
   } catch (error) {
-    console.error("LASt READ JSON ERROR:", error);
+
+    console.error(
+      "LASt READ JSON ERROR:",
+      error
+    );
+
     return fallback;
   }
 }
 
 function writeJSON(file, data) {
   try {
+
     fs.writeFileSync(
       file,
       JSON.stringify(data, null, 2),
@@ -47,8 +65,14 @@ function writeJSON(file, data) {
     );
 
     return true;
+
   } catch (error) {
-    console.error("LASt WRITE JSON ERROR:", error);
+
+    console.error(
+      "LASt WRITE JSON ERROR:",
+      error
+    );
+
     return false;
   }
 }
@@ -69,164 +93,226 @@ function collectThreadIDs(Threads) {
 
   const ids = new Set();
 
+  // ==================================================
   // global.data.allThreadID
+  // ==================================================
+
   try {
+
     if (
       global.data &&
-      Array.isArray(global.data.allThreadID)
+      Array.isArray(
+        global.data.allThreadID
+      )
     ) {
-      for (const id of global.data.allThreadID) {
-        if (id) ids.add(String(id));
+
+      for (
+        const id of global.data.allThreadID
+      ) {
+
+        if (id) {
+          ids.add(
+            String(id)
+          );
+        }
       }
     }
+
   } catch (e) {}
 
+  // ==================================================
   // global.data.threadData
+  // ==================================================
+
   try {
+
     if (
       global.data &&
       global.data.threadData
     ) {
 
-      const data = global.data.threadData;
+      const data =
+        global.data.threadData;
 
-      if (data instanceof Map) {
+      if (
+        data instanceof Map
+      ) {
 
-        for (const id of data.keys()) {
-          if (id) ids.add(String(id));
+        for (
+          const id of data.keys()
+        ) {
+
+          if (id) {
+            ids.add(
+              String(id)
+            );
+          }
         }
 
       } else if (
         typeof data === "object"
       ) {
 
-        for (const id of Object.keys(data)) {
-          if (id) ids.add(String(id));
+        for (
+          const id of Object.keys(data)
+        ) {
+
+          if (id) {
+            ids.add(
+              String(id)
+            );
+          }
         }
       }
     }
+
   } catch (e) {}
 
+  // ==================================================
   // Threads.database
+  // ==================================================
+
   try {
+
     if (
       Threads &&
       Threads.database
     ) {
 
-      const database = Threads.database;
+      const database =
+        Threads.database;
 
-      if (database instanceof Map) {
+      if (
+        database instanceof Map
+      ) {
 
-        for (const id of database.keys()) {
-          if (id) ids.add(String(id));
+        for (
+          const id of database.keys()
+        ) {
+
+          if (id) {
+            ids.add(
+              String(id)
+            );
+          }
         }
 
       } else if (
         typeof database === "object"
       ) {
 
-        for (const id of Object.keys(database)) {
-          if (id) ids.add(String(id));
+        for (
+          const id of Object.keys(database)
+        ) {
+
+          if (id) {
+            ids.add(
+              String(id)
+            );
+          }
         }
       }
     }
+
   } catch (e) {}
 
-  // Threads.getAll
-  // بعض نسخ FCA/KIRA تحتوي على هذه الدالة
-  try {
-    if (
-      Threads &&
-      typeof Threads.getAll === "function"
-    ) {
-
-      // لا نستطيع انتظار async هنا،
-      // لذلك سيتم التعامل معها في الدالة الرئيسية.
-    }
-  } catch (e) {}
-
-  return [...ids];
+  return [
+    ...ids
+  ];
 }
 
 // ======================================================
-// التحقق من المجموعة
+// قراءة المحادثات التي خرج منها البوت
 // ======================================================
 
-async function getRealThreadInfo(api, threadID) {
+function getLeftThreads() {
 
-  try {
+  const data =
+    readJSON(
+      LEFT_THREADS_FILE,
+      {}
+    );
 
-    if (
-      !api ||
-      typeof api.getThreadInfo !== "function"
-    ) {
-      return null;
-    }
+  if (
+    !data ||
+    typeof data !== "object" ||
+    Array.isArray(data)
+  ) {
 
-    const info =
-      await api.getThreadInfo(String(threadID));
-
-    if (
-      !info ||
-      typeof info !== "object"
-    ) {
-      return null;
-    }
-
-    /*
-     * إذا كانت FCA أعادت معلومات المجموعة بشكل صحيح
-     * فهذا يعني أن البوت ما زال قادرًا على الوصول إليها.
-     */
-
-    return info;
-
-  } catch (error) {
-
-    // المجموعة لم تعد متاحة للبوت
-    return null;
+    return {};
   }
+
+  return data;
 }
 
 // ======================================================
-// اسم المجموعة
+// تسجيل محادثة قديمة
 // ======================================================
 
-function getGroupName(info, id) {
+function saveLeftThread(
+  threadID,
+  info = {}
+) {
 
-  if (!info) {
-    return `مجموعة ${id}`;
-  }
+  const id =
+    String(threadID);
 
-  return (
-    info.threadName ||
-    info.name ||
-    info.title ||
-    `مجموعة ${id}`
+  const data =
+    getLeftThreads();
+
+  data[id] = {
+
+    threadID: id,
+
+    name:
+      info.threadName ||
+      info.name ||
+      info.title ||
+      `مجموعة ${id}`,
+
+    status:
+      "unavailable",
+
+    time:
+      Date.now()
+  };
+
+  return writeJSON(
+    LEFT_THREADS_FILE,
+    data
   );
 }
 
 // ======================================================
-// عدد الأعضاء
+// حذف ID من سجل المحادثات القديمة
 // ======================================================
 
-function getMemberCount(info) {
+function removeLeftThread(
+  threadID
+) {
 
-  if (!info) return "?";
+  const id =
+    String(threadID);
+
+  const data =
+    getLeftThreads();
 
   if (
-    Array.isArray(info.participantIDs)
+    Object.prototype.hasOwnProperty.call(
+      data,
+      id
+    )
   ) {
-    return info.participantIDs.length;
+
+    delete data[id];
+
+    return writeJSON(
+      LEFT_THREADS_FILE,
+      data
+    );
   }
 
-  if (
-    Array.isArray(info.participants)
-  ) {
-    return info.participants.length;
-  }
-
-  return "?";
+  return true;
 }
 
 // ======================================================
@@ -235,10 +321,14 @@ function getMemberCount(info) {
 
 function isBanned(threadID) {
 
-  const id = String(threadID);
+  const id =
+    String(threadID);
 
   const banned =
-    readJSON(BANNED_FILE, {});
+    readJSON(
+      BANNED_FILE,
+      {}
+    );
 
   if (
     Object.prototype.hasOwnProperty.call(
@@ -247,13 +337,15 @@ function isBanned(threadID) {
     )
   ) {
 
-    const value = banned[id];
+    const value =
+      banned[id];
 
     if (
       value === true ||
       value === 1 ||
       value === "true"
     ) {
+
       return true;
     }
 
@@ -262,6 +354,7 @@ function isBanned(threadID) {
       typeof value === "object" &&
       value.banned !== false
     ) {
+
       return true;
     }
   }
@@ -275,15 +368,16 @@ function isBanned(threadID) {
 
       if (
         typeof global.data.threadBanned.has ===
-        "function" &&
+          "function" &&
         global.data.threadBanned.has(id)
       ) {
+
         return true;
       }
 
       if (
         typeof global.data.threadBanned.get ===
-        "function" &&
+          "function" &&
         global.data.threadBanned.get(id)
       ) {
 
@@ -302,15 +396,24 @@ function isBanned(threadID) {
 
 function banGroup(threadID) {
 
-  const id = String(threadID);
+  const id =
+    String(threadID);
 
   const banned =
-    readJSON(BANNED_FILE, {});
+    readJSON(
+      BANNED_FILE,
+      {}
+    );
 
   banned[id] = {
+
     banned: true,
-    reason: "حظر بواسطة أمر لاست",
-    time: Date.now()
+
+    reason:
+      "حظر بواسطة أمر لاست",
+
+    time:
+      Date.now()
   };
 
   writeJSON(
@@ -324,7 +427,7 @@ function banGroup(threadID) {
       global.data &&
       global.data.threadBanned &&
       typeof global.data.threadBanned.set ===
-      "function"
+        "function"
     ) {
 
       global.data.threadBanned.set(
@@ -344,10 +447,14 @@ function banGroup(threadID) {
 
 function unbanGroup(threadID) {
 
-  const id = String(threadID);
+  const id =
+    String(threadID);
 
   const banned =
-    readJSON(BANNED_FILE, {});
+    readJSON(
+      BANNED_FILE,
+      {}
+    );
 
   if (
     Object.prototype.hasOwnProperty.call(
@@ -355,6 +462,7 @@ function unbanGroup(threadID) {
       id
     )
   ) {
+
     delete banned[id];
   }
 
@@ -369,10 +477,12 @@ function unbanGroup(threadID) {
       global.data &&
       global.data.threadBanned &&
       typeof global.data.threadBanned.delete ===
-      "function"
+        "function"
     ) {
 
-      global.data.threadBanned.delete(id);
+      global.data.threadBanned.delete(
+        id
+      );
     }
 
   } catch (e) {}
@@ -381,62 +491,196 @@ function unbanGroup(threadID) {
 }
 
 // ======================================================
+// التحقق من المجموعة
+// ======================================================
+
+async function getRealThreadInfo(
+  api,
+  threadID
+) {
+
+  try {
+
+    if (
+      !api ||
+      typeof api.getThreadInfo !==
+        "function"
+    ) {
+
+      return null;
+    }
+
+    const info =
+      await api.getThreadInfo(
+        String(threadID)
+      );
+
+    if (
+      !info ||
+      typeof info !== "object"
+    ) {
+
+      return null;
+    }
+
+    return info;
+
+  } catch (error) {
+
+    return null;
+  }
+}
+
+// ======================================================
+// اسم المجموعة
+// ======================================================
+
+function getGroupName(
+  info,
+  id
+) {
+
+  if (!info) {
+
+    return `مجموعة ${id}`;
+  }
+
+  return (
+    info.threadName ||
+    info.name ||
+    info.title ||
+    `مجموعة ${id}`
+  );
+}
+
+// ======================================================
+// عدد الأعضاء
+// ======================================================
+
+function getMemberCount(info) {
+
+  if (!info) {
+    return "?";
+  }
+
+  if (
+    Array.isArray(
+      info.participantIDs
+    )
+  ) {
+
+    return info.participantIDs.length;
+  }
+
+  if (
+    Array.isArray(
+      info.participants
+    )
+  ) {
+
+    return info.participants.length;
+  }
+
+  return "?";
+}
+
+// ======================================================
+// إزالة ID من allThreadID
+// ======================================================
+
+function removeFromKnownThreads(
+  threadID
+) {
+
+  const id =
+    String(threadID);
+
+  try {
+
+    if (
+      global.data &&
+      Array.isArray(
+        global.data.allThreadID
+      )
+    ) {
+
+      global.data.allThreadID =
+        global.data.allThreadID.filter(
+          item =>
+            String(item) !== id
+        );
+    }
+
+  } catch (e) {}
+}
+
+// ======================================================
 // خروج البوت
 // ======================================================
 
-async function leaveGroup(api, threadID) {
+async function leaveGroup(
+  api,
+  threadID
+) {
 
-  const id = String(threadID);
+  const id =
+    String(threadID);
 
   const botID =
     api.getCurrentUserID();
 
   try {
 
-    /*
-     * أولاً رسالة الوداع داخل المجموعة
-     */
+    // ----------------------------------------------
+    // رسالة الوداع
+    // ----------------------------------------------
 
     await api.sendMessage(
       "المطور ابو هريرة يأمرني بالخروج\nاعتذر وداعا",
       id
     );
 
-    /*
-     * انتظار بسيط حتى يتم إرسال الرسالة
-     */
+    // ----------------------------------------------
+    // انتظار إرسال الرسالة
+    // ----------------------------------------------
 
-    await new Promise(resolve =>
-      setTimeout(resolve, 700)
+    await new Promise(
+      resolve =>
+        setTimeout(
+          resolve,
+          700
+        )
     );
 
-    /*
-     * بعد ذلك يخرج البوت
-     */
+    // ----------------------------------------------
+    // خروج البوت
+    // ----------------------------------------------
 
-    return await new Promise(resolve => {
+    return await new Promise(
+      resolve => {
 
-      api.removeUserFromGroup(
-        botID,
-        id,
-        error => {
+        api.removeUserFromGroup(
+          botID,
+          id,
+          error => {
 
-          if (error) {
+            if (error) {
 
-            console.error(
-              "LASt LEAVE ERROR:",
-              error
-            );
+              console.error(
+                "LASt LEAVE ERROR:",
+                error
+              );
 
-            resolve(false);
-            return;
+              resolve(false);
+              return;
+            }
+
+            resolve(true);
           }
+        );
 
-          resolve(true);
-        }
-      );
-
-    });
+      }
+    );
 
   } catch (error) {
 
@@ -450,10 +694,254 @@ async function leaveGroup(api, threadID) {
 }
 
 // ======================================================
+// حذف محادثة
+// ======================================================
+
+async function deleteThread(
+  api,
+  threadID
+) {
+
+  if (
+    !api ||
+    typeof api.deleteThread !==
+      "function"
+  ) {
+
+    return {
+
+      success: false,
+
+      error:
+        "api.deleteThread غير متوفرة في نسخة API الحالية"
+    };
+  }
+
+  const id =
+    String(threadID);
+
+  try {
+
+    /*
+     * محاولة callback
+     */
+
+    const result =
+      await new Promise(
+        resolve => {
+
+          let finished = false;
+
+          const done =
+            error => {
+
+              if (finished) {
+                return;
+              }
+
+              finished = true;
+
+              resolve({
+                callback: true,
+                error
+              });
+            };
+
+          try {
+
+            const returned =
+              api.deleteThread(
+                id,
+                done
+              );
+
+            /*
+             * بعض النسخ تعيد Promise
+             */
+
+            if (
+              returned &&
+              typeof returned.then ===
+                "function"
+            ) {
+
+              returned
+                .then(() => {
+
+                  if (!finished) {
+
+                    finished = true;
+
+                    resolve({
+                      callback: true,
+                      error: null
+                    });
+                  }
+
+                })
+                .catch(error => {
+
+                  if (!finished) {
+
+                    finished = true;
+
+                    resolve({
+                      callback: true,
+                      error
+                    });
+                  }
+
+                });
+            }
+
+          } catch (error) {
+
+            if (!finished) {
+
+              finished = true;
+
+              resolve({
+                callback: true,
+                error
+              });
+            }
+          }
+
+          /*
+           * حماية من API لا يستعمل callback
+           */
+
+          setTimeout(
+            () => {
+
+              if (!finished) {
+
+                finished = true;
+
+                resolve({
+                  callback: false,
+                  error: null
+                });
+              }
+
+            },
+            5000
+          );
+
+        }
+      );
+
+    if (!result.error) {
+
+      return {
+        success: true
+      };
+    }
+
+    return {
+
+      success: false,
+
+      error:
+        result.error?.message ||
+        String(result.error)
+    };
+
+  } catch (error) {
+
+    return {
+
+      success: false,
+
+      error:
+        error?.message ||
+        String(error)
+    };
+  }
+}
+
+// ======================================================
+// تنظيف محادثة واحدة
+// ======================================================
+
+async function cleanThread(
+  api,
+  threadID
+) {
+
+  const id =
+    String(threadID);
+
+  /*
+   * نتأكد أولًا أن المحادثة
+   * لم تعد متاحة للبوت
+   */
+
+  const info =
+    await getRealThreadInfo(
+      api,
+      id
+    );
+
+  if (info) {
+
+    return {
+
+      success: false,
+
+      active: true,
+
+      error:
+        "البوت ما زال قادرًا على الوصول إلى هذه المجموعة"
+    };
+  }
+
+  /*
+   * المحادثة غير متاحة
+   * لذلك نحاول حذفها
+   */
+
+  const result =
+    await deleteThread(
+      api,
+      id
+    );
+
+  if (!result.success) {
+
+    return {
+
+      success: false,
+
+      active: false,
+
+      error:
+        result.error
+    };
+  }
+
+  /*
+   * نجح الحذف
+   */
+
+  removeLeftThread(id);
+
+  removeFromKnownThreads(id);
+
+  return {
+
+    success: true,
+
+    active: false
+  };
+}
+
+// ======================================================
 // HANDLE REPLY
 // ======================================================
 
-module.exports.handleReply = async function ({
+module.exports.handleReply =
+async function ({
   api,
   event,
   handleReply
@@ -462,8 +950,11 @@ module.exports.handleReply = async function ({
   try {
 
     if (
-      !isDeveloper(event.senderID)
+      !isDeveloper(
+        event.senderID
+      )
     ) {
+
       return;
     }
 
@@ -472,22 +963,129 @@ module.exports.handleReply = async function ({
       handleReply.name !== "لاست" ||
       handleReply.type !== "groupList"
     ) {
+
       return;
     }
 
     const body =
-      String(event.body || "").trim();
+      String(
+        event.body || ""
+      ).trim();
 
-    if (!body) return;
+    if (!body) {
+      return;
+    }
 
     const args =
       body.split(/\s+/);
 
     const command =
-      String(args[0] || "").toLowerCase();
+      String(
+        args[0] || ""
+      ).toLowerCase();
 
     const number =
-      parseInt(args[1], 10);
+      parseInt(
+        args[1],
+        10
+      );
+
+    const header =
+      "⌬ ━━━━━━━━━━━━ ⌬";
+
+    // ==================================================
+    // تنظيف الكل
+    // ==================================================
+
+    if (
+      command === "تنظيف_الكل" ||
+      command === "تنظيفالكل" ||
+      command === "cleanall"
+    ) {
+
+      const leftThreads =
+        getLeftThreads();
+
+      const ids =
+        Object.keys(
+          leftThreads
+        );
+
+      if (!ids.length) {
+
+        return api.sendMessage(
+`${header}
+
+✅ لا توجد محادثات قديمة لتنظيفها.`,
+          event.threadID,
+          event.messageID
+        );
+      }
+
+      await api.sendMessage(
+`${header}
+
+⏳ جاري تنظيف المحادثات القديمة...
+
+عدد المحادثات:
+${ids.length}`,
+        event.threadID,
+        event.messageID
+      );
+
+      let success =
+        0;
+
+      let failed =
+        0;
+
+      for (
+        const id of ids
+      ) {
+
+        const result =
+          await cleanThread(
+            api,
+            id
+          );
+
+        if (
+          result.success
+        ) {
+
+          success++;
+
+        } else {
+
+          failed++;
+        }
+
+        await new Promise(
+          resolve =>
+            setTimeout(
+              resolve,
+              300
+            )
+        );
+      }
+
+      return api.sendMessage(
+`${header}
+
+✅ انتهى التنظيف.
+
+🗑️ تم حذف:
+${success}
+
+❌ فشل:
+${failed}`,
+        event.threadID
+      );
+    }
+
+    // ==================================================
+    // التحقق من الرقم
+    // ==================================================
 
     if (
       !Number.isInteger(number) ||
@@ -495,13 +1093,18 @@ module.exports.handleReply = async function ({
     ) {
 
       return api.sendMessage(
-`⌬ ━━━━━━━━━━━━ ⌬
+`${header}
 
 ⚠️ استخدم الأمر بهذا الشكل:
 
 حظر 1
 الغاء_حظر 1
 خروج 1
+تنظيف 1
+
+أو:
+
+تنظيف_الكل
 
 ⌬ ━━━━━━━━━━━━ ⌬`,
         event.threadID,
@@ -512,27 +1115,25 @@ module.exports.handleReply = async function ({
     const groupid =
       handleReply.groupid || [];
 
+    const groupStatus =
+      handleReply.groupStatus || {};
+
     const idgr =
       groupid[number - 1];
 
     if (!idgr) {
 
       return api.sendMessage(
-`⌬ ━━━━━━━━━━━━ ⌬
+`${header}
 
 ❌ رقم المجموعة غير صحيح.
 
 استخدم:
-لاست
-
-⌬ ━━━━━━━━━━━━ ⌃`,
+لاست`,
         event.threadID,
         event.messageID
       );
     }
-
-    const header =
-      "⌬ ━━━━━━━━━━━━ ⌬";
 
     // ==================================================
     // حظر
@@ -543,7 +1144,9 @@ module.exports.handleReply = async function ({
       command === "ban"
     ) {
 
-      banGroup(idgr);
+      banGroup(
+        idgr
+      );
 
       return api.sendMessage(
 `${header}
@@ -569,7 +1172,9 @@ ${idgr}
       command === "unban"
     ) {
 
-      unbanGroup(idgr);
+      unbanGroup(
+        idgr
+      );
 
       return api.sendMessage(
 `${header}
@@ -592,10 +1197,6 @@ ${idgr}`,
       command === "غادري" ||
       command === "leave"
     ) {
-
-      /*
-       * إرسال رسالة للمطور أولاً
-       */
 
       await api.sendMessage(
         "⏳ جاري إرسال رسالة الوداع ثم الخروج...",
@@ -626,27 +1227,25 @@ ${idgr}
       }
 
       /*
-       * إزالة المجموعة القديمة من
-       * global.data.allThreadID
-       * حتى لا تظهر مجددًا في لاست.
+       * تسجيل المجموعة قبل إزالتها
        */
 
-      try {
-
-        if (
-          global.data &&
-          Array.isArray(global.data.allThreadID)
-        ) {
-
-          global.data.allThreadID =
-            global.data.allThreadID.filter(
-              id =>
-                String(id) !==
-                String(idgr)
-            );
+      saveLeftThread(
+        idgr,
+        {
+          threadName:
+            groupStatus[idgr]?.name ||
+            `مجموعة ${idgr}`
         }
+      );
 
-      } catch (e) {}
+      /*
+       * إزالة المجموعة من القائمة المعروفة
+       */
+
+      removeFromKnownThreads(
+        idgr
+      );
 
       return api.sendMessage(
 `${header}
@@ -654,11 +1253,93 @@ ${idgr}
 ✅ تم الخروج من المجموعة.
 
 ⪼ ID:
-${idgr}`,
+${idgr}
+
+🗑️ أصبحت المحادثة متاحة للتنظيف.
+
+استخدم:
+تنظيف ${number}`,
         event.threadID,
         event.messageID
       );
     }
+
+    // ==================================================
+    // تنظيف
+    // ==================================================
+
+    if (
+      command === "تنظيف" ||
+      command === "clean"
+    ) {
+
+      /*
+       * إذا كانت المجموعة ما زالت متاحة
+       * نمنع حذفها
+       */
+
+      const result =
+        await cleanThread(
+          api,
+          idgr
+        );
+
+      if (
+        result.active
+      ) {
+
+        return api.sendMessage(
+`${header}
+
+⚠️ لا يمكن تنظيف هذه المحادثة.
+
+البوت ما زال قادرًا على الوصول إلى المجموعة.
+
+⪼ ID:
+${idgr}`,
+          event.threadID,
+          event.messageID
+        );
+      }
+
+      if (
+        !result.success
+      ) {
+
+        return api.sendMessage(
+`${header}
+
+❌ فشل تنظيف المحادثة.
+
+⪼ ID:
+${idgr}
+
+الخطأ:
+${result.error || "خطأ غير معروف"}
+
+يمكنك المحاولة مرة أخرى.`,
+          event.threadID,
+          event.messageID
+        );
+      }
+
+      return api.sendMessage(
+`${header}
+
+✅ تم تنظيف المحادثة بنجاح.
+
+⪼ ID:
+${idgr}
+
+🗑️ تم حذفها من محادثات حساب البوت.`,
+        event.threadID,
+        event.messageID
+      );
+    }
+
+    // ==================================================
+    // أمر غير معروف
+    // ==================================================
 
     return api.sendMessage(
 `${header}
@@ -669,7 +1350,12 @@ ${idgr}`,
 
 حظر 1
 الغاء_حظر 1
-خروج 1`,
+خروج 1
+تنظيف 1
+
+أو:
+
+تنظيف_الكل`,
       event.threadID,
       event.messageID
     );
@@ -682,13 +1368,11 @@ ${idgr}`,
     );
 
     return api.sendMessage(
-`⌬ ━━━━━━━━━━━━ ⌬
+`${header}
 
 ❌ حدث خطأ أثناء تنفيذ الأمر.
 
-${error.message}
-
-⌬ ━━━━━━━━━━━━ ⌬`,
+${error.message}`,
       event.threadID
     );
   }
@@ -698,7 +1382,8 @@ ${error.message}
 // RUN
 // ======================================================
 
-module.exports.run = async function ({
+module.exports.run =
+async function ({
   api,
   event,
   Threads
@@ -707,8 +1392,11 @@ module.exports.run = async function ({
   try {
 
     if (
-      !isDeveloper(event.senderID)
+      !isDeveloper(
+        event.senderID
+      )
     ) {
+
       return;
     }
 
@@ -717,33 +1405,37 @@ module.exports.run = async function ({
       ⚙️ قـائـمـة الـمـجـمـوعـات
 ⌬ ━━━━━━━━━━━━ ⌬`;
 
-    /*
-     * جمع IDs من أكثر من مصدر
-     */
+    // ==================================================
+    // جمع IDs
+    // ==================================================
 
     let threadIDs =
-      collectThreadIDs(Threads);
+      collectThreadIDs(
+        Threads
+      );
 
-    /*
-     * محاولة الحصول على كل المجموعات
-     * المسجلة في Threads.getAll إن كانت
-     * النسخة الحالية تدعمها.
-     */
+    // ==================================================
+    // Threads.getAll
+    // ==================================================
 
     try {
 
       if (
         Threads &&
         typeof Threads.getAll ===
-        "function"
+          "function"
       ) {
 
         const all =
           await Threads.getAll();
 
-        if (Array.isArray(all)) {
+        if (
+          Array.isArray(all)
+        ) {
 
-          for (const item of all) {
+          for (
+            const item of all
+          ) {
 
             const id =
               item.threadID ||
@@ -751,6 +1443,7 @@ module.exports.run = async function ({
               item._id;
 
             if (id) {
+
               threadIDs.push(
                 String(id)
               );
@@ -760,44 +1453,64 @@ module.exports.run = async function ({
       }
 
     } catch (e) {
+
       console.log(
         "LASt Threads.getAll skipped:",
         e.message
       );
     }
 
-    /*
-     * إزالة التكرار
-     */
+    // ==================================================
+    // إضافة المحادثات المسجلة قديمًا
+    // ==================================================
 
-    threadIDs =
-      [...new Set(
-        threadIDs.map(id =>
-          String(id)
-        )
-      )];
-
-    /*
-     * إضافة المجموعات المحظورة
-     * فقط حتى يمكن التحكم بها.
-     */
-
-    const banned =
-      readJSON(BANNED_FILE, {});
+    const leftThreads =
+      getLeftThreads();
 
     for (
-      const id of Object.keys(banned)
+      const id of Object.keys(
+        leftThreads
+      )
     ) {
 
-      if (
-        !threadIDs.includes(String(id))
-      ) {
-
-        threadIDs.push(
-          String(id)
-        );
-      }
+      threadIDs.push(
+        String(id)
+      );
     }
+
+    // ==================================================
+    // إضافة المحظورة
+    // ==================================================
+
+    const banned =
+      readJSON(
+        BANNED_FILE,
+        {}
+      );
+
+    for (
+      const id of Object.keys(
+        banned
+      )
+    ) {
+
+      threadIDs.push(
+        String(id)
+      );
+    }
+
+    // ==================================================
+    // إزالة التكرار
+    // ==================================================
+
+    threadIDs =
+      [
+        ...new Set(
+          threadIDs.map(
+            id => String(id)
+          )
+        )
+      ];
 
     if (!threadIDs.length) {
 
@@ -809,13 +1522,9 @@ module.exports.run = async function ({
       );
     }
 
-    /*
-     * التحقق الحقيقي من كل مجموعة
-     *
-     * إذا getThreadInfo فشل:
-     * لا نعرض المجموعة لأنها غالبًا
-     * لم تعد متاحة للبوت.
-     */
+    // ==================================================
+    // فحص المجموعات
+    // ==================================================
 
     const groups = [];
 
@@ -829,32 +1538,49 @@ module.exports.run = async function ({
           id
         );
 
-      /*
-       * إذا لم نستطع الوصول للمجموعة
-       * وكانت غير محظورة، نتجاهلها.
-       */
+      // ==================================================
+      // المجموعة غير متاحة
+      // ==================================================
 
       if (!info) {
 
-        if (!isBanned(id)) {
-          continue;
-        }
-
         /*
-         * المجموعة محظورة:
-         * نحتفظ بها حتى يستطيع المطور
-         * إلغاء حظرها.
+         * نحفظها حتى تبقى ظاهرة
+         * ويمكن تنظيفها يدويًا
          */
 
-        groups.push({
+        saveLeftThread(
           id,
-          name: `مجموعة ${id}`,
-          members: "?",
-          banned: true
+          leftThreads[id] || {}
+        );
+
+        const oldData =
+          leftThreads[id] || {};
+
+        groups.push({
+
+          id,
+
+          name:
+            oldData.name ||
+            `مجموعة ${id}`,
+
+          members:
+            "غير متاح",
+
+          banned:
+            isBanned(id),
+
+          unavailable:
+            true
         });
 
         continue;
       }
+
+      // ==================================================
+      // المجموعة متاحة
+      // ==================================================
 
       const name =
         getGroupName(
@@ -867,38 +1593,60 @@ module.exports.run = async function ({
           info
         );
 
+      /*
+       * إذا عادت المجموعة وأصبحت متاحة
+       * نحذفها من سجل المحادثات القديمة
+       */
+
+      removeLeftThread(
+        id
+      );
+
       groups.push({
+
         id,
+
         name,
+
         members,
-        banned: isBanned(id)
+
+        banned:
+          isBanned(id),
+
+        unavailable:
+          false
       });
     }
+
+    // ==================================================
+    // لا توجد نتائج
+    // ==================================================
 
     if (!groups.length) {
 
       return api.sendMessage(
 `${header}
 
-❌ لم أجد مجموعات متاحة حاليًا.
-
-المجموعات التي خرج منها البوت لن تظهر بعد الآن.`,
+❌ لم أجد أي مجموعات.`,
         event.threadID
       );
     }
 
-    /*
-     * إنشاء القائمة
-     */
+    // ==================================================
+    // إنشاء القائمة
+    // ==================================================
 
     let msg =
 `${header}
 
-📊 المجموعات المتاحة للبوت: ${groups.length}
+📊 المجموعات المعروفة:
+${groups.length}
 
 `;
 
     const groupid = [];
+
+    const groupStatus = {};
 
     for (
       let i = 0;
@@ -913,19 +1661,61 @@ module.exports.run = async function ({
         g.id
       );
 
-      const status =
+      groupStatus[
+        g.id
+      ] = {
+        name:
+          g.name,
+        unavailable:
+          g.unavailable
+      };
+
+      let status;
+
+      if (
+        g.unavailable
+      ) {
+
+        status =
+          "⚠️ غير متاحة";
+
+      } else if (
         g.banned
-          ? "🔒 محظورة"
-          : "🟢 نشطة";
+      ) {
+
+        status =
+          "🔒 محظورة";
+
+      } else {
+
+        status =
+          "🟢 نشطة";
+      }
 
       msg +=
 `${i + 1}. ${g.name}
 ⪼ الأعضاء: ${g.members}
 ⪼ الحالة: ${status}
-⪼ ID: ${g.id}
+⪼ ID: ${g.id}`;
+
+      if (
+        g.unavailable
+      ) {
+
+        msg +=
+`
+⪼ يمكن تنظيفها: نعم`;
+      }
+
+      msg +=
+`
 
 `;
     }
+
+    // ==================================================
+    // التحكم
+    // ==================================================
 
     msg +=
 `⌬ ━━━━━━━━━━━━ ⌬
@@ -934,17 +1724,23 @@ module.exports.run = async function ({
 • حظر [رقم]
 • الغاء_حظر [رقم]
 • خروج [رقم]
+• تنظيف [رقم]
+• تنظيف_الكل
 
 مثال:
+
 حظر 1
 الغاء_حظر 1
 خروج 1
+تنظيف 2
+
+تنظيف_الكل
 
 ⌬ ━━━━━━━━━━━━ ⌬`;
 
-    /*
-     * إرسال القائمة
-     */
+    // ==================================================
+    // إرسال القائمة
+    // ==================================================
 
     return api.sendMessage(
       msg,
@@ -964,20 +1760,27 @@ module.exports.run = async function ({
         if (
           !global.client.handleReply
         ) {
-          global.client.handleReply = [];
+
+          global.client.handleReply =
+            [];
         }
 
         global.client.handleReply.push({
 
-          name: "لاست",
+          name:
+            "لاست",
 
           messageID:
             info.messageID,
 
           author:
-            String(event.senderID),
+            String(
+              event.senderID
+            ),
 
           groupid,
+
+          groupStatus,
 
           type:
             "groupList"
