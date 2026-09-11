@@ -1,7 +1,7 @@
 module.exports.config = {
     name: "guardBot",
     eventType: ["log:subscribe"],
-    version: "1.2.0",
+    version: "1.3.0",
     credits: "أبو هريرة",
     description: "حماية زنجوبة من الإضافة بدون إذن المطور",
     category: "events"
@@ -17,7 +17,32 @@ const DEVELOPER_IDS = [
 ];
 
 // ==================================================
-// تحويل أي ID إلى String بشكل آمن
+// صورة التنبيه
+// ==================================================
+
+const GUARD_IMAGE_URL =
+    "https://files.catbox.moe/njxao1.jpg";
+
+// ==================================================
+// المكتبات
+// ==================================================
+
+const axios = require("axios");
+const fs = require("fs-extra");
+const path = require("path");
+
+// ==================================================
+// مجلد الكاش
+// ==================================================
+
+const CACHE_DIR =
+    path.join(
+        __dirname,
+        "cache"
+    );
+
+// ==================================================
+// تحويل ID إلى String
 // ==================================================
 
 function normalizeID(id) {
@@ -34,7 +59,7 @@ function normalizeID(id) {
 }
 
 // ==================================================
-// استخراج ID من كائن مشارك
+// استخراج ID من مشارك
 // ==================================================
 
 function getParticipantID(participant) {
@@ -56,6 +81,98 @@ function getParticipantID(participant) {
 }
 
 // ==================================================
+// تحميل صورة الحماية
+// ==================================================
+
+async function downloadGuardImage() {
+
+    if (
+        !fs.existsSync(
+            CACHE_DIR
+        )
+    ) {
+
+        fs.ensureDirSync(
+            CACHE_DIR
+        );
+
+    }
+
+    const imagePath =
+        path.join(
+            CACHE_DIR,
+            "guardBot.jpg"
+        );
+
+    try {
+
+        const response =
+            await axios.get(
+                GUARD_IMAGE_URL,
+                {
+                    responseType:
+                        "arraybuffer",
+
+                    timeout:
+                        30000
+                }
+            );
+
+        fs.writeFileSync(
+            imagePath,
+            Buffer.from(
+                response.data
+            )
+        );
+
+        return imagePath;
+
+    } catch (error) {
+
+        console.error(
+            "[guardBot] فشل تحميل صورة الحماية:",
+            error.message
+        );
+
+        return null;
+
+    }
+
+}
+
+// ==================================================
+// حذف الصورة المؤقتة
+// ==================================================
+
+function removeGuardImage(
+    imagePath
+) {
+
+    try {
+
+        if (
+            imagePath &&
+            fs.existsSync(imagePath)
+        ) {
+
+            fs.unlinkSync(
+                imagePath
+            );
+
+        }
+
+    } catch (error) {
+
+        console.error(
+            "[guardBot] فشل حذف الصورة:",
+            error.message
+        );
+
+    }
+
+}
+
+// ==================================================
 // الحدث
 // ==================================================
 
@@ -71,7 +188,7 @@ module.exports.handleEvent = async function ({
         }
 
         // ==================================================
-        // بيانات المجموعة
+        // ID المجموعة
         // ==================================================
 
         const threadID =
@@ -93,7 +210,8 @@ module.exports.handleEvent = async function ({
 
             if (
                 api &&
-                typeof api.getCurrentUserID === "function"
+                typeof api.getCurrentUserID ===
+                "function"
             ) {
 
                 botID =
@@ -106,7 +224,7 @@ module.exports.handleEvent = async function ({
         } catch (error) {
 
             console.error(
-                "[guardBot] فشل الحصول على ID البوت:",
+                "[guardBot] تعذر الحصول على ID البوت:",
                 error.message
             );
 
@@ -122,7 +240,7 @@ module.exports.handleEvent = async function ({
         }
 
         // ==================================================
-        // بيانات حدث الإضافة
+        // بيانات الإضافة
         // ==================================================
 
         const logMessageData =
@@ -138,12 +256,11 @@ module.exports.handleEvent = async function ({
         if (
             addedParticipants.length === 0
         ) {
-
             return;
         }
 
         // ==================================================
-        // معرفة من تمت إضافته
+        // IDs الأشخاص الذين تمت إضافتهم
         // ==================================================
 
         const addedIDs =
@@ -161,19 +278,20 @@ module.exports.handleEvent = async function ({
         );
 
         // ==================================================
-        // التأكد أن البوت هو أحد المضافين
+        // التأكد أن البوت تمت إضافته
         // ==================================================
 
         const botAdded =
-            addedIDs.includes(botID);
+            addedIDs.includes(
+                botID
+            );
 
         if (!botAdded) {
-
             return;
         }
 
         // ==================================================
-        // الشخص الذي قام بالإضافة
+        // الشخص الذي أضاف البوت
         // ==================================================
 
         const author =
@@ -200,7 +318,7 @@ module.exports.handleEvent = async function ({
         );
 
         // ==================================================
-        // إذا لم نستطع معرفة من أضاف البوت
+        // إذا لم نعرف صاحب الإضافة
         // ==================================================
 
         if (!author) {
@@ -231,13 +349,13 @@ module.exports.handleEvent = async function ({
             );
 
         // ==================================================
-        // المطور مسموح له
+        // إضافة مصرح بها
         // ==================================================
 
         if (isDeveloper) {
 
             console.log(
-                `[guardBot] إضافة مصرح بها من المطور: ${author}`
+                `[guardBot] تمت إضافة البوت بواسطة مطور مصرح به: ${author}`
             );
 
             return;
@@ -260,50 +378,119 @@ module.exports.handleEvent = async function ({
         );
 
         // ==================================================
-        // رسالة زنجوبة
+        // تحميل الصورة
+        // ==================================================
+
+        const imagePath =
+            await downloadGuardImage();
+
+        // ==================================================
+        // الرسالة المتوافقة مع الصورة
         // ==================================================
 
         const message =
-`إنت أضفتني بدون إذن المطور؟
-ماشي، بس إذنه أول وبعدها نحكي '-'`;
+`⌬ ━━ HINA UTILITY ━━ ⌬
+
+⚠️ تنبيه أمني
+
+تمت إضافة HINA إلى هذه المجموعة بدون إذن المطور
+
+هذه الإضافة غير مصرح بها
+لذلك سيتم مغادرة المجموعة الآن
+
+يرجى الحصول على إذن المطور قبل إعادة الإضافة`;
 
         // ==================================================
-        // إرسال الرسالة
+        // إرسال الصورة + الرسالة
         // ==================================================
 
         try {
 
-            await new Promise(resolve => {
+            if (
+                imagePath &&
+                fs.existsSync(imagePath)
+            ) {
 
-                api.sendMessage(
-                    message,
-                    threadID,
-                    error => {
+                await new Promise(
+                    resolve => {
 
-                        if (error) {
+                        api.sendMessage(
+                            {
+                                body:
+                                    message,
 
-                            console.error(
-                                "[guardBot] فشل إرسال رسالة الخروج:",
-                                error
-                            );
+                                attachment:
+                                    fs.createReadStream(
+                                        imagePath
+                                    )
+                            },
 
-                        }
+                            threadID,
 
-                        resolve();
+                            error => {
+
+                                if (error) {
+
+                                    console.error(
+                                        "[guardBot] فشل إرسال الصورة والرسالة:",
+                                        error
+                                    );
+
+                                }
+
+                                resolve();
+
+                            }
+                        );
 
                     }
                 );
 
-            });
+            } else {
+
+                await new Promise(
+                    resolve => {
+
+                        api.sendMessage(
+                            message,
+                            threadID,
+                            error => {
+
+                                if (error) {
+
+                                    console.error(
+                                        "[guardBot] فشل إرسال الرسالة:",
+                                        error
+                                    );
+
+                                }
+
+                                resolve();
+
+                            }
+                        );
+
+                    }
+                );
+
+            }
 
         } catch (error) {
 
             console.error(
-                "[guardBot] خطأ أثناء إرسال الرسالة:",
+                "[guardBot] خطأ أثناء إرسال التنبيه:",
                 error
             );
 
         }
+
+        // ==================================================
+        // تنظيف الصورة
+        // ==================================================
+
+        removeGuardImage(
+            imagePath
+        );
 
         // ==================================================
         // انتظار بسيط
