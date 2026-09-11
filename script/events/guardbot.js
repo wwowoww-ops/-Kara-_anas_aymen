@@ -1,7 +1,7 @@
 module.exports.config = {
     name: "guardBot",
     eventType: ["log:subscribe"],
-    version: "1.1.0",
+    version: "1.2.0",
     credits: "أبو هريرة",
     description: "حماية زنجوبة من الإضافة بدون إذن المطور",
     category: "events"
@@ -16,6 +16,49 @@ const DEVELOPER_IDS = [
     "61578581225040"
 ];
 
+// ==================================================
+// تحويل أي ID إلى String بشكل آمن
+// ==================================================
+
+function normalizeID(id) {
+
+    if (
+        id === undefined ||
+        id === null
+    ) {
+        return "";
+    }
+
+    return String(id).trim();
+
+}
+
+// ==================================================
+// استخراج ID من كائن مشارك
+// ==================================================
+
+function getParticipantID(participant) {
+
+    if (!participant) {
+        return "";
+    }
+
+    return normalizeID(
+        participant.userFbId ||
+        participant.userFbID ||
+        participant.userID ||
+        participant.userId ||
+        participant.id ||
+        participant.uid ||
+        ""
+    );
+
+}
+
+// ==================================================
+// الحدث
+// ==================================================
+
 module.exports.handleEvent = async function ({
     api,
     event
@@ -23,26 +66,54 @@ module.exports.handleEvent = async function ({
 
     try {
 
-        if (!event) return;
+        if (!event) {
+            return;
+        }
+
+        // ==================================================
+        // بيانات المجموعة
+        // ==================================================
 
         const threadID =
-            String(event.threadID || "");
+            normalizeID(
+                event.threadID
+            );
 
-        const author =
-            String(event.author || "");
-
-        if (!threadID || !author) return;
+        if (!threadID) {
+            return;
+        }
 
         // ==================================================
         // ID البوت
         // ==================================================
 
-        const botID =
-            String(
-                api.getCurrentUserID()
+        let botID = "";
+
+        try {
+
+            if (
+                api &&
+                typeof api.getCurrentUserID === "function"
+            ) {
+
+                botID =
+                    normalizeID(
+                        api.getCurrentUserID()
+                    );
+
+            }
+
+        } catch (error) {
+
+            console.error(
+                "[guardBot] فشل الحصول على ID البوت:",
+                error.message
             );
 
+        }
+
         if (!botID) {
+
             console.error(
                 "[guardBot] تعذر الحصول على ID البوت"
             );
@@ -51,7 +122,7 @@ module.exports.handleEvent = async function ({
         }
 
         // ==================================================
-        // بيانات الإضافة
+        // بيانات حدث الإضافة
         // ==================================================
 
         const logMessageData =
@@ -64,41 +135,109 @@ module.exports.handleEvent = async function ({
                 ? logMessageData.addedParticipants
                 : [];
 
-        if (!addedParticipants.length) {
+        if (
+            addedParticipants.length === 0
+        ) {
+
             return;
         }
 
         // ==================================================
-        // التأكد أن زنجوبة هي التي تمت إضافتها
+        // معرفة من تمت إضافته
+        // ==================================================
+
+        const addedIDs =
+            addedParticipants
+                .map(
+                    participant =>
+                        getParticipantID(
+                            participant
+                        )
+                )
+                .filter(Boolean);
+
+        console.log(
+            `[guardBot] Added IDs: ${addedIDs.join(", ")}`
+        );
+
+        // ==================================================
+        // التأكد أن البوت هو أحد المضافين
         // ==================================================
 
         const botAdded =
-            addedParticipants.some(
-                participant =>
-                    String(
-                        participant.userFbId || ""
-                    ) === botID
-            );
+            addedIDs.includes(botID);
 
         if (!botAdded) {
+
             return;
         }
 
         // ==================================================
-        // التحقق من المطورين
+        // الشخص الذي قام بالإضافة
+        // ==================================================
+
+        const author =
+            normalizeID(
+                event.author ||
+                event.senderID ||
+                logMessageData.author ||
+                logMessageData.authorID ||
+                logMessageData.actor ||
+                logMessageData.actorID ||
+                ""
+            );
+
+        console.log(
+            `[guardBot] Bot ID: ${botID}`
+        );
+
+        console.log(
+            `[guardBot] Author ID: ${author || "غير معروف"}`
+        );
+
+        console.log(
+            `[guardBot] Thread ID: ${threadID}`
+        );
+
+        // ==================================================
+        // إذا لم نستطع معرفة من أضاف البوت
+        // ==================================================
+
+        if (!author) {
+
+            console.error(
+                "[guardBot] لم يتم العثور على ID الشخص الذي أضاف البوت"
+            );
+
+            console.error(
+                "[guardBot] Event:",
+                JSON.stringify(
+                    event,
+                    null,
+                    2
+                )
+            );
+
+            return;
+        }
+
+        // ==================================================
+        // التحقق من المطور
         // ==================================================
 
         const isDeveloper =
-            DEVELOPER_IDS.includes(author);
+            DEVELOPER_IDS.includes(
+                author
+            );
 
         // ==================================================
-        // إذا كان أحد المطورين هو من أضاف البوت
+        // المطور مسموح له
         // ==================================================
 
         if (isDeveloper) {
 
             console.log(
-                `[guardBot] تمت إضافة البوت بواسطة مطور مصرح به: ${author}`
+                `[guardBot] إضافة مصرح بها من المطور: ${author}`
             );
 
             return;
@@ -109,11 +248,11 @@ module.exports.handleEvent = async function ({
         // ==================================================
 
         console.log(
-            `[guardBot] إضافة غير مصرح بها`
+            "[guardBot] ⚠️ إضافة غير مصرح بها"
         );
 
         console.log(
-            `[guardBot] الشخص الذي أضاف البوت: ${author}`
+            `[guardBot] الشخص: ${author}`
         );
 
         console.log(
@@ -129,79 +268,145 @@ module.exports.handleEvent = async function ({
 ماشي، بس إذنه أول وبعدها نحكي '-'`;
 
         // ==================================================
-        // إرسال الرسالة قبل الخروج
+        // إرسال الرسالة
         // ==================================================
 
-        await new Promise(resolve => {
+        try {
 
-            api.sendMessage(
-                message,
-                threadID,
-                error => {
+            await new Promise(resolve => {
 
-                    if (error) {
+                api.sendMessage(
+                    message,
+                    threadID,
+                    error => {
 
-                        console.error(
-                            "[guardBot] فشل إرسال رسالة الخروج:",
-                            error
-                        );
+                        if (error) {
+
+                            console.error(
+                                "[guardBot] فشل إرسال رسالة الخروج:",
+                                error
+                            );
+
+                        }
+
+                        resolve();
 
                     }
+                );
 
-                    resolve();
+            });
 
-                }
+        } catch (error) {
+
+            console.error(
+                "[guardBot] خطأ أثناء إرسال الرسالة:",
+                error
             );
 
-        });
+        }
 
         // ==================================================
-        // انتظار بسيط حتى تصل الرسالة
+        // انتظار بسيط
         // ==================================================
 
-        await new Promise(resolve =>
-            setTimeout(resolve, 1200)
+        await new Promise(
+            resolve =>
+                setTimeout(
+                    resolve,
+                    1000
+                )
         );
 
         // ==================================================
-        // خروج البوت من المجموعة
+        // إخراج البوت
         // ==================================================
 
-        await new Promise((resolve, reject) => {
+        try {
 
-            api.removeUserFromGroup(
-                botID,
-                threadID,
-                error => {
+            await new Promise(
+                (resolve, reject) => {
 
-                    if (error) {
+                    api.removeUserFromGroup(
+                        botID,
+                        threadID,
+                        error => {
 
-                        console.error(
-                            "[guardBot] فشل خروج البوت من المجموعة:",
-                            error
-                        );
+                            if (error) {
 
-                        return reject(error);
-                    }
+                                console.error(
+                                    "[guardBot] فشل خروج البوت:",
+                                    error
+                                );
 
-                    console.log(
-                        `[guardBot] خرج البوت من المجموعة بنجاح: ${threadID}`
+                                return reject(
+                                    error
+                                );
+
+                            }
+
+                            console.log(
+                                `[guardBot] خرج البوت بنجاح من: ${threadID}`
+                            );
+
+                            resolve();
+
+                        }
                     );
-
-                    resolve();
 
                 }
             );
 
-        });
+        } catch (error) {
+
+            console.error(
+                "[guardBot] Remove User Error:",
+                error
+            );
+
+        }
 
     } catch (error) {
 
         console.error(
-            "❌ GUARD BOT ERROR:",
+            "================================="
+        );
+
+        console.error(
+            "❌ GUARD BOT ERROR"
+        );
+
+        console.error(
             error
+        );
+
+        console.error(
+            "================================="
         );
 
     }
 
 };
+
+أهم تعديل
+
+أصبح يتعرف على الـID من أكثر من مكان:
+
+event.author
+event.senderID
+logMessageData.author
+logMessageData.authorID
+logMessageData.actor
+logMessageData.actorID
+
+وكذلك يتعرف على ID البوت من عدة صيغ داخل "addedParticipants".
+
+لكن هناك نقطة مهمة جدًا: إذا ظل الحدث لا يعمل إطلاقًا، فالمشكلة ليست في منطق الحماية، بل في تحميل الحدث نفسه. والـLoader الذي أرسلته سابقًا كان يقول إن "guard.js" فشل تحميله. بعد وضع هذه النسخة، يجب أن يظهر "guardBot" ضمن الأحداث المحملة، وليس ضمن "FAILED EVENTS".
+
+جرّبه بإضافة البوت من حساب غير موجود في:
+
+const DEVELOPER_IDS = [
+    "61592700121061",
+    "61578581225040"
+];
+
+ويفترض أن يرسل الرسالة ثم يخرج البوت من المجموعة.
