@@ -74,10 +74,7 @@ module.exports.run = async function({ api, event }) {
     for (const admin of adminsToRemove) {
       try {
         await api.changeAdminStatus(threadID, admin.id, false);
-        success++;
-
-        // تأخير بسيط بين العمليات
-        await new Promise(resolve => setTimeout(resolve, 500));
+        success++; 
       } catch (error) {
         failed++;
         console.error(
