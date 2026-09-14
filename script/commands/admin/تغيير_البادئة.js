@@ -14,12 +14,29 @@ module.exports.run = async function({ api, event, args }) {
   const fs = require("fs");
   const path = "./data/prefix.json";
 
-  // التحقق من صلاحية الأدمن
-  const threadInfo = await api.getThreadInfo(threadID);
-  const isAdmin = threadInfo.adminIDs.some(admin => admin.id === senderID);
-  if (!isAdmin) {
+  // ═══════════════════════════════════════════════
+  // التحقق من الصلاحية
+  // الأدمن أو المطور
+  // ═══════════════════════════════════════════════
+
+  const adminIDs = global.config.ADMINBOT || [];
+
+  const isDeveloper =
+    adminIDs.map(String).includes(String(senderID));
+
+  let isAdmin = false;
+
+  if (!isDeveloper) {
+    const threadInfo = await api.getThreadInfo(threadID);
+
+    isAdmin = threadInfo.adminIDs.some(
+      admin => String(admin.id) === String(senderID)
+    );
+  }
+
+  if (!isAdmin && !isDeveloper) {
     return api.sendMessage(
-      `⌬ ━━ HINA ADMIN ━━ ⌬\n\n⛔ هذا الأمر للأدمن فقط!`,
+      `⌬ ━━ HINA ADMIN ━━ ⌬\n\n⛔ هذا الأمر للأدمن أو المطور فقط!`,
       threadID,
       messageID
     );
@@ -35,8 +52,13 @@ module.exports.run = async function({ api, event, args }) {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // عرض البادئة الحالية
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
   if (!args[0]) {
-    const currentPrefix = data[threadID] || global.config.PREFIX || ".";
+    const currentPrefix =
+      data[threadID] ||
+      global.config.PREFIX ||
+      ".";
+
     return api.sendMessage(
       `⌬ ━━ HINA ADMIN ━━ ⌬\n\n🔑 البادئة الحالية: ${currentPrefix}\n\n📝 لتغييرها: تغيير_البادئة [الرمز الجديد]\nمثال: تغيير_البادئة !`,
       threadID,
@@ -47,9 +69,10 @@ module.exports.run = async function({ api, event, args }) {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // تغيير البادئة
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
   const newPrefix = args[0];
-  
-  // منع البادئة الفارغة أو الطويلة جداً
+
+  // منع البادئة الطويلة جداً
   if (newPrefix.length > 5) {
     return api.sendMessage(
       `⌬ ━━ HINA ADMIN ━━ ⌬\n\n⚠️ البادئة لا يمكن أن تزيد عن 5 أحرف.`,
@@ -59,18 +82,34 @@ module.exports.run = async function({ api, event, args }) {
   }
 
   // حفظ البادئة الجديدة
-  const oldPrefix = data[threadID] || global.config.PREFIX || ".";
+  const oldPrefix =
+    data[threadID] ||
+    global.config.PREFIX ||
+    ".";
+
   data[threadID] = newPrefix;
-  fs.writeFileSync(path, JSON.stringify(data, null, 2));
+
+  fs.writeFileSync(
+    path,
+    JSON.stringify(data, null, 2)
+  );
 
   // تحديث البادئة في الذاكرة
   if (global.data.threadData) {
+
     if (!global.data.threadData.has(threadID)) {
       global.data.threadData.set(threadID, {});
     }
-    const threadData = global.data.threadData.get(threadID);
+
+    const threadData =
+      global.data.threadData.get(threadID);
+
     threadData.PREFIX = newPrefix;
-    global.data.threadData.set(threadID, threadData);
+
+    global.data.threadData.set(
+      threadID,
+      threadData
+    );
   }
 
   return api.sendMessage(
