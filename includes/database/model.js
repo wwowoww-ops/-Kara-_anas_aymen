@@ -16,30 +16,128 @@ module.exports = function (input) {
 
     const PetCurrency =
         require("./models/PetCurrency")(input);
-        
 
 
-    // مزامنة الجداول
+    // ============================================================
+    // مزامنة الجداول بشكل آمن
+    // ============================================================
 
-    Users.sync({ force });
+    async function safeSync(name, model) {
 
-    Threads.sync({ force });
+        try {
 
-    Currencies.sync({ force });
+            await model.sync({
+                force
+            });
 
-    Pets.sync({ force });
+            console.log(
+                `✅ [DB] ${name} جاهز`
+            );
 
-    PetCurrency.sync({ force });
+            return true;
 
+        } catch (error) {
+
+            const message =
+                error?.original?.message ||
+                error?.parent?.message ||
+                error?.message ||
+                String(error);
+
+            console.error(
+                `❌ [DB] فشل مزامنة ${name}: ${message}`
+            );
+
+            return false;
+        }
+    }
+
+
+    // ============================================================
+    // تشغيل المزامنة بدون تعطيل تحميل البوت
+    // ============================================================
+
+    Promise.allSettled([
+
+        safeSync(
+            "Users",
+            Users
+        ),
+
+        safeSync(
+            "Threads",
+            Threads
+        ),
+
+        safeSync(
+            "Currencies",
+            Currencies
+        ),
+
+        safeSync(
+            "Pets",
+            Pets
+        ),
+
+        safeSync(
+            "PetCurrency",
+            PetCurrency
+        )
+
+    ]).then(results => {
+
+        const successCount =
+            results.filter(
+                result =>
+                    result.status === "fulfilled" &&
+                    result.value === true
+            ).length;
+
+        if (successCount === 5) {
+
+            console.log(
+                "✅ [DB] جميع الجداول جاهزة"
+            );
+
+        } else {
+
+            console.warn(
+                `⚠️ [DB] تم تجهيز ${successCount}/5 من الجداول`
+            );
+
+            console.warn(
+                "⚠️ [DB] البوت سيستمر في التشغيل رغم مشكلة قاعدة البيانات"
+            );
+        }
+
+    }).catch(error => {
+
+        console.error(
+            "❌ [DB] خطأ أثناء تهيئة قاعدة البيانات:",
+            error?.message || error
+        );
+
+    });
+
+
+    // ============================================================
+    // إرجاع الـModels
+    // ============================================================
 
     return {
 
         model: {
+
             Users,
+
             Threads,
+
             Currencies,
+
             Pets,
-            PetCurrency 
+
+            PetCurrency
+
         },
 
         use: function (modelName) {
@@ -47,7 +145,9 @@ module.exports = function (input) {
             return this.model[
                 `${modelName}`
             ];
+
         }
 
     };
+
 };
