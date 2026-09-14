@@ -102,10 +102,6 @@ global.client = new Object({
 
     configPath: new String(),
 
-    // ═══════════════════════════════════════════
-    // LOAD STATISTICS
-    // ═══════════════════════════════════════════
-
     loadStats: {
 
         commandsLoaded: 0,
@@ -247,12 +243,55 @@ try {
 // DATABASE
 // ═══════════════════════════════════════════════
 
-const {
-    Sequelize,
-    sequelize
-} = require(
-    "./includes/database/index.js"
-);
+let Sequelize;
+let sequelize;
+let database;
+
+try {
+
+    database =
+        require(
+            "./includes/database/index.js"
+        );
+
+    Sequelize =
+        database?.Sequelize;
+
+    sequelize =
+        database?.sequelize;
+
+    if (
+        sequelize &&
+        typeof sequelize.authenticate === "function"
+    ) {
+
+        console.log(
+            chalk.green(
+                "✅ Sequelize module loaded successfully."
+            )
+        );
+
+    } else {
+
+        console.log(
+            chalk.yellow(
+                "⚠️ Sequelize غير متاح حالياً — سيتم تشغيل البوت بدون قاعدة البيانات."
+            )
+        );
+
+    }
+
+} catch (error) {
+
+    console.log(
+        chalk.red(
+            "❌ فشل تحميل نظام قاعدة البيانات:"
+        )
+    );
+
+    console.log(error);
+
+}
 
 writeFileSync(
     global.client.configPath + ".temp",
@@ -960,10 +999,6 @@ function onBot({
                                 commandPath
                             );
 
-                        // ═══════════════════════════════
-                        // التحقق من صحة الأمر
-                        // ═══════════════════════════════
-
                         if (
                             !commandModule ||
                             !commandModule.config ||
@@ -978,21 +1013,12 @@ function onBot({
 
                         }
 
-                        // ═══════════════════════════════
-                        // تسجيل الأمر
-                        // ═══════════════════════════════
-
                         global.client.commands.set(
                             commandModule.config.name,
                             commandModule
                         );
 
                         global.client.loadStats.commandsLoaded++;
-
-                        // ═══════════════════════════════
-                        // تسجيل الأمر كـ Event
-                        // بدون احتسابه كحدث إضافي
-                        // ═══════════════════════════════
 
                         if (
                             typeof commandModule.handleEvent ===
@@ -1107,10 +1133,6 @@ function onBot({
                                 eventPath
                             );
 
-                        // ═══════════════════════════════
-                        // التحقق من صحة الحدث
-                        // ═══════════════════════════════
-
                         if (
                             !event ||
                             !event.config ||
@@ -1124,10 +1146,6 @@ function onBot({
                             );
 
                         }
-
-                        // ═══════════════════════════════
-                        // تسجيل الحدث
-                        // ═══════════════════════════════
 
                         global.client.events.set(
                             event.config.name,
@@ -1304,10 +1322,6 @@ function onBot({
                         message
                     ) => {
 
-                        // ═══════════════════════════════
-                        // تجاهل أحداث اتصال قديم
-                        // ═══════════════════════════════
-
                         if (
                             currentGeneration !==
                             connectionGeneration
@@ -1316,10 +1330,6 @@ function onBot({
                             return;
 
                         }
-
-                        // ═══════════════════════════════
-                        // MQTT ERROR
-                        // ═══════════════════════════════
 
                         if (
                             error
@@ -1383,10 +1393,6 @@ function onBot({
 
                         }
 
-                        // ═══════════════════════════════
-                        // MESSAGE
-                        // ═══════════════════════════════
-
                         if (
                             !message
                         ) {
@@ -1394,10 +1400,6 @@ function onBot({
                             return;
 
                         }
-
-                        // ═══════════════════════════════
-                        // HINA LISTENER
-                        // ═══════════════════════════════
 
                         try {
 
@@ -1581,35 +1583,101 @@ function onBot({
 
 (async () => {
 
-    try {
+    let models = null;
 
-        await sequelize.authenticate();
+    // ═══════════════════════════════════════════
+    // محاولة الاتصال بقاعدة البيانات
+    // لكن فشلها لا يمنع تشغيل البوت
+    // ═══════════════════════════════════════════
+
+    if (
+        sequelize &&
+        typeof sequelize.authenticate === "function"
+    ) {
+
+        try {
+
+            await sequelize.authenticate();
+
+            console.log(
+                chalk.green(
+                    "✅ Database connection established."
+                )
+            );
+
+        } catch (error) {
+
+            console.log(
+                chalk.yellow(
+                    "⚠️ Database connection failed."
+                )
+            );
+
+            console.log(
+                chalk.gray(
+                    error?.message ||
+                    error
+                )
+            );
+
+            console.log(
+                chalk.yellow(
+                    "⚠️ سيتم تشغيل البوت وتحميل الأوامر رغم فشل قاعدة البيانات."
+                )
+            );
+
+        }
+
+    } else {
 
         console.log(
-            chalk.green(
-                "✅ Database connection established."
+            chalk.yellow(
+                "⚠️ Database غير متاحة — سيتم تشغيل البوت بدونها."
             )
         );
 
-        const models =
-            require(
-                "./includes/database/model.js"
-            )({
-                Sequelize,
-                sequelize
-            });
+    }
 
-        onBot({
-            models
-        });
+    // ═══════════════════════════════════════════
+    // تحميل Models
+    // ═══════════════════════════════════════════
 
-    } catch (
-        error
-    ) {
+    try {
+
+        if (
+            Sequelize &&
+            sequelize
+        ) {
+
+            models =
+                require(
+                    "./includes/database/model.js"
+                )({
+                    Sequelize,
+                    sequelize
+                });
+
+            console.log(
+                chalk.green(
+                    "✅ Database models loaded."
+                )
+            );
+
+        } else {
+
+            console.log(
+                chalk.yellow(
+                    "⚠️ تم تخطي تحميل Database Models لأن Sequelize غير متاح."
+                )
+            );
+
+        }
+
+    } catch (error) {
 
         console.log(
-            chalk.red(
-                "❌ Database Error:"
+            chalk.yellow(
+                "⚠️ فشل تحميل Database Models:"
             )
         );
 
@@ -1617,9 +1685,30 @@ function onBot({
             error
         );
 
-        logger(
-            "DB Error",
-            "error"
+        models = null;
+
+    }
+
+    // ═══════════════════════════════════════════
+    // تشغيل البوت مهما كانت حالة قاعدة البيانات
+    // ═══════════════════════════════════════════
+
+    try {
+
+        onBot({
+            models
+        });
+
+    } catch (error) {
+
+        console.log(
+            chalk.red(
+                "❌ فشل بدء البوت:"
+            )
+        );
+
+        console.log(
+            error
         );
 
     }
