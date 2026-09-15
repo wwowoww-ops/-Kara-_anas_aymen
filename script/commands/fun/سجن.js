@@ -11,7 +11,7 @@ const Jimp = require("jimp");
 
 module.exports.config = {
     name: "سجن",
-    version: "1.2.0",
+    version: "1.3.0",
     hasPermssion: 0,
     credits: "أبو هريرة",
     description: "وضع صورة بروفايل العضو خلف القضبان",
@@ -195,13 +195,52 @@ async function prepareProfile(
             profileBuffer
         );
 
-    // جعل الصورة تغطي كامل القالب
     profile.cover(
         width,
         height
     );
 
     return profile;
+}
+
+// ==================================================
+// إزالة الخلفية البيضاء من القالب
+// ==================================================
+
+function removeWhiteBackground(image) {
+
+    image.scan(
+        0,
+        0,
+        image.bitmap.width,
+        image.bitmap.height,
+        function (x, y, idx) {
+
+            const r =
+                this.bitmap.data[idx];
+
+            const g =
+                this.bitmap.data[idx + 1];
+
+            const b =
+                this.bitmap.data[idx + 2];
+
+            /*
+             * إزالة الأبيض والفاتح جدًا
+             * مع إبقاء القضبان الداكنة
+             */
+
+            if (
+                r >= 225 &&
+                g >= 225 &&
+                b >= 225
+            ) {
+                this.bitmap.data[idx + 3] = 0;
+            }
+        }
+    );
+
+    return image;
 }
 
 // ==================================================
@@ -213,56 +252,6 @@ async function makePrisonImage(
     templateBuffer,
     outputPath
 ) {
-    // تحميل صورة العضو
-    const profile = await Jimp.read(profileBuffer);
-
-    // تحميل قالب السجن
-    const template = await Jimp.read(templateBuffer);
-
-    const width = template.bitmap.width;
-    const height = template.bitmap.height;
-
-    // جعل صورة العضو بنفس حجم القالب
-    profile.cover(width, height);
-
-    // جعل الخلفية البيضاء في قالب السجن شفافة
-    template.scan(
-        0,
-        0,
-        template.bitmap.width,
-        template.bitmap.height,
-        function (x, y, idx) {
-
-            const r = this.bitmap.data[idx];
-            const g = this.bitmap.data[idx + 1];
-            const b = this.bitmap.data[idx + 2];
-
-            // اكتشاف اللون الأبيض والفاتح
-            if (
-                r >= 220 &&
-                g >= 220 &&
-                b >= 220
-            ) {
-                this.bitmap.data[idx + 3] = 0;
-            }
-        }
-    );
-
-    // وضع القضبان فوق صورة العضو
-    profile.composite(
-        template,
-        0,
-        0,
-        Jimp.BLEND_SOURCE_OVER
-    );
-
-    // حفظ النتيجة
-    await profile
-        .quality(95)
-        .writeAsync(outputPath);
-
-    return outputPath;
-}
 
     // ----------------------------------------------
     // قراءة قالب السجن
@@ -291,32 +280,29 @@ async function makePrisonImage(
         );
 
     // ----------------------------------------------
-    // وضع صورة العضو كخلفية
+    // إزالة الخلفية البيضاء من قالب القضبان
     // ----------------------------------------------
 
-    const result =
-        profile;
+    removeWhiteBackground(
+        template
+    );
 
     // ----------------------------------------------
-    // وضع قالب القضبان فوق الصورة
+    // وضع القضبان فوق صورة العضو
     // ----------------------------------------------
 
-    result.composite(
+    profile.composite(
         template,
         0,
-        0,
-        {
-            mode: Jimp.BLEND_SOURCE_OVER,
-            opacitySource: 1,
-            opacityDest: 1
-        }
+        0
     );
 
     // ----------------------------------------------
     // حفظ الصورة
     // ----------------------------------------------
 
-    await result.quality(95)
+    await profile
+        .quality(95)
         .writeAsync(
             outputPath
         );
