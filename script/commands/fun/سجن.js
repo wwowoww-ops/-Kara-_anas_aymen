@@ -213,6 +213,56 @@ async function makePrisonImage(
     templateBuffer,
     outputPath
 ) {
+    // تحميل صورة العضو
+    const profile = await Jimp.read(profileBuffer);
+
+    // تحميل قالب السجن
+    const template = await Jimp.read(templateBuffer);
+
+    const width = template.bitmap.width;
+    const height = template.bitmap.height;
+
+    // جعل صورة العضو بنفس حجم القالب
+    profile.cover(width, height);
+
+    // جعل الخلفية البيضاء في قالب السجن شفافة
+    template.scan(
+        0,
+        0,
+        template.bitmap.width,
+        template.bitmap.height,
+        function (x, y, idx) {
+
+            const r = this.bitmap.data[idx];
+            const g = this.bitmap.data[idx + 1];
+            const b = this.bitmap.data[idx + 2];
+
+            // اكتشاف اللون الأبيض والفاتح
+            if (
+                r >= 220 &&
+                g >= 220 &&
+                b >= 220
+            ) {
+                this.bitmap.data[idx + 3] = 0;
+            }
+        }
+    );
+
+    // وضع القضبان فوق صورة العضو
+    profile.composite(
+        template,
+        0,
+        0,
+        Jimp.BLEND_SOURCE_OVER
+    );
+
+    // حفظ النتيجة
+    await profile
+        .quality(95)
+        .writeAsync(outputPath);
+
+    return outputPath;
+}
 
     // ----------------------------------------------
     // قراءة قالب السجن
