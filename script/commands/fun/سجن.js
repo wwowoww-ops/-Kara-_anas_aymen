@@ -3,7 +3,7 @@
 const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
-const sharp = require("sharp");
+const Jimp = require("jimp");
 
 // ==================================================
 // إعداد الأمر
@@ -11,11 +11,11 @@ const sharp = require("sharp");
 
 module.exports.config = {
     name: "سجن",
-    version: "1.1.0",
+    version: "1.2.0",
     hasPermssion: 0,
     credits: "أبو هريرة",
     description: "وضع صورة بروفايل العضو خلف القضبان",
-    commandCategory: "Fun",
+    commandCategory: "fun",
     usages: "سجن",
     cooldowns: 5
 };
@@ -46,7 +46,12 @@ const CHARGES = [
     "ارتكاب جرائم الضحك",
     "سرقة النوم من أعضاء المجموعة",
     "إزعاج الأبرياء دون سبب",
-    "التصرف بشكل مشبوه"
+    "التصرف بشكل مشبوه",
+    "إفساد هدوء المجموعة",
+    "ارتكاب جريمة الغياب",
+    "التواجد بدون إذن",
+    "كثرة الكلام",
+    "الاشتباه في كونه مشاغبًا"
 ];
 
 function getRandomCharge() {
@@ -71,10 +76,10 @@ if (!fs.existsSync(TEMP_DIR)) {
 }
 
 // ==================================================
-// تحميل ملف من رابط
+// تحميل صورة من رابط
 // ==================================================
 
-async function downloadFile(url) {
+async function downloadImage(url) {
 
     const response = await axios.get(url, {
         responseType: "arraybuffer",
@@ -83,7 +88,8 @@ async function downloadFile(url) {
         maxBodyLength: 15 * 1024 * 1024,
 
         headers: {
-            "User-Agent": "Mozilla/5.0"
+            "User-Agent":
+                "Mozilla/5.0"
         }
     });
 
@@ -114,19 +120,33 @@ function getUserInfo(api, userID) {
 }
 
 // ==================================================
+// استخراج بيانات المستخدم
+// ==================================================
+
+function getUserData(userInfo, userID) {
+
+    if (!userInfo) {
+        return {};
+    }
+
+    return (
+        userInfo[userID] ||
+        userInfo[String(userID)] ||
+        userInfo
+    );
+}
+
+// ==================================================
 // استخراج اسم المستخدم
 // ==================================================
 
 function getUserName(userInfo, userID) {
 
-    if (!userInfo) {
-        return "المتهم";
-    }
-
     const info =
-        userInfo[userID] ||
-        userInfo[String(userID)] ||
-        userInfo;
+        getUserData(
+            userInfo,
+            userID
+        );
 
     return (
         info.name ||
@@ -136,19 +156,19 @@ function getUserName(userInfo, userID) {
 }
 
 // ==================================================
-// استخراج رابط صورة البروفايل
+// استخراج صورة البروفايل
 // ==================================================
 
-function getProfilePicture(userInfo, userID) {
-
-    if (!userInfo) {
-        return null;
-    }
+function getProfilePicture(
+    userInfo,
+    userID
+) {
 
     const info =
-        userInfo[userID] ||
-        userInfo[String(userID)] ||
-        userInfo;
+        getUserData(
+            userInfo,
+            userID
+        );
 
     return (
         info.thumbSrc ||
@@ -161,7 +181,31 @@ function getProfilePicture(userInfo, userID) {
 }
 
 // ==================================================
-// جعل القضبان فوق الصورة
+// تجهيز صورة العضو
+// ==================================================
+
+async function prepareProfile(
+    profileBuffer,
+    width,
+    height
+) {
+
+    const profile =
+        await Jimp.read(
+            profileBuffer
+        );
+
+    // جعل الصورة تغطي كامل القالب
+    profile.cover(
+        width,
+        height
+    );
+
+    return profile;
+}
+
+// ==================================================
+// تركيب صورة السجن
 // ==================================================
 
 async function makePrisonImage(
@@ -170,109 +214,62 @@ async function makePrisonImage(
     outputPath
 ) {
 
-    const templateMetadata =
-        await sharp(templateBuffer)
-            .metadata();
+    // ----------------------------------------------
+    // قراءة قالب السجن
+    // ----------------------------------------------
+
+    const template =
+        await Jimp.read(
+            templateBuffer
+        );
 
     const width =
-        templateMetadata.width || 480;
+        template.bitmap.width;
 
     const height =
-        templateMetadata.height || 480;
+        template.bitmap.height;
 
     // ----------------------------------------------
     // تجهيز صورة البروفايل
     // ----------------------------------------------
 
-    const profileImage =
-        await sharp(profileBuffer)
-            .resize({
-                width,
-                height,
-                fit: "cover",
-                position: "centre"
-            })
-            .jpeg({
-                quality: 95
-            })
-            .toBuffer();
+    const profile =
+        await prepareProfile(
+            profileBuffer,
+            width,
+            height
+        );
 
     // ----------------------------------------------
-    // تجهيز قالب القضبان
+    // وضع صورة العضو كخلفية
     // ----------------------------------------------
 
-    const rawTemplate =
-        await sharp(templateBuffer)
-            .resize(width, height, {
-                fit: "fill"
-            })
-            .ensureAlpha()
-            .raw()
-            .toBuffer({
-                resolveWithObject: true
-            });
-
-    const pixels = rawTemplate.data;
+    const result =
+        profile;
 
     // ----------------------------------------------
-    // جعل المناطق البيضاء شفافة
+    // وضع قالب القضبان فوق الصورة
     // ----------------------------------------------
 
-    for (
-        let i = 0;
-        i < pixels.length;
-        i += 4
-    ) {
-
-        const r = pixels[i];
-        const g = pixels[i + 1];
-        const b = pixels[i + 2];
-
-        if (
-            r > 220 &&
-            g > 220 &&
-            b > 220
-        ) {
-
-            pixels[i + 3] = 0;
-
-        } else {
-
-            pixels[i + 3] = 255;
+    result.composite(
+        template,
+        0,
+        0,
+        {
+            mode: Jimp.BLEND_SOURCE_OVER,
+            opacitySource: 1,
+            opacityDest: 1
         }
-    }
+    );
 
     // ----------------------------------------------
-    // إعادة بناء طبقة القضبان
+    // حفظ الصورة
     // ----------------------------------------------
 
-    const transparentTemplate =
-        await sharp(pixels, {
-            raw: {
-                width,
-                height,
-                channels: 4
-            }
-        })
-            .png()
-            .toBuffer();
-
-    // ----------------------------------------------
-    // تركيب الصورة
-    // ----------------------------------------------
-
-    await sharp(profileImage)
-        .composite([
-            {
-                input: transparentTemplate,
-                top: 0,
-                left: 0
-            }
-        ])
-        .jpeg({
-            quality: 95
-        })
-        .toFile(outputPath);
+    await result.quality(95)
+        .writeAsync(
+            outputPath
+        );
 
     return outputPath;
 }
@@ -296,10 +293,40 @@ function safeDelete(filePath) {
     } catch (error) {
 
         console.error(
-            "[سجن] فشل حذف الملف المؤقت:",
+            "[سجن] فشل حذف الملف:",
             error.message
         );
     }
+}
+
+// ==================================================
+// إرسال رسالة
+// ==================================================
+
+function sendMessage(
+    api,
+    message,
+    threadID
+) {
+
+    return new Promise(
+        (resolve, reject) => {
+
+            api.sendMessage(
+                message,
+                threadID,
+                (error, info) => {
+
+                    if (error) {
+                        return reject(error);
+                    }
+
+                    resolve(info);
+                }
+            );
+
+        }
+    );
 }
 
 // ==================================================
@@ -315,7 +342,7 @@ module.exports.run = async function ({
         event.threadID;
 
     // ----------------------------------------------
-    // التأكد من وجود رد
+    // يجب أن يكون الأمر كرد على رسالة
     // ----------------------------------------------
 
     if (
@@ -323,7 +350,8 @@ module.exports.run = async function ({
         !event.messageReply.senderID
     ) {
 
-        return api.sendMessage(
+        return sendMessage(
+            api,
             "⌬ ━━ HINA FUN ━━ ⌬\n\nرد على رسالة الشخص الذي تريد وضعه في السجن",
             threadID
         );
@@ -333,7 +361,7 @@ module.exports.run = async function ({
         event.messageReply.senderID;
 
     // ----------------------------------------------
-    // منع سجن البوت نفسه
+    // الحصول على ID البوت
     // ----------------------------------------------
 
     let botID = null;
@@ -341,7 +369,8 @@ module.exports.run = async function ({
     try {
 
         if (
-            typeof api.getCurrentUserID === "function"
+            typeof api.getCurrentUserID ===
+            "function"
         ) {
 
             botID =
@@ -353,30 +382,40 @@ module.exports.run = async function ({
         botID = null;
     }
 
+    // ----------------------------------------------
+    // منع سجن البوت
+    // ----------------------------------------------
+
     if (
         botID &&
-        String(targetID) === String(botID)
+        String(targetID) ===
+        String(botID)
     ) {
 
-        return api.sendMessage(
+        return sendMessage(
+            api,
             "⌬ ━━ HINA FUN ━━ ⌬\n\nحتى أنا لا أستطيع سجن نفسي",
             threadID
         );
     }
 
-    let profileBuffer;
-    let templateBuffer;
     let outputPath = null;
 
     try {
 
         // ------------------------------------------
-        // الحصول على بيانات المستخدم
+        // بيانات العضو
         // ------------------------------------------
 
         const userInfo =
             await getUserInfo(
                 api,
+                targetID
+            );
+
+        const userName =
+            getUserName(
+                userInfo,
                 targetID
             );
 
@@ -388,20 +427,15 @@ module.exports.run = async function ({
 
         if (!profileURL) {
 
-            return api.sendMessage(
+            return sendMessage(
+                api,
                 "⌬ ━━ HINA FUN ━━ ⌬\n\nلم أستطع الحصول على صورة بروفايل هذا العضو",
                 threadID
             );
         }
 
-        const userName =
-            getUserName(
-                userInfo,
-                targetID
-            );
-
         // ------------------------------------------
-        // اختيار التهمة
+        // اختيار تهمة عشوائية
         // ------------------------------------------
 
         const charge =
@@ -411,8 +445,8 @@ module.exports.run = async function ({
         // تحميل صورة البروفايل
         // ------------------------------------------
 
-        profileBuffer =
-            await downloadFile(
+        const profileBuffer =
+            await downloadImage(
                 profileURL
             );
 
@@ -420,13 +454,13 @@ module.exports.run = async function ({
         // تحميل قالب السجن
         // ------------------------------------------
 
-        templateBuffer =
-            await downloadFile(
+        const templateBuffer =
+            await downloadImage(
                 PRISON_TEMPLATE
             );
 
         // ------------------------------------------
-        // إنشاء اسم مؤقت
+        // اسم الملف المؤقت
         // ------------------------------------------
 
         const randomName =
@@ -451,7 +485,7 @@ module.exports.run = async function ({
         );
 
         // ------------------------------------------
-        // رسالة HINA
+        // رسالة النتيجة
         // ------------------------------------------
 
         const message =
@@ -478,13 +512,13 @@ module.exports.run = async function ({
                             )
                     },
                     threadID,
-                    (error) => {
+                    (error, info) => {
 
                         if (error) {
                             return reject(error);
                         }
 
-                        resolve();
+                        resolve(info);
                     }
                 );
 
@@ -500,7 +534,8 @@ module.exports.run = async function ({
 
         try {
 
-            await api.sendMessage(
+            await sendMessage(
+                api,
                 "⌬ ━━ HINA FUN ━━ ⌬\n\nحدث خطأ أثناء تجهيز صورة السجن",
                 threadID
             );
@@ -516,9 +551,11 @@ module.exports.run = async function ({
     } finally {
 
         // ------------------------------------------
-        // تنظيف الملف الناتج
+        // تنظيف الملف
         // ------------------------------------------
 
-        safeDelete(outputPath);
+        safeDelete(
+            outputPath
+        );
     }
 };
