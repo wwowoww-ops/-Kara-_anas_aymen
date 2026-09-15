@@ -11,7 +11,7 @@ const Jimp = require("jimp");
 
 module.exports.config = {
     name: "سجن",
-    version: "1.3.0",
+    version: "1.4.0",
     hasPermssion: 0,
     credits: "أبو هريرة",
     description: "وضع صورة بروفايل العضو خلف القضبان",
@@ -26,6 +26,16 @@ module.exports.config = {
 
 const PRISON_TEMPLATE =
     "https://files.catbox.moe/rysh6o.jpg";
+
+// ==================================================
+// Facebook Access Token
+// ==================================================
+//
+// ضع التوكن الذي تستخدمه في أمر ايدي هنا
+// ==================================================
+
+const FB_ACCESS_TOKEN =
+    "6628568379|c1e620fa708a1d5696fb991c1bde5662";
 
 // ==================================================
 // التهم العشوائية
@@ -84,8 +94,8 @@ async function downloadImage(url) {
     const response = await axios.get(url, {
         responseType: "arraybuffer",
         timeout: 30000,
-        maxContentLength: 15 * 1024 * 1024,
-        maxBodyLength: 15 * 1024 * 1024,
+        maxContentLength: 20 * 1024 * 1024,
+        maxBodyLength: 20 * 1024 * 1024,
 
         headers: {
             "User-Agent":
@@ -156,7 +166,7 @@ function getUserName(userInfo, userID) {
 }
 
 // ==================================================
-// استخراج صورة البروفايل
+// استخراج صورة البروفايل الاحتياطية
 // ==================================================
 
 function getProfilePicture(
@@ -177,6 +187,80 @@ function getProfilePicture(
         info.profilePicture ||
         info.imageSrc ||
         null
+    );
+}
+
+// ==================================================
+// جلب صورة البروفايل بأعلى جودة
+// ==================================================
+
+async function getHighQualityProfile(
+    userID,
+    fallbackURL
+) {
+
+    try {
+
+        const graphURL =
+            `https://graph.facebook.com/${userID}/picture` +
+            `?width=1500&height=1500` +
+            `&access_token=${encodeURIComponent(FB_ACCESS_TOKEN)}`;
+
+        const response =
+            await axios.get(
+                graphURL,
+                {
+                    responseType:
+                        "arraybuffer",
+
+                    timeout: 30000,
+
+                    maxContentLength:
+                        20 * 1024 * 1024,
+
+                    maxBodyLength:
+                        20 * 1024 * 1024,
+
+                    headers: {
+                        "User-Agent":
+                            "Mozilla/5.0"
+                    }
+                }
+            );
+
+        const buffer =
+            Buffer.from(
+                response.data
+            );
+
+        if (
+            buffer &&
+            buffer.length > 1000
+        ) {
+            return buffer;
+        }
+
+    } catch (error) {
+
+        console.error(
+            "[سجن] فشل جلب الصورة عالية الجودة:",
+            error.message
+        );
+    }
+
+    // ==================================================
+    // استخدام صورة Facebook العادية كبديل
+    // ==================================================
+
+    if (fallbackURL) {
+
+        return await downloadImage(
+            fallbackURL
+        );
+    }
+
+    throw new Error(
+        "تعذر الحصول على صورة البروفايل"
     );
 }
 
@@ -204,7 +288,7 @@ async function prepareProfile(
 }
 
 // ==================================================
-// إزالة الخلفية البيضاء من القالب
+// إزالة الخلفية البيضاء من قالب السجن
 // ==================================================
 
 function removeWhiteBackground(image) {
@@ -225,16 +309,12 @@ function removeWhiteBackground(image) {
             const b =
                 this.bitmap.data[idx + 2];
 
-            /*
-             * إزالة الأبيض والفاتح جدًا
-             * مع إبقاء القضبان الداكنة
-             */
-
             if (
                 r >= 225 &&
                 g >= 225 &&
                 b >= 225
             ) {
+
                 this.bitmap.data[idx + 3] = 0;
             }
         }
@@ -253,10 +333,6 @@ async function makePrisonImage(
     outputPath
 ) {
 
-    // ----------------------------------------------
-    // قراءة قالب السجن
-    // ----------------------------------------------
-
     const template =
         await Jimp.read(
             templateBuffer
@@ -268,10 +344,6 @@ async function makePrisonImage(
     const height =
         template.bitmap.height;
 
-    // ----------------------------------------------
-    // تجهيز صورة البروفايل
-    // ----------------------------------------------
-
     const profile =
         await prepareProfile(
             profileBuffer,
@@ -279,17 +351,9 @@ async function makePrisonImage(
             height
         );
 
-    // ----------------------------------------------
-    // إزالة الخلفية البيضاء من قالب القضبان
-    // ----------------------------------------------
-
     removeWhiteBackground(
         template
     );
-
-    // ----------------------------------------------
-    // وضع القضبان فوق صورة العضو
-    // ----------------------------------------------
 
     profile.composite(
         template,
@@ -297,12 +361,8 @@ async function makePrisonImage(
         0
     );
 
-    // ----------------------------------------------
-    // حفظ الصورة
-    // ----------------------------------------------
-
     await profile
-        .quality(95)
+        .quality(100)
         .writeAsync(
             outputPath
         );
@@ -377,10 +437,6 @@ module.exports.run = async function ({
     const threadID =
         event.threadID;
 
-    // ----------------------------------------------
-    // يجب أن يكون الأمر كرد على رسالة
-    // ----------------------------------------------
-
     if (
         !event.messageReply ||
         !event.messageReply.senderID
@@ -396,9 +452,9 @@ module.exports.run = async function ({
     const targetID =
         event.messageReply.senderID;
 
-    // ----------------------------------------------
+    // ==================================================
     // الحصول على ID البوت
-    // ----------------------------------------------
+    // ==================================================
 
     let botID = null;
 
@@ -418,9 +474,9 @@ module.exports.run = async function ({
         botID = null;
     }
 
-    // ----------------------------------------------
+    // ==================================================
     // منع سجن البوت
-    // ----------------------------------------------
+    // ==================================================
 
     if (
         botID &&
@@ -439,9 +495,9 @@ module.exports.run = async function ({
 
     try {
 
-        // ------------------------------------------
+        // ==================================================
         // بيانات العضو
-        // ------------------------------------------
+        // ==================================================
 
         const userInfo =
             await getUserInfo(
@@ -461,43 +517,35 @@ module.exports.run = async function ({
                 targetID
             );
 
-        if (!profileURL) {
-
-            return sendMessage(
-                api,
-                "⌬ ━━ HINA FUN ━━ ⌬\n\nلم أستطع الحصول على صورة بروفايل هذا العضو",
-                threadID
-            );
-        }
-
-        // ------------------------------------------
-        // اختيار تهمة عشوائية
-        // ------------------------------------------
+        // ==================================================
+        // التهمة
+        // ==================================================
 
         const charge =
             getRandomCharge();
 
-        // ------------------------------------------
-        // تحميل صورة البروفايل
-        // ------------------------------------------
+        // ==================================================
+        // تحميل صورة البروفايل عالية الجودة
+        // ==================================================
 
         const profileBuffer =
-            await downloadImage(
+            await getHighQualityProfile(
+                targetID,
                 profileURL
             );
 
-        // ------------------------------------------
+        // ==================================================
         // تحميل قالب السجن
-        // ------------------------------------------
+        // ==================================================
 
         const templateBuffer =
             await downloadImage(
                 PRISON_TEMPLATE
             );
 
-        // ------------------------------------------
+        // ==================================================
         // اسم الملف المؤقت
-        // ------------------------------------------
+        // ==================================================
 
         const randomName =
             `${Date.now()}_${Math.random()
@@ -510,9 +558,9 @@ module.exports.run = async function ({
                 randomName
             );
 
-        // ------------------------------------------
+        // ==================================================
         // تركيب الصورة
-        // ------------------------------------------
+        // ==================================================
 
         await makePrisonImage(
             profileBuffer,
@@ -520,9 +568,9 @@ module.exports.run = async function ({
             outputPath
         );
 
-        // ------------------------------------------
+        // ==================================================
         // رسالة النتيجة
-        // ------------------------------------------
+        // ==================================================
 
         const message =
             `⌬ ━━ HINA FUN ━━ ⌬
@@ -532,9 +580,9 @@ module.exports.run = async function ({
 التهمة: ${charge}
 الحكم: السجن المؤبد`;
 
-        // ------------------------------------------
+        // ==================================================
         // إرسال الصورة
-        // ------------------------------------------
+        // ==================================================
 
         await new Promise(
             (resolve, reject) => {
@@ -585,10 +633,6 @@ module.exports.run = async function ({
         }
 
     } finally {
-
-        // ------------------------------------------
-        // تنظيف الملف
-        // ------------------------------------------
 
         safeDelete(
             outputPath
