@@ -1,104 +1,137 @@
-"use strict";
-
-const Jimp = require("jimp");
 const fs = require("fs");
 const path = require("path");
+const os = require("os");
+const {
+    createCanvas,
+    GlobalFonts
+} = require("@napi-rs/canvas");
+
+// ==================================================
+// الإعدادات
+// ==================================================
 
 module.exports.config = {
     name: "اكسو",
-    version: "1.0.0",
+    version: "2.0.0",
     hasPermssion: 0,
     credits: "أبو هريرة",
-    description: "لعبة إكس أو بالصورة",
-    commandCategory: "Games",
-    usages: "اكسو | اكس او | xo",
-    cooldowns: 2
+    description: "لعبة XO بصورة تفاعلية",
+    commandCategory: "games",
+    usages: "اكسو",
+    cooldowns: 3
 };
 
 // ==================================================
-// إعدادات
+// الخط العربي
+// ==================================================
+
+const possibleFonts = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/opentype/noto/NotoSansArabic-Regular.ttf",
+    "/usr/share/fonts/opentype/noto/NotoSansArabic-Bold.ttf",
+    "/usr/share/fonts/truetype/noto/NotoSansArabicUI-Regular.ttf",
+    "/system/fonts/NotoNaskhArabic-Regular.ttf",
+    "/system/fonts/NotoSansArabic-Regular.ttf"
+];
+
+for (const font of possibleFonts) {
+    try {
+        if (fs.existsSync(font)) {
+            GlobalFonts.registerFromPath(font, "HINA");
+        }
+    } catch {}
+}
+
+// ==================================================
+// الألعاب
 // ==================================================
 
 const games = new Map();
 
-const CACHE_DIR = path.join(__dirname, "cache");
+// ==================================================
+// أدوات
+// ==================================================
 
-if (!fs.existsSync(CACHE_DIR)) {
-    fs.mkdirSync(CACHE_DIR, {
-        recursive: true
-    });
+function createGameID() {
+    return (
+        Date.now().toString(36) +
+        Math.random().toString(36).slice(2, 10)
+    );
+}
+
+function cleanName(name, fallback = "لاعب") {
+    if (!name) return fallback;
+
+    return String(name)
+        .replace(/[<>]/g, "")
+        .slice(0, 18);
+}
+
+function getName(event) {
+    return cleanName(
+        event.senderName ||
+        event.name ||
+        "لاعب"
+    );
 }
 
 // ==================================================
-// الكلمات المقبولة
+// إنشاء اللعبة
 // ==================================================
 
-const COMMAND_ALIASES = [
-    "اكسو",
-    "اكس او",
-    "اكس-او",
-    "xo",
-    "x o"
-];
+function createGame({
+    threadID,
+    player1ID,
+    player1Name,
+    player2ID = null,
+    player2Name = "HINA",
+    vsBot = false
+}) {
+    const gameID = createGameID();
 
-// ==================================================
-// الأرقام
-// ==================================================
+    const game = {
+        id: gameID,
+        threadID: String(threadID),
 
-const DIGITS = [
-    "1",
-    "2",
-    "3",
-    "4",
-    "5",
-    "6",
-    "7",
-    "8",
-    "9"
-];
+        player1: {
+            id: String(player1ID),
+            name: cleanName(player1Name, "اللاعب"),
+            symbol: "X"
+        },
 
-// ==================================================
-// معرفة هل النص حركة
-// ==================================================
+        player2: {
+            id: player2ID
+                ? String(player2ID)
+                : null,
+            name: cleanName(player2Name, "HINA"),
+            symbol: "O"
+        },
 
-function getMove(text) {
+        vsBot,
 
-    if (!text) return null;
+        board: [
+            null, null, null,
+            null, null, null,
+            null, null, null
+        ],
 
-    const value = String(text)
-        .trim()
-        .toLowerCase();
+        turn: "X",
+        status: "playing",
 
-    if (!DIGITS.includes(value)) {
-        return null;
-    }
+        boardMessageID: null
+    };
 
-    return Number(value) - 1;
+    games.set(gameID, game);
+
+    return game;
 }
 
 // ==================================================
-// إنشاء لوحة فارغة
-// ==================================================
-
-function createBoard() {
-    return [
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        ""
-    ];
-}
-
-// ==================================================
-// التحقق من الفوز
+// الفائز
 // ==================================================
 
 function checkWinner(board) {
-
     const combinations = [
         [0, 1, 2],
         [3, 4, 5],
@@ -112,10 +145,7 @@ function checkWinner(board) {
         [2, 4, 6]
     ];
 
-    for (const combo of combinations) {
-
-        const [a, b, c] = combo;
-
+    for (const [a, b, c] of combinations) {
         if (
             board[a] &&
             board[a] === board[b] &&
@@ -123,15 +153,15 @@ function checkWinner(board) {
         ) {
             return {
                 winner: board[a],
-                line: combo
+                cells: [a, b, c]
             };
         }
     }
 
-    if (board.every(cell => cell !== "")) {
+    if (board.every(Boolean)) {
         return {
             winner: "draw",
-            line: []
+            cells: []
         };
     }
 
@@ -139,15 +169,13 @@ function checkWinner(board) {
 }
 
 // ==================================================
-// الحركات المتاحة
+// حركات البوت
 // ==================================================
 
 function getAvailableMoves(board) {
-
     const moves = [];
 
     for (let i = 0; i < board.length; i++) {
-
         if (!board[i]) {
             moves.push(i);
         }
@@ -156,799 +184,937 @@ function getAvailableMoves(board) {
     return moves;
 }
 
-// ==================================================
-// حركة البوت
-// ==================================================
+function findWinningMove(board, symbol) {
+    const moves = getAvailableMoves(board);
+
+    for (const move of moves) {
+        const test = [...board];
+        test[move] = symbol;
+
+        const result = checkWinner(test);
+
+        if (result && result.winner === symbol) {
+            return move;
+        }
+    }
+
+    return null;
+}
 
 function botMove(board) {
-
     const available = getAvailableMoves(board);
 
     if (!available.length) {
         return null;
     }
 
-    // أولاً يحاول الفوز
-    for (const move of available) {
+    // الفوز
+    const winningMove = findWinningMove(
+        board,
+        "O"
+    );
 
-        const testBoard = [...board];
-
-        testBoard[move] = "O";
-
-        const result = checkWinner(testBoard);
-
-        if (result && result.winner === "O") {
-            return move;
-        }
+    if (winningMove !== null) {
+        return winningMove;
     }
 
-    // يمنع اللاعب من الفوز
-    for (const move of available) {
+    // منع اللاعب من الفوز
+    const blockingMove = findWinningMove(
+        board,
+        "X"
+    );
 
-        const testBoard = [...board];
-
-        testBoard[move] = "X";
-
-        const result = checkWinner(testBoard);
-
-        if (result && result.winner === "X") {
-            return move;
-        }
+    if (blockingMove !== null) {
+        return blockingMove;
     }
 
-    // يفضل المنتصف
-    if (board[4] === "") {
+    // المركز
+    if (!board[4]) {
         return 4;
     }
 
     // الزوايا
-    const corners = [0, 2, 6, 8]
-        .filter(index => board[index] === "");
+    const corners = [
+        0,
+        2,
+        6,
+        8
+    ].filter(index => !board[index]);
 
     if (corners.length) {
         return corners[
-            Math.floor(Math.random() * corners.length)
+            Math.floor(
+                Math.random() * corners.length
+            )
         ];
     }
 
     // أي خانة متاحة
     return available[
-        Math.floor(Math.random() * available.length)
+        Math.floor(
+            Math.random() * available.length
+        )
     ];
 }
 
 // ==================================================
-// تحميل الخط
+// رسم اللوحة
 // ==================================================
 
-async function loadFont() {
-
-    try {
-        return await Jimp.loadFont(
-            Jimp.FONT_SANS_32_WHITE
-        );
-    } catch (error) {
-        return null;
-    }
-}
-
-// ==================================================
-// إنشاء صورة اللعبة
-// ==================================================
-
-async function createGameImage(game) {
-
+function createBoardImage(game) {
     const width = 900;
-    const height = 1050;
+    const height = 900;
 
-    const image = new Jimp(
+    const canvas = createCanvas(
         width,
-        height,
-        0x11111FFF
+        height
     );
 
-    const font = await loadFont();
+    const ctx = canvas.getContext("2d");
 
-    // ----------------------------------------------
+    // الخلفية
+    const background =
+        ctx.createLinearGradient(
+            0,
+            0,
+            width,
+            height
+        );
+
+    background.addColorStop(
+        0,
+        "#10051f"
+    );
+
+    background.addColorStop(
+        0.5,
+        "#241044"
+    );
+
+    background.addColorStop(
+        1,
+        "#090512"
+    );
+
+    ctx.fillStyle = background;
+
+    ctx.fillRect(
+        0,
+        0,
+        width,
+        height
+    );
+
     // العنوان
-    // ----------------------------------------------
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
 
-    if (font) {
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 52px HINA";
 
-        image.print(
-            font,
-            0,
-            35,
-            {
-                text: "HINA XO",
-                alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER,
-                alignmentY: Jimp.VERTICAL_ALIGN_MIDDLE
-            },
-            width,
-            60
-        );
-
-        image.print(
-            font,
-            0,
-            105,
-            {
-                text:
-                    game.mode === "bot"
-                        ? `${game.playerName}  X   ضد   HINA  O`
-                        : `${game.playerName}  X   ضد   ${game.opponentName}  O`,
-                alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER,
-                alignmentY: Jimp.VERTICAL_ALIGN_MIDDLE
-            },
-            width,
-            50
-        );
-    }
-
-    // ----------------------------------------------
-    // أبعاد اللوحة
-    // ----------------------------------------------
-
-    const boardSize = 720;
-
-    const startX =
-        Math.floor((width - boardSize) / 2);
-
-    const startY = 210;
-
-    const cellSize =
-        Math.floor(boardSize / 3);
-
-    // ----------------------------------------------
-    // رسم الخلفية
-    // ----------------------------------------------
-
-    const boardBackground = new Jimp(
-        boardSize,
-        boardSize,
-        0x1C1C2BFF
+    ctx.fillText(
+        "HINA • XO",
+        width / 2,
+        55
     );
 
-    image.composite(
-        boardBackground,
-        startX,
-        startY
+    // أسماء اللاعبين
+    ctx.font = "bold 27px HINA";
+
+    ctx.fillStyle =
+        game.turn === "X"
+            ? "#c084fc"
+            : "#aaa0bb";
+
+    ctx.fillText(
+        `${game.player1.name}  [ X ]`,
+        230,
+        115
     );
 
-    // ----------------------------------------------
-    // رسم الخطوط
-    // ----------------------------------------------
+    ctx.fillStyle =
+        game.turn === "O"
+            ? "#c084fc"
+            : "#aaa0bb";
 
-    const lineColor = 0x8A5CFFFF;
+    ctx.fillText(
+        `${game.player2.name}  [ O ]`,
+        670,
+        115
+    );
+
+    // اللوحة
+    const boardX = 100;
+    const boardY = 170;
+    const boardSize = 700;
+    const cellSize = boardSize / 3;
+
+    ctx.fillStyle =
+        "rgba(255,255,255,0.04)";
+
+    ctx.roundRect(
+        boardX,
+        boardY,
+        boardSize,
+        boardSize,
+        30
+    );
+
+    ctx.fill();
+
+    // الخطوط
+    ctx.strokeStyle =
+        "rgba(192,132,252,0.65)";
+
+    ctx.lineWidth = 8;
+
+    ctx.lineCap = "round";
 
     for (let i = 1; i < 3; i++) {
+        const position =
+            boardX + cellSize * i;
 
-        const x =
-            startX + i * cellSize;
-
-        const verticalLine = new Jimp(
-            8,
-            boardSize,
-            lineColor
+        ctx.beginPath();
+        ctx.moveTo(
+            position,
+            boardY + 25
         );
-
-        image.composite(
-            verticalLine,
-            x - 4,
-            startY
+        ctx.lineTo(
+            position,
+            boardY + boardSize - 25
         );
+        ctx.stroke();
 
-        const y =
-            startY + i * cellSize;
+        const horizontal =
+            boardY + cellSize * i;
 
-        const horizontalLine = new Jimp(
-            boardSize,
-            8,
-            lineColor
+        ctx.beginPath();
+        ctx.moveTo(
+            boardX + 25,
+            horizontal
         );
-
-        image.composite(
-            horizontalLine,
-            startX,
-            y - 4
+        ctx.lineTo(
+            boardX + boardSize - 25,
+            horizontal
         );
+        ctx.stroke();
     }
 
-    // ----------------------------------------------
-    // رسم X و O
-    // ----------------------------------------------
-
-    const symbolFont = await Jimp.loadFont(
-        Jimp.FONT_SANS_128_WHITE
-    );
-
+    // الخانات
     for (let i = 0; i < 9; i++) {
+        const row = Math.floor(i / 3);
+        const col = i % 3;
 
-        const value = game.board[i];
+        const centerX =
+            boardX +
+            col * cellSize +
+            cellSize / 2;
+
+        const centerY =
+            boardY +
+            row * cellSize +
+            cellSize / 2;
+
+        const value =
+            game.board[i];
 
         if (!value) {
+            ctx.fillStyle =
+                "rgba(255,255,255,0.30)";
 
-            // رقم الخانة
-            if (font) {
+            ctx.font =
+                "bold 30px HINA";
 
-                const number =
-                    String(i + 1);
-
-                const col = i % 3;
-                const row = Math.floor(i / 3);
-
-                const cellX =
-                    startX +
-                    col * cellSize;
-
-                const cellY =
-                    startY +
-                    row * cellSize;
-
-                image.print(
-                    font,
-                    cellX,
-                    cellY,
-                    {
-                        text: number,
-                        alignmentX:
-                            Jimp.HORIZONTAL_ALIGN_CENTER,
-                        alignmentY:
-                            Jimp.VERTICAL_ALIGN_MIDDLE
-                    },
-                    cellSize,
-                    cellSize
-                );
-            }
+            ctx.fillText(
+                String(i + 1),
+                centerX,
+                centerY
+            );
 
             continue;
         }
 
-        const col = i % 3;
-        const row = Math.floor(i / 3);
+        if (value === "X") {
+            ctx.strokeStyle =
+                "#c084fc";
 
-        const cellX =
-            startX +
-            col * cellSize;
+            ctx.lineWidth = 22;
 
-        const cellY =
-            startY +
-            row * cellSize;
+            ctx.beginPath();
 
-        image.print(
-            symbolFont,
-            cellX,
-            cellY,
-            {
-                text: value,
-                alignmentX:
-                    Jimp.HORIZONTAL_ALIGN_CENTER,
-                alignmentY:
-                    Jimp.VERTICAL_ALIGN_MIDDLE
-            },
-            cellSize,
-            cellSize
-        );
-    }
+            ctx.moveTo(
+                centerX - 55,
+                centerY - 55
+            );
 
-    // ----------------------------------------------
-    // النص السفلي
-    // ----------------------------------------------
+            ctx.lineTo(
+                centerX + 55,
+                centerY + 55
+            );
 
-    if (font) {
+            ctx.moveTo(
+                centerX + 55,
+                centerY - 55
+            );
 
-        let status;
+            ctx.lineTo(
+                centerX - 55,
+                centerY + 55
+            );
 
-        if (game.finished) {
-
-            if (game.result === "draw") {
-                status = "تعادل";
-            } else if (game.result === "player") {
-                status = `الفائز: ${game.playerName}`;
-            } else {
-                status = "HINA فازت";
-            }
+            ctx.stroke();
 
         } else {
+            ctx.strokeStyle =
+                "#e9d5ff";
 
-            status =
-                game.turn === "X"
-                    ? `الدور: ${game.playerName}`
-                    : game.mode === "bot"
-                        ? "الدور: HINA"
-                        : `الدور: ${game.opponentName}`;
+            ctx.lineWidth = 20;
+
+            ctx.beginPath();
+
+            ctx.arc(
+                centerX,
+                centerY,
+                62,
+                0,
+                Math.PI * 2
+            );
+
+            ctx.stroke();
         }
-
-        image.print(
-            font,
-            0,
-            955,
-            {
-                text: status,
-                alignmentX:
-                    Jimp.HORIZONTAL_ALIGN_CENTER,
-                alignmentY:
-                    Jimp.VERTICAL_ALIGN_MIDDLE
-            },
-            width,
-            55
-        );
     }
 
-    const fileName =
-        `xo_${game.threadID}_${game.playerID}_${Date.now()}.png`;
-
-    const outputPath =
-        path.join(CACHE_DIR, fileName);
-
-    await image
-        .quality(100)
-        .writeAsync(outputPath);
-
-    return outputPath;
-}
-
-// ==================================================
-// حذف الصورة
-// ==================================================
-
-function deleteFile(filePath) {
-
-    try {
-
-        if (
-            filePath &&
-            fs.existsSync(filePath)
-        ) {
-            fs.unlinkSync(filePath);
-        }
-
-    } catch (error) {}
-}
-
-// ==================================================
-// إرسال اللوحة
-// ==================================================
-
-async function sendBoard(
-    api,
-    threadID,
-    game,
-    replyTo
-) {
-
-    const imagePath =
-        await createGameImage(game);
-
-    return new Promise((resolve) => {
-
-        api.sendMessage(
-            {
-                body:
-                    game.finished
-                        ? "انتهت اللعبة"
-                        : "اختر رقم الخانة من الصورة",
-                attachment:
-                    fs.createReadStream(imagePath)
-            },
-            threadID,
-            (error) => {
-
-                deleteFile(imagePath);
-
-                resolve();
-            },
-            replyTo
-        );
-    });
-}
-
-// ==================================================
-// بدء لعبة
-// ==================================================
-
-async function startGame({
-    api,
-    event,
-    opponentID,
-    opponentName,
-    mode
-}) {
-
-    const {
-        threadID,
-        senderID
-    } = event;
-
-    const key =
-        `${threadID}:${senderID}`;
-
-    if (games.has(key)) {
-
-        return api.sendMessage(
-            "لديك لعبة XO جارية بالفعل",
-            threadID
-        );
-    }
-
-    const game = {
-
-        threadID,
-
-        playerID:
-            senderID,
-
-        playerName:
-            event.senderName ||
-            "اللاعب",
-
-        opponentID,
-
-        opponentName:
-            opponentName ||
-            "HINA",
-
-        mode,
-
-        board:
-            createBoard(),
-
-        turn: "X",
-
-        finished: false,
-
-        result: null
-    };
-
-    games.set(key, game);
-
-    await sendBoard(
-        api,
-        threadID,
-        game,
-        event.messageID
-    );
-}
-
-// ==================================================
-// تنفيذ الحركة
-// ==================================================
-
-async function playMove({
-    api,
-    event,
-    game,
-    move
-}) {
-
-    if (
-        game.finished ||
-        game.turn !== "X"
-    ) {
-        return;
-    }
-
-    if (
-        move === null ||
-        game.board[move]
-    ) {
-
-        return api.sendMessage(
-            "هذه الخانة غير متاحة اختر خانة أخرى",
-            event.threadID
-        );
-    }
-
-    game.board[move] = "X";
-
-    let result =
+    // خط الفوز
+    const result =
         checkWinner(game.board);
 
-    if (result) {
+    if (
+        result &&
+        result.winner !== "draw" &&
+        result.cells.length === 3
+    ) {
+        const first =
+            result.cells[0];
 
-        finishGame(
-            game,
-            result,
-            "player"
+        const last =
+            result.cells[2];
+
+        const firstRow =
+            Math.floor(first / 3);
+
+        const firstCol =
+            first % 3;
+
+        const lastRow =
+            Math.floor(last / 3);
+
+        const lastCol =
+            last % 3;
+
+        const x1 =
+            boardX +
+            firstCol * cellSize +
+            cellSize / 2;
+
+        const y1 =
+            boardY +
+            firstRow * cellSize +
+            cellSize / 2;
+
+        const x2 =
+            boardX +
+            lastCol * cellSize +
+            cellSize / 2;
+
+        const y2 =
+            boardY +
+            lastRow * cellSize +
+            cellSize / 2;
+
+        ctx.strokeStyle =
+            "#ffffff";
+
+        ctx.lineWidth = 12;
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+            x1,
+            y1
         );
 
-        await sendBoard(
-            api,
-            event.threadID,
-            game,
-            event.messageID
+        ctx.lineTo(
+            x2,
+            y2
         );
 
-        games.delete(
-            `${game.threadID}:${game.playerID}`
-        );
+        ctx.stroke();
+    }
 
+    // الحالة
+    let status = "";
+
+    if (game.status === "playing") {
+        const current =
+            game.turn === "X"
+                ? game.player1.name
+                : game.player2.name;
+
+        status =
+            `دور ${current} — أرسل رقم الخانة 1 إلى 9`;
+
+    } else {
+        const result =
+            checkWinner(game.board);
+
+        if (
+            result &&
+            result.winner === "draw"
+        ) {
+            status = "تعادل";
+        } else if (
+            result &&
+            result.winner === "X"
+        ) {
+            status =
+                `الفائز: ${game.player1.name}`;
+        } else if (
+            result &&
+            result.winner === "O"
+        ) {
+            status =
+                `الفائز: ${game.player2.name}`;
+        }
+    }
+
+    ctx.fillStyle =
+        "#ffffff";
+
+    ctx.font =
+        "bold 28px HINA";
+
+    ctx.fillText(
+        status,
+        width / 2,
+        850
+    );
+
+    return canvas.toBuffer("image/png");
+}
+
+// ==================================================
+// إرسال اللوحة وتسجيل HandleReply
+// ==================================================
+
+function removeGameReplies(gameID) {
+    if (
+        !global.client ||
+        !Array.isArray(
+            global.client.handleReply
+        )
+    ) {
         return;
     }
 
-    // ----------------------------------------------
-    // البوت
-    // ----------------------------------------------
+    global.client.handleReply =
+        global.client.handleReply.filter(
+            item =>
+                item.gameID !== gameID
+        );
+}
 
-    if (game.mode === "bot") {
-
-        game.turn = "O";
-
-        const botMoveIndex =
-            botMove(game.board);
-
-        if (botMoveIndex !== null) {
-
-            game.board[botMoveIndex] = "O";
-        }
-
-        result =
-            checkWinner(game.board);
-
-        if (result) {
-
-            finishGame(
-                game,
-                result,
-                result.winner === "O"
-                    ? "bot"
-                    : "draw"
-            );
-
-            await sendBoard(
-                api,
-                event.threadID,
-                game,
-                event.messageID
-            );
-
-            games.delete(
-                `${game.threadID}:${game.playerID}`
-            );
-
-            return;
-        }
-
-        game.turn = "X";
-    }
-
-    // ----------------------------------------------
-    // ضد لاعب
-    // ----------------------------------------------
-
-    else {
-
-        game.turn = "O";
-    }
-
-    await sendBoard(
-        api,
-        event.threadID,
-        game,
-        event.messageID
+function saveImage(buffer) {
+    const file = path.join(
+        os.tmpdir(),
+        `hina_xo_${Date.now()}_${Math.random()
+            .toString(36)
+            .slice(2)}.png`
     );
+
+    fs.writeFileSync(
+        file,
+        buffer
+    );
+
+    return file;
+}
+
+function sendBoard({
+    api,
+    game,
+    event
+}) {
+    return new Promise(resolve => {
+        const buffer =
+            createBoardImage(game);
+
+        const imagePath =
+            saveImage(buffer);
+
+        let messageText =
+            "لعبة XO\n\n";
+
+        if (game.status === "playing") {
+            messageText +=
+                "قم بالرد على هذه الصورة برقم الخانة من 1 إلى 9";
+        } else {
+            const result =
+                checkWinner(game.board);
+
+            if (
+                result &&
+                result.winner === "draw"
+            ) {
+                messageText +=
+                    "انتهت اللعبة بالتعادل";
+            } else {
+                const winner =
+                    result.winner === "X"
+                        ? game.player1.name
+                        : game.player2.name;
+
+                messageText +=
+                    `انتهت اللعبة\nالفائز: ${winner}`;
+            }
+        }
+
+        try {
+            api.sendMessage(
+                {
+                    body: messageText,
+                    attachment:
+                        fs.createReadStream(
+                            imagePath
+                        )
+                },
+                game.threadID,
+                (error, info) => {
+                    try {
+                        fs.unlinkSync(
+                            imagePath
+                        );
+                    } catch {}
+
+                    if (error || !info) {
+                        return resolve(
+                            null
+                        );
+                    }
+
+                    game.boardMessageID =
+                        info.messageID;
+
+                    // تسجيل HandleReply
+                    if (
+                        !global.client
+                            .handleReply
+                    ) {
+                        global.client
+                            .handleReply = [];
+                    }
+
+                    if (
+                        game.status ===
+                        "playing"
+                    ) {
+                        global.client
+                            .handleReply.push({
+                                name: "اكسو",
+
+                                messageID:
+                                    info.messageID,
+
+                                author:
+                                    game.player1.id,
+
+                                threadID:
+                                    game.threadID,
+
+                                gameID:
+                                    game.id,
+
+                                player1:
+                                    game.player1.id,
+
+                                player2:
+                                    game.player2.id,
+
+                                vsBot:
+                                    game.vsBot
+                            });
+                    }
+
+                    resolve(info);
+                },
+                event
+                    ? event.messageID
+                    : undefined
+            );
+        } catch (error) {
+            try {
+                fs.unlinkSync(
+                    imagePath
+                );
+            } catch {}
+
+            resolve(null);
+        }
+    });
 }
 
 // ==================================================
 // إنهاء اللعبة
 // ==================================================
 
-function finishGame(
-    game,
-    result,
-    winnerType
-) {
+function finishGame(game) {
+    game.status = "finished";
 
-    game.finished = true;
+    removeGameReplies(
+        game.id
+    );
 
-    if (result.winner === "draw") {
-
-        game.result = "draw";
-
-        return;
-    }
-
-    if (winnerType === "player") {
-
-        game.result = "player";
-
-        return;
-    }
-
-    game.result = "bot";
+    setTimeout(() => {
+        games.delete(
+            game.id
+        );
+    }, 60 * 1000);
 }
 
 // ==================================================
-// التعامل مع حركة الخصم
+// تنفيذ حركة اللاعب
 // ==================================================
 
-async function playOpponentMove({
+async function makeMove({
     api,
     event,
     game,
-    move
+    position
 }) {
-
     if (
-        game.finished ||
-        game.mode !== "player"
+        game.status !== "playing"
     ) {
         return;
     }
 
-    if (game.turn !== "O") {
+    if (
+        position < 0 ||
+        position > 8
+    ) {
         return;
     }
 
     if (
-        move === null ||
-        game.board[move]
+        game.board[position]
     ) {
-
         return api.sendMessage(
-            "هذه الخانة غير متاحة اختر خانة أخرى",
-            event.threadID
+            "هذه الخانة مستخدمة بالفعل",
+            event.threadID,
+            event.messageID
         );
     }
 
-    game.board[move] = "O";
+    const senderID =
+        String(event.senderID);
+
+    // ==================================================
+    // تحديد صاحب الدور
+    // ==================================================
+
+    if (game.turn === "X") {
+        if (
+            senderID !==
+            game.player1.id
+        ) {
+            return;
+        }
+    } else {
+        if (
+            game.vsBot
+        ) {
+            return;
+        }
+
+        if (
+            senderID !==
+            game.player2.id
+        ) {
+            return;
+        }
+    }
+
+    // الحركة
+    game.board[position] =
+        game.turn;
 
     const result =
         checkWinner(game.board);
 
     if (result) {
+        finishGame(game);
 
-        finishGame(
-            game,
-            result,
-            result.winner === "O"
-                ? "opponent"
-                : "draw"
-        );
-
-        await sendBoard(
+        return sendBoard({
             api,
-            event.threadID,
             game,
-            event.messageID
-        );
-
-        games.delete(
-            `${game.threadID}:${game.playerID}`
-        );
-
-        return;
+            event
+        });
     }
 
-    game.turn = "X";
+    // تبديل الدور
+    game.turn =
+        game.turn === "X"
+            ? "O"
+            : "X";
 
-    await sendBoard(
+    // ==================================================
+    // حركة البوت
+    // ==================================================
+
+    if (
+        game.vsBot &&
+        game.turn === "O"
+    ) {
+        const move =
+            botMove(game.board);
+
+        if (
+            move !== null
+        ) {
+            game.board[move] =
+                "O";
+        }
+
+        const botResult =
+            checkWinner(
+                game.board
+            );
+
+        if (botResult) {
+            finishGame(game);
+
+            return sendBoard({
+                api,
+                game,
+                event
+            });
+        }
+
+        game.turn = "X";
+    }
+
+    return sendBoard({
         api,
-        event.threadID,
         game,
-        event.messageID
-    );
+        event
+    });
 }
 
 // ==================================================
-// الأمر الرئيسي
+// بدء اللعبة
 // ==================================================
 
 module.exports.run = async function ({
     api,
-    event,
-    args
+    event
 }) {
+    const threadID =
+        String(event.threadID);
 
-    const {
-        threadID,
-        senderID,
-        messageID,
-        type,
-        messageReply
-    } = event;
+    const player1ID =
+        String(event.senderID);
 
-    // ----------------------------------------------
-    // إذا كانت هناك لعبة جارية
-    // ----------------------------------------------
+    const player1Name =
+        getName(event);
 
-    const key =
-        `${threadID}:${senderID}`;
+    // ==================================================
+    // اللعب ضد شخص بالرد
+    // ==================================================
 
-    const existingGame =
-        games.get(key);
+    let player2ID = null;
+    let player2Name = "HINA";
+    let vsBot = true;
 
-    if (existingGame) {
-
-        const move =
-            getMove(
-                args &&
-                args.length
-                    ? args[0]
-                    : ""
+    if (
+        event.messageReply &&
+        event.messageReply.senderID
+    ) {
+        player2ID =
+            String(
+                event.messageReply.senderID
             );
 
-        if (move === null) {
-
+        if (
+            player2ID ===
+            player1ID
+        ) {
             return api.sendMessage(
-                "اللعبة جارية أرسل رقم الخانة من 1 إلى 9",
-                threadID
+                "لا يمكنك اللعب ضد نفسك",
+                threadID,
+                event.messageID
             );
+        }
+
+        player2Name =
+            cleanName(
+                event.messageReply.senderName,
+                "الخصم"
+            );
+
+        vsBot = false;
+    }
+
+    // ==================================================
+    // منع وجود أكثر من لعبة لنفس اللاعب
+    // ==================================================
+
+    for (const game of games.values()) {
+        if (
+            game.threadID !==
+            threadID
+        ) {
+            continue;
         }
 
         if (
-            existingGame.mode === "player" &&
-            existingGame.turn === "O"
+            game.status !==
+            "playing"
         ) {
-
-            return playOpponentMove({
-                api,
-                event,
-                game: existingGame,
-                move
-            });
+            continue;
         }
 
-        return playMove({
-            api,
-            event,
-            game: existingGame,
-            move
-        });
-    }
-
-    // ----------------------------------------------
-    // بدء لعبة جديدة
-    // ----------------------------------------------
-
-    let opponentID = null;
-    let opponentName = null;
-    let mode = "bot";
-
-    if (
-        type === "message_reply" &&
-        messageReply &&
-        messageReply.senderID
-    ) {
-
-        opponentID =
-            messageReply.senderID;
-
-        // لا يسمح بتحدي نفسه
-        if (opponentID === senderID) {
-
+        if (
+            game.player1.id ===
+            player1ID ||
+            game.player2.id ===
+            player1ID
+        ) {
             return api.sendMessage(
-                "لا يمكنك لعب XO ضد نفسك",
-                threadID
+                "لديك لعبة XO قيد التشغيل بالفعل",
+                threadID,
+                event.messageID
             );
         }
-
-        // محاولة الحصول على اسم الخصم
-        try {
-
-            const info =
-                await api.getUserInfo(
-                    opponentID
-                );
-
-            if (
-                info &&
-                info[opponentID]
-            ) {
-                opponentName =
-                    info[opponentID].name;
-            }
-
-        } catch (error) {}
-
-        mode = "player";
     }
 
-    await startGame({
+    // ==================================================
+    // إنشاء اللعبة
+    // ==================================================
+
+    const game =
+        createGame({
+            threadID,
+            player1ID,
+            player1Name,
+            player2ID,
+            player2Name,
+            vsBot
+        });
+
+    await sendBoard({
+        api,
+        game,
+        event
+    });
+};
+
+// ==================================================
+// HandleReply
+// ==================================================
+
+module.exports.handleReply =
+async function ({
+    api,
+    event,
+    handleReply
+}) {
+    if (!event.body) {
+        return;
+    }
+
+    const gameID =
+        handleReply.gameID;
+
+    if (!gameID) {
+        return;
+    }
+
+    const game =
+        games.get(gameID);
+
+    if (!game) {
+        return;
+    }
+
+    if (
+        game.status !==
+        "playing"
+    ) {
+        return;
+    }
+
+    const senderID =
+        String(event.senderID);
+
+    // ==================================================
+    // التأكد أن اللاعب مشارك
+    // ==================================================
+
+    if (
+        senderID !==
+            game.player1.id &&
+        senderID !==
+            game.player2.id
+    ) {
+        return;
+    }
+
+    // ==================================================
+    // التأكد من صاحب الدور
+    // ==================================================
+
+    if (
+        game.turn === "X" &&
+        senderID !==
+            game.player1.id
+    ) {
+        return;
+    }
+
+    if (
+        game.turn === "O" &&
+        (
+            game.vsBot ||
+            senderID !==
+                game.player2.id
+        )
+    ) {
+        return;
+    }
+
+    // ==================================================
+    // قراءة الحركة
+    // ==================================================
+
+    const body =
+        String(event.body)
+            .trim();
+
+    if (
+        !/^[1-9]$/.test(body)
+    ) {
+        return api.sendMessage(
+            "أرسل رقم خانة واحد من 1 إلى 9",
+            event.threadID,
+            event.messageID
+        );
+    }
+
+    const position =
+        Number(body) - 1;
+
+    await makeMove({
         api,
         event,
-        opponentID,
-        opponentName,
-        mode
+        game,
+        position
     });
 };
