@@ -59,9 +59,9 @@ const CONFIG = {
      * مفتاح AI
      */
 
-    apiKey1: "PUT_YOUR_EXISTING_API_KEY_1_HERE",
+    apiKey1: "dwlS0F7cEF35xpaNlfnCv5TNpTL6K27b6HHTRGQj",
 
-    apiKey2: "PUT_YOUR_EXISTING_API_KEY_2_HERE"
+    apiKey2: "OP2N3hYKC83GpPc1irCbs8IJarRnIwF87tjQAGQx"
 
 };
 
