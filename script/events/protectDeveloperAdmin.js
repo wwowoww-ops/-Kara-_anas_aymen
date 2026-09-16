@@ -1,13 +1,16 @@
 module.exports.config = {
     name: "protectDeveloperAdmin",
     eventType: ["log:thread-admins"],
-    version: "1.1.0",
+    version: "2.0.0",
     credits: "أبو هريرة",
     description: "منع إزالة صلاحية الأدمن من المطور",
     category: "events"
 };
 
 const DEVELOPER_ID = "100080215660819";
+
+// حفظ حالة المطور في كل مجموعة
+const developerAdminState = new Map();
 
 module.exports.handleEvent = async function ({
     api,
@@ -23,118 +26,147 @@ module.exports.handleEvent = async function ({
 
         if (!threadID) return;
 
-        const data =
-            event.logMessageData || {};
+        /*
+         * جلب معلومات المجموعة الحالية
+         */
+        const threadInfo =
+            await api.getThreadInfo(threadID);
+
+        if (!threadInfo) return;
+
+        const adminIDs =
+            Array.isArray(threadInfo.adminIDs)
+                ? threadInfo.adminIDs
+                : [];
 
         /*
-         * مهم:
-         * لا نقوم بأي شيء عند إضافة المطور
-         * أو عند دخوله للمجموعة.
+         * هل المطور أدمن حاليًا؟
+         */
+        const developerIsAdmin =
+            adminIDs.some(
+                admin =>
+                    String(admin.id) ===
+                    DEVELOPER_ID
+            );
+
+        /*
+         * هل لدينا حالة سابقة لهذه المجموعة؟
+         */
+        const previousState =
+            developerAdminState.get(threadID);
+
+        /*
+         * أول مرة نرى المجموعة:
          *
-         * نتحقق فقط من عملية إزالة الأدمن.
+         * نسجل الحالة فقط.
+         *
+         * إذا كان المطور أدمن:
+         * نحفظ أنه أدمن.
+         *
+         * إذا لم يكن أدمن:
+         * نحفظ أنه ليس أدمن.
+         *
+         * ولا نعطيه صلاحية.
          */
+        if (previousState === undefined) {
 
-        const removedAdmin =
-            data.removedParticipants ||
-            data.removedAdmins ||
-            data.removedAdmin ||
-            [];
-
-        const removedIDs = [];
-
-        if (Array.isArray(removedAdmin)) {
-
-            for (const user of removedAdmin) {
-
-                const id =
-                    String(
-                        user.userFbId ||
-                        user.userID ||
-                        user.id ||
-                        ""
-                    );
-
-                if (id) {
-                    removedIDs.push(id);
-                }
-            }
-
-        } else if (removedAdmin) {
-
-            const id =
-                String(
-                    removedAdmin.userFbId ||
-                    removedAdmin.userID ||
-                    removedAdmin.id ||
-                    removedAdmin ||
-                    ""
-                );
-
-            if (id) {
-                removedIDs.push(id);
-            }
-        }
-
-        /*
-         * بعض نسخ FCA ترسل userID مباشرة
-         * عند تغيير صلاحيات الأدمن.
-         */
-
-        if (data.userID) {
-            removedIDs.push(
-                String(data.userID)
+            developerAdminState.set(
+                threadID,
+                developerIsAdmin
             );
-        }
 
-        if (data.targetID) {
-            removedIDs.push(
-                String(data.targetID)
+            console.log(
+                `[PROTECT] الحالة الأولية للمطور في ${threadID}: ${
+                    developerIsAdmin
+                        ? "ADMIN"
+                        : "NOT ADMIN"
+                }`
             );
-        }
 
-        /*
-         * لا يوجد أي دليل على إزالة أدمن
-         */
-        if (!removedIDs.includes(DEVELOPER_ID)) {
             return;
         }
 
         /*
-         * نتأكد أن المطور كان هو المستهدف
-         * بعملية إزالة الأدمن.
+         * المطور كان أدمن سابقًا
+         * والآن لم يعد موجودًا في قائمة الأدمن.
+         *
+         * هذا يعني أن صلاحية الأدمن أزيلت.
          */
-
         if (
-            typeof api.changeAdminStatus !==
-            "function"
+            previousState === true &&
+            developerIsAdmin === false
         ) {
 
-            console.error(
-                "[PROTECT] api.changeAdminStatus غير متوفر"
+            console.log(
+                `[PROTECT] تم اكتشاف إزالة أدمن المطور في ${threadID}`
+            );
+
+            /*
+             * نتأكد أن البوت نفسه أدمن
+             */
+            const botID =
+                String(
+                    api.getCurrentUserID()
+                );
+
+            const botIsAdmin =
+                adminIDs.some(
+                    admin =>
+                        String(admin.id) ===
+                        botID
+                );
+
+            if (!botIsAdmin) {
+
+                console.log(
+                    `[PROTECT] لا يمكن إعادة المطور لأن البوت ليس أدمن في ${threadID}`
+                );
+
+                developerAdminState.set(
+                    threadID,
+                    false
+                );
+
+                return;
+            }
+
+            /*
+             * إعادة صلاحية الأدمن للمطور
+             */
+            await api.changeAdminStatus(
+                threadID,
+                DEVELOPER_ID,
+                true
+            );
+
+            console.log(
+                `[PROTECT] تمت إعادة أدمن المطور في ${threadID}`
+            );
+
+            /*
+             * نعتبره أدمن مرة أخرى
+             */
+            developerAdminState.set(
+                threadID,
+                true
             );
 
             return;
         }
 
         /*
-         * إعادة الأدمن فقط بعد إزالة الصلاحية
+         * تحديث الحالة الحالية
          */
-
-        await api.changeAdminStatus(
+        developerAdminState.set(
             threadID,
-            DEVELOPER_ID,
-            true
-        );
-
-        console.log(
-            `[PROTECT] تمت إعادة أدمن المطور في المجموعة ${threadID}`
+            developerIsAdmin
         );
 
     } catch (error) {
 
         console.error(
             "❌ DEVELOPER ADMIN PROTECTION ERROR:",
-            error
+            error.message
         );
 
     }
