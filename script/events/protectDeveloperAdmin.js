@@ -1,7 +1,7 @@
 module.exports.config = {
     name: "protectDeveloperAdmin",
     eventType: ["log:thread-admins"],
-    version: "1.0.0",
+    version: "1.1.0",
     credits: "أبو هريرة",
     description: "منع إزالة صلاحية الأدمن من المطور",
     category: "events"
@@ -23,75 +23,102 @@ module.exports.handleEvent = async function ({
 
         if (!threadID) return;
 
-        const logMessageData =
+        const data =
             event.logMessageData || {};
 
         /*
-         * نحاول استخراج الأعضاء الذين تم تغيير صلاحياتهم
+         * مهم:
+         * لا نقوم بأي شيء عند إضافة المطور
+         * أو عند دخوله للمجموعة.
+         *
+         * نتحقق فقط من عملية إزالة الأدمن.
          */
-        const targetIDs = [];
 
-        const addedParticipants =
-            Array.isArray(logMessageData.addedParticipants)
-                ? logMessageData.addedParticipants
-                : [];
+        const removedAdmin =
+            data.removedParticipants ||
+            data.removedAdmins ||
+            data.removedAdmin ||
+            [];
 
-        const removedParticipants =
-            Array.isArray(logMessageData.removedParticipants)
-                ? logMessageData.removedParticipants
-                : [];
+        const removedIDs = [];
 
-        for (const participant of [
-            ...addedParticipants,
-            ...removedParticipants
-        ]) {
+        if (Array.isArray(removedAdmin)) {
 
-            const id = String(
-                participant.userFbId ||
-                participant.userID ||
-                participant.id ||
-                ""
-            );
+            for (const user of removedAdmin) {
+
+                const id =
+                    String(
+                        user.userFbId ||
+                        user.userID ||
+                        user.id ||
+                        ""
+                    );
+
+                if (id) {
+                    removedIDs.push(id);
+                }
+            }
+
+        } else if (removedAdmin) {
+
+            const id =
+                String(
+                    removedAdmin.userFbId ||
+                    removedAdmin.userID ||
+                    removedAdmin.id ||
+                    removedAdmin ||
+                    ""
+                );
 
             if (id) {
-                targetIDs.push(id);
+                removedIDs.push(id);
             }
         }
 
         /*
          * بعض نسخ FCA ترسل userID مباشرة
+         * عند تغيير صلاحيات الأدمن.
          */
-        if (logMessageData.userID) {
-            targetIDs.push(
-                String(logMessageData.userID)
+
+        if (data.userID) {
+            removedIDs.push(
+                String(data.userID)
             );
         }
 
-        if (logMessageData.targetID) {
-            targetIDs.push(
-                String(logMessageData.targetID)
+        if (data.targetID) {
+            removedIDs.push(
+                String(data.targetID)
             );
         }
 
         /*
-         * لا يوجد تغيير يخص المطور
+         * لا يوجد أي دليل على إزالة أدمن
          */
-        if (!targetIDs.includes(DEVELOPER_ID)) {
+        if (!removedIDs.includes(DEVELOPER_ID)) {
             return;
         }
 
         /*
-         * إعادة الأدمن للمطور
+         * نتأكد أن المطور كان هو المستهدف
+         * بعملية إزالة الأدمن.
          */
+
         if (
             typeof api.changeAdminStatus !==
             "function"
         ) {
+
             console.error(
-                "[protectDeveloperAdmin] changeAdminStatus غير متوفر"
+                "[PROTECT] api.changeAdminStatus غير متوفر"
             );
+
             return;
         }
+
+        /*
+         * إعادة الأدمن فقط بعد إزالة الصلاحية
+         */
 
         await api.changeAdminStatus(
             threadID,
@@ -100,7 +127,7 @@ module.exports.handleEvent = async function ({
         );
 
         console.log(
-            `[PROTECT] تمت إعادة أدمن المطور ${DEVELOPER_ID} في المجموعة ${threadID}`
+            `[PROTECT] تمت إعادة أدمن المطور في المجموعة ${threadID}`
         );
 
     } catch (error) {
