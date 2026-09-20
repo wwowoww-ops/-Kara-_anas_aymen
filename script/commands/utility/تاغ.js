@@ -2,7 +2,7 @@
  * تاغ.js
  *
  * .تاغ
- * منشن جميع أعضاء المجموعة في رسالة واحدة
+ * منشن جميع أعضاء المجموعة
  *
  * .تاغ م
  * منشن الأعضاء الذين يبدأ اسمهم بحرف م
@@ -10,11 +10,11 @@
 
 module.exports.config = {
     name: "تاغ",
-    version: "3.1.0",
+    version: "3.2.0",
     hasPermssion: 0,
     credits: "أبو هريرة",
     description: "منشن أعضاء المجموعة أو الأعضاء حسب أول حرف من الاسم",
-    commandCategory: "utility",
+    commandCategory: "Utility",
     usages: "تاغ [الحرف]",
     cooldowns: 5
 };
@@ -31,11 +31,9 @@ const HEADER =
 // ==================================================
 
 function cleanName(name) {
-
     return String(name || "")
         .replace(/\s+/g, " ")
         .trim();
-
 }
 
 // ==================================================
@@ -44,18 +42,16 @@ function cleanName(name) {
 
 function getFirstCharacter(name) {
 
-    const value =
-        cleanName(name);
+    const value = cleanName(name);
 
     if (!value) {
         return "";
     }
 
-    const cleaned =
-        value.replace(
-            /^[^\p{L}\p{N}]+/u,
-            ""
-        );
+    const cleaned = value.replace(
+        /^[^\p{L}\p{N}]+/u,
+        ""
+    );
 
     if (!cleaned) {
         return "";
@@ -70,8 +66,7 @@ function getFirstCharacter(name) {
 // تنفيذ الأمر
 // ==================================================
 
-module.exports.run =
-async function ({
+module.exports.run = async function ({
     api,
     event,
     args
@@ -80,9 +75,7 @@ async function ({
     try {
 
         const threadID =
-            String(
-                event.threadID || ""
-            );
+            String(event.threadID || "");
 
         if (!threadID) {
             return;
@@ -93,33 +86,29 @@ async function ({
         // ==================================================
 
         const botID =
-            String(
-                api.getCurrentUserID()
-            );
+            String(api.getCurrentUserID());
 
         // ==================================================
-        // الحصول على معلومات المجموعة
+        // معلومات المجموعة
         // ==================================================
 
         const threadInfo =
-            await new Promise(
-                (resolve, reject) => {
+            await new Promise((resolve, reject) => {
 
-                    api.getThreadInfo(
-                        threadID,
-                        (error, info) => {
+                api.getThreadInfo(
+                    threadID,
+                    (error, info) => {
 
-                            if (error) {
-                                reject(error);
-                                return;
-                            }
-
-                            resolve(info);
+                        if (error) {
+                            reject(error);
+                            return;
                         }
-                    );
 
-                }
-            );
+                        resolve(info);
+                    }
+                );
+
+            });
 
         if (!threadInfo) {
 
@@ -132,27 +121,22 @@ async function ({
         }
 
         // ==================================================
-        // معلومات الأعضاء
+        // الحصول على معلومات الأعضاء
         // ==================================================
 
         let userInfo =
-            Array.isArray(
-                threadInfo.userInfo
-            )
+            Array.isArray(threadInfo.userInfo)
                 ? threadInfo.userInfo
                 : [];
 
         // ==================================================
-        // إذا لم توجد userInfo
-        // نستخدم participantIDs
+        // في حالة عدم وجود userInfo
         // ==================================================
 
         if (!userInfo.length) {
 
             const participantIDs =
-                Array.isArray(
-                    threadInfo.participantIDs
-                )
+                Array.isArray(threadInfo.participantIDs)
                     ? threadInfo.participantIDs
                     : [];
 
@@ -168,13 +152,9 @@ async function ({
 
             userInfo = [];
 
-            for (
-                const id
-                of participantIDs
-            ) {
+            for (const id of participantIDs) {
 
-                const userID =
-                    String(id);
+                const userID = String(id);
 
                 if (
                     !userID ||
@@ -186,33 +166,28 @@ async function ({
                 try {
 
                     const result =
-                        await new Promise(
-                            resolve => {
+                        await new Promise(resolve => {
 
-                                api.getUserInfo(
-                                    userID,
-                                    (
-                                        error,
-                                        info
-                                    ) => {
+                            api.getUserInfo(
+                                userID,
+                                (error, info) => {
 
-                                        if (
-                                            error ||
-                                            !info
-                                        ) {
-                                            resolve(null);
-                                            return;
-                                        }
-
-                                        resolve(
-                                            info[userID] ||
-                                            info
-                                        );
+                                    if (
+                                        error ||
+                                        !info
+                                    ) {
+                                        resolve(null);
+                                        return;
                                     }
-                                );
 
-                            }
-                        );
+                                    resolve(
+                                        info[userID] ||
+                                        info
+                                    );
+                                }
+                            );
+
+                        });
 
                     if (result) {
                         userInfo.push(result);
@@ -224,21 +199,17 @@ async function ({
                         "[TAG USER ERROR]:",
                         error.message
                     );
-
                 }
             }
         }
 
         // ==================================================
-        // تحويل بيانات الأعضاء
+        // تحويل البيانات
         // ==================================================
 
         const members = [];
 
-        for (
-            const user
-            of userInfo
-        ) {
+        for (const user of userInfo) {
 
             if (!user) {
                 continue;
@@ -278,29 +249,17 @@ async function ({
 
         const uniqueMembers = [];
 
-        const usedIDs =
-            new Set();
+        const usedIDs = new Set();
 
-        for (
-            const member
-            of members
-        ) {
+        for (const member of members) {
 
-            if (
-                usedIDs.has(
-                    member.id
-                )
-            ) {
+            if (usedIDs.has(member.id)) {
                 continue;
             }
 
-            usedIDs.add(
-                member.id
-            );
+            usedIDs.add(member.id);
 
-            uniqueMembers.push(
-                member
-            );
+            uniqueMembers.push(member);
         }
 
         // ==================================================
@@ -329,9 +288,7 @@ async function ({
         ) {
 
             letter =
-                cleanName(
-                    args.join(" ")
-                );
+                cleanName(args.join(" "));
 
             letter =
                 letter
@@ -340,11 +297,10 @@ async function ({
         }
 
         // ==================================================
-        // تصفية الأعضاء حسب الحرف
+        // تصفية الأعضاء
         // ==================================================
 
-        let selected =
-            uniqueMembers;
+        let selected = uniqueMembers;
 
         if (letter) {
 
@@ -359,11 +315,8 @@ async function ({
             if (!selected.length) {
 
                 return api.sendMessage(
-
                     HEADER +
-
                     `لم أجد أي عضو يبدأ اسمه بحرف ${letter}.`,
-
                     threadID,
                     event.messageID
                 );
@@ -371,62 +324,63 @@ async function ({
         }
 
         // ==================================================
-        // بناء المنشنات
+        // بناء الرسالة والمنشنات
         // ==================================================
 
-        const mentions = [];
-
-        const names = [];
-
-        for (
-            const member
-            of selected
-        ) {
-
-            mentions.push({
-                tag: member.name,
-                id: member.id
-            });
-
-            names.push(
-                `@${member.name}`
-            );
-        }
-
-        // ==================================================
-        // العنوان
-        // ==================================================
-
-        let title;
+        let body =
+            HEADER;
 
         if (letter) {
 
-            title =
-                `منشن الأعضاء الذين يبدأ اسمهم بحرف ${letter}`;
+            body +=
+                `منشن الأعضاء الذين يبدأ اسمهم بحرف ${letter}\n\n`;
 
         } else {
 
-            title =
-                "منشن جميع أعضاء المجموعة";
+            body +=
+                "منشن جميع أعضاء المجموعة\n\n";
+        }
+
+        const mentions = [];
+
+        for (const member of selected) {
+
+            /*
+             * نحدد مكان بداية المنشن بالضبط
+             * حتى يتعرف Messenger عليه كتاغ حقيقي
+             */
+
+            const tagText =
+                `@${member.name}`;
+
+            const fromIndex =
+                body.length;
+
+            body +=
+                tagText +
+                " ";
+
+            mentions.push({
+                tag: tagText,
+                id: member.id,
+                fromIndex
+            });
         }
 
         // ==================================================
-        // الرسالة الواحدة
+        // عدد الأعضاء
         // ==================================================
 
-        const message =
-            HEADER +
-            title +
-            "\n\n" +
-            names.join(" ");
+        body +=
+            `\n\nعدد الأعضاء الذين تم منشنهم: ${selected.length}`;
 
         // ==================================================
-        // إرسال جميع المنشنات في رسالة واحدة
+        // إرسال الرسالة
         // ==================================================
 
         return api.sendMessage(
             {
-                body: message,
+                body,
                 mentions
             },
 
@@ -440,9 +394,7 @@ async function ({
                         "[TAG SEND ERROR]:",
                         error
                     );
-
                 }
-
             },
 
             event.messageID
@@ -451,14 +403,12 @@ async function ({
     } catch (error) {
 
         console.error(
-            "❌ TAG ERROR:",
+            "[TAG ERROR]:",
             error
         );
 
         return api.sendMessage(
-
             HEADER +
-
             "حدث خطأ أثناء تنفيذ الأمر.\n\n" +
             (
                 error.message ||
