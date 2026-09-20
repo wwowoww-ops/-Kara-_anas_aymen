@@ -12,47 +12,158 @@ const FormData = require("form-data");
 
 module.exports.config = {
     name: "عدلي",
-    version: "1.1.0",
+    version: "1.2.0",
     hasPermssion: 0,
     credits: "أبو هريرة",
     description: "تعديل الصور بالذكاء الاصطناعي",
-    commandCategory: "Photos",
+    commandCategory: "pic",
     usages: "عدلي <وصف التعديل>",
     cooldowns: 10
 };
 
-const HINA_HEADER = "⌬ ━━ 𝗛𝗜𝗡𝗔  ━━ ⌬\n\n";
+const HINA_HEADER =
+    "⌬ ━━ 𝗛𝗜𝗡𝗔  ━━ ⌬\n\n";
 
 /**
- * تحميل الصورة من Messenger
+ * ==================================================
+ * تعديل رسالة بشكل آمن
+ * ==================================================
+ *
+ * مهم:
+ * hut-chat-api عندك يستخدم callback
+ * وليس Promise في api.editMessage
  */
-async function downloadImage(url) {
-    if (!url) {
-        throw new Error("رابط الصورة غير موجود");
+function safeEditMessage(api, message, messageID) {
+
+    if (!messageID) {
+        return;
     }
 
-    const response = await axios.get(url, {
-        responseType: "arraybuffer",
-        timeout: 60000,
-        maxContentLength: 25 * 1024 * 1024,
-        maxBodyLength: 25 * 1024 * 1024
-    });
+    try {
 
-    const buffer = Buffer.from(response.data);
+        api.editMessage(
+            message,
+            messageID,
+            (error) => {
 
-    if (!buffer.length) {
-        throw new Error("الصورة التي تم تحميلها فارغة");
+                if (error) {
+
+                    console.error(
+                        "[HINA AI EDIT] Edit Message Error:",
+                        error.message || error
+                    );
+
+                }
+
+            }
+        );
+
+    } catch (error) {
+
+        console.error(
+            "[HINA AI EDIT] Edit Message Exception:",
+            error.message || error
+        );
+
     }
 
-    return buffer;
 }
 
 /**
+ * ==================================================
+ * حذف رسالة بشكل آمن
+ * ==================================================
+ */
+function safeUnsendMessage(api, messageID) {
+
+    if (!messageID) {
+        return;
+    }
+
+    try {
+
+        api.unsendMessage(
+            messageID,
+            (error) => {
+
+                if (error) {
+
+                    console.error(
+                        "[HINA AI EDIT] Unsend Message Error:",
+                        error.message || error
+                    );
+
+                }
+
+            }
+        );
+
+    } catch (error) {
+
+        console.error(
+            "[HINA AI EDIT] Unsend Message Exception:",
+            error.message || error
+        );
+
+    }
+
+}
+
+/**
+ * ==================================================
+ * تحميل الصورة من Messenger
+ * ==================================================
+ */
+async function downloadImage(url) {
+
+    if (!url) {
+
+        throw new Error(
+            "رابط الصورة غير موجود"
+        );
+
+    }
+
+    const response =
+        await axios.get(
+            url,
+            {
+                responseType: "arraybuffer",
+
+                timeout: 60000,
+
+                maxContentLength:
+                    25 * 1024 * 1024,
+
+                maxBodyLength:
+                    25 * 1024 * 1024
+            }
+        );
+
+    const buffer =
+        Buffer.from(response.data);
+
+    if (!buffer.length) {
+
+        throw new Error(
+            "الصورة التي تم تحميلها فارغة"
+        );
+
+    }
+
+    return buffer;
+
+}
+
+/**
+ * ==================================================
  * رفع الصورة إلى Uguu
+ * ==================================================
  */
 async function uploadToUguu(buffer) {
 
-    const form = new FormData();
+    const form =
+        new FormData();
 
     form.append(
         "files[]",
@@ -63,20 +174,27 @@ async function uploadToUguu(buffer) {
         }
     );
 
-    const response = await axios.post(
-        "https://uguu.se/upload.php",
-        form,
-        {
-            headers: {
-                ...form.getHeaders()
-            },
-            timeout: 60000,
-            maxContentLength: 25 * 1024 * 1024,
-            maxBodyLength: 25 * 1024 * 1024
-        }
-    );
+    const response =
+        await axios.post(
+            "https://uguu.se/upload.php",
+            form,
+            {
+                headers: {
+                    ...form.getHeaders()
+                },
 
-    const data = response.data;
+                timeout: 60000,
+
+                maxContentLength:
+                    25 * 1024 * 1024,
+
+                maxBodyLength:
+                    25 * 1024 * 1024
+            }
+        );
+
+    const data =
+        response.data;
 
     if (
         !data ||
@@ -84,34 +202,58 @@ async function uploadToUguu(buffer) {
         !data.files.length ||
         !data.files[0].url
     ) {
+
         throw new Error(
             "فشل رفع الصورة إلى Uguu: " +
             JSON.stringify(data || {})
         );
+
     }
 
     return data.files[0].url;
+
 }
 
 /**
+ * ==================================================
  * إرسال الصورة إلى API التعديل
+ * ==================================================
  */
-async function editImage(imageUrl, prompt) {
+async function editImage(
+    imageUrl,
+    prompt
+) {
 
     try {
 
-        const response = await axios.get(
-            "https://engez.a7a.online/api/v1/ai/ai/imgedit",
-            {
-                params: {
-                    image_url: imageUrl,
-                    prompt: prompt
-                },
-                timeout: 120000
-            }
+        const response =
+            await axios.get(
+                "https://engez.a7a.online/api/v1/ai/ai/imgedit",
+                {
+                    params: {
+                        image_url:
+                            imageUrl,
+
+                        prompt:
+                            prompt
+                    },
+
+                    timeout: 120000
+                }
+            );
+
+        const data =
+            response.data;
+
+        console.log(
+            "[HINA AI EDIT] API Status:",
+            response.status
         );
 
-        const data = response.data;
+        console.log(
+            "[HINA AI EDIT] API Response:",
+            JSON.stringify(data)
+        );
 
         if (
             data &&
@@ -119,25 +261,37 @@ async function editImage(imageUrl, prompt) {
             data.response &&
             data.response.image
         ) {
+
             return {
-                image: data.response.image,
+
+                image:
+                    data.response.image,
+
                 originalImage:
                     data.response.source_image ||
                     imageUrl,
+
                 images:
-                    data.response.images || [],
+                    data.response.images ||
+                    [],
+
                 serial_no:
                     data.response.serial_no ||
                     "غير متوفر",
+
                 prompt:
                     data.response.prompt ||
                     prompt
+
             };
+
         }
 
         throw new Error(
             "API لم يرجع صورة صالحة:\n" +
-            JSON.stringify(data || {})
+            JSON.stringify(
+                data || {}
+            )
         );
 
     } catch (error) {
@@ -147,57 +301,96 @@ async function editImage(imageUrl, prompt) {
             let apiError;
 
             try {
+
                 apiError =
                     typeof error.response.data === "string"
                         ? error.response.data
                         : JSON.stringify(
                             error.response.data
                         );
+
             } catch {
+
                 apiError =
                     "استجابة غير معروفة من API";
+
             }
 
             throw new Error(
                 `API Error ${error.response.status}: ${apiError}`
             );
+
         }
 
         throw error;
+
     }
+
 }
 
 /**
+ * ==================================================
  * تحميل الصورة الناتجة
+ * ==================================================
  */
 async function getResultBuffer(url) {
 
     if (!url) {
+
         throw new Error(
             "لم يتم الحصول على رابط الصورة المعدلة"
         );
+
     }
 
-    const response = await axios.get(
-        url,
-        {
-            responseType: "arraybuffer",
-            timeout: 120000,
-            maxContentLength: 25 * 1024 * 1024,
-            maxBodyLength: 25 * 1024 * 1024
-        }
-    );
+    const response =
+        await axios.get(
+            url,
+            {
+                responseType:
+                    "arraybuffer",
 
-    return Buffer.from(response.data);
+                timeout:
+                    120000,
+
+                maxContentLength:
+                    25 * 1024 * 1024,
+
+                maxBodyLength:
+                    25 * 1024 * 1024
+            }
+        );
+
+    const buffer =
+        Buffer.from(
+            response.data
+        );
+
+    if (!buffer.length) {
+
+        throw new Error(
+            "الصورة الناتجة فارغة"
+        );
+
+    }
+
+    return buffer;
+
 }
 
+/**
+ * ==================================================
+ * الأمر الأساسي
+ * ==================================================
+ */
 module.exports.run = async function ({
     api,
     event,
     args
 }) {
 
-    const threadID = event.threadID;
+    const threadID =
+        event.threadID;
 
     /**
      * يجب أن يكون الأمر ردًا على رسالة
@@ -212,12 +405,16 @@ module.exports.run = async function ({
             "مثال:\n" +
             "عدلي خلي الشعر أسود\n\n" +
             "عدلي حط نظارة شمسية",
+
             threadID,
+
             event.messageID
         );
+
     }
 
-    const reply = event.messageReply;
+    const reply =
+        event.messageReply;
 
     /**
      * البحث عن الصورة
@@ -225,16 +422,17 @@ module.exports.run = async function ({
     const attachments =
         reply.attachments || [];
 
-    const image = attachments.find(
-        attachment =>
-            attachment &&
-            attachment.url &&
-            (
-                attachment.type === "photo" ||
-                attachment.type === "image" ||
-                !attachment.type
-            )
-    );
+    const image =
+        attachments.find(
+            attachment =>
+                attachment &&
+                attachment.url &&
+                (
+                    attachment.type === "photo" ||
+                    attachment.type === "image" ||
+                    !attachment.type
+                )
+        );
 
     if (!image) {
 
@@ -242,9 +440,12 @@ module.exports.run = async function ({
             HINA_HEADER +
             "❌ الرسالة التي رددت عليها لا تحتوي على صورة.\n\n" +
             "رد على صورة مباشرة ثم اكتب وصف التعديل.",
+
             threadID,
+
             event.messageID
         );
+
     }
 
     /**
@@ -262,9 +463,12 @@ module.exports.run = async function ({
             "❌ اكتب وصف التعديل أولًا.\n\n" +
             "مثال:\n" +
             "عدلي خلي الشعر أسود",
+
             threadID,
+
             event.messageID
         );
+
     }
 
     /**
@@ -277,52 +481,84 @@ module.exports.run = async function ({
             "📥 تحميل الصورة...\n" +
             "✏️ التعديل: " +
             prompt,
+
             threadID
         );
 
     try {
 
         /**
+         * ==========================================
          * 1 — تحميل صورة Messenger
+         * ==========================================
          */
+        console.log(
+            "[HINA AI EDIT] Downloading Messenger image..."
+        );
+
         const imageBuffer =
-            await downloadImage(image.url);
+            await downloadImage(
+                image.url
+            );
+
+        console.log(
+            "[HINA AI EDIT] Image downloaded:",
+            imageBuffer.length,
+            "bytes"
+        );
 
         /**
+         * ==========================================
          * 2 — رفعها إلى Uguu
+         * ==========================================
          */
-        if (
+        safeEditMessage(
+            api,
+
+            HINA_HEADER +
+            "⏳ جاري معالجة الصورة...\n\n" +
+            "📤 رفع الصورة إلى الخادم...\n" +
+            "✏️ التعديل: " +
+            prompt,
+
             waitMessage &&
             waitMessage.messageID
-        ) {
-            await api.editMessage(
-                HINA_HEADER +
-                "⏳ جاري معالجة الصورة...\n\n" +
-                "📤 رفع الصورة إلى الخادم...\n" +
-                "✏️ التعديل: " +
-                prompt,
-                waitMessage.messageID
-            ).catch(() => {});
-        }
+        );
+
+        console.log(
+            "[HINA AI EDIT] Uploading image to Uguu..."
+        );
 
         const publicImageUrl =
-            await uploadToUguu(imageBuffer);
+            await uploadToUguu(
+                imageBuffer
+            );
+
+        console.log(
+            "[HINA AI EDIT] Public image URL:",
+            publicImageUrl
+        );
 
         /**
-         * 3 — إرسال الرابط العام إلى API
+         * ==========================================
+         * 3 — إرسال الرابط إلى API
+         * ==========================================
          */
-        if (
+        safeEditMessage(
+            api,
+
+            HINA_HEADER +
+            "⏳ جاري تعديل الصورة...\n\n" +
+            "✏️ التعديل: " +
+            prompt,
+
             waitMessage &&
             waitMessage.messageID
-        ) {
-            await api.editMessage(
-                HINA_HEADER +
-                "⏳ جاري تعديل الصورة...\n\n" +
-                "✏️ التعديل: " +
-                prompt,
-                waitMessage.messageID
-            ).catch(() => {});
-        }
+        );
+
+        console.log(
+            "[HINA AI EDIT] Sending image to AI API..."
+        );
 
         const result =
             await editImage(
@@ -330,28 +566,40 @@ module.exports.run = async function ({
                 prompt
             );
 
+        console.log(
+            "[HINA AI EDIT] AI image received."
+        );
+
         /**
+         * ==========================================
          * 4 — تحميل الصورة الناتجة
+         * ==========================================
          */
         const resultBuffer =
             await getResultBuffer(
                 result.image
             );
 
+        console.log(
+            "[HINA AI EDIT] Result downloaded:",
+            resultBuffer.length,
+            "bytes"
+        );
+
         /**
          * حذف رسالة الانتظار
          */
-        if (
+        safeUnsendMessage(
+            api,
+
             waitMessage &&
             waitMessage.messageID
-        ) {
-            await api.unsendMessage(
-                waitMessage.messageID
-            ).catch(() => {});
-        }
+        );
 
         /**
+         * ==========================================
          * 5 — إرسال الصورة المعدلة
+         * ==========================================
          */
         return api.sendMessage(
             {
@@ -364,25 +612,58 @@ module.exports.run = async function ({
                     "🔢 رقم المهمة: " +
                     result.serial_no,
 
-                attachment: resultBuffer
+                attachment:
+                    resultBuffer
             },
+
             threadID,
+
             event.messageID
         );
 
     } catch (error) {
 
+        console.error(
+            "================================="
+        );
+
+        console.error(
+            "[HINA AI EDIT] ERROR"
+        );
+
+        console.error(
+            "Message:",
+            error.message
+        );
+
+        console.error(
+            "Status:",
+            error.response?.status
+        );
+
+        console.error(
+            "Response:",
+            error.response?.data
+        );
+
+        console.error(
+            "URL:",
+            error.config?.url
+        );
+
+        console.error(
+            "================================="
+        );
+
         /**
          * حذف رسالة الانتظار
          */
-        if (
+        safeUnsendMessage(
+            api,
+
             waitMessage &&
             waitMessage.messageID
-        ) {
-            await api.unsendMessage(
-                waitMessage.messageID
-            ).catch(() => {});
-        }
+        );
 
         let errorMessage =
             error &&
@@ -393,9 +674,14 @@ module.exports.run = async function ({
         if (
             errorMessage.length > 2000
         ) {
+
             errorMessage =
-                errorMessage.slice(0, 2000) +
+                errorMessage.slice(
+                    0,
+                    2000
+                ) +
                 "\n...";
+
         }
 
         return api.sendMessage(
@@ -404,9 +690,13 @@ module.exports.run = async function ({
             "الخطأ:\n" +
             errorMessage +
             "\n\n" +
-            "إذا ظهر API Error 500 فالمشكلة من خدمة التعديل نفسها أو من الرابط الذي استقبلته.",
+            "إذا ظهر API Error 500 فغالبًا المشكلة من خدمة التعديل الخارجية أو من الرابط الذي استقبلته.",
+
             threadID,
+
             event.messageID
         );
+
     }
+
 };
