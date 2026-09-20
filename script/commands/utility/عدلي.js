@@ -5,9 +5,6 @@
  * الاستخدام:
  * رد على صورة واكتب:
  * عدلي خلي شعرها اسود
- *
- * أو:
- * عدلي حط نظارة شمسية
  */
 
 const axios = require("axios");
@@ -17,18 +14,14 @@ const path = require("path");
 
 module.exports.config = {
     name: "عدلي",
-    version: "1.0.0",
+    version: "1.0.1",
     hasPermssion: 0,
     credits: "أبو هريرة",
     description: "تعديل الصور بالذكاء الاصطناعي",
-    commandCategory: "Photos",
+    commandCategory: "photos",
     usages: "عدلي <وصف التعديل>",
     cooldowns: 10
 };
-
-// ==================================================
-// الإعدادات
-// ==================================================
 
 const HINA_HEADER =
     "⌬ ━━ 𝗛𝗜𝗡𝗔  ━━ ⌬\n\n";
@@ -41,24 +34,101 @@ const CACHE_DIR = path.join(
 
 fs.ensureDirSync(CACHE_DIR);
 
-// ==================================================
-// أدوات
-// ==================================================
-
 function hinaMessage(text) {
     return HINA_HEADER + text;
 }
 
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+function getReplyImage(event) {
+    const reply = event.messageReply;
+
+    if (
+        !reply ||
+        !Array.isArray(reply.attachments)
+    ) {
+        return null;
+    }
+
+    for (const attachment of reply.attachments) {
+        if (!attachment) continue;
+
+        const type = String(
+            attachment.type || ""
+        ).toLowerCase();
+
+        if (
+            (
+                type === "photo" ||
+                type === "image"
+            ) &&
+            attachment.url
+        ) {
+            return attachment.url;
+        }
+    }
+
+    return null;
+}
+
+async function safeEditMessage(
+    api,
+    messageID,
+    text
+) {
+    if (!messageID) return;
+
+    try {
+        const result = api.editMessage(
+            text,
+            messageID
+        );
+
+        if (
+            result &&
+            typeof result.then === "function"
+        ) {
+            await result;
+        }
+    } catch (error) {
+        console.log(
+            "[عدلي] تعذر تعديل رسالة الانتظار:",
+            error.message
+        );
+    }
+}
+
+async function safeUnsendMessage(
+    api,
+    messageID
+) {
+    if (!messageID) return;
+
+    try {
+        const result = api.unsendMessage(
+            messageID
+        );
+
+        if (
+            result &&
+            typeof result.then === "function"
+        ) {
+            await result;
+        }
+    } catch (error) {
+        console.log(
+            "[عدلي] تعذر حذف رسالة الانتظار:",
+            error.message
+        );
+    }
 }
 
 // ==================================================
 // رفع الصورة إلى Uguu
 // ==================================================
 
-async function uploadToUguu(buffer, ext = "jpg") {
-
+async function uploadToUguu(
+    buffer,
+    ext = "jpg"
+) {
     const form = new FormData();
 
     form.append(
@@ -68,24 +138,21 @@ async function uploadToUguu(buffer, ext = "jpg") {
     );
 
     try {
-
-        const response = await axios.post(
-            "https://uguu.se/upload.php",
-            form,
-            {
-                timeout: 60000,
-
-                headers: {
-                    ...form.getHeaders()
-                },
-
-                maxContentLength:
-                    Infinity,
-
-                maxBodyLength:
-                    Infinity
-            }
-        );
+        const response =
+            await axios.post(
+                "https://uguu.se/upload.php",
+                form,
+                {
+                    timeout: 60000,
+                    headers: {
+                        ...form.getHeaders()
+                    },
+                    maxContentLength:
+                        Infinity,
+                    maxBodyLength:
+                        Infinity
+                }
+            );
 
         const result =
             response.data;
@@ -96,7 +163,6 @@ async function uploadToUguu(buffer, ext = "jpg") {
             !result.files.length ||
             !result.files[0].url
         ) {
-
             throw new Error(
                 "لم يتم الحصول على رابط الصورة من Uguu"
             );
@@ -107,10 +173,11 @@ async function uploadToUguu(buffer, ext = "jpg") {
     } catch (error) {
 
         if (error.response) {
-
             throw new Error(
                 `Uguu Error ${error.response.status}: ` +
-                JSON.stringify(error.response.data)
+                JSON.stringify(
+                    error.response.data
+                )
             );
         }
 
@@ -118,50 +185,6 @@ async function uploadToUguu(buffer, ext = "jpg") {
             `فشل رفع الصورة: ${error.message}`
         );
     }
-}
-
-// ==================================================
-// الحصول على صورة الرد
-// ==================================================
-
-function getReplyImage(event) {
-
-    const reply =
-        event.messageReply;
-
-    if (
-        !reply ||
-        !Array.isArray(reply.attachments)
-    ) {
-        return null;
-    }
-
-    for (
-        const attachment of reply.attachments
-    ) {
-
-        if (!attachment) {
-            continue;
-        }
-
-        const type =
-            String(
-                attachment.type || ""
-            ).toLowerCase();
-
-        if (
-            (
-                type === "photo" ||
-                type === "image"
-            ) &&
-            attachment.url
-        ) {
-
-            return attachment.url;
-        }
-    }
-
-    return null;
 }
 
 // ==================================================
@@ -205,7 +228,6 @@ async function downloadImage(url) {
         contentType &&
         !contentType.startsWith("image/")
     ) {
-
         throw new Error(
             "الرابط لا يحتوي على صورة"
         );
@@ -217,46 +239,6 @@ async function downloadImage(url) {
 }
 
 // ==================================================
-// تحديد الامتداد
-// ==================================================
-
-function getExtensionFromType(
-    contentType
-) {
-
-    contentType =
-        String(
-            contentType || ""
-        ).toLowerCase();
-
-    if (
-        contentType.includes(
-            "png"
-        )
-    ) {
-        return "png";
-    }
-
-    if (
-        contentType.includes(
-            "webp"
-        )
-    ) {
-        return "webp";
-    }
-
-    if (
-        contentType.includes(
-            "gif"
-        )
-    ) {
-        return "gif";
-    }
-
-    return "jpg";
-}
-
-// ==================================================
 // API تعديل الصورة
 // ==================================================
 
@@ -264,7 +246,6 @@ async function editImageWithAPI(
     imageUrl,
     prompt
 ) {
-
     try {
 
         const response =
@@ -321,7 +302,6 @@ async function editImageWithAPI(
     } catch (error) {
 
         if (error.response) {
-
             throw new Error(
                 `API Error ${error.response.status}: ` +
                 JSON.stringify(
@@ -337,7 +317,7 @@ async function editImageWithAPI(
 }
 
 // ==================================================
-// إرسال الصورة المعدلة
+// تحميل الصورة المعدلة وإرسالها
 // ==================================================
 
 async function sendEditedImage(
@@ -373,14 +353,27 @@ async function sendEditedImage(
         );
 
     const contentType =
-        response.headers[
-            "content-type"
-        ] || "image/jpeg";
+        String(
+            response.headers[
+                "content-type"
+            ] || ""
+        ).toLowerCase();
 
-    const ext =
-        getExtensionFromType(
-            contentType
-        );
+    let ext = "jpg";
+
+    if (
+        contentType.includes("png")
+    ) {
+        ext = "png";
+    } else if (
+        contentType.includes("webp")
+    ) {
+        ext = "webp";
+    } else if (
+        contentType.includes("gif")
+    ) {
+        ext = "gif";
+    }
 
     const fileName =
         `edited_${Date.now()}.${ext}`;
@@ -422,14 +415,11 @@ async function sendEditedImage(
 
     } finally {
 
-        setTimeout(
-            () => {
-                fs.remove(
-                    filePath
-                ).catch(() => {});
-            },
-            30000
-        );
+        setTimeout(() => {
+            fs.remove(
+                filePath
+            ).catch(() => {});
+        }, 30000);
     }
 }
 
@@ -448,10 +438,6 @@ module.exports.run = async function ({
             ? args.join(" ").trim()
             : "";
 
-    // ----------------------------------------------
-    // التأكد من وجود وصف
-    // ----------------------------------------------
-
     if (!prompt) {
 
         return api.sendMessage(
@@ -465,16 +451,10 @@ module.exports.run = async function ({
                 "عدلي حط نظارة شمسية\n" +
                 "عدلي غير لون الملابس إلى البنفسجي"
             ),
-
             event.threadID,
-
             event.messageID
         );
     }
-
-    // ----------------------------------------------
-    // الحصول على الصورة
-    // ----------------------------------------------
 
     const imageUrl =
         getReplyImage(event);
@@ -488,20 +468,18 @@ module.exports.run = async function ({
                 "رد على الصورة واكتب:\n" +
                 "عدلي خلي شعرها اسود"
             ),
-
             event.threadID,
-
             event.messageID
         );
     }
 
-    // ----------------------------------------------
-    // رسالة الانتظار
-    // ----------------------------------------------
-
-    let waitMessage;
+    let waitMessage = null;
 
     try {
+
+        // ------------------------------------------
+        // رسالة الانتظار
+        // ------------------------------------------
 
         waitMessage =
             await api.sendMessage(
@@ -510,18 +488,9 @@ module.exports.run = async function ({
                     `التعديل: ${prompt}\n\n` +
                     "يرجى الانتظار..."
                 ),
-
                 event.threadID,
-
                 event.messageID
             );
-
-    } catch {
-
-        waitMessage = null;
-    }
-
-    try {
 
         // ------------------------------------------
         // تحميل الصورة
@@ -536,7 +505,6 @@ module.exports.run = async function ({
             !imageBuffer ||
             !imageBuffer.length
         ) {
-
             throw new Error(
                 "فشل تحميل الصورة"
             );
@@ -546,54 +514,44 @@ module.exports.run = async function ({
         // رفع الصورة
         // ------------------------------------------
 
-        if (waitMessage?.messageID) {
+        await safeEditMessage(
+            api,
+            waitMessage?.messageID,
+            hinaMessage(
+                "جاري رفع الصورة إلى الخادم...\n\n" +
+                `التعديل: ${prompt}`
+            )
+        );
 
-            await api.editMessage(
-                hinaMessage(
-                    "جاري رفع الصورة إلى الخادم...\n\n" +
-                    `التعديل: ${prompt}`
-                ),
-                waitMessage.messageID
-            ).catch(() => {});
-        }
-
-        /*
-         * الصورة القادمة من Messenger قد تكون JPEG
-         * لذلك نستخدم jpg كامتداد آمن.
-         */
-
-        const imageUploadUrl =
+        const uploadedUrl =
             await uploadToUguu(
                 imageBuffer,
                 "jpg"
             );
 
-        if (!imageUploadUrl) {
-
+        if (!uploadedUrl) {
             throw new Error(
                 "فشل الحصول على رابط الصورة"
             );
         }
 
         // ------------------------------------------
-        // إرسال الصورة إلى API
+        // تعديل الصورة
         // ------------------------------------------
 
-        if (waitMessage?.messageID) {
-
-            await api.editMessage(
-                hinaMessage(
-                    "جاري تعديل الصورة بالذكاء الاصطناعي...\n\n" +
-                    `التعديل: ${prompt}\n\n` +
-                    "قد تستغرق العملية بعض الوقت."
-                ),
-                waitMessage.messageID
-            ).catch(() => {});
-        }
+        await safeEditMessage(
+            api,
+            waitMessage?.messageID,
+            hinaMessage(
+                "جاري تعديل الصورة بالذكاء الاصطناعي...\n\n" +
+                `التعديل: ${prompt}\n\n` +
+                "قد تستغرق العملية بعض الوقت."
+            )
+        );
 
         const result =
             await editImageWithAPI(
-                imageUploadUrl,
+                uploadedUrl,
                 prompt
             );
 
@@ -601,7 +559,6 @@ module.exports.run = async function ({
             !result ||
             !result.editedImage
         ) {
-
             throw new Error(
                 "لم يتم الحصول على الصورة المعدلة"
             );
@@ -611,14 +568,10 @@ module.exports.run = async function ({
         // حذف رسالة الانتظار
         // ------------------------------------------
 
-        if (
+        await safeUnsendMessage(
+            api,
             waitMessage?.messageID
-        ) {
-
-            await api.unsendMessage(
-                waitMessage.messageID
-            ).catch(() => {});
-        }
+        );
 
         // ------------------------------------------
         // إرسال النتيجة
@@ -635,18 +588,10 @@ module.exports.run = async function ({
 
     } catch (error) {
 
-        // ------------------------------------------
-        // حذف رسالة الانتظار
-        // ------------------------------------------
-
-        if (
+        await safeUnsendMessage(
+            api,
             waitMessage?.messageID
-        ) {
-
-            await api.unsendMessage(
-                waitMessage.messageID
-            ).catch(() => {});
-        }
+        );
 
         let errorMessage =
             error?.message ||
@@ -655,7 +600,6 @@ module.exports.run = async function ({
         if (
             errorMessage.length > 2500
         ) {
-
             errorMessage =
                 errorMessage.slice(
                     0,
@@ -675,17 +619,11 @@ module.exports.run = async function ({
                 `الخطأ:\n${errorMessage}\n\n` +
                 "حاول مرة أخرى بعد قليل."
             ),
-
             event.threadID,
-
             event.messageID
         );
     }
 };
-
-// ==================================================
-// تصدير إضافي
-// ==================================================
 
 module.exports.editImageWithAPI =
     editImageWithAPI;
