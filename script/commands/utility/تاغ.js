@@ -2,7 +2,7 @@
  * تاغ.js
  *
  * .تاغ
- * منشن جميع أعضاء المجموعة
+ * منشن جميع أعضاء المجموعة في رسالة واحدة
  *
  * .تاغ م
  * منشن الأعضاء الذين يبدأ اسمهم بحرف م
@@ -10,11 +10,11 @@
 
 module.exports.config = {
     name: "تاغ",
-    version: "3.0.0",
+    version: "3.1.0",
     hasPermssion: 0,
     credits: "أبو هريرة",
     description: "منشن أعضاء المجموعة أو الأعضاء حسب أول حرف من الاسم",
-    commandCategory: "utility",
+    commandCategory: "Utility",
     usages: "تاغ [الحرف]",
     cooldowns: 5
 };
@@ -51,7 +51,6 @@ function getFirstCharacter(name) {
         return "";
     }
 
-    // نحذف الرموز من بداية الاسم
     const cleaned =
         value.replace(
             /^[^\p{L}\p{N}]+/u,
@@ -145,7 +144,7 @@ async function ({
 
         // ==================================================
         // إذا لم توجد userInfo
-        // نحاول استخدام participantIDs
+        // نستخدم participantIDs
         // ==================================================
 
         if (!userInfo.length) {
@@ -167,7 +166,6 @@ async function ({
                 );
             }
 
-            // جلب معلومات كل عضو
             userInfo = [];
 
             for (
@@ -336,7 +334,8 @@ async function ({
                 );
 
             letter =
-                letter.charAt(0)
+                letter
+                    .charAt(0)
                     .toLocaleLowerCase("ar");
         }
 
@@ -372,126 +371,82 @@ async function ({
         }
 
         // ==================================================
-        // الحد الأقصى لكل رسالة
+        // بناء المنشنات
         // ==================================================
 
-        const MAX_PER_MESSAGE = 15;
+        const mentions = [];
 
-        // ==================================================
-        // تقسيم الأعضاء
-        // ==================================================
+        const names = [];
 
         for (
-            let start = 0;
-            start < selected.length;
-            start += MAX_PER_MESSAGE
+            const member
+            of selected
         ) {
 
-            const group =
-                selected.slice(
-                    start,
-                    start + MAX_PER_MESSAGE
-                );
+            mentions.push({
+                tag: member.name,
+                id: member.id
+            });
 
-            const mentions = [];
+            names.push(
+                `@${member.name}`
+            );
+        }
 
-            const names = [];
+        // ==================================================
+        // العنوان
+        // ==================================================
 
-            // ==================================================
-            // بناء المنشنات
-            // ==================================================
+        let title;
 
-            for (
-                const member
-                of group
-            ) {
+        if (letter) {
 
-                mentions.push({
-                    tag: member.name,
-                    id: member.id
-                });
+            title =
+                `منشن الأعضاء الذين يبدأ اسمهم بحرف ${letter}`;
 
-                names.push(
-                    `@${member.name}`
-                );
-            }
+        } else {
 
-            // ==================================================
-            // النص
-            // ==================================================
+            title =
+                "منشن جميع أعضاء المجموعة";
+        }
 
-            let title;
+        // ==================================================
+        // الرسالة الواحدة
+        // ==================================================
 
-            if (letter) {
+        const message =
+            HEADER +
+            title +
+            "\n\n" +
+            names.join(" ");
 
-                title =
-                    `منشن الأعضاء الذين يبدأ اسمهم بحرف ${letter}`;
+        // ==================================================
+        // إرسال جميع المنشنات في رسالة واحدة
+        // ==================================================
 
-            } else {
+        return api.sendMessage(
+            {
+                body: message,
+                mentions
+            },
 
-                title =
-                    "منشن جميع أعضاء المجموعة";
-            }
+            threadID,
 
-            const message =
-                HEADER +
-                title +
-                "\n\n" +
-                names.join(" ");
+            error => {
 
-            // ==================================================
-            // إرسال
-            // ==================================================
+                if (error) {
 
-            await new Promise(
-                resolve => {
-
-                    api.sendMessage(
-                        {
-                            body: message,
-                            mentions
-                        },
-
-                        threadID,
-
-                        error => {
-
-                            if (error) {
-
-                                console.error(
-                                    "[TAG SEND ERROR]:",
-                                    error
-                                );
-
-                            }
-
-                            resolve();
-                        },
-
-                        event.messageID
+                    console.error(
+                        "[TAG SEND ERROR]:",
+                        error
                     );
 
                 }
-            );
 
-            // ==================================================
-            // تأخير بين الرسائل
-            // ==================================================
+            },
 
-            if (
-                start + MAX_PER_MESSAGE <
-                selected.length
-            ) {
-
-                await new Promise(
-                    resolve =>
-                        setTimeout(
-                            resolve,
-                            800
-                        )
-                );
-            }
-        }
+            event.messageID
+        );
 
     } catch (error) {
 
