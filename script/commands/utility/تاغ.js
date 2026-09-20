@@ -2,18 +2,18 @@
  * تاغ.js
  *
  * .تاغ
- * منشن لجميع أعضاء المجموعة
+ * منشن جميع أعضاء المجموعة
  *
  * .تاغ م
- * منشن لكل الأعضاء الذين يبدأ اسمهم بحرف م
+ * منشن الأعضاء الذين يبدأ اسمهم بحرف م
  */
 
 module.exports.config = {
     name: "تاغ",
-    version: "2.0.0",
+    version: "3.0.0",
     hasPermssion: 0,
     credits: "أبو هريرة",
-    description: "منشن جميع أعضاء المجموعة أو حسب أول حرف",
+    description: "منشن أعضاء المجموعة أو الأعضاء حسب أول حرف من الاسم",
     commandCategory: "utility",
     usages: "تاغ [الحرف]",
     cooldowns: 5
@@ -23,7 +23,7 @@ module.exports.config = {
 // HINA
 // ==================================================
 
-const HINA_HEADER =
+const HEADER =
     "⌬ ━━ 𝗛𝗜𝗡𝗔  ━━ ⌬\n\n";
 
 // ==================================================
@@ -39,163 +39,36 @@ function cleanName(name) {
 }
 
 // ==================================================
-// أول حرف من الاسم
+// استخراج أول حرف حقيقي من الاسم
 // ==================================================
 
 function getFirstCharacter(name) {
 
-    const clean =
+    const value =
         cleanName(name);
 
-    if (!clean) {
+    if (!value) {
         return "";
     }
 
-    /*
-     * نتجاوز الرموز الموجودة في بداية الاسم
-     * مثل:
-     * ★ محمد
-     * 『محمد』
-     * 〆محمد
-     */
-
-    const match =
-        clean.match(
-            /[A-Za-z\u0600-\u06FF\u0750-\u077F]/
+    // نحذف الرموز من بداية الاسم
+    const cleaned =
+        value.replace(
+            /^[^\p{L}\p{N}]+/u,
+            ""
         );
 
-    if (!match) {
-        return clean.charAt(0);
+    if (!cleaned) {
+        return "";
     }
 
-    return match[0]
+    return cleaned
+        .charAt(0)
         .toLocaleLowerCase("ar");
 }
 
 // ==================================================
-// تقسيم المصفوفة
-// ==================================================
-
-function chunk(array, size) {
-
-    const result = [];
-
-    for (
-        let i = 0;
-        i < array.length;
-        i += size
-    ) {
-
-        result.push(
-            array.slice(
-                i,
-                i + size
-            )
-        );
-
-    }
-
-    return result;
-}
-
-// ==================================================
-// إرسال منشن
-// ==================================================
-
-function sendMentionMessage(
-    api,
-    threadID,
-    body,
-    users,
-    replyTo
-) {
-
-    return new Promise(
-        resolve => {
-
-            const mentions = [];
-
-            const names = [];
-
-            for (
-                const user of users
-            ) {
-
-                const id =
-                    String(
-                        user.id || ""
-                    );
-
-                const name =
-                    cleanName(
-                        user.name
-                    );
-
-                if (!id || !name) {
-                    continue;
-                }
-
-                names.push(
-                    `@${name}`
-                );
-
-                /*
-                 * هذه هي نفس صيغة المنشن
-                 * المستخدمة في joinNoti عندك
-                 */
-
-                mentions.push({
-                    tag: name,
-                    id
-                });
-            }
-
-            if (!mentions.length) {
-
-                resolve(false);
-
-                return;
-            }
-
-            const message =
-                body +
-                "\n\n" +
-                names.join(" ");
-
-            api.sendMessage(
-                {
-                    body: message,
-                    mentions
-                },
-
-                threadID,
-
-                error => {
-
-                    if (error) {
-
-                        console.error(
-                            "[TAG SEND ERROR]:",
-                            error
-                        );
-
-                        resolve(false);
-
-                        return;
-                    }
-
-                    resolve(true);
-                },
-
-                replyTo
-            );
-
-        }
-    );
-}
-
-// ==================================================
-// الأمر
+// تنفيذ الأمر
 // ==================================================
 
 module.exports.run =
@@ -205,252 +78,416 @@ async function ({
     args
 }) {
 
-    const threadID =
-        String(
-            event.threadID || ""
-        );
-
-    if (!threadID) {
-        return;
-    }
-
     try {
 
-        // ==========================================
-        // معلومات المجموعة
-        // ==========================================
-
-        const threadInfo =
-            await api.getThreadInfo(
-                threadID
+        const threadID =
+            String(
+                event.threadID || ""
             );
 
-        if (
-            !threadInfo ||
-            !Array.isArray(
-                threadInfo.participantIDs
-            )
-        ) {
-
-            return api.sendMessage(
-                HINA_HEADER +
-                "تعذر الحصول على أعضاء المجموعة.",
-                threadID,
-                event.messageID
-            );
+        if (!threadID) {
+            return;
         }
 
-        // ==========================================
+        // ==================================================
         // ID البوت
-        // ==========================================
+        // ==================================================
 
         const botID =
             String(
                 api.getCurrentUserID()
             );
 
-        // ==========================================
-        // IDs الأعضاء
-        // ==========================================
+        // ==================================================
+        // الحصول على معلومات المجموعة
+        // ==================================================
 
-        const participantIDs =
-            threadInfo.participantIDs
-                .map(
-                    id => String(id)
+        const threadInfo =
+            await new Promise(
+                (resolve, reject) => {
+
+                    api.getThreadInfo(
+                        threadID,
+                        (error, info) => {
+
+                            if (error) {
+                                reject(error);
+                                return;
+                            }
+
+                            resolve(info);
+                        }
+                    );
+
+                }
+            );
+
+        if (!threadInfo) {
+
+            return api.sendMessage(
+                HEADER +
+                "تعذر الحصول على معلومات المجموعة.",
+                threadID,
+                event.messageID
+            );
+        }
+
+        // ==================================================
+        // معلومات الأعضاء
+        // ==================================================
+
+        let userInfo =
+            Array.isArray(
+                threadInfo.userInfo
+            )
+                ? threadInfo.userInfo
+                : [];
+
+        // ==================================================
+        // إذا لم توجد userInfo
+        // نحاول استخدام participantIDs
+        // ==================================================
+
+        if (!userInfo.length) {
+
+            const participantIDs =
+                Array.isArray(
+                    threadInfo.participantIDs
                 )
-                .filter(
-                    id =>
-                        id &&
-                        id !== botID
+                    ? threadInfo.participantIDs
+                    : [];
+
+            if (!participantIDs.length) {
+
+                return api.sendMessage(
+                    HEADER +
+                    "لم أتمكن من الحصول على أعضاء المجموعة.",
+                    threadID,
+                    event.messageID
                 );
+            }
 
-        if (!participantIDs.length) {
+            // جلب معلومات كل عضو
+            userInfo = [];
 
-            return api.sendMessage(
-                HINA_HEADER +
-                "لا يوجد أعضاء لمنشنهم.",
-                threadID,
-                event.messageID
-            );
+            for (
+                const id
+                of participantIDs
+            ) {
+
+                const userID =
+                    String(id);
+
+                if (
+                    !userID ||
+                    userID === botID
+                ) {
+                    continue;
+                }
+
+                try {
+
+                    const result =
+                        await new Promise(
+                            resolve => {
+
+                                api.getUserInfo(
+                                    userID,
+                                    (
+                                        error,
+                                        info
+                                    ) => {
+
+                                        if (
+                                            error ||
+                                            !info
+                                        ) {
+                                            resolve(null);
+                                            return;
+                                        }
+
+                                        resolve(
+                                            info[userID] ||
+                                            info
+                                        );
+                                    }
+                                );
+
+                            }
+                        );
+
+                    if (result) {
+                        userInfo.push(result);
+                    }
+
+                } catch (error) {
+
+                    console.error(
+                        "[TAG USER ERROR]:",
+                        error.message
+                    );
+
+                }
+            }
         }
 
-        // ==========================================
-        // جلب أسماء الأعضاء
-        // ==========================================
+        // ==================================================
+        // تحويل بيانات الأعضاء
+        // ==================================================
 
-        let userInfo;
-
-        try {
-
-            userInfo =
-                await api.getUserInfo(
-                    participantIDs
-                );
-
-        } catch (error) {
-
-            console.error(
-                "[TAG GET USER INFO ERROR]:",
-                error
-            );
-
-            return api.sendMessage(
-                HINA_HEADER +
-                "تعذر الحصول على معلومات أعضاء المجموعة.",
-                threadID,
-                event.messageID
-            );
-        }
-
-        const users = [];
+        const members = [];
 
         for (
-            const id of participantIDs
+            const user
+            of userInfo
         ) {
 
-            const data =
-                userInfo &&
-                userInfo[id];
-
-            if (!data) {
+            if (!user) {
                 continue;
             }
+
+            const userID =
+                String(
+                    user.id ||
+                    user.userFbId ||
+                    ""
+                );
 
             const name =
                 cleanName(
-                    data.name
+                    user.name ||
+                    user.fullName ||
+                    ""
                 );
 
-            if (!name) {
+            if (
+                !userID ||
+                !name ||
+                userID === botID
+            ) {
                 continue;
             }
 
-            users.push({
-                id,
+            members.push({
+                id: userID,
                 name
             });
         }
 
-        // ==========================================
-        // الحرف
-        // ==========================================
+        // ==================================================
+        // إزالة التكرار
+        // ==================================================
 
-        const requestedLetter =
-            args &&
-            args.length
-                ? cleanName(
-                    args[0]
-                ).charAt(0)
-                : "";
+        const uniqueMembers = [];
 
-        // ==========================================
-        // تحديد الأعضاء
-        // ==========================================
+        const usedIDs =
+            new Set();
 
-        let selectedUsers =
-            users;
+        for (
+            const member
+            of members
+        ) {
 
-        if (requestedLetter) {
+            if (
+                usedIDs.has(
+                    member.id
+                )
+            ) {
+                continue;
+            }
 
-            const letter =
-                requestedLetter
-                    .toLocaleLowerCase("ar");
+            usedIDs.add(
+                member.id
+            );
 
-            selectedUsers =
-                users.filter(
-                    user =>
-                        getFirstCharacter(
-                            user.name
-                        ) === letter
-                );
+            uniqueMembers.push(
+                member
+            );
         }
 
-        // ==========================================
-        // لا توجد نتائج
-        // ==========================================
+        // ==================================================
+        // لا يوجد أعضاء
+        // ==================================================
 
-        if (!selectedUsers.length) {
+        if (!uniqueMembers.length) {
 
-            if (requestedLetter) {
+            return api.sendMessage(
+                HEADER +
+                "لم أتمكن من العثور على أعضاء المجموعة.",
+                threadID,
+                event.messageID
+            );
+        }
+
+        // ==================================================
+        // تحديد الحرف
+        // ==================================================
+
+        let letter = "";
+
+        if (
+            Array.isArray(args) &&
+            args.length
+        ) {
+
+            letter =
+                cleanName(
+                    args.join(" ")
+                );
+
+            letter =
+                letter.charAt(0)
+                    .toLocaleLowerCase("ar");
+        }
+
+        // ==================================================
+        // تصفية الأعضاء حسب الحرف
+        // ==================================================
+
+        let selected =
+            uniqueMembers;
+
+        if (letter) {
+
+            selected =
+                uniqueMembers.filter(
+                    member =>
+                        getFirstCharacter(
+                            member.name
+                        ) === letter
+                );
+
+            if (!selected.length) {
 
                 return api.sendMessage(
 
-                    HINA_HEADER +
+                    HEADER +
 
-                    `لم أجد أي عضو يبدأ اسمه بحرف ${requestedLetter}.`,
+                    `لم أجد أي عضو يبدأ اسمه بحرف ${letter}.`,
 
                     threadID,
                     event.messageID
                 );
-
             }
-
-            return api.sendMessage(
-                HINA_HEADER +
-                "لم أجد أعضاء لمنشنهم.",
-                threadID,
-                event.messageID
-            );
         }
 
-        // ==========================================
-        // تقسيم المنشنات
-        // ==========================================
+        // ==================================================
+        // الحد الأقصى لكل رسالة
+        // ==================================================
 
-        /*
-         * نقسمها حتى لا تصبح الرسالة ضخمة جدًا.
-         */
+        const MAX_PER_MESSAGE = 15;
 
-        const groups =
-            chunk(
-                selectedUsers,
-                20
-            );
+        // ==================================================
+        // تقسيم الأعضاء
+        // ==================================================
 
         for (
-            let i = 0;
-            i < groups.length;
-            i++
+            let start = 0;
+            start < selected.length;
+            start += MAX_PER_MESSAGE
         ) {
 
             const group =
-                groups[i];
+                selected.slice(
+                    start,
+                    start + MAX_PER_MESSAGE
+                );
 
-            let text;
+            const mentions = [];
 
-            if (requestedLetter) {
+            const names = [];
 
-                text =
-                    HINA_HEADER +
-                    `منشن الأعضاء الذين يبدأ اسمهم بحرف ${requestedLetter}:`;
+            // ==================================================
+            // بناء المنشنات
+            // ==================================================
+
+            for (
+                const member
+                of group
+            ) {
+
+                mentions.push({
+                    tag: member.name,
+                    id: member.id
+                });
+
+                names.push(
+                    `@${member.name}`
+                );
+            }
+
+            // ==================================================
+            // النص
+            // ==================================================
+
+            let title;
+
+            if (letter) {
+
+                title =
+                    `منشن الأعضاء الذين يبدأ اسمهم بحرف ${letter}`;
 
             } else {
 
-                text =
-                    HINA_HEADER +
-                    "منشن جميع أعضاء المجموعة:";
-
+                title =
+                    "منشن جميع أعضاء المجموعة";
             }
 
-            await sendMentionMessage(
-                api,
-                threadID,
-                text,
-                group,
-                event.messageID
+            const message =
+                HEADER +
+                title +
+                "\n\n" +
+                names.join(" ");
+
+            // ==================================================
+            // إرسال
+            // ==================================================
+
+            await new Promise(
+                resolve => {
+
+                    api.sendMessage(
+                        {
+                            body: message,
+                            mentions
+                        },
+
+                        threadID,
+
+                        error => {
+
+                            if (error) {
+
+                                console.error(
+                                    "[TAG SEND ERROR]:",
+                                    error
+                                );
+
+                            }
+
+                            resolve();
+                        },
+
+                        event.messageID
+                    );
+
+                }
             );
 
-            // تأخير بسيط بين الرسائل
+            // ==================================================
+            // تأخير بين الرسائل
+            // ==================================================
+
             if (
-                i <
-                groups.length - 1
+                start + MAX_PER_MESSAGE <
+                selected.length
             ) {
 
                 await new Promise(
                     resolve =>
                         setTimeout(
                             resolve,
-                            700
+                            800
                         )
                 );
             }
@@ -465,16 +502,15 @@ async function ({
 
         return api.sendMessage(
 
-            HINA_HEADER +
+            HEADER +
 
-            "حدث خطأ أثناء تنفيذ التاغ.\n\n" +
-
+            "حدث خطأ أثناء تنفيذ الأمر.\n\n" +
             (
                 error.message ||
                 "خطأ غير معروف"
             ),
 
-            threadID,
+            event.threadID,
             event.messageID
         );
     }
