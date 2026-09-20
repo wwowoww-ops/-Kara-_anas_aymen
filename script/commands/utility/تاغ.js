@@ -14,7 +14,7 @@ module.exports.config = {
     hasPermssion: 0,
     credits: "أبو هريرة",
     description: "منشن أعضاء المجموعة أو الأعضاء حسب أول حرف من الاسم",
-    commandCategory: "Utility",
+    commandCategory: "utility",
     usages: "تاغ [الحرف]",
     cooldowns: 5
 };
