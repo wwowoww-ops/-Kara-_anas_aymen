@@ -52,7 +52,7 @@
 "node-fetch": "^3.3.2",
 "node-superfetch": "^0.2.3",
 "ora": "^8.0.1",
-"pet-pet-gif": "^1.0.0" 
+"pet-pet-gif": "^1.0.0", 
 "pidusage": "^3.0.2",
 "pg": "^8.16.3", 
 "request": "^2.88.2",
