@@ -2,24 +2,29 @@
  * موافقة.js
  *
  * .موافقة
- * عرض حالة موافقة الأدمن الحقيقية للمجموعة
+ * عرض حالة موافقة الأدمن الحقيقية
  *
  * .موافقة تشغيل
- * محاولة تفعيل موافقة الأدمن
+ * تفعيل موافقة الأدمن
  *
  * .موافقة إيقاف
- * محاولة إيقاف موافقة الأدمن
+ * إيقاف موافقة الأدمن
+ *
+ * لا يستخدم قاعدة بيانات
+ * ولا يحتاج approval.json
  */
+
+const axios = require("axios");
 
 module.exports.config = {
     name: "موافقة",
-    version: "1.1.0",
+    version: "2.0.0",
     hasPermssion: 1,
     credits: "أبو هريرة",
     description: "التحكم في موافقة الأدمن على إضافة الأعضاء",
     commandCategory: "Admin",
     usages: "موافقة | موافقة تشغيل | موافقة إيقاف",
-    cooldowns: 3
+    cooldowns: 5
 };
 
 const HEADER =
@@ -44,7 +49,289 @@ function getThreadInfo(api, threadID) {
                 resolve(info);
             }
         );
+
     });
+}
+
+// ==================================================
+// تحويل AppState إلى Cookie
+// ==================================================
+
+function buildCookie(appState) {
+
+    if (!Array.isArray(appState)) {
+        throw new Error(
+            "تعذر الحصول على AppState."
+        );
+    }
+
+    return appState
+        .map(cookie => {
+            if (
+                !cookie ||
+                !cookie.key ||
+                cookie.value === undefined
+            ) {
+                return null;
+            }
+
+            return `${cookie.key}=${cookie.value}`;
+        })
+        .filter(Boolean)
+        .join("; ");
+}
+
+// ==================================================
+// استخراج fb_dtsg من صفحة Facebook
+// ==================================================
+
+function extractDTSG(html) {
+
+    if (!html) {
+        return null;
+    }
+
+    let match =
+        html.match(
+            /"DTSGInitialData",\[\],\{"token":"([^"]+)"/
+        );
+
+    if (match && match[1]) {
+        return match[1];
+    }
+
+    match =
+        html.match(
+            /"token":"([^"]+)"/
+        );
+
+    if (match && match[1]) {
+        return match[1];
+    }
+
+    match =
+        html.match(
+            /name="fb_dtsg"\s+value="([^"]+)"/
+        );
+
+    if (match && match[1]) {
+        return match[1];
+    }
+
+    return null;
+}
+
+// ==================================================
+// الحصول على fb_dtsg
+// ==================================================
+
+async function getFacebookTokens(cookie) {
+
+    const response =
+        await axios.get(
+            "https://www.facebook.com/",
+            {
+                timeout: 20000,
+
+                headers: {
+                    Cookie: cookie,
+
+                    "User-Agent":
+                        "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36",
+
+                    Accept:
+                        "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+                },
+
+                maxRedirects: 5
+            }
+        );
+
+    const html =
+        String(
+            response.data || ""
+        );
+
+    const fb_dtsg =
+        extractDTSG(html);
+
+    if (!fb_dtsg) {
+
+        throw new Error(
+            "تعذر استخراج fb_dtsg من جلسة Facebook."
+        );
+    }
+
+    return {
+        fb_dtsg
+    };
+}
+
+// ==================================================
+// تغيير وضع الموافقة مباشرة
+// ==================================================
+
+async function setApprovalMode(
+    api,
+    threadID,
+    enabled
+) {
+
+    // --------------------------------------------------
+    // الحصول على AppState الحالي
+    // --------------------------------------------------
+
+    if (
+        typeof api.getAppState !== "function"
+    ) {
+
+        throw new Error(
+            "API الحالي لا يوفر getAppState."
+        );
+    }
+
+    const appState =
+        api.getAppState();
+
+    const cookie =
+        buildCookie(
+            appState
+        );
+
+    if (!cookie) {
+
+        throw new Error(
+            "تعذر إنشاء Cookie من AppState."
+        );
+    }
+
+    // --------------------------------------------------
+    // الحصول على fb_dtsg
+    // --------------------------------------------------
+
+    const tokens =
+        await getFacebookTokens(
+            cookie
+        );
+
+    // --------------------------------------------------
+    // تجهيز البيانات
+    // --------------------------------------------------
+
+    const form =
+        new URLSearchParams();
+
+    form.append(
+        "set_mode",
+        enabled ? "1" : "0"
+    );
+
+    form.append(
+        "thread_fbid",
+        String(threadID)
+    );
+
+    form.append(
+        "fb_dtsg",
+        tokens.fb_dtsg
+    );
+
+    form.append(
+        "jazoest",
+        "25436"
+    );
+
+    // --------------------------------------------------
+    // إرسال الطلب الداخلي
+    // --------------------------------------------------
+
+    const response =
+        await axios.post(
+            "https://www.facebook.com/messaging/set_approval_mode/?dpr=1",
+            form.toString(),
+            {
+                timeout: 20000,
+
+                headers: {
+                    Cookie: cookie,
+
+                    "User-Agent":
+                        "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36",
+
+                    "Content-Type":
+                        "application/x-www-form-urlencoded",
+
+                    Accept:
+                        "*/*",
+
+                    Origin:
+                        "https://www.facebook.com",
+
+                    Referer:
+                        "https://www.facebook.com/"
+                },
+
+                maxRedirects: 5
+            }
+        );
+
+    const result =
+        String(
+            response.data || ""
+        );
+
+    console.log(
+        "[APPROVAL RAW RESPONSE]:",
+        result.substring(0, 1000)
+    );
+
+    // --------------------------------------------------
+    // فحص الرد
+    // --------------------------------------------------
+
+    if (
+        result.includes(
+            "approval_mode"
+        ) ||
+        result.includes(
+            '"success":true'
+        ) ||
+        result.includes(
+            '"success": true'
+        )
+    ) {
+
+        return true;
+    }
+
+    /*
+     * Facebook قد يعيد HTML أو JSON مختلف
+     * حسب الجلسة والإصدار.
+     *
+     * لذلك نتحقق بعد الطلب من الحالة الحقيقية.
+     */
+
+    const info =
+        await getThreadInfo(
+            api,
+            threadID
+        );
+
+    const current =
+        info &&
+        (
+            info.approvalMode === true ||
+            info.approvalMode === 1 ||
+            info.approvalMode === "1"
+        );
+
+    if (current === Boolean(enabled)) {
+        return true;
+    }
+
+    throw new Error(
+        "Facebook لم يغيّر حالة موافقة الأدمن."
+    );
 }
 
 // ==================================================
@@ -57,7 +344,9 @@ module.exports.run = async function ({
 }) {
 
     const threadID =
-        String(event.threadID || "");
+        String(
+            event.threadID || ""
+        );
 
     if (!threadID) {
         return;
@@ -66,8 +355,10 @@ module.exports.run = async function ({
     try {
 
         const body =
-            String(event.body || "")
-                .trim();
+            String(
+                event.body || ""
+            )
+            .trim();
 
         const args =
             body
@@ -75,11 +366,13 @@ module.exports.run = async function ({
                 .slice(1);
 
         const action =
-            String(args[0] || "")
-                .toLowerCase();
+            String(
+                args[0] || ""
+            )
+            .toLowerCase();
 
         // ==================================================
-        // الحصول على الحالة الحقيقية من Facebook
+        // قراءة الحالة الحقيقية
         // ==================================================
 
         const threadInfo =
@@ -88,66 +381,33 @@ module.exports.run = async function ({
                 threadID
             );
 
-        console.log(
-            "[APPROVAL THREAD INFO]",
-            JSON.stringify(
-                {
-                    threadID,
-                    approvalMode:
-                        threadInfo &&
-                        threadInfo.approvalMode,
+        const approvalMode =
+            threadInfo &&
+            threadInfo.approvalMode;
 
-                    approvalQueue:
-                        threadInfo &&
-                        threadInfo.approvalQueue
-                },
-                null,
-                2
-            )
-        );
+        const enabled =
+            approvalMode === true ||
+            approvalMode === 1 ||
+            approvalMode === "1";
 
         // ==================================================
-        // عرض الحالة
+        // .موافقة
         // ==================================================
 
         if (!action) {
-
-            const approvalMode =
-                threadInfo &&
-                threadInfo.approvalMode;
-
-            let status;
-
-            if (
-                approvalMode === true ||
-                approvalMode === 1 ||
-                approvalMode === "1"
-            ) {
-
-                status =
-                    "مفعلة";
-
-            } else if (
-                approvalMode === false ||
-                approvalMode === 0 ||
-                approvalMode === "0"
-            ) {
-
-                status =
-                    "متوقفة";
-
-            } else {
-
-                status =
-                    "غير معروفة";
-            }
 
             return api.sendMessage(
 
                 HEADER +
                 "حالة موافقة الأدمن\n\n" +
-                `الحالة: ${status}\n\n` +
-                `approvalMode: ${String(approvalMode)}`,
+                `الحالة: ${
+                    enabled
+                        ? "مفعلة"
+                        : "متوقفة"
+                }\n\n` +
+                `approvalMode: ${String(
+                    approvalMode
+                )}`,
 
                 threadID,
                 event.messageID
@@ -164,19 +424,52 @@ module.exports.run = async function ({
             action === "enable"
         ) {
 
-            /*
-             * hut-chat-api عندك لا يحتوي حاليًا
-             * على changeApprovalMode.
-             *
-             * لذلك لا نحفظ حالة وهمية ولا نقول
-             * إن الميزة اشتغلت بينما Facebook لم يتغير.
-             */
+            if (enabled) {
+
+                return api.sendMessage(
+                    HEADER +
+                    "موافقة إضافة الأعضاء مفعلة بالفعل.",
+                    threadID,
+                    event.messageID
+                );
+            }
+
+            console.log(
+                `[APPROVAL] محاولة تفعيل المجموعة ${threadID}`
+            );
+
+            await setApprovalMode(
+                api,
+                threadID,
+                true
+            );
+
+            // التحقق النهائي
+            const updatedInfo =
+                await getThreadInfo(
+                    api,
+                    threadID
+                );
+
+            const updated =
+                updatedInfo &&
+                (
+                    updatedInfo.approvalMode === true ||
+                    updatedInfo.approvalMode === 1 ||
+                    updatedInfo.approvalMode === "1"
+                );
+
+            if (!updated) {
+
+                throw new Error(
+                    "تم إرسال الطلب لكن حالة المجموعة لم تتغير."
+                );
+            }
 
             return api.sendMessage(
 
                 HEADER +
-                "لا يمكن تفعيلها من النسخة الحالية من API.\n\n" +
-                "قراءة الحالة تعمل من Facebook مباشرة لكن API المستخدم حاليًا لا يوفر دالة تغيير approvalMode.",
+                "تم تفعيل موافقة الأدمن على إضافة الأعضاء.",
 
                 threadID,
                 event.messageID
@@ -193,11 +486,52 @@ module.exports.run = async function ({
             action === "disable"
         ) {
 
+            if (!enabled) {
+
+                return api.sendMessage(
+                    HEADER +
+                    "موافقة إضافة الأعضاء متوقفة بالفعل.",
+                    threadID,
+                    event.messageID
+                );
+            }
+
+            console.log(
+                `[APPROVAL] محاولة إيقاف المجموعة ${threadID}`
+            );
+
+            await setApprovalMode(
+                api,
+                threadID,
+                false
+            );
+
+            // التحقق النهائي
+            const updatedInfo =
+                await getThreadInfo(
+                    api,
+                    threadID
+                );
+
+            const updated =
+                updatedInfo &&
+                (
+                    updatedInfo.approvalMode === true ||
+                    updatedInfo.approvalMode === 1 ||
+                    updatedInfo.approvalMode === "1"
+                );
+
+            if (updated) {
+
+                throw new Error(
+                    "تم إرسال الطلب لكن حالة المجموعة لم تتغير."
+                );
+            }
+
             return api.sendMessage(
 
                 HEADER +
-                "لا يمكن إيقافها من النسخة الحالية من API.\n\n" +
-                "قراءة الحالة تعمل من Facebook مباشرة لكن API المستخدم حاليًا لا يوفر دالة تغيير approvalMode.",
+                "تم إيقاف موافقة الأدمن على إضافة الأعضاء.",
 
                 threadID,
                 event.messageID
@@ -223,14 +557,25 @@ module.exports.run = async function ({
     } catch (error) {
 
         console.error(
-            "[APPROVAL ERROR]:",
+            "========================================"
+        );
+
+        console.error(
+            "[APPROVAL ERROR]"
+        );
+
+        console.error(
             error
+        );
+
+        console.error(
+            "========================================"
         );
 
         return api.sendMessage(
 
             HEADER +
-            "حدث خطأ أثناء قراءة حالة الموافقة.\n\n" +
+            "حدث خطأ أثناء تغيير موافقة الأدمن.\n\n" +
             (
                 error &&
                 error.message
