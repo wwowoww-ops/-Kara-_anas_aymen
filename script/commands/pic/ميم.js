@@ -1,18 +1,28 @@
 /**
  * ميم.js
- * إنشاء ميم من صورة مع نص عربي
+ * HINA Meme Generator
  *
  * الاستخدام:
  *
- * رد على صورة واكتب:
+ * رد على صورة:
+ *
  * ميم هذا النص
+ *        => أعلى الصورة
  *
- * أو:
- * ميم فوق: النص هنا
- * ميم تحت: النص هنا
+ * ميم فوق هذا النص
+ *        => أعلى الصورة
  *
- * أو:
- * ميم النص فوق | النص تحت
+ * ميم تحت هذا النص
+ *        => أسفل الصورة
+ *
+ * ميم فوق: هذا النص
+ *        => أعلى الصورة
+ *
+ * ميم تحت: هذا النص
+ *        => أسفل الصورة
+ *
+ * ميم فوق هذا | تحت هذا
+ *        => نص أعلى + نص أسفل
  */
 
 const axios = require("axios");
@@ -27,11 +37,11 @@ const {
 
 module.exports.config = {
     name: "ميم",
-    version: "1.0.0",
+    version: "2.0.0",
     hasPermssion: 0,
     credits: "أبو هريرة",
-    description: "إنشاء ميم من صورة مع نص عربي",
-    commandCategory: "pic",
+    description: "إنشاء ميم عربي من صورة",
+    commandCategory: "Photos",
     usages: "ميم <النص>",
     cooldowns: 5
 };
@@ -53,8 +63,11 @@ const CACHE_DIR =
 const TEMP_DIR =
     path.join(CACHE_DIR, "meme");
 
+const FONT_DIR =
+    path.join(__dirname, "fonts");
+
 // ==================================================
-// الخطوط
+// الخط
 // ==================================================
 
 let fontLoaded = false;
@@ -65,127 +78,129 @@ function loadArabicFont() {
         return true;
     }
 
-    const possibleFonts = [
+    const fonts = [
 
+        // ==========================================
+        // خط داخل مجلد الأمر
+        // ==========================================
+
+        path.join(
+            FONT_DIR,
+            "NotoSansArabic-Bold.ttf"
+        ),
+
+        path.join(
+            FONT_DIR,
+            "NotoNaskhArabic-Bold.ttf"
+        ),
+
+        path.join(
+            FONT_DIR,
+            "NotoKufiArabic-Bold.ttf"
+        ),
+
+        // ==========================================
         // Linux / Railway
+        // ==========================================
+
         "/usr/share/fonts/truetype/noto/NotoSansArabic-Bold.ttf",
 
         "/usr/share/fonts/opentype/noto/NotoSansArabic-Bold.ttf",
 
-        "/usr/share/fonts/truetype/noto/NotoSansArabic-Regular.ttf",
+        "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Bold.ttf",
 
-        // Android / Pydroid / بعض البيئات
-        "/system/fonts/NotoNaskhArabic-Regular.ttf",
-
-        "/system/fonts/NotoNaskhArabic-Bold.ttf",
-
-        "/system/fonts/NotoSansArabic-Regular.ttf",
+        // ==========================================
+        // Android
+        // ==========================================
 
         "/system/fonts/NotoSansArabic-Bold.ttf",
 
-        // ملفات المشروع إن وجدت
-        path.join(__dirname, "fonts", "NotoSansArabic-Bold.ttf"),
+        "/system/fonts/NotoNaskhArabic-Bold.ttf",
 
-        path.join(__dirname, "fonts", "NotoSansArabic-Regular.ttf"),
-
-        path.join(
-            __dirname,
-            "../../fonts/NotoSansArabic-Bold.ttf"
-        ),
-
-        path.join(
-            __dirname,
-            "../../fonts/NotoSansArabic-Regular.ttf"
-        )
+        "/system/fonts/NotoKufiArabic-Bold.ttf"
     ];
 
-    for (const fontPath of possibleFonts) {
+    for (const fontPath of fonts) {
 
         try {
 
             if (
-                fs.existsSync(fontPath)
+                !fs.existsSync(fontPath)
             ) {
+                continue;
+            }
 
-                const registered =
-                    GlobalFonts.registerFromPath(
-                        fontPath,
-                        "HINAMemeArabic"
-                    );
+            const result =
+                GlobalFonts.registerFromPath(
+                    fontPath,
+                    "HINAMemeArabic"
+                );
 
-                if (registered) {
+            if (result) {
 
-                    console.log(
-                        "[HINA MEME] Arabic font loaded:",
-                        fontPath
-                    );
+                console.log(
+                    "[HINA MEME] Arabic font:",
+                    fontPath
+                );
 
-                    fontLoaded = true;
+                fontLoaded = true;
 
-                    return true;
-
-                }
-
+                return true;
             }
 
         } catch (error) {
 
-            console.error(
+            console.log(
                 "[HINA MEME] Font error:",
                 error.message
             );
 
         }
-
     }
 
     console.log(
-        "[HINA MEME] Arabic font not found, using fallback."
+        "[HINA MEME] WARNING: Arabic font not found."
     );
 
     return false;
 }
 
 // ==================================================
-// إنشاء المجلدات
+// المجلدات
 // ==================================================
 
-function ensureDirectories() {
+function prepareFolders() {
+
+    fs.ensureDirSync(
+        CACHE_DIR
+    );
 
     fs.ensureDirSync(
         TEMP_DIR
     );
 
+    fs.ensureDirSync(
+        FONT_DIR
+    );
 }
 
 // ==================================================
-// تنظيف ملف
+// حذف ملف
 // ==================================================
 
-function removeFile(filePath) {
+function removeFile(file) {
 
     try {
 
         if (
-            filePath &&
-            fs.existsSync(filePath)
+            file &&
+            fs.existsSync(file)
         ) {
 
-            fs.removeSync(
-                filePath
-            );
-
+            fs.removeSync(file);
         }
 
-    } catch (error) {
-
-        console.error(
-            "[HINA MEME] Cleanup Error:",
-            error.message
-        );
-
-    }
-
+    } catch {}
 }
 
 // ==================================================
@@ -194,23 +209,13 @@ function removeFile(filePath) {
 
 async function downloadImage(url) {
 
-    if (!url) {
-
-        throw new Error(
-            "رابط الصورة غير موجود"
-        );
-
-    }
-
     const response =
         await axios.get(
             url,
             {
-                responseType:
-                    "arraybuffer",
+                responseType: "arraybuffer",
 
-                timeout:
-                    60000,
+                timeout: 60000,
 
                 maxContentLength:
                     30 * 1024 * 1024,
@@ -219,7 +224,6 @@ async function downloadImage(url) {
                     30 * 1024 * 1024,
 
                 headers: {
-
                     "User-Agent":
                         "Mozilla/5.0"
                 }
@@ -232,15 +236,13 @@ async function downloadImage(url) {
     ) {
 
         throw new Error(
-            "الصورة التي تم تحميلها فارغة"
+            "الصورة فارغة"
         );
-
     }
 
     return Buffer.from(
         response.data
     );
-
 }
 
 // ==================================================
@@ -249,58 +251,168 @@ async function downloadImage(url) {
 
 function cleanText(text) {
 
-    if (!text) {
-        return "";
-    }
-
-    return String(text)
+    return String(
+        text || ""
+    )
         .replace(/\r/g, "")
-        .replace(/\n+/g, " ")
+        .replace(/\n/g, " ")
         .replace(/\s+/g, " ")
         .trim();
-
 }
 
 // ==================================================
-// عكس النص العربي عند الحاجة
+// تحليل الأمر
 // ==================================================
 
-function prepareArabicText(text) {
+function parseMemeCommand(args) {
 
-    if (!text) {
-        return "";
+    const input =
+        cleanText(
+            Array.isArray(args)
+                ? args.join(" ")
+                : ""
+        );
+
+    if (!input) {
+
+        return {
+            position: null,
+            text: ""
+        };
     }
 
-    /*
-     * @napi-rs/canvas في أغلب البيئات الحديثة
-     * يتعامل مع العربية بشكل صحيح.
-     *
-     * لذلك لا نعكس الحروف يدويًا حتى لا
-     * تظهر العربية بشكل معكوس في البيئات
-     * التي تدعم RTL.
-     */
+    // ==============================================
+    // نصين
+    // ==============================================
 
-    return text;
+    if (
+        input.includes("|")
+    ) {
 
+        const parts =
+            input.split("|");
+
+        let top =
+            cleanText(parts[0]);
+
+        let bottom =
+            cleanText(
+                parts
+                    .slice(1)
+                    .join("|")
+            );
+
+        // إزالة كلمة فوق من البداية
+        top =
+            top
+                .replace(/^فوق\s*:?\s*/i, "")
+                .trim();
+
+        // إزالة كلمة تحت من البداية
+        bottom =
+            bottom
+                .replace(/^تحت\s*:?\s*/i, "")
+                .trim();
+
+        return {
+            position: "both",
+            top,
+            bottom
+        };
+    }
+
+    // ==============================================
+    // فوق:
+    // ==============================================
+
+    if (
+        /^فوق\s*:/i.test(input)
+    ) {
+
+        return {
+            position: "top",
+            text:
+                cleanText(
+                    input.replace(
+                        /^فوق\s*:\s*/i,
+                        ""
+                    )
+                )
+        };
+    }
+
+    // ==============================================
+    // تحت:
+    // ==============================================
+
+    if (
+        /^تحت\s*:/i.test(input)
+    ) {
+
+        return {
+            position: "bottom",
+            text:
+                cleanText(
+                    input.replace(
+                        /^تحت\s*:\s*/i,
+                        ""
+                    )
+                )
+        };
+    }
+
+    // ==============================================
+    // فوق النص
+    // ==============================================
+
+    if (
+        /^فوق\s+/i.test(input)
+    ) {
+
+        return {
+            position: "top",
+            text:
+                cleanText(
+                    input.replace(
+                        /^فوق\s+/i,
+                        ""
+                    )
+                )
+        };
+    }
+
+    // ==============================================
+    // تحت النص
+    // ==============================================
+
+    if (
+        /^تحت\s+/i.test(input)
+    ) {
+
+        return {
+            position: "bottom",
+            text:
+                cleanText(
+                    input.replace(
+                        /^تحت\s+/i,
+                        ""
+                    )
+                )
+        };
+    }
+
+    // ==============================================
+    // الوضع الافتراضي
+    // ==============================================
+
+    return {
+        position: "top",
+        text: input
+    };
 }
 
 // ==================================================
-// قياس النص
-// ==================================================
-
-function measureTextWidth(
-    ctx,
-    text
-) {
-
-    return ctx.measureText(
-        text
-    ).width;
-
-}
-
-// ==================================================
-// تقسيم النص إلى أسطر
+// تقسيم النص
 // ==================================================
 
 function wrapText(
@@ -314,110 +426,60 @@ function wrapText(
 
     const lines = [];
 
-    let currentLine = "";
+    let current = "";
 
     for (
         const word of words
     ) {
 
-        const testLine =
-            currentLine
-                ? currentLine + " " + word
+        const test =
+            current
+                ? current + " " + word
                 : word;
 
         const width =
-            measureTextWidth(
-                ctx,
-                testLine
-            );
+            ctx.measureText(
+                test
+            ).width;
 
         if (
             width <= maxWidth
         ) {
 
-            currentLine =
-                testLine;
+            current = test;
 
         } else {
 
-            if (currentLine) {
+            if (current) {
 
                 lines.push(
-                    currentLine
+                    current
                 );
-
             }
 
-            currentLine =
-                word;
+            current = word;
         }
-
     }
 
-    if (currentLine) {
+    if (current) {
 
         lines.push(
-            currentLine
+            current
         );
-
     }
 
     return lines;
-
 }
 
 // ==================================================
-// تصغير حجم الخط حتى يناسب الصورة
+// رسم النص
 // ==================================================
 
-function calculateFontSize(
+function drawArabicText(
     ctx,
     text,
-    maxWidth,
-    startSize
-) {
-
-    let size =
-        startSize;
-
-    while (
-        size > 20
-    ) {
-
-        ctx.font =
-            `bold ${size}px HINAMemeArabic`;
-
-        const width =
-            measureTextWidth(
-                ctx,
-                text
-            );
-
-        if (
-            width <= maxWidth
-        ) {
-
-            break;
-
-        }
-
-        size -= 2;
-
-    }
-
-    return size;
-
-}
-
-// ==================================================
-// رسم نص الميم
-// ==================================================
-
-function drawMemeText(
-    ctx,
-    text,
-    x,
-    y,
+    centerX,
+    startY,
     maxWidth,
     position
 ) {
@@ -426,67 +488,40 @@ function drawMemeText(
         return;
     }
 
-    text =
-        prepareArabicText(
-            text
-        );
-
-    // ==============================================
-    // حجم الخط
-    // ==============================================
-
     let fontSize =
-        Math.max(
-            32,
-            Math.floor(
-                ctx.canvas.width * 0.075
-            )
+        Math.floor(
+            ctx.canvas.width * 0.075
         );
 
-    // لا نجعل الخط ضخمًا جدًا
     fontSize =
-        Math.min(
-            fontSize,
-            90
+        Math.max(
+            38,
+            Math.min(
+                fontSize,
+                90
+            )
         );
 
     ctx.font =
         `bold ${fontSize}px HINAMemeArabic`;
 
-    // ==============================================
-    // تقسيم النص
-    // ==============================================
-
-    const maxTextWidth =
-        maxWidth ||
-        ctx.canvas.width * 0.90;
-
     let lines =
         wrapText(
             ctx,
             text,
-            maxTextWidth
+            maxWidth
         );
 
     // ==============================================
-    // إذا كان السطر طويلًا جدًا
+    // تصغير الخط إذا كان النص طويلًا
     // ==============================================
 
-    if (
-        lines.length === 1 &&
-        measureTextWidth(
-            ctx,
-            lines[0]
-        ) > maxTextWidth
+    while (
+        lines.length > 4 &&
+        fontSize > 28
     ) {
 
-        fontSize =
-            calculateFontSize(
-                ctx,
-                lines[0],
-                maxTextWidth,
-                fontSize
-            );
+        fontSize -= 2;
 
         ctx.font =
             `bold ${fontSize}px HINAMemeArabic`;
@@ -495,45 +530,17 @@ function drawMemeText(
             wrapText(
                 ctx,
                 text,
-                maxTextWidth
+                maxWidth
             );
-
     }
 
     // ==============================================
-    // ارتفاع السطر
+    // RTL
     // ==============================================
 
-    const lineHeight =
-        Math.floor(
-            fontSize * 1.25
-        );
-
-    const totalHeight =
-        lines.length *
-        lineHeight;
-
-    // ==============================================
-    // موضع البداية
-    // ==============================================
-
-    let startY =
-        y;
-
-    if (
-        position === "bottom"
-    ) {
-
-        startY =
-            y -
-            totalHeight +
-            lineHeight;
-
-    }
-
-    // ==============================================
-    // إعداد Canvas
-    // ==============================================
+    try {
+        ctx.direction = "rtl";
+    } catch {}
 
     ctx.textAlign =
         "center";
@@ -544,15 +551,21 @@ function drawMemeText(
     ctx.font =
         `bold ${fontSize}px HINAMemeArabic`;
 
-    // Stroke أسود قوي
+    // ==============================================
+    // Stroke
+    // ==============================================
+
     ctx.lineJoin =
         "round";
 
+    ctx.miterLimit =
+        2;
+
     ctx.lineWidth =
         Math.max(
-            4,
+            5,
             Math.floor(
-                fontSize * 0.10
+                fontSize * 0.11
             )
         );
 
@@ -563,36 +576,62 @@ function drawMemeText(
         "#ffffff";
 
     // ==============================================
-    // الرسم
+    // ارتفاع السطر
     // ==============================================
 
-    lines.forEach(
-        (line, index) => {
+    const lineHeight =
+        Math.floor(
+            fontSize * 1.2
+        );
 
-            const lineY =
-                startY +
-                index *
-                lineHeight;
+    // ==============================================
+    // أعلى / أسفل
+    // ==============================================
 
-            // Stroke
-            ctx.strokeText(
-                line,
-                x,
-                lineY,
-                maxTextWidth
-            );
+    let y =
+        startY;
 
-            // النص
-            ctx.fillText(
-                line,
-                x,
-                lineY,
-                maxTextWidth
-            );
+    if (
+        position === "bottom"
+    ) {
 
-        }
-    );
+        y =
+            startY -
+            (lines.length - 1) *
+            lineHeight;
+    }
 
+    // ==============================================
+    // رسم الأسطر
+    // ==============================================
+
+    for (
+        let i = 0;
+        i < lines.length;
+        i++
+    ) {
+
+        const lineY =
+            y +
+            i *
+            lineHeight;
+
+        // Stroke
+        ctx.strokeText(
+            lines[i],
+            centerX,
+            lineY,
+            maxWidth
+        );
+
+        // Fill
+        ctx.fillText(
+            lines[i],
+            centerX,
+            lineY,
+            maxWidth
+        );
+    }
 }
 
 // ==================================================
@@ -600,16 +639,14 @@ function drawMemeText(
 // ==================================================
 
 async function createMeme(
-    imageBuffer,
+    buffer,
     topText,
     bottomText
 ) {
 
-    loadArabicFont();
-
     const image =
         await loadImage(
-            imageBuffer
+            buffer
         );
 
     let width =
@@ -619,54 +656,30 @@ async function createMeme(
         image.height;
 
     // ==============================================
-    // الحد الأقصى للصورة
+    // تصغير الصور الضخمة
     // ==============================================
 
-    const MAX_WIDTH =
-        1600;
+    const MAX_SIZE =
+        1800;
 
-    const MAX_HEIGHT =
-        1600;
+    const scale =
+        Math.min(
+            1,
+            MAX_SIZE / Math.max(
+                width,
+                height
+            )
+        );
 
-    let scale =
-        1;
+    width =
+        Math.floor(
+            width * scale
+        );
 
-    if (
-        width > MAX_WIDTH
-    ) {
-
-        scale =
-            MAX_WIDTH /
-            width;
-
-    }
-
-    if (
-        height * scale >
-        MAX_HEIGHT
-    ) {
-
-        scale =
-            MAX_HEIGHT /
-            height;
-
-    }
-
-    if (
-        scale < 1
-    ) {
-
-        width =
-            Math.floor(
-                width * scale
-            );
-
-        height =
-            Math.floor(
-                height * scale
-            );
-
-    }
+    height =
+        Math.floor(
+            height * scale
+        );
 
     // ==============================================
     // Canvas
@@ -684,7 +697,7 @@ async function createMeme(
         );
 
     // ==============================================
-    // رسم الصورة
+    // الصورة
     // ==============================================
 
     ctx.drawImage(
@@ -695,13 +708,16 @@ async function createMeme(
         height
     );
 
+    const maxWidth =
+        width * 0.90;
+
     // ==============================================
     // النص العلوي
     // ==============================================
 
     if (topText) {
 
-        drawMemeText(
+        drawArabicText(
             ctx,
 
             topText,
@@ -710,11 +726,10 @@ async function createMeme(
 
             height * 0.12,
 
-            width * 0.90,
+            maxWidth,
 
             "top"
         );
-
     }
 
     // ==============================================
@@ -723,7 +738,7 @@ async function createMeme(
 
     if (bottomText) {
 
-        drawMemeText(
+        drawArabicText(
             ctx,
 
             bottomText,
@@ -732,140 +747,15 @@ async function createMeme(
 
             height * 0.90,
 
-            width * 0.90,
+            maxWidth,
 
             "bottom"
         );
-
     }
-
-    // ==============================================
-    // إخراج PNG
-    // ==============================================
 
     return canvas.toBuffer(
         "image/png"
     );
-
-}
-
-// ==================================================
-// تحليل الأمر
-// ==================================================
-
-function parseMemeText(
-    args
-) {
-
-    const input =
-        Array.isArray(args)
-            ? args.join(" ").trim()
-            : "";
-
-    if (!input) {
-
-        return {
-            top: "",
-            bottom: ""
-        };
-
-    }
-
-    // ==============================================
-    // صيغة:
-    // ميم فوق: النص
-    // ==============================================
-
-    if (
-        input.startsWith("فوق:")
-    ) {
-
-        return {
-
-            top:
-                cleanText(
-                    input
-                        .slice(4)
-                ),
-
-            bottom:
-                ""
-
-        };
-
-    }
-
-    // ==============================================
-    // صيغة:
-    // ميم تحت: النص
-    // ==============================================
-
-    if (
-        input.startsWith("تحت:")
-    ) {
-
-        return {
-
-            top:
-                "",
-
-            bottom:
-                cleanText(
-                    input
-                        .slice(4)
-                )
-
-        };
-
-    }
-
-    // ==============================================
-    // صيغة:
-    // ميم النص | النص
-    // ==============================================
-
-    if (
-        input.includes("|")
-    ) {
-
-        const parts =
-            input.split("|");
-
-        return {
-
-            top:
-                cleanText(
-                    parts[0]
-                ),
-
-            bottom:
-                cleanText(
-                    parts
-                        .slice(1)
-                        .join("|")
-                )
-
-        };
-
-    }
-
-    // ==============================================
-    // الوضع الافتراضي:
-    // النص في الأعلى
-    // ==============================================
-
-    return {
-
-        top:
-            cleanText(
-                input
-            ),
-
-        bottom:
-            ""
-
-    };
-
 }
 
 // ==================================================
@@ -883,7 +773,7 @@ async function ({
         event.threadID;
 
     // ==============================================
-    // التأكد من وجود رد
+    // يجب الرد على صورة
     // ==============================================
 
     if (
@@ -894,48 +784,48 @@ async function ({
 
             HINA_HEADER +
 
-            "🖼️ إنشاء ميم\n\n" +
+            "طريقة الاستخدام:\n\n" +
 
-            "رد على صورة واكتب:\n\n" +
+            "رد على صورة ثم اكتب:\n\n" +
 
-            "ميم هذا النص\n\n" +
+            "ميم هذا النص\n" +
 
-            "أو:\n" +
+            "→ النص في الأعلى\n\n" +
 
-            "ميم فوق: النص\n" +
+            "ميم فوق هذا النص\n" +
 
-            "ميم تحت: النص\n\n" +
+            "→ النص في الأعلى\n\n" +
 
-            "ولإضافة نصين:\n" +
+            "ميم تحت هذا النص\n" +
 
-            "ميم النص فوق | النص تحت",
+            "→ النص في الأسفل\n\n" +
+
+            "ميم فوق هذا | تحت هذا\n" +
+
+            "→ نص أعلى + نص أسفل",
 
             threadID,
 
             event.messageID
         );
-
     }
 
     // ==============================================
-    // الحصول على المرفقات
+    // المرفقات
     // ==============================================
 
-    const reply =
-        event.messageReply;
-
     const attachments =
-        reply.attachments || [];
+        event.messageReply.attachments || [];
 
     const image =
         attachments.find(
-            attachment =>
-                attachment &&
-                attachment.url &&
+            item =>
+                item &&
+                item.url &&
                 (
-                    attachment.type === "photo" ||
-                    attachment.type === "image" ||
-                    !attachment.type
+                    item.type === "photo" ||
+                    item.type === "image" ||
+                    !item.type
                 )
         );
 
@@ -945,85 +835,98 @@ async function ({
 
             HINA_HEADER +
 
-            "❌ الرسالة التي رددت عليها لا تحتوي على صورة.\n\n" +
-
-            "رد على صورة مباشرة ثم اكتب:\n" +
-
-            "ميم النص",
+            "الرسالة التي رددت عليها ليست صورة",
 
             threadID,
 
             event.messageID
         );
-
     }
 
     // ==============================================
     // تحليل النص
     // ==============================================
 
-    const memeText =
-        parseMemeText(
+    const parsed =
+        parseMemeCommand(
             args
         );
 
+    let topText = "";
+    let bottomText = "";
+
     if (
-        !memeText.top &&
-        !memeText.bottom
+        parsed.position === "both"
+    ) {
+
+        topText =
+            parsed.top || "";
+
+        bottomText =
+            parsed.bottom || "";
+
+    } else if (
+        parsed.position === "bottom"
+    ) {
+
+        bottomText =
+            parsed.text || "";
+
+    } else {
+
+        topText =
+            parsed.text || "";
+    }
+
+    if (
+        !topText &&
+        !bottomText
     ) {
 
         return api.sendMessage(
 
             HINA_HEADER +
 
-            "❌ اكتب النص الذي تريد وضعه على الميم.\n\n" +
-
-            "مثال:\n" +
-
-            "ميم لما يشتغل البوت أخيرًا",
+            "اكتب النص الذي تريد وضعه على الصورة",
 
             threadID,
 
             event.messageID
         );
-
     }
 
     // ==============================================
-    // رسالة الانتظار
+    // تجهيز
     // ==============================================
 
-    const waitMessage =
-        await api.sendMessage(
+    prepareFolders();
 
-            HINA_HEADER +
+    loadArabicFont();
 
-            "⏳ جاري إنشاء الميم...\n\n" +
-
-            "🖼️ تحميل الصورة...\n" +
-
-            "✏️ إضافة النص...",
-
-            threadID
-        );
-
-    let outputPath =
-        null;
+    let waitMessage = null;
+    let outputPath = null;
 
     try {
 
         // ==========================================
-        // إنشاء المجلد
+        // رسالة الانتظار
         // ==========================================
 
-        ensureDirectories();
+        waitMessage =
+            await api.sendMessage(
+
+                HINA_HEADER +
+                "جاري إنشاء الميم...",
+
+                threadID
+            );
 
         // ==========================================
         // تحميل الصورة
         // ==========================================
 
         console.log(
-            "[HINA MEME] Downloading image..."
+            "[HINA MEME] Downloading..."
         );
 
         const imageBuffer =
@@ -1031,155 +934,34 @@ async function ({
                 image.url
             );
 
-        console.log(
-            "[HINA MEME] Image downloaded:",
-            imageBuffer.length,
-            "bytes"
-        );
-
         // ==========================================
         // إنشاء الميم
         // ==========================================
 
-        console.log(
-            "[HINA MEME] Creating meme..."
-        );
-
-        const memeBuffer =
+        const result =
             await createMeme(
                 imageBuffer,
-                memeText.top,
-                memeText.bottom
+                topText,
+                bottomText
             );
-
-        if (
-            !memeBuffer ||
-            memeBuffer.length === 0
-        ) {
-
-            throw new Error(
-                "فشل إنشاء صورة الميم"
-            );
-
-        }
 
         // ==========================================
-        // حفظ مؤقت
+        // حفظ
         // ==========================================
 
         outputPath =
             path.join(
                 TEMP_DIR,
-                `${Date.now()}_meme.png`
+                `meme_${Date.now()}.png`
             );
 
         fs.writeFileSync(
             outputPath,
-            memeBuffer
-        );
-
-        console.log(
-            "[HINA MEME] Meme saved:",
-            outputPath
+            result
         );
 
         // ==========================================
-        // حذف رسالة الانتظار
-        // ==========================================
-
-        if (
-            waitMessage &&
-            waitMessage.messageID
-        ) {
-
-            try {
-
-                api.unsendMessage(
-                    waitMessage.messageID,
-                    () => {}
-                );
-
-            } catch (error) {
-
-                console.error(
-                    "[HINA MEME] Wait message cleanup:",
-                    error.message
-                );
-
-            }
-
-        }
-
-        // ==========================================
-        // إرسال الميم
-        // ==========================================
-
-        return api.sendMessage(
-
-            {
-                body:
-                    HINA_HEADER +
-                    "✅ تم إنشاء الميم",
-
-                attachment:
-                    fs.createReadStream(
-                        outputPath
-                    )
-            },
-
-            threadID,
-
-            (error) => {
-
-                if (error) {
-
-                    console.error(
-                        "[HINA MEME] Send Error:",
-                        error
-                    );
-
-                } else {
-
-                    console.log(
-                        "[HINA MEME] Meme sent successfully."
-                    );
-
-                }
-
-                // ==================================
-                // تنظيف
-                // ==================================
-
-                removeFile(
-                    outputPath
-                );
-
-            },
-
-            event.messageID
-        );
-
-    } catch (error) {
-
-        console.error(
-            "================================="
-        );
-
-        console.error(
-            "[HINA MEME] ERROR"
-        );
-
-        console.error(
-            "Message:",
-            error.message
-        );
-
-        console.error(
-            "================================="
-        );
-
-        // ==========================================
-        // حذف رسالة الانتظار
+        // حذف الانتظار
         // ==========================================
 
         if (
@@ -1195,52 +977,83 @@ async function ({
                 );
 
             } catch {}
-
         }
 
         // ==========================================
-        // تنظيف الملف
+        // إرسال الصورة
         // ==========================================
+
+        return api.sendMessage(
+
+            {
+                body:
+                    HINA_HEADER +
+                    "تم إنشاء الميم",
+
+                attachment:
+                    fs.createReadStream(
+                        outputPath
+                    )
+            },
+
+            threadID,
+
+            () => {
+
+                removeFile(
+                    outputPath
+                );
+
+            },
+
+            event.messageID
+        );
+
+    } catch (error) {
+
+        console.error(
+            "[HINA MEME]",
+            error
+        );
+
+        // ==========================================
+        // حذف الانتظار
+        // ==========================================
+
+        if (
+            waitMessage &&
+            waitMessage.messageID
+        ) {
+
+            try {
+
+                api.unsendMessage(
+                    waitMessage.messageID,
+                    () => {}
+                );
+
+            } catch {}
+        }
 
         removeFile(
             outputPath
         );
 
-        let errorMessage =
-            error &&
-            error.message
-                ? error.message
-                : "خطأ غير معروف";
-
-        if (
-            errorMessage.length >
-            1500
-        ) {
-
-            errorMessage =
-                errorMessage.slice(
-                    0,
-                    1500
-                ) +
-                "\n...";
-
-        }
-
         return api.sendMessage(
 
             HINA_HEADER +
 
-            "❌ فشل إنشاء الميم\n\n" +
+            "فشل إنشاء الميم\n\n" +
 
-            "الخطأ:\n" +
-
-            errorMessage,
+            "الخطأ: " +
+            (
+                error.message ||
+                "خطأ غير معروف"
+            ),
 
             threadID,
 
             event.messageID
         );
-
     }
-
 };
