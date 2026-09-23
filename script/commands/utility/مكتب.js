@@ -1,399 +1,765 @@
 /**
  * مكتب.js
  *
- * نظام تقرير مكتب التوظيف
- *
- * بدون قاعدة بيانات
- * البيانات مؤقتة وتختفي عند إعادة تشغيل البوت
+ * نظام تقرير مكتب التوظيف التفاعلي
  *
  * الأوامر:
  *
- * .مكتب
  * .مكتب جديد
- * .مكتب تاريخ 21/09/2026
- * .مكتب تقرير أبو هريرة
- *
- * .مكتب ف1 يانو | ساكا | آدم، نرجس، شوتو
- * .مكتب ف2 نصرو | حمزة | يوسف، فايز
- * .مكتب ف3 أبو هريرة | شوتو | سارومي، ياتو
- *
- * .مكتب درس يانو | أبو هريرة | آدم، نرجس
- *
- * .مكتب ترقية شيماء | G جناح
- * .مكتب ترقية شوتو | H نجم نخبة + G جناح
- *
- * .مكتب ملاحظة لا يوجد مشاكل
- *
- * .مكتب مسؤول يانو | ليدر قسم المكتب
- *
- * .مكتب نشاط يانو | نصرو
- *
  * .مكتب عرض
- * .مكتب مسح
- * .مكتب إنهاء
+ * .مكتب انهاء
+ *
+ * جميع البيانات مؤقتة ولا تحتاج قاعدة بيانات.
  */
 
 module.exports.config = {
     name: "مكتب",
-    version: "2.0.0",
+    version: "3.0.0",
     hasPermssion: 0,
     credits: "أبو هريرة",
-    description: "إنشاء تقرير مكتب التوظيف",
+    description: "إنشاء تقرير مكتب التوظيف بشكل تفاعلي",
     commandCategory: "utility",
-    usages: "مكتب",
+    usages: "مكتب جديد | مكتب عرض | مكتب انهاء",
     cooldowns: 2
 };
 
-// ==================================================
-// الإعدادات
-// ==================================================
-
 const HEADER = "⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬\n\n";
+
+// ==================================================
+// التقارير المؤقتة
+// ==================================================
 
 const reports = new Map();
 
+
 // ==================================================
-// إنشاء تقرير جديد
+// إنشاء تقرير
 // ==================================================
 
 function createReport() {
     return {
-        date: "__/**/2026",
-        reporter: "أبو هريرة",
+        step: 0,
 
-        activities: {
-            1: {
+        date: "",
+        reporter: "",
+
+        activities: [
+            {
                 organizer: "",
                 winner: "",
-                participants: []
+                participants: ""
             },
-
-            2: {
+            {
                 organizer: "",
                 winner: "",
-                participants: []
+                participants: ""
             },
-
-            3: {
+            {
                 organizer: "",
                 winner: "",
-                participants: []
+                participants: ""
             }
-        },
+        ],
 
         lesson: {
             teacher: "",
             testMaker: "",
-            participants: []
+            participants: ""
         },
 
-        promotions: [],
+        promotions: "",
 
-        notes: [],
+        notes: "",
 
-        staff: [
-            {
-                name: "يـانـو",
-                role: "ليدر قسم المكتب",
-                type: "normal"
-            },
+        staff: "",
 
-            {
-                name: "نـصـࢪو",
-                role: "الـنـائـب 1 [ الـمكـتـب ]",
-                type: "deputy"
-            },
-
-            {
-                name: "أبـو هࢪيࢪة",
-                role: "الـنـائـب 2 [ الـمكـتـب ]",
-                type: "deputy"
-            }
-        ],
-
-        activityRanking: {
-            first: "",
-            second: ""
-        }
+        first: "",
+        second: ""
     };
 }
 
+
 // ==================================================
-// الحصول على تقرير المجموعة
+// إنشاء جلسة رد
 // ==================================================
 
-function getReport(threadID) {
-    if (!reports.has(threadID)) {
-        reports.set(threadID, createReport());
+function createReply(threadID, step) {
+    return {
+        name: "مكتب",
+        author: "office-system",
+        threadID: String(threadID),
+        step
+    };
+}
+
+
+// ==================================================
+// إرسال سؤال وحفظ الخطوة
+// ==================================================
+
+function ask(api, event, report, text, step) {
+
+    report.step = step;
+
+    return api.sendMessage(
+        HEADER + text,
+        event.threadID,
+        (error, info) => {
+
+            if (error) {
+                console.error("[OFFICE REPLY ERROR]:", error);
+                return;
+            }
+
+            global.client.handleReply = global.client.handleReply || [];
+
+            global.client.handleReply.push(
+                createReply(event.threadID, step)
+            );
+        },
+        event.messageID
+    );
+}
+
+
+// ==================================================
+// حذف جلسات الرد القديمة لنفس المجموعة
+// ==================================================
+
+function removeOldReplies(threadID) {
+
+    if (
+        !global.client ||
+        !Array.isArray(global.client.handleReply)
+    ) {
+        return;
     }
 
-    return reports.get(threadID);
+    global.client.handleReply =
+        global.client.handleReply.filter(
+            item =>
+                String(item.threadID) !== String(threadID) ||
+                item.name !== "مكتب"
+        );
 }
 
-// ==================================================
-// أدوات
-// ==================================================
-
-function clean(value) {
-    return String(value || "").trim();
-}
-
-function splitPipe(text) {
-    return String(text || "")
-        .split("|")
-        .map(x => x.trim());
-}
-
-function splitNames(text) {
-    if (!text) return [];
-
-    return String(text)
-        .split(/[,،]/)
-        .map(x => x.trim())
-        .filter(Boolean);
-}
 
 // ==================================================
 // تنسيق المشاركين
 // ==================================================
 
-function formatParticipants(participants) {
-    if (!participants || !participants.length) {
-        return "لا يوجد";
+function participantBlock(text) {
+
+    if (!text || !text.trim()) {
+        return "```🕹️📋\n```";
     }
 
-    return participants
-        .map(name => `- ${name}`)
-        .join("\n");
+    return "```🕹️📋\n" + text.trim() + "\n```";
 }
 
-// ==================================================
-// تنسيق الفعالية
-// ==================================================
-
-function formatActivity(activity, number) {
-
-    if (!activity.organizer && !activity.winner) {
-        return (
-            `• فعالية ${number === 1 ? "الاولى" : number === 2 ? "ثانية" : "ثالثة"}\n\n` +
-            `• المشاركون :\n\n` +
-            "```🕹️📋\n" +
-            "لا يوجد\n" +
-            "```"
-        );
-    }
-
-    const activityName =
-        number === 1
-            ? "الاولى"
-            : number === 2
-                ? "ثانية"
-                : "ثالثة";
-
-    return (
-        `• فعالية ${activityName} و التي قام بها ❀${activity.organizer || "..."} ❀ و فاز بها ❀${activity.winner || "..."} ❀\n\n` +
-
-        `• المشاركون :\n\n` +
-
-        "```🕹️📋\n" +
-
-        formatParticipants(activity.participants) +
-
-        "\n```"
-    );
-}
 
 // ==================================================
-// الترقيات
-// ==================================================
-
-function formatPromotions(report) {
-
-    if (!report.promotions.length) {
-        return "-\n\n- \n\n- \n\n-";
-    }
-
-    return report.promotions
-        .map(promotion => `- ${promotion.name} → ${promotion.rank}`)
-        .join("\n\n");
-}
-
-// ==================================================
-// المسؤولين
-// ==================================================
-
-function formatStaff(report) {
-
-    return report.staff
-        .map(member => {
-
-            if (member.type === "deputy") {
-                return `🔱️ ${member.name} - ${member.role} 🔱`;
-            }
-
-            return `▪️${member.name} - ${member.role}▪️`;
-        })
-        .join("\n\n");
-}
-
-// ==================================================
-// التقرير النهائي
+// بناء التقرير
 // ==================================================
 
 function buildReport(report) {
 
     let text = "";
 
-    text += `📃تقرير يوم ${report.date}📃 تقرير : ${report.reporter}\n\n`;
+    text +=
+        `📃تقرير يوم ${report.date || "**/**/2026"}📃 ` +
+        `تقرير : ${report.reporter || "أبو هريرة"}\n\n`;
 
     text += "```🖋📋\n";
     text += "```\n\n";
 
-    // =========================
+
+    // ==================================================
     // الفعالية الأولى
-    // =========================
+    // ==================================================
 
-    text += formatActivity(report.activities[1], 1);
+    text +=
+        "• فعالية الاولى و التي قام بها " +
+        `❀${report.activities[0].organizer || "..."} ❀ ` +
+        "و فاز بها " +
+        `❀${report.activities[0].winner || "..."} ❀\n\n`;
+
+    text += "• المشاركون :\n\n";
+    text += participantBlock(report.activities[0].participants);
     text += "\n\n";
 
-    // =========================
+
+    // ==================================================
     // الفعالية الثانية
-    // =========================
+    // ==================================================
 
-    text += formatActivity(report.activities[2], 2);
+    text +=
+        "• فعالية ثانية التي قام بها " +
+        `❀${report.activities[1].organizer || "..."} ❀ ` +
+        "الذي فاز بها " +
+        `❀${report.activities[1].winner || "..."} ❀\n\n`;
+
+    text += "• المشاركين :\n\n";
+    text += participantBlock(report.activities[1].participants);
     text += "\n\n";
 
-    // =========================
+
+    // ==================================================
     // الفعالية الثالثة
-    // =========================
+    // ==================================================
 
-    text += formatActivity(report.activities[3], 3);
+    text +=
+        "•فعالية ثالثة الذي قام بها " +
+        `❀${report.activities[2].organizer || "..."} ❀ ` +
+        "الذي فاز بها " +
+        `❀${report.activities[2].winner || "..."} ❀\n\n`;
+
+    text += "• المشاركون :\n\n";
+    text += participantBlock(report.activities[2].participants);
     text += "\n\n";
+
 
     text += "```🎟️🧫\n";
     text += "```\n\n";
 
-    // =========================
+
+    // ==================================================
     // الدرس والاختبار
-    // =========================
+    // ==================================================
 
     text +=
-        `📕درس تم تقديمه من طرف ♡${report.lesson.teacher || "..."} ♡ ` +
-        `📄الاختبار تم عمله من طرف ♡${report.lesson.testMaker || "..."} ♡\n\n`;
+        `📕درس تم تقديمه من طرف ♡${report.lesson.teacher || "..."} ♡` +
+        ` 📄الاختبار تم عمله من طرف ♡${report.lesson.testMaker || "..."} ♡\n\n`;
 
     text += "• المشاركون :\n\n";
 
-    text += "```🎟️🧫\n";
+    text +=
+        "```🎟️🧫\n" +
+        (report.lesson.participants || "") +
+        "\n```";
 
-    text += formatParticipants(report.lesson.participants);
+    text += "\n\n";
 
-    text += "\n```\n\n";
 
-    // =========================
+    // ==================================================
     // الترقيات
-    // =========================
+    // ==================================================
 
     text += "```\n";
     text += "          ♡•••ترقيات•••♡\n";
     text += "```\n\n";
 
-    text += formatPromotions(report);
+    text +=
+        report.promotions && report.promotions.trim()
+            ? report.promotions.trim()
+            : "-\n\n-\n\n-\n\n-";
 
     text += "\n\n";
 
-    // =========================
+
+    // ==================================================
     // الملاحظات
-    // =========================
+    // ==================================================
 
     text += "```\n\n";
 
     text += "• ملاحظات ومشاكل في المكتب :\n";
 
-    if (report.notes.length) {
-
-        for (const note of report.notes) {
-            text += `♡ ${note}\n`;
-        }
-
+    if (report.notes && report.notes.trim()) {
+        text += report.notes.trim() + "\n";
     } else {
         text += "♡ لا يوجد مشاكل\n";
     }
 
     text += "\n";
-
     text += "-‏- ‏~~~~~~~~~🤍🪄~~~~~~~~~~~~\n";
-
-    // =========================
-    // المسؤولين
-    // =========================
 
     text += "• مسؤولين المكتب :\n\n";
 
-    text += formatStaff(report);
+    if (report.staff && report.staff.trim()) {
+        text += report.staff.trim() + "\n";
+    } else {
+        text +=
+            "▪️يـانـو - ليدر قسم المكتب▪️\n\n" +
+            "🔱️ نـصـࢪو - الـنـائـب 1 [ الـمكـتـب ] 🔱\n\n" +
+            "🔱️ أبـو هࢪيࢪة - الـنـائـب 2 [ الـمكـتـب ] 🔱\n";
+    }
 
-    text += "\n\n";
-
+    text += "\n";
     text += "```\n";
 
-    // =========================
-    // النشاط
-    // =========================
 
+    // ==================================================
+    // النشاط
+    // ==================================================
+
+    text += "\n";
     text += "☆أكثر العمال نشاطا☆ :\n\n";
 
     text += "```♡~~~~\n\n";
 
-    text += `- المركز الاول : ${report.activityRanking.first || ""}\n`;
-    text += `- المركز الثاني : ${report.activityRanking.second || ""}\n`;
+    text +=
+        `- المركز الاول : ${report.first || ""}\n` +
+        `- المركز الثاني : ${report.second || ""}\n`;
 
     text += "\n```";
 
     return text;
 }
 
+
 // ==================================================
-// المساعدة
+// بدء التقرير
 // ==================================================
 
-function help() {
+async function startReport({ api, event }) {
 
-    return (
-        HEADER +
+    const threadID = String(event.threadID);
 
-        "نظام مكتب التوظيف\n\n" +
+    removeOldReplies(threadID);
 
-        ".مكتب جديد\n" +
-        ".مكتب تاريخ اليوم/الشهر/السنة\n" +
-        ".مكتب تقرير الاسم\n\n" +
+    const report = createReport();
 
-        "إضافة الفعاليات:\n" +
-        ".مكتب ف1 المنظم | الفائز | المشاركون\n" +
-        ".مكتب ف2 المنظم | الفائز | المشاركون\n" +
-        ".مكتب ف3 المنظم | الفائز | المشاركون\n\n" +
+    reports.set(threadID, report);
 
-        "الدرس والاختبار:\n" +
-        ".مكتب درس مقدم الدرس | مقدم الاختبار | المشاركون\n\n" +
+    return ask(
+        api,
+        event,
+        report,
 
-        "الترقيات:\n" +
-        ".مكتب ترقية الاسم | الرتبة\n\n" +
+        "تم إنشاء تقرير مكتب جديد.\n\n" +
+        "الخطوة 1 من 15\n\n" +
+        "أرسل تاريخ التقرير بالرد على هذه الرسالة.\n\n" +
+        "مثال:\n" +
+        "23/09/2026",
 
-        "الملاحظات:\n" +
-        ".مكتب ملاحظة النص\n\n" +
-
-        "المسؤولون:\n" +
-        ".مكتب مسؤول الاسم | المنصب\n\n" +
-
-        "النشاط:\n" +
-        ".مكتب نشاط المركز الأول | المركز الثاني\n\n" +
-
-        ".مكتب عرض\n" +
-        ".مكتب إنهاء\n" +
-        ".مكتب مسح"
+        1
     );
 }
 
+
 // ==================================================
-// التنفيذ
+// معالجة الردود
+// ==================================================
+
+module.exports.handleReply = async function ({
+    api,
+    event,
+    handleReply
+}) {
+
+    try {
+
+        const threadID = String(event.threadID);
+
+        const report = reports.get(threadID);
+
+        if (!report) {
+            return;
+        }
+
+        const body = String(event.body || "").trim();
+
+        if (!body) {
+            return api.sendMessage(
+                HEADER + "لم يتم استلام أي نص. أرسل الإجابة بالرد على الرسالة.",
+                event.threadID,
+                event.messageID
+            );
+        }
+
+
+        // ==================================================
+        // 1 - التاريخ
+        // ==================================================
+
+        if (handleReply.step === 1) {
+
+            report.date = body;
+
+            return ask(
+                api,
+                event,
+                report,
+
+                "تم حفظ التاريخ.\n\n" +
+                "الخطوة 2 من 15\n\n" +
+                "أرسل اسم صاحب التقرير بالرد على هذه الرسالة.",
+
+                2
+            );
+        }
+
+
+        // ==================================================
+        // 2 - صاحب التقرير
+        // ==================================================
+
+        if (handleReply.step === 2) {
+
+            report.reporter = body;
+
+            return ask(
+                api,
+                event,
+                report,
+
+                "تم حفظ اسم صاحب التقرير.\n\n" +
+                "الخطوة 3 من 15\n\n" +
+                "أرسل اسم منظم الفعالية الأولى والفائز بها بهذا الشكل:\n\n" +
+                "يانو | ساكا",
+
+                3
+            );
+        }
+
+
+        // ==================================================
+        // 3 - الفعالية الأولى
+        // ==================================================
+
+        if (handleReply.step === 3) {
+
+            const parts = body.split("|");
+
+            report.activities[0].organizer =
+                (parts[0] || "").trim();
+
+            report.activities[0].winner =
+                (parts[1] || "").trim();
+
+            return ask(
+                api,
+                event,
+                report,
+
+                "تم حفظ الفعالية الأولى.\n\n" +
+                "الخطوة 4 من 15\n\n" +
+                "أرسل قائمة المشاركين في الفعالية الأولى " +
+                "بالرد على هذه الرسالة.\n\n" +
+                "سأحفظ القائمة كما ترسلها بدون تغيير.",
+
+                4
+            );
+        }
+
+
+        // ==================================================
+        // 4 - قائمة الفعالية الأولى
+        // ==================================================
+
+        if (handleReply.step === 4) {
+
+            report.activities[0].participants = body;
+
+            return ask(
+                api,
+                event,
+                report,
+
+                "تم حفظ قائمة الفعالية الأولى.\n\n" +
+                "الخطوة 5 من 15\n\n" +
+                "أرسل اسم منظم الفعالية الثانية والفائز بها بهذا الشكل:\n\n" +
+                "نصرو | حمزة",
+
+                5
+            );
+        }
+
+
+        // ==================================================
+        // 5 - الفعالية الثانية
+        // ==================================================
+
+        if (handleReply.step === 5) {
+
+            const parts = body.split("|");
+
+            report.activities[1].organizer =
+                (parts[0] || "").trim();
+
+            report.activities[1].winner =
+                (parts[1] || "").trim();
+
+            return ask(
+                api,
+                event,
+                report,
+
+                "تم حفظ الفعالية الثانية.\n\n" +
+                "الخطوة 6 من 15\n\n" +
+                "أرسل قائمة المشاركين في الفعالية الثانية " +
+                "بالرد على هذه الرسالة.\n\n" +
+                "ستُحفظ كما هي بدون تغيير.",
+
+                6
+            );
+        }
+
+
+        // ==================================================
+        // 6 - قائمة الفعالية الثانية
+        // ==================================================
+
+        if (handleReply.step === 6) {
+
+            report.activities[1].participants = body;
+
+            return ask(
+                api,
+                event,
+                report,
+
+                "تم حفظ قائمة الفعالية الثانية.\n\n" +
+                "الخطوة 7 من 15\n\n" +
+                "أرسل اسم منظم الفعالية الثالثة والفائز بها بهذا الشكل:\n\n" +
+                "أبو هريرة | شوتو",
+
+                7
+            );
+        }
+
+
+        // ==================================================
+        // 7 - الفعالية الثالثة
+        // ==================================================
+
+        if (handleReply.step === 7) {
+
+            const parts = body.split("|");
+
+            report.activities[2].organizer =
+                (parts[0] || "").trim();
+
+            report.activities[2].winner =
+                (parts[1] || "").trim();
+
+            return ask(
+                api,
+                event,
+                report,
+
+                "تم حفظ الفعالية الثالثة.\n\n" +
+                "الخطوة 8 من 15\n\n" +
+                "أرسل قائمة المشاركين في الفعالية الثالثة " +
+                "بالرد على هذه الرسالة.",
+
+                8
+            );
+        }
+
+
+        // ==================================================
+        // 8 - قائمة الفعالية الثالثة
+        // ==================================================
+
+        if (handleReply.step === 8) {
+
+            report.activities[2].participants = body;
+
+            return ask(
+                api,
+                event,
+                report,
+
+                "تم حفظ قائمة الفعالية الثالثة.\n\n" +
+                "الخطوة 9 من 15\n\n" +
+                "أرسل اسم مقدم الدرس واسم من قام بالاختبار بهذا الشكل:\n\n" +
+                "يانو | أبو هريرة",
+
+                9
+            );
+        }
+
+
+        // ==================================================
+        // 9 - الدرس والاختبار
+        // ==================================================
+
+        if (handleReply.step === 9) {
+
+            const parts = body.split("|");
+
+            report.lesson.teacher =
+                (parts[0] || "").trim();
+
+            report.lesson.testMaker =
+                (parts[1] || "").trim();
+
+            return ask(
+                api,
+                event,
+                report,
+
+                "تم حفظ مقدم الدرس والاختبار.\n\n" +
+                "الخطوة 10 من 15\n\n" +
+                "أرسل قائمة المشاركين في الدرس والاختبار " +
+                "بالرد على هذه الرسالة.\n\n" +
+                "ستُحفظ كما هي بدون تغيير.",
+
+                10
+            );
+        }
+
+
+        // ==================================================
+        // 10 - المشاركون في الدرس والاختبار
+        // ==================================================
+
+        if (handleReply.step === 10) {
+
+            report.lesson.participants = body;
+
+            return ask(
+                api,
+                event,
+                report,
+
+                "تم حفظ قائمة المشاركين.\n\n" +
+                "الخطوة 11 من 15\n\n" +
+                "أرسل جميع الترقيات بالطول بالرد على هذه الرسالة.\n\n" +
+                "كل ترقية في سطر مستقل.\n\n" +
+                "مثال:\n" +
+                "- شيماء G جناح\n" +
+                "- شوتو H نجم نخبة + G جناح",
+
+                11
+            );
+        }
+
+
+        // ==================================================
+        // 11 - الترقيات
+        // ==================================================
+
+        if (handleReply.step === 11) {
+
+            report.promotions = body;
+
+            return ask(
+                api,
+                event,
+                report,
+
+                "تم حفظ الترقيات.\n\n" +
+                "الخطوة 12 من 15\n\n" +
+                "أرسل ملاحظات ومشاكل المكتب بالرد على هذه الرسالة.\n\n" +
+                "إذا لا توجد مشاكل اكتب:\n" +
+                "لا يوجد مشاكل",
+
+                12
+            );
+        }
+
+
+        // ==================================================
+        // 12 - الملاحظات
+        // ==================================================
+
+        if (handleReply.step === 12) {
+
+            report.notes = body;
+
+            return ask(
+                api,
+                event,
+                report,
+
+                "تم حفظ الملاحظات.\n\n" +
+                "الخطوة 13 من 15\n\n" +
+                "أرسل مسؤولين المكتب بالترتيب وبنفس التنسيق الذي تريد ظهوره في التقرير.",
+
+                13
+            );
+        }
+
+
+        // ==================================================
+        // 13 - المسؤولين
+        // ==================================================
+
+        if (handleReply.step === 13) {
+
+            report.staff = body;
+
+            return ask(
+                api,
+                event,
+                report,
+
+                "تم حفظ مسؤولين المكتب.\n\n" +
+                "الخطوة 14 من 15\n\n" +
+                "أرسل اسم صاحب المركز الأول في أكثر العمال نشاطًا.",
+
+                14
+            );
+        }
+
+
+        // ==================================================
+        // 14 - المركز الأول
+        // ==================================================
+
+        if (handleReply.step === 14) {
+
+            report.first = body;
+
+            return ask(
+                api,
+                event,
+                report,
+
+                "تم حفظ المركز الأول.\n\n" +
+                "الخطوة 15 من 15\n\n" +
+                "أرسل اسم صاحب المركز الثاني.",
+
+                15
+            );
+        }
+
+
+        // ==================================================
+        // 15 - المركز الثاني
+        // ==================================================
+
+        if (handleReply.step === 15) {
+
+            report.second = body;
+
+            report.step = 16;
+
+            removeOldReplies(threadID);
+
+            return api.sendMessage(
+                HEADER +
+                "تم جمع جميع بيانات تقرير المكتب.\n\n" +
+                "استخدم:\n\n" +
+                ".مكتب عرض\n\n" +
+                "لمعاينة التقرير.\n\n" +
+                "إذا كان كل شيء صحيحًا استخدم:\n\n" +
+                ".مكتب انهاء",
+                event.threadID,
+                event.messageID
+            );
+        }
+
+    } catch (error) {
+
+        console.error("[OFFICE HANDLE REPLY ERROR]:", error);
+
+        return api.sendMessage(
+            HEADER +
+            "حدث خطأ أثناء حفظ الإجابة:\n\n" +
+            (error.message || "خطأ غير معروف"),
+            event.threadID,
+            event.messageID
+        );
+    }
+};
+
+
+// ==================================================
+// الأوامر الرئيسية
 // ==================================================
 
 module.exports.run = async function ({ api, event, args }) {
@@ -402,301 +768,61 @@ module.exports.run = async function ({ api, event, args }) {
 
     try {
 
-        const action = clean(args[0]);
+        const action = String(args[0] || "")
+            .trim()
+            .toLowerCase();
 
-        // ------------------------------------------
-        // بدون أمر
-        // ------------------------------------------
+
+        // ==================================================
+        // مكتب فقط
+        // ==================================================
 
         if (!action) {
 
             return api.sendMessage(
-                help(),
+                HEADER +
+                "نظام مكتب التوظيف\n\n" +
+                ".مكتب جديد\n" +
+                ".مكتب عرض\n" +
+                ".مكتب انهاء",
                 event.threadID,
                 event.messageID
             );
         }
 
-        // ------------------------------------------
-        // تقرير جديد
-        // ------------------------------------------
+
+        // ==================================================
+        // جديد
+        // ==================================================
 
         if (action === "جديد") {
 
-            reports.set(threadID, createReport());
-
-            return api.sendMessage(
-                HEADER +
-                "تم إنشاء تقرير مكتب جديد.\n\n" +
-                "يمكنك الآن إدخال بيانات التقرير.",
-                event.threadID,
-                event.messageID
-            );
-        }
-
-        const report = getReport(threadID);
-
-        // ------------------------------------------
-        // التاريخ
-        // ------------------------------------------
-
-        if (action === "تاريخ") {
-
-            const date = clean(args.slice(1).join(" "));
-
-            if (!date) {
-
-                return api.sendMessage(
-                    HEADER +
-                    "اكتب التاريخ.\n\n" +
-                    "مثال:\n" +
-                    ".مكتب تاريخ 21/09/2026",
-                    event.threadID,
-                    event.messageID
-                );
-            }
-
-            report.date = date;
-
-            return api.sendMessage(
-                HEADER +
-                `تم تحديد تاريخ التقرير: ${date}`,
-                event.threadID,
-                event.messageID
-            );
-        }
-
-        // ------------------------------------------
-        // اسم صاحب التقرير
-        // ------------------------------------------
-
-        if (action === "تقرير") {
-
-            const name = clean(args.slice(1).join(" "));
-
-            if (!name) {
-
-                return api.sendMessage(
-                    HEADER +
-                    "اكتب اسم صاحب التقرير.",
-                    event.threadID,
-                    event.messageID
-                );
-            }
-
-            report.reporter = name;
-
-            return api.sendMessage(
-                HEADER +
-                `تم تحديد صاحب التقرير: ${name}`,
-                event.threadID,
-                event.messageID
-            );
-        }
-
-        // ------------------------------------------
-        // الفعالية الأولى
-        // ------------------------------------------
-
-        if (action === "ف1") {
-
-            const values = splitPipe(args.slice(1).join(" "));
-
-            report.activities[1].organizer = clean(values[0]);
-            report.activities[1].winner = clean(values[1]);
-            report.activities[1].participants = splitNames(values[2]);
-
-            return api.sendMessage(
-                HEADER +
-                "تم تسجيل الفعالية الأولى.",
-                event.threadID,
-                event.messageID
-            );
-        }
-
-        // ------------------------------------------
-        // الفعالية الثانية
-        // ------------------------------------------
-
-        if (action === "ف2") {
-
-            const values = splitPipe(args.slice(1).join(" "));
-
-            report.activities[2].organizer = clean(values[0]);
-            report.activities[2].winner = clean(values[1]);
-            report.activities[2].participants = splitNames(values[2]);
-
-            return api.sendMessage(
-                HEADER +
-                "تم تسجيل الفعالية الثانية.",
-                event.threadID,
-                event.messageID
-            );
-        }
-
-        // ------------------------------------------
-        // الفعالية الثالثة
-        // ------------------------------------------
-
-        if (action === "ف3") {
-
-            const values = splitPipe(args.slice(1).join(" "));
-
-            report.activities[3].organizer = clean(values[0]);
-            report.activities[3].winner = clean(values[1]);
-            report.activities[3].participants = splitNames(values[2]);
-
-            return api.sendMessage(
-                HEADER +
-                "تم تسجيل الفعالية الثالثة.",
-                event.threadID,
-                event.messageID
-            );
-        }
-
-        // ------------------------------------------
-        // الدرس + الاختبار
-        // ------------------------------------------
-
-        if (action === "درس") {
-
-            const values = splitPipe(args.slice(1).join(" "));
-
-            report.lesson.teacher = clean(values[0]);
-            report.lesson.testMaker = clean(values[1]);
-            report.lesson.participants = splitNames(values[2]);
-
-            return api.sendMessage(
-                HEADER +
-                "تم تسجيل الدرس والاختبار والمشاركين.",
-                event.threadID,
-                event.messageID
-            );
-        }
-
-        // ------------------------------------------
-        // ترقية
-        // ------------------------------------------
-
-        if (action === "ترقية") {
-
-            const values = splitPipe(args.slice(1).join(" "));
-
-            const name = clean(values[0]);
-            const rank = clean(values[1]);
-
-            if (!name || !rank) {
-
-                return api.sendMessage(
-                    HEADER +
-                    "الصيغة:\n\n" +
-                    ".مكتب ترقية الاسم | الرتبة",
-                    event.threadID,
-                    event.messageID
-                );
-            }
-
-            report.promotions.push({
-                name,
-                rank
+            return startReport({
+                api,
+                event
             });
-
-            return api.sendMessage(
-                HEADER +
-                `تمت إضافة ترقية ${name}.`,
-                event.threadID,
-                event.messageID
-            );
         }
 
-        // ------------------------------------------
-        // ملاحظة
-        // ------------------------------------------
 
-        if (action === "ملاحظة") {
-
-            const note = clean(args.slice(1).join(" "));
-
-            if (!note) {
-
-                return api.sendMessage(
-                    HEADER +
-                    "اكتب الملاحظة.",
-                    event.threadID,
-                    event.messageID
-                );
-            }
-
-            report.notes.push(note);
-
-            return api.sendMessage(
-                HEADER +
-                "تمت إضافة الملاحظة.",
-                event.threadID,
-                event.messageID
-            );
-        }
-
-        // ------------------------------------------
-        // مسؤول
-        // ------------------------------------------
-
-        if (action === "مسؤول") {
-
-            const values = splitPipe(args.slice(1).join(" "));
-
-            const name = clean(values[0]);
-            const role = clean(values[1]);
-
-            if (!name || !role) {
-
-                return api.sendMessage(
-                    HEADER +
-                    "الصيغة:\n\n" +
-                    ".مكتب مسؤول الاسم | المنصب",
-                    event.threadID,
-                    event.messageID
-                );
-            }
-
-            report.staff.push({
-                name,
-                role,
-                type: "normal"
-            });
-
-            return api.sendMessage(
-                HEADER +
-                `تمت إضافة المسؤول: ${name}`,
-                event.threadID,
-                event.messageID
-            );
-        }
-
-        // ------------------------------------------
-        // النشاط
-        // ------------------------------------------
-
-        if (action === "نشاط") {
-
-            const values = splitPipe(args.slice(1).join(" "));
-
-            report.activityRanking.first = clean(values[0]);
-            report.activityRanking.second = clean(values[1]);
-
-            return api.sendMessage(
-                HEADER +
-                "تم تسجيل أكثر العمال نشاطًا.",
-                event.threadID,
-                event.messageID
-            );
-        }
-
-        // ------------------------------------------
+        // ==================================================
         // عرض
-        // ------------------------------------------
+        // ==================================================
 
         if (action === "عرض") {
+
+            const report = reports.get(threadID);
+
+            if (!report) {
+
+                return api.sendMessage(
+                    HEADER +
+                    "لا يوجد تقرير قيد الإنشاء.\n\n" +
+                    "استخدم:\n" +
+                    ".مكتب جديد",
+                    event.threadID,
+                    event.messageID
+                );
+            }
 
             return api.sendMessage(
                 buildReport(report),
@@ -705,18 +831,33 @@ module.exports.run = async function ({ api, event, args }) {
             );
         }
 
-        // ------------------------------------------
+
+        // ==================================================
         // إنهاء
-        // ------------------------------------------
+        // ==================================================
 
         if (
             action === "انهاء" ||
             action === "إنهاء"
         ) {
 
+            const report = reports.get(threadID);
+
+            if (!report) {
+
+                return api.sendMessage(
+                    HEADER +
+                    "لا يوجد تقرير قيد الإنشاء.",
+                    event.threadID,
+                    event.messageID
+                );
+            }
+
             const finalReport = buildReport(report);
 
             reports.delete(threadID);
+
+            removeOldReplies(threadID);
 
             return api.sendMessage(
                 finalReport,
@@ -725,28 +866,17 @@ module.exports.run = async function ({ api, event, args }) {
             );
         }
 
-        // ------------------------------------------
-        // مسح
-        // ------------------------------------------
 
-        if (action === "مسح") {
-
-            reports.delete(threadID);
-
-            return api.sendMessage(
-                HEADER +
-                "تم مسح تقرير المكتب.",
-                event.threadID,
-                event.messageID
-            );
-        }
-
-        // ------------------------------------------
+        // ==================================================
         // أمر غير معروف
-        // ------------------------------------------
+        // ==================================================
 
         return api.sendMessage(
-            help(),
+            HEADER +
+            "الأوامر المتاحة:\n\n" +
+            ".مكتب جديد\n" +
+            ".مكتب عرض\n" +
+            ".مكتب انهاء",
             event.threadID,
             event.messageID
         );
@@ -757,7 +887,7 @@ module.exports.run = async function ({ api, event, args }) {
 
         return api.sendMessage(
             HEADER +
-            "حدث خطأ في نظام المكتب:\n\n" +
+            "حدث خطأ:\n\n" +
             (error.message || "خطأ غير معروف"),
             event.threadID,
             event.messageID
