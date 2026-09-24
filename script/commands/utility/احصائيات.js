@@ -2,10 +2,10 @@ const path = require("path");
 
 module.exports.config = {
     name: "احصائيات",
-    version: "3.0.0",
+    version: "4.0.0",
     hasPermssion: 0,
     credits: "أبو هريرة",
-    description: "عرض إحصائيات المجموعة وأكثر الأعضاء نشاطًا خلال اليوم",
+    description: "عرض إحصائيات المجموعة والرسائل والصور وأكثر الأعضاء نشاطًا",
     commandCategory: "utility",
     usages: "احصائيات",
     cooldowns: 5
@@ -83,7 +83,6 @@ function normalizeTimestamp(value) {
         return 0;
     }
 
-    // بعض نسخ الـ API قد تعطي ثواني
     if (number < 100000000000) {
         return number * 1000;
     }
@@ -97,7 +96,8 @@ function normalizeTimestamp(value) {
 
 function getTunisiaDayStart() {
 
-    const now = new Date();
+    const now =
+        new Date();
 
     const formatter =
         new Intl.DateTimeFormat(
@@ -117,8 +117,12 @@ function getTunisiaDayStart() {
 
     for (const part of parts) {
 
-        if (part.type !== "literal") {
-            values[part.type] = part.value;
+        if (
+            part.type !== "literal"
+        ) {
+
+            values[part.type] =
+                part.value;
         }
     }
 
@@ -131,10 +135,6 @@ function getTunisiaDayStart() {
     const day =
         Number(values.day);
 
-    /*
-     * تونس UTC+1.
-     * نحول منتصف الليل في تونس إلى Unix timestamp UTC.
-     */
     return (
         Date.UTC(
             year,
@@ -144,15 +144,111 @@ function getTunisiaDayStart() {
             0,
             0,
             0
-        ) - 60 * 60 * 1000
+        ) -
+        60 * 60 * 1000
     );
 }
 
 // ==================================================
-// قراءة سجل المجموعة من بداية اليوم
+// معرفة هل المرفق صورة
 // ==================================================
 
-async function getTodayMessages(api, threadID) {
+function isImageAttachment(attachment) {
+
+    if (!attachment) {
+        return false;
+    }
+
+    const type =
+        String(
+            attachment.type ||
+            attachment.mimeType ||
+            attachment.mime ||
+            ""
+        ).toLowerCase();
+
+    if (
+        type === "photo" ||
+        type === "image" ||
+        type === "image/jpeg" ||
+        type === "image/png" ||
+        type === "image/webp" ||
+        type === "image/gif"
+    ) {
+
+        return true;
+    }
+
+    /*
+     * بعض نسخ الـ API لا تضع type واضحًا
+     * لكن رابط المرفق يكون رابط صورة.
+     */
+
+    const url =
+        String(
+            attachment.url ||
+            attachment.href ||
+            attachment.src ||
+            attachment.previewUrl ||
+            ""
+        ).toLowerCase();
+
+    if (
+        /\.(jpg|jpeg|png|webp|gif)(\?|$)/i.test(
+            url
+        )
+    ) {
+
+        return true;
+    }
+
+    return false;
+}
+
+// ==================================================
+// الحصول على عدد الصور في الرسالة
+// ==================================================
+
+function getImageCount(message) {
+
+    if (
+        !message ||
+        !Array.isArray(
+            message.attachments
+        )
+    ) {
+
+        return 0;
+    }
+
+    let count = 0;
+
+    for (
+        const attachment
+        of message.attachments
+    ) {
+
+        if (
+            isImageAttachment(
+                attachment
+            )
+        ) {
+
+            count++;
+        }
+    }
+
+    return count;
+}
+
+// ==================================================
+// قراءة سجل الرسائل من بداية اليوم
+// ==================================================
+
+async function getTodayMessages(
+    api,
+    threadID
+) {
 
     if (
         !api ||
@@ -208,19 +304,17 @@ async function getTodayMessages(api, threadID) {
             !Array.isArray(history) ||
             history.length === 0
         ) {
+
             break;
         }
-
-        /*
-         * getThreadHistory يعيد الرسائل من الأحدث
-         * إلى الأقدم، وأول عنصر يكون أقدم رسالة
-         * في الصفحة الحالية حسب API.
-         */
 
         let oldestTimestamp =
             null;
 
-        for (const message of history) {
+        for (
+            const message
+            of history
+        ) {
 
             if (!message) {
                 continue;
@@ -233,9 +327,7 @@ async function getTodayMessages(api, threadID) {
                     message.createdAt
                 );
 
-            if (
-                !messageTimestamp
-            ) {
+            if (!messageTimestamp) {
                 continue;
             }
 
@@ -249,64 +341,61 @@ async function getTodayMessages(api, threadID) {
             }
 
             /*
-             * إذا وصلنا إلى رسائل قبل بداية اليوم
-             * فلا نحتاج إلى إضافتها.
+             * الرسائل قبل بداية اليوم لا نحتاجها.
              */
+
             if (
                 messageTimestamp < dayStart
             ) {
+
                 continue;
             }
 
-            /*
-             * نتأكد أن الرسالة تخص اليوم الحالي.
-             */
+            const messageID =
+                String(
+                    message.messageID ||
+                    message.threadingID ||
+                    `${messageTimestamp}_${message.senderID || ""}_${message.body || ""}`
+                );
+
             if (
-                messageTimestamp >= dayStart
+                !messageIDs.has(
+                    messageID
+                )
             ) {
 
-                const messageID =
-                    String(
-                        message.messageID ||
-                        message.threadingID ||
-                        `${messageTimestamp}_${message.senderID || ""}_${message.body || ""}`
-                    );
+                messageIDs.add(
+                    messageID
+                );
 
-                if (
-                    !messageIDs.has(
-                        messageID
-                    )
-                ) {
-
-                    messageIDs.add(
-                        messageID
-                    );
-
-                    messages.push(
-                        message
-                    );
-                }
+                messages.push(
+                    message
+                );
             }
         }
 
         /*
-         * وصلنا إلى بداية اليوم.
+         * وصلنا إلى ما قبل بداية اليوم.
          */
+
         if (
             oldestTimestamp !== null &&
             oldestTimestamp < dayStart
         ) {
+
             break;
         }
 
         /*
-         * حماية من تكرار نفس الصفحة
-         * أو توقف الـ API عن التقدم.
+         * حماية من تكرار الصفحة.
          */
+
         if (
             oldestTimestamp === null ||
-            oldestTimestamp === previousOldestTimestamp
+            oldestTimestamp ===
+            previousOldestTimestamp
         ) {
+
             break;
         }
 
@@ -314,9 +403,9 @@ async function getTodayMessages(api, threadID) {
             oldestTimestamp;
 
         /*
-         * الصفحة التالية تكون قبل أقدم
-         * رسالة حصلنا عليها.
+         * اجلب الصفحة الأقدم.
          */
+
         timestamp =
             oldestTimestamp;
     }
@@ -331,7 +420,11 @@ async function getTodayMessages(api, threadID) {
 // معلومات المجموعة
 // ==================================================
 
-async function getThreadInfo(api, Threads, threadID) {
+async function getThreadInfo(
+    api,
+    Threads,
+    threadID
+) {
 
     let info = null;
 
@@ -366,7 +459,7 @@ async function getThreadInfo(api, Threads, threadID) {
 }
 
 // ==================================================
-// استخراج أعضاء المجموعة
+// استخراج الأعضاء
 // ==================================================
 
 function getParticipants(info) {
@@ -458,6 +551,32 @@ function getAdmins(info) {
 }
 
 // ==================================================
+// الحصول على ID البوت
+// ==================================================
+
+async function getBotID(api) {
+
+    try {
+
+        if (
+            api &&
+            typeof api.getCurrentUserID === "function"
+        ) {
+
+            const id =
+                await api.getCurrentUserID();
+
+            if (id) {
+                return String(id);
+            }
+        }
+
+    } catch (e) {}
+
+    return "";
+}
+
+// ==================================================
 // تنفيذ الأمر
 // ==================================================
 
@@ -498,7 +617,7 @@ module.exports.run = async function ({
         }
 
         // ==================================================
-        // الأعضاء
+        // أعضاء المجموعة
         // ==================================================
 
         const participants =
@@ -517,7 +636,14 @@ module.exports.run = async function ({
             getAdmins(info);
 
         // ==================================================
-        // قراءة رسائل اليوم كاملة
+        // ID البوت
+        // ==================================================
+
+        const botID =
+            await getBotID(api);
+
+        // ==================================================
+        // قراءة كامل تاريخ اليوم
         // ==================================================
 
         const {
@@ -530,13 +656,29 @@ module.exports.run = async function ({
             );
 
         // ==================================================
-        // حساب نشاط الأعضاء
+        // الإحصائيات
         // ==================================================
 
         const activity =
             {};
 
-        for (const message of messages) {
+        let totalTextMessages =
+            0;
+
+        let totalImages =
+            0;
+
+        let ignoredBotMessages =
+            0;
+
+        // ==================================================
+        // تحليل الرسائل
+        // ==================================================
+
+        for (
+            const message
+            of messages
+        ) {
 
             if (!message) {
                 continue;
@@ -553,31 +695,101 @@ module.exports.run = async function ({
                 continue;
             }
 
-            /*
-             * لا نحسب إلا أعضاء المجموعة الحاليين.
-             */
+            // ==================================================
+            // استثناء رسائل البوت
+            // ==================================================
+
+            if (
+                botID &&
+                senderID === botID
+            ) {
+
+                ignoredBotMessages++;
+
+                continue;
+            }
+
+            // ==================================================
+            // لا نحسب إلا أعضاء المجموعة الحاليين
+            // ==================================================
+
             if (
                 !currentMembers.has(
                     senderID
                 )
             ) {
+
                 continue;
             }
+
+            // ==================================================
+            // الصور
+            // ==================================================
+
+            const imageCount =
+                getImageCount(
+                    message
+                );
+
+            if (
+                imageCount > 0
+            ) {
+
+                totalImages +=
+                    imageCount;
+            }
+
+            // ==================================================
+            // الرسائل النصية
+            // ==================================================
+
+            const body =
+                typeof message.body === "string"
+                    ? message.body.trim()
+                    : "";
+
+            /*
+             * إذا كانت الرسالة تحتوي على صورة
+             * فلا تدخل ضمن الرسائل النصية.
+             */
+
+            if (
+                imageCount > 0
+            ) {
+
+                continue;
+            }
+
+            /*
+             * الرسائل التي لا تحتوي على نص
+             * لا تحسب.
+             */
+
+            if (!body) {
+                continue;
+            }
+
+            // ==================================================
+            // تسجيل نشاط العضو
+            // ==================================================
 
             if (
                 !activity[senderID]
             ) {
 
                 activity[senderID] = {
-                    messages: 0
+                    messages: 0,
+                    images: 0
                 };
             }
 
             activity[senderID].messages++;
+
+            totalTextMessages++;
         }
 
         // ==================================================
-        // ترتيب النشاط
+        // ترتيب أكثر الأعضاء نشاطًا
         // ==================================================
 
         const ranking =
@@ -594,7 +806,7 @@ module.exports.run = async function ({
                 .slice(0, 10);
 
         // ==================================================
-        // إنشاء قائمة النشاط
+        // قائمة النشاط
         // ==================================================
 
         let rankingText =
@@ -605,7 +817,7 @@ module.exports.run = async function ({
         ) {
 
             rankingText =
-                "لا توجد رسائل مسجلة اليوم.";
+                "لا توجد رسائل نصية مسجلة اليوم.";
 
         } else {
 
@@ -645,24 +857,6 @@ module.exports.run = async function ({
                 rankingText +=
                     `${medal} ${name} — ${count} رسالة\n`;
             }
-        }
-
-        // ==================================================
-        // إجمالي رسائل اليوم
-        // ==================================================
-
-        let totalMessages =
-            0;
-
-        for (
-            const data
-            of Object.values(activity)
-        ) {
-
-            totalMessages +=
-                Number(
-                    data?.messages || 0
-                );
         }
 
         // ==================================================
@@ -714,12 +908,17 @@ ${participants.length}
 👑 عدد المشرفين:
 ${admins.length}
 
-💬 رسائل اليوم:
-${totalMessages}
+━━━━━━━━━━━━━━━━━━
+
+💬 الرسائل النصية:
+${totalTextMessages}
+
+🖼️ الصور المرسلة:
+${totalImages}
 
 ━━━━━━━━━━━━━━━━━━
 
-🔥 أكثر الأعضاء نشاطًا اليوم:
+🔥 أكثر الأعضاء نشاطًا:
 
 ${rankingText}
 ━━━━━━━━━━━━━━━━━━
