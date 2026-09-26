@@ -7,6 +7,9 @@ module.exports.config = {
     category: "events"
 };
 
+const ACADEMY_THREAD_ID =
+    "8555825081107393";
+
 module.exports.handleEvent = async function ({
     api,
     event,
@@ -21,6 +24,14 @@ module.exports.handleEvent = async function ({
             String(event.threadID || "");
 
         if (!threadID) return;
+
+        // ==================================================
+        // استثناء أكاديمية ANGELS
+        // ==================================================
+
+        if (threadID === ACADEMY_THREAD_ID) {
+            return;
+        }
 
         const logMessageData =
             event.logMessageData || {};
