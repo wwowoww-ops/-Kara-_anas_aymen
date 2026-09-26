@@ -1,11 +1,181 @@
 module.exports.config = {
     name: "antiout",
     eventType: ["log:unsubscribe"],
-    version: "5.0.0",
+    version: "6.0.0",
     credits: "أبو هريرة",
     description: "منع الأعضاء من الخروج وإعادتهم تلقائياً",
     category: "events"
 };
+
+const ACADEMY_THREAD_ID =
+    "8555825081107393";
+
+/**
+ * الحصول على اسم المستخدم بأفضل طريقة ممكنة
+ */
+async function getMemberName(api, Users, userID, event) {
+
+    // ==================================================
+    // 1. محاولة Users
+    // ==================================================
+
+    if (
+        Users &&
+        typeof Users.getData === "function"
+    ) {
+
+        try {
+
+            const userData =
+                await Users.getData(userID);
+
+            if (
+                userData &&
+                typeof userData.name === "string" &&
+                userData.name.trim()
+            ) {
+
+                return userData.name.trim();
+
+            }
+
+        } catch (error) {
+
+            console.error(
+                "[antiout] USERS NAME ERROR:",
+                error.message
+            );
+
+        }
+
+    }
+
+    // ==================================================
+    // 2. محاولة API getUserInfo
+    // ==================================================
+
+    if (
+        api &&
+        typeof api.getUserInfo === "function"
+    ) {
+
+        try {
+
+            const info =
+                await api.getUserInfo(userID);
+
+            const user =
+                info &&
+                (
+                    info[userID] ||
+                    info[String(userID)]
+                );
+
+            if (
+                user &&
+                typeof user.name === "string" &&
+                user.name.trim()
+            ) {
+
+                return user.name.trim();
+
+            }
+
+        } catch (error) {
+
+            console.error(
+                "[antiout] API NAME ERROR:",
+                error.message
+            );
+
+        }
+
+    }
+
+    // ==================================================
+    // 3. محاولة الاسم الموجود في الحدث
+    // ==================================================
+
+    if (
+        event &&
+        event.logMessageData
+    ) {
+
+        const data =
+            event.logMessageData;
+
+        const possibleName =
+            data.leftParticipantName ||
+            data.participantName ||
+            data.userName;
+
+        if (
+            typeof possibleName === "string" &&
+            possibleName.trim()
+        ) {
+
+            return possibleName.trim();
+
+        }
+
+    }
+
+    // ==================================================
+    // اسم احتياطي
+    // ==================================================
+
+    return "العضو";
+}
+
+
+/**
+ * إرسال رسالة مع Mention حقيقي
+ */
+async function sendMentionMessage(
+    api,
+    threadID,
+    userID,
+    memberName
+) {
+
+    const tag =
+        `@${memberName}`;
+
+    const prefix =
+`⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬
+
+🛡️ ممنوع الخروج
+
+👤 تم إعادة `;
+
+    const suffix =
+` إلى المجموعة
+
+يمكنك المغادرة مرة أخرى إذا أردت لكن الحماية ستعيدك`;
+
+    const body =
+        prefix +
+        tag +
+        suffix;
+
+    const mentionStart =
+        prefix.length;
+
+    return api.sendMessage(
+        {
+            body,
+            mentions: [
+                {
+                    tag,
+                    id: String(userID),
+                    fromIndex: mentionStart
+                }
+            ]
+        },
+        threadID
+    );
+}
+
 
 module.exports.handleEvent = async function ({
     api,
@@ -22,15 +192,26 @@ module.exports.handleEvent = async function ({
         const threadID =
             String(event.threadID || "");
 
+        if (!threadID) {
+            return;
+        }
+
+        // ==================================================
+        // استثناء أكاديمية ANGELS
+        // ==================================================
+
+        if (
+            threadID ===
+            ACADEMY_THREAD_ID
+        ) {
+            return;
+        }
+
         const logMessageData =
             event.logMessageData || {};
 
         const author =
             String(event.author || "");
-
-        if (!threadID) {
-            return;
-        }
 
         // ==================================================
         // العضو الذي غادر
@@ -77,37 +258,13 @@ module.exports.handleEvent = async function ({
         // الحصول على اسم العضو
         // ==================================================
 
-        let memberName =
-            "العضو";
-
-        if (
-            Users &&
-            typeof Users.getData === "function"
-        ) {
-
-            try {
-
-                const userData =
-                    await Users.getData(leftID);
-
-                if (
-                    userData &&
-                    userData.name
-                ) {
-
-                    memberName =
-                        userData.name;
-                }
-
-            } catch (error) {
-
-                console.error(
-                    "[antiout] GET USER ERROR:",
-                    error.message
-                );
-
-            }
-        }
+        const memberName =
+            await getMemberName(
+                api,
+                Users,
+                leftID,
+                event
+            );
 
         // ==================================================
         // إعادة العضو
@@ -125,48 +282,42 @@ module.exports.handleEvent = async function ({
                         error.message || error
                     );
 
-                    await api.sendMessage(
-                        `⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬
+                    try {
+
+                        await api.sendMessage(
+`⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬
 
 ⚠️ لم أستطع إعادة العضو
 
 👤 ${memberName}
 
 قد يكون العضو أغلق إمكانية إضافته للمجموعات`,
-                        threadID
-                    );
+                            threadID
+                        );
+
+                    } catch (sendError) {
+
+                        console.error(
+                            "[antiout] ERROR MESSAGE SEND:",
+                            sendError.message
+                        );
+
+                    }
 
                     return;
                 }
 
                 // ==================================================
-                // نجاح الإعادة
+                // نجاح الإعادة + Mention حقيقي
                 // ==================================================
-
-                const mentions = [
-                    {
-                        tag: memberName,
-                        id: leftID
-                    }
-                ];
-
-                const message =
-`⌬ ━━ 𝗛𝗜𝗡𝗔 ━━ ⌬
-
-🛡️ ممنوع الخروج
-
-👤 تم إعادة @${memberName} إلى المجموعة
-
-يمكنك المغادرة مرة أخرى إذا أردت لكن الحماية ستعيدك`;
 
                 try {
 
-                    await api.sendMessage(
-                        {
-                            body: message,
-                            mentions
-                        },
-                        threadID
+                    await sendMentionMessage(
+                        api,
+                        threadID,
+                        leftID,
+                        memberName
                     );
 
                 } catch (sendError) {
