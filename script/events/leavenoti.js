@@ -1,7 +1,7 @@
 module.exports.config = {
     name: "leaveNoti",
     eventType: ["log:unsubscribe"],
-    version: "9.1.0",
+    version: "10.0.0",
     credits: "HINA System - Abu Huraira",
     description: "نظام وداع سريع عند مغادرة أو طرد أعضاء المجموعة",
     category: "events"
@@ -23,8 +23,8 @@ module.exports.handleEvent = async function ({
         // ==================================================
 
         if (
-            event.logMessageType !==
-            "log:unsubscribe"
+            event.logMessageType &&
+            event.logMessageType !== "log:unsubscribe"
         ) {
             return;
         }
@@ -67,7 +67,6 @@ module.exports.handleEvent = async function ({
 
         // ==================================================
         // تنظيف الاسم
-        // حماية من الأسماء المخفية والرموز غير المرئية
         // ==================================================
 
         function cleanUserName(name) {
@@ -84,6 +83,7 @@ module.exports.handleEvent = async function ({
                     /[\u0000-\u001F\u007F\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\uFEFF]/g,
                     ""
                 )
+                .replace(/\s+/g, " ")
                 .trim();
 
         }
@@ -100,15 +100,13 @@ module.exports.handleEvent = async function ({
             );
 
         // ==================================================
-        // إذا لم يتوفر الاسم
-        // نحاول استخراجه من Users
+        // استخراج الاسم من Users
         // ==================================================
 
         if (
             !userName &&
             Users &&
-            typeof Users.getData ===
-            "function"
+            typeof Users.getData === "function"
         ) {
 
             try {
@@ -143,15 +141,13 @@ module.exports.handleEvent = async function ({
         }
 
         // ==================================================
-        // محاولة أخيرة من Users.getName
-        // إذا كان النظام يدعمها
+        // محاولة من Users.getName
         // ==================================================
 
         if (
             !userName &&
             Users &&
-            typeof Users.getName ===
-            "function"
+            typeof Users.getName === "function"
         ) {
 
             try {
@@ -178,6 +174,52 @@ module.exports.handleEvent = async function ({
         }
 
         // ==================================================
+        // محاولة أخيرة من API
+        // ==================================================
+
+        if (
+            !userName &&
+            api &&
+            typeof api.getUserInfo === "function"
+        ) {
+
+            try {
+
+                const info =
+                    await api.getUserInfo(
+                        leftID
+                    );
+
+                const userInfo =
+                    info &&
+                    (
+                        info[leftID] ||
+                        info[String(leftID)]
+                    );
+
+                if (userInfo) {
+
+                    userName =
+                        cleanUserName(
+                            userInfo.name ||
+                            userInfo.fullName ||
+                            ""
+                        );
+
+                }
+
+            } catch (error) {
+
+                console.error(
+                    "[LEAVE] API GET USER NAME ERROR:",
+                    error.message
+                );
+
+            }
+
+        }
+
+        // ==================================================
         // الاسم الاحتياطي
         // ==================================================
 
@@ -196,10 +238,18 @@ module.exports.handleEvent = async function ({
             author === leftID;
 
         // ==================================================
+        // إعداد المنشن الحقيقي
+        // ==================================================
+
+        const tag =
+            `@${userName}`;
+
+        // ==================================================
         // الرسالة
         // ==================================================
 
         let message;
+        let mentionStart;
 
         // ==================================================
         // خروج العضو بنفسه
@@ -207,12 +257,18 @@ module.exports.handleEvent = async function ({
 
         if (leftVoluntarily) {
 
-            message =
+            const prefix =
 `⌬ ━ 𝗛𝗜𝗡𝗔 〢 𝗚𝗢𝗢𝗗𝗕𝗬𝗘 ━⌬
 
-${userName}
+`;
 
-قرر ${userName} ينسحب من الخدمة
+            const line =
+`قرر ${tag} ينسحب من الخدمة`;
+
+            message =
+`${prefix}${tag}
+
+${line}
 
 ☕ شال قهوته
 🍰 وخلى القاطو ورانا
@@ -223,6 +279,10 @@ ${userName}
 الله يعينك على الطريق
 ونشوفك على خير`;
 
+            // أول منشن
+            mentionStart =
+                prefix.length;
+
         }
 
         // ==================================================
@@ -231,12 +291,18 @@ ${userName}
 
         else {
 
-            message =
+            const prefix =
 `⌬ ━ 𝗛𝗜𝗡𝗔 〢 𝗞𝗜𝗖𝗞 ━⌬
 
-${userName}
+`;
 
-تم طرد ${userName} بنجاح
+            const line =
+`تم طرد ${tag} بنجاح`;
+
+            message =
+`${prefix}${tag}
+
+${line}
 
 ☕ القهوة قالت خليه يمشي
 🍰 والقاطو رفض يروح معاه
@@ -247,16 +313,21 @@ ${userName}
 مع السلامة يا ${userName}
 الباب مفتوح من الجهة الثانية`;
 
+            // أول منشن
+            mentionStart =
+                prefix.length;
+
         }
 
         // ==================================================
-        // المنشن
+        // المنشن الحقيقي
         // ==================================================
 
         const mentions = [
             {
-                tag: userName,
-                id: leftID
+                tag,
+                id: leftID,
+                fromIndex: mentionStart
             }
         ];
 
@@ -298,8 +369,7 @@ ${userName}
 
                 if (
                     Users &&
-                    typeof Users.getData ===
-                    "function"
+                    typeof Users.getData === "function"
                 ) {
 
                     try {
@@ -327,8 +397,7 @@ ${userName}
                     !leftVoluntarily &&
                     author &&
                     Users &&
-                    typeof Users.getData ===
-                    "function"
+                    typeof Users.getData === "function"
                 ) {
 
                     try {
@@ -354,8 +423,7 @@ ${userName}
 
                 if (
                     Threads &&
-                    typeof Threads.getInfo ===
-                    "function"
+                    typeof Threads.getInfo === "function"
                 ) {
 
                     try {
