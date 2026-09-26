@@ -1,142 +1,126 @@
 module.exports.config = {
     name: "academyJoin",
     eventType: ["log:subscribe"],
-    version: "3.0.0",
+    version: "4.0.0",
     credits: "أبو هريرة",
-    description: "نظام أكاديمية ANGELS للترحيب والكنية والترقيم",
+    description: "نظام أكاديمية ANGELS عند دخول عضو جديد",
     category: "events"
 };
-
-// ==================================================
-// مجموعة الأكاديمية فقط
-// ==================================================
 
 const ACADEMY_THREAD_ID =
     "8555825081107393";
 
-
-// ==================================================
-// الإعدادات
-// ==================================================
-
-const NICKNAME_DELAY = 3000; // 3 ثوانٍ بعد الاختبارات
-const WAIT_TIME = 5 * 60 * 1000; // 5 دقائق
-
-
-// ==================================================
-// الجلسات المؤقتة
-// ==================================================
+const NICKNAME_DELAY = 3000;
+const SERIAL_WAIT_TIME = 5 * 60 * 1000;
 
 const pending = new Map();
 
-
-// ==================================================
-// الاسم الأول
-// ==================================================
+/*
+ * ==========================================================
+ * أدوات مساعدة
+ * ==========================================================
+ */
 
 function getFirstName(name) {
 
-    const clean =
-        String(name || "")
-            .trim()
-            .replace(/\s+/g, " ");
-
-    if (!clean) {
+    if (!name) {
         return "عضو";
     }
 
-    return clean.split(" ")[0];
+    return String(name)
+        .trim()
+        .split(/\s+/)[0] || "عضو";
 }
 
 
-// ==================================================
-// تغيير الكنية
-// ==================================================
+async function getThreadInfo(api, threadID) {
 
-function changeNickname(
-    api,
-    threadID,
-    userID,
-    nickname
-) {
+    try {
 
-    return new Promise(resolve => {
+        if (
+            api &&
+            typeof api.getThreadInfo === "function"
+        ) {
 
-        try {
-
-            api.changeNickname(
-                nickname,
-                threadID,
-                userID,
-                error => {
-
-                    if (error) {
-
-                        console.error(
-                            "[academyJoin] NICKNAME ERROR:",
-                            error
-                        );
-
-                        return resolve(false);
-                    }
-
-                    resolve(true);
-                }
+            return await api.getThreadInfo(
+                threadID
             );
 
-        } catch (error) {
-
-            console.error(
-                "[academyJoin] NICKNAME EXCEPTION:",
-                error
-            );
-
-            resolve(false);
         }
-    });
+
+    } catch (error) {
+
+        console.error(
+            "[academyJoin] THREAD INFO ERROR:",
+            error.message
+        );
+
+    }
+
+    return null;
 }
 
 
-// ==================================================
-// معلومات المجموعة
-// ==================================================
+/*
+ * ==========================================================
+ * الحصول على اسم المستخدم
+ * ==========================================================
+ */
 
-function getThreadInfo(
-    api,
-    threadID
-) {
+async function getUserName(api, userID) {
 
-    return new Promise(resolve => {
+    try {
 
-        try {
+        if (
+            api &&
+            typeof api.getUserInfo === "function"
+        ) {
 
-            api.getThreadInfo(
-                threadID,
-                (error, info) => {
+            const info =
+                await api.getUserInfo(
+                    String(userID)
+                );
 
-                    if (error || !info) {
-                        return resolve(null);
-                    }
+            const user =
+                info &&
+                (
+                    info[String(userID)] ||
+                    info[userID]
+                );
 
-                    resolve(info);
-                }
-            );
+            if (
+                user &&
+                user.name
+            ) {
 
-        } catch (error) {
+                return String(
+                    user.name
+                ).trim();
 
-            resolve(null);
+            }
+
         }
-    });
+
+    } catch (error) {
+
+        console.error(
+            "[academyJoin] GET NAME ERROR:",
+            error.message
+        );
+
+    }
+
+    return "عضو";
 }
 
 
-// ==================================================
-// إزالة HandleReply قديم
-// ==================================================
+/*
+ * ==========================================================
+ * حذف HandleReply
+ * ==========================================================
+ */
 
-function removeHandleReply(
-    messageID
-) {
+function removeHandleReply(messageID) {
 
     if (
         !global.client ||
@@ -150,455 +134,459 @@ function removeHandleReply(
     global.client.handleReply =
         global.client.handleReply.filter(
             item =>
-                String(item.messageID) !==
-                String(messageID)
+                item.messageID != messageID
         );
 }
 
 
-// ==================================================
-// إرسال رسالة طلب الكنية
-// ==================================================
+/*
+ * ==========================================================
+ * تغيير الكنية
+ * ==========================================================
+ */
 
-async function askNickname(
+function changeNickname(
     api,
     threadID,
     userID,
-    accountName
+    nickname
 ) {
 
-    const firstName =
-        getFirstName(accountName);
+    return new Promise(
+        resolve => {
+
+            try {
+
+                api.changeNickname(
+                    nickname,
+                    threadID,
+                    userID,
+                    error => {
+
+                        if (error) {
+
+                            console.error(
+                                "[academyJoin] CHANGE NICKNAME ERROR:",
+                                error.message || error
+                            );
+
+                        }
+
+                        resolve(!error);
+
+                    }
+                );
+
+            } catch (error) {
+
+                console.error(
+                    "[academyJoin] CHANGE NICKNAME EXCEPTION:",
+                    error.message
+                );
+
+                resolve(false);
+
+            }
+
+        }
+    );
+}
 
 
-    return new Promise(resolve => {
+/*
+ * ==========================================================
+ * إنهاء الكنية
+ * ==========================================================
+ */
 
-        const text =
+async function finishNickname(
+    api,
+    threadID,
+    targetID,
+    nickname,
+    serial
+) {
+
+    const cleanSerial =
+        String(serial || "00")
+            .replace(
+                /^EX_/i,
+                ""
+            )
+            .replace(
+                /\D/g,
+                ""
+            ) || "00";
+
+    const finalSerial =
+        cleanSerial
+            .padStart(2, "0");
+
+    const finalNickname =
+        `EX_${finalSerial} (${nickname})`;
+
+    await changeNickname(
+        api,
+        threadID,
+        targetID,
+        finalNickname
+    );
+
+    const mentions = [
+        {
+            tag: `@${nickname}`,
+            id: String(targetID),
+            fromIndex:
+                (
+                    `⌬ ━━ 𝗛𝗜𝗡𝗔 〢 𝗔𝗡𝗚𝗘𝗟𝗦 𝗔𝗖𝗔𝗗𝗘𝗠𝗬 ━━ ⌬\n\n`
+                    + "تم تسجيل "
+                ).length
+        }
+    ];
+
+    const prefix =
 `⌬ ━━ 𝗛𝗜𝗡𝗔 〢 𝗔𝗡𝗚𝗘𝗟𝗦 𝗔𝗖𝗔𝗗𝗘𝗠𝗬 ━━ ⌬
 
-@${accountName}
+تم تسجيل `;
 
-أرسل كنيتك بالرد على هذه الرسالة.
+    const tag =
+        `@${nickname}`;
 
-يمكن للعضو أو أحد أدمن المجموعة تحديد الكنية.
+    const body =
+`${prefix}${tag}
 
-لديك 5 دقائق للرد.
+الكنية: ${finalNickname}
 
-إذا لم يصل أي رد سيتم استخدام اسم حسابك الأول تلقائيًا.
+تم اعتماد الرقم بنجاح.`;
 
-❈『 ANGELS ~ ACADEMY 』❈`;
+    try {
 
-
-        api.sendMessage(
+        await api.sendMessage(
             {
-                body: text,
-
-                mentions: [
-                    {
-                        tag: `@${accountName}`,
-                        id: userID,
-                        fromIndex:
-                            text.indexOf(
-                                `@${accountName}`
-                            )
-                    }
-                ]
+                body,
+                mentions
             },
+            threadID
+        );
 
+    } catch (error) {
+
+        console.error(
+            "[academyJoin] FINAL MESSAGE ERROR:",
+            error.message
+        );
+
+    }
+
+    pending.delete(
+        String(targetID)
+    );
+}
+
+
+/*
+ * ==========================================================
+ * طلب الرقم من الأدمن
+ * ==========================================================
+ */
+
+async function askNumber(
+    api,
+    threadID,
+    targetID,
+    nickname
+) {
+
+    const targetKey =
+        String(targetID);
+
+    const session =
+        pending.get(targetKey);
+
+    if (!session) {
+        return;
+    }
+
+    session.nickname =
+        nickname || session.nickname;
+
+    session.type =
+        "number";
+
+    /*
+     * لا نعتمد على قائمة الأدمن القديمة.
+     * يتم التحقق من الأدمن عند الرد نفسه.
+     */
+
+    const message =
+`⌬ ━━ 𝗛𝗜𝗡𝗔 〢 𝗔𝗡𝗚𝗘𝗟𝗦 𝗔𝗖𝗔𝗗𝗘𝗠𝗬 ━━ ⌬
+
+تم اعتماد الكنية:
+
+${session.nickname}
+
+الآن نحتاج رقم العضو.
+
+الأدمن فقط يرسل الرقم بالرد على هذه الرسالة.
+
+مثال:
+07
+أو
+EX_07
+
+إذا لم يرسل أي أدمن رقمًا خلال 5 دقائق سيتم اعتماد EX_00 تلقائيًا.`;
+
+    try {
+
+        await api.sendMessage(
+            message,
             threadID,
-
             (error, info) => {
 
                 if (error) {
 
                     console.error(
-                        "[academyJoin] ASK NICKNAME ERROR:",
+                        "[academyJoin] NUMBER REQUEST ERROR:",
                         error
                     );
 
-                    return resolve();
+                    return;
                 }
-
 
                 if (
                     !info ||
                     !info.messageID
                 ) {
-
-                    return resolve();
+                    return;
                 }
 
-
-                const messageID =
-                    String(
-                        info.messageID
-                    );
-
-
-                const session = {
-
-                    type: "nickname",
-
-                    messageID,
-
-                    threadID,
-
-                    userID,
-
-                    accountName,
-
-                    firstName,
-
-                    finished: false,
-
-                    timeout: null
-                };
-
-
-                pending.set(
-                    messageID,
-                    session
-                );
-
-
-                // تسجيل الرد في نظام البوت
-                if (
-                    !global.client.handleReply
-                ) {
-
-                    global.client.handleReply = [];
-
-                }
-
+                session.numberMessageID =
+                    info.messageID;
 
                 global.client.handleReply.push({
-
                     name: "academyJoin",
-
-                    messageID,
-
-                    author: userID,
-
-                    targetID: userID,
-
-                    threadID,
-
-                    type: "nickname"
-
+                    messageID: info.messageID,
+                    author: targetID,
+                    targetID: targetID,
+                    threadID: threadID,
+                    type: "number"
                 });
 
-
-                // مهلة الكنية
-                session.timeout =
+                session.numberTimeout =
                     setTimeout(
                         async () => {
 
+                            const current =
+                                pending.get(
+                                    targetKey
+                                );
+
                             if (
-                                session.finished
+                                !current ||
+                                current.type !==
+                                "number"
                             ) {
                                 return;
                             }
 
-
-                            session.finished =
-                                true;
-
-
-                            pending.delete(
-                                messageID
-                            );
-
-
                             removeHandleReply(
-                                messageID
+                                current.numberMessageID
                             );
 
-
-                            // لم يرد أحد
-                            // نستخدم الاسم الأول
-                            await askNumber(
+                            await finishNickname(
                                 api,
                                 threadID,
-                                userID,
-                                firstName,
-                                accountName
+                                targetID,
+                                current.nickname,
+                                "00"
                             );
 
                         },
-                        WAIT_TIME
+                        SERIAL_WAIT_TIME
                     );
-
-
-                resolve();
 
             }
         );
 
-    });
+    } catch (error) {
+
+        console.error(
+            "[academyJoin] ASK NUMBER ERROR:",
+            error
+        );
+
+    }
 }
 
 
-// ==================================================
-// طلب الرقم من الأدمن
-// ==================================================
+/*
+ * ==========================================================
+ * طلب الكنية
+ * ==========================================================
+ */
 
-async function askNumber(
+async function askNickname(
     api,
     threadID,
-    userID,
-    nickname,
-    accountName
+    targetID
 ) {
+
+    const targetKey =
+        String(targetID);
+
+    if (
+        pending.has(targetKey)
+    ) {
+        return;
+    }
+
+    const accountName =
+        await getUserName(
+            api,
+            targetID
+        );
+
+    const firstName =
+        getFirstName(
+            accountName
+        );
+
+    const session = {
+        targetID,
+        threadID,
+        accountName,
+        firstName,
+        nickname: null,
+        type: "nickname",
+        nicknameMessageID: null,
+        numberMessageID: null,
+        nicknameTimeout: null,
+        numberTimeout: null
+    };
+
+    pending.set(
+        targetKey,
+        session
+    );
+
+    const message =
+`⌬ ━━ 𝗛𝗜𝗡𝗔 〢 𝗔𝗡𝗚𝗘𝗟𝗦 𝗔𝗖𝗔𝗗𝗘𝗠𝗬 ━━ ⌬
+
+@${firstName}
+
+أرسل الكنية التي تريد اعتمادها في الأكاديمية بالرد على هذه الرسالة.
+
+يمكنك أنت أو أحد الأدمن إرسال الكنية.
+
+مثال:
+Mohamed`;
 
     try {
 
-        const threadInfo =
-            await getThreadInfo(
-                api,
-                threadID
-            );
-
-
-        if (!threadInfo) {
-            return;
-        }
-
-
-        const adminIDs =
-            new Set(
-                Array.isArray(
-                    threadInfo.adminIDs
-                )
-                    ? threadInfo.adminIDs.map(
-                        id => String(id)
-                    )
-                    : []
-            );
-
-
-        return new Promise(resolve => {
-
-            const text =
-`⌬ ━━ 𝗛𝗜𝗡𝗔 〢 𝗔𝗡𝗚𝗘𝗟𝗦 𝗔𝗖𝗔𝗗𝗘𝗠𝗬 ━━ ⌬
-
-تم تسجيل الكنية:
-
-${nickname}
-
-الآن نحتاج الرقم التسلسلي.
-
-أحد أدمن المجموعة فقط يرد على هذه الرسالة بالرقم المطلوب.
-
-مثال:
-07
-
-إذا لم يحدد أحد الأدمن الرقم خلال 5 دقائق سيتم تعيين:
-
-EX_00
-
-الكنية النهائية ستكون بالشكل:
-
-EX_07 (${nickname})`;
-
-
-            api.sendMessage(
-                text,
-                threadID,
-
-                (error, info) => {
-
-                    if (error) {
-
-                        console.error(
-                            "[academyJoin] ASK NUMBER ERROR:",
-                            error
-                        );
-
-                        return resolve();
+        await api.sendMessage(
+            {
+                body: message,
+                mentions: [
+                    {
+                        tag: `@${firstName}`,
+                        id: String(targetID),
+                        fromIndex:
+                            (
+                                "⌬ ━━ 𝗛𝗜𝗡𝗔 〢 𝗔𝗡𝗚𝗘𝗟𝗦 𝗔𝗖𝗔𝗗𝗘𝗠𝗬 ━━ ⌬\n\n"
+                            ).length
                     }
+                ]
+            },
+            threadID,
+            (error, info) => {
 
+                if (error) {
 
-                    if (
-                        !info ||
-                        !info.messageID
-                    ) {
-                        return resolve();
-                    }
-
-
-                    const messageID =
-                        String(
-                            info.messageID
-                        );
-
-
-                    const session = {
-
-                        type: "number",
-
-                        messageID,
-
-                        threadID,
-
-                        userID,
-
-                        nickname,
-
-                        accountName,
-
-                        adminIDs,
-
-                        finished: false,
-
-                        timeout: null
-                    };
-
-
-                    pending.set(
-                        messageID,
-                        session
+                    console.error(
+                        "[academyJoin] NICKNAME REQUEST ERROR:",
+                        error
                     );
 
-
-                    // تسجيل HandleReply
-                    if (
-                        !global.client.handleReply
-                    ) {
-
-                        global.client.handleReply = [];
-
-                    }
-
-
-                    global.client.handleReply.push({
-
-                        name: "academyJoin",
-
-                        messageID,
-
-                        author: userID,
-
-                        targetID: userID,
-
-                        threadID,
-
-                        type: "number"
-
-                    });
-
-
-                    // مهلة الرقم
-                    session.timeout =
-                        setTimeout(
-                            async () => {
-
-                                if (
-                                    session.finished
-                                ) {
-                                    return;
-                                }
-
-
-                                session.finished =
-                                    true;
-
-
-                                pending.delete(
-                                    messageID
-                                );
-
-
-                                removeHandleReply(
-                                    messageID
-                                );
-
-
-                                // لا يوجد رقم من الأدمن
-                                await finishNickname(
-                                    api,
-                                    session,
-                                    "00"
-                                );
-
-                            },
-                            WAIT_TIME
-                        );
-
-
-                    resolve();
-
+                    return;
                 }
-            );
 
-        });
+                if (
+                    !info ||
+                    !info.messageID
+                ) {
+                    return;
+                }
+
+                session.nicknameMessageID =
+                    info.messageID;
+
+                global.client.handleReply.push({
+                    name: "academyJoin",
+                    messageID: info.messageID,
+                    author: targetID,
+                    targetID: targetID,
+                    threadID: threadID,
+                    type: "nickname"
+                });
+
+                session.nicknameTimeout =
+                    setTimeout(
+                        async () => {
+
+                            const current =
+                                pending.get(
+                                    targetKey
+                                );
+
+                            if (
+                                !current ||
+                                current.type !==
+                                "nickname"
+                            ) {
+                                return;
+                            }
+
+                            removeHandleReply(
+                                current.nicknameMessageID
+                            );
+
+                            const fallbackNickname =
+                                current.firstName ||
+                                "عضو";
+
+                            await askNumber(
+                                api,
+                                threadID,
+                                targetID,
+                                fallbackNickname
+                            );
+
+                        },
+                        SERIAL_WAIT_TIME
+                    );
+
+            }
+        );
 
     } catch (error) {
 
         console.error(
-            "[academyJoin] ASK NUMBER EXCEPTION:",
+            "[academyJoin] ASK NICKNAME ERROR:",
             error
         );
+
     }
 }
 
 
-// ==================================================
-// الكنية النهائية
-// ==================================================
+/*
+ * ==========================================================
+ * الحدث الأساسي
+ * ==========================================================
+ */
 
-async function finishNickname(
-    api,
-    session,
-    number
-) {
-
-    const cleanNumber =
-        String(number)
-            .trim()
-            .replace(/^EX_/i, "")
-            .padStart(2, "0");
-
-
-    const finalNickname =
-        `EX_${cleanNumber} (${session.nickname})`;
-
-
-    const changed =
-        await changeNickname(
-            api,
-            session.threadID,
-            session.userID,
-            finalNickname
-        );
-
-
-    if (!changed) {
-
-        return api.sendMessage(
-            `تعذر تغيير كنية العضو إلى:
-
-${finalNickname}`,
-            session.threadID
-        );
-    }
-
-
-    return api.sendMessage(
-        `⌬ ━━ 𝗛𝗜𝗡𝗔 〢 𝗔𝗡𝗚𝗘𝗟𝗦 𝗔𝗖𝗔𝗗𝗘𝗠𝗬 ━━ ⌬
-
-تم تعيين الكنية بنجاح:
-
-${finalNickname}`,
-        session.threadID
-    );
-}
-
-
-// ==================================================
-// حدث دخول عضو
-// ==================================================
-
-module.exports.handleEvent = async function ({
+module.exports.handleEvent =
+async function ({
     api,
     event
 }) {
@@ -609,12 +597,10 @@ module.exports.handleEvent = async function ({
             return;
         }
 
-
         const threadID =
             String(
                 event.threadID || ""
             );
-
 
         if (
             threadID !==
@@ -623,10 +609,8 @@ module.exports.handleEvent = async function ({
             return;
         }
 
-
         const logMessageData =
             event.logMessageData || {};
-
 
         const addedParticipants =
             Array.isArray(
@@ -635,19 +619,16 @@ module.exports.handleEvent = async function ({
                 ? logMessageData.addedParticipants
                 : [];
 
-
         if (
             addedParticipants.length === 0
         ) {
             return;
         }
 
-
         const botID =
             String(
                 api.getCurrentUserID()
             );
-
 
         const newMembers =
             addedParticipants.filter(
@@ -657,22 +638,14 @@ module.exports.handleEvent = async function ({
                     ) !== botID
             );
 
-
         if (
             newMembers.length === 0
         ) {
             return;
         }
 
-
-        // ==================================================
-        // المنشنات
-        // ==================================================
-
         const mentions = [];
-
         let mentionText = "";
-
 
         for (
             const participant
@@ -684,11 +657,9 @@ module.exports.handleEvent = async function ({
                     participant.userFbId || ""
                 );
 
-
             if (!userID) {
                 continue;
             }
-
 
             const name =
                 String(
@@ -697,31 +668,21 @@ module.exports.handleEvent = async function ({
                     "عضو جديد"
                 );
 
-
             const tag =
                 `@${name}`;
-
 
             const fromIndex =
                 mentionText.length;
 
-
             mentionText +=
                 tag + " ";
 
-
             mentions.push({
-
                 tag,
-
                 id: userID,
-
                 fromIndex
-
             });
-
         }
-
 
         if (
             mentions.length === 0
@@ -729,10 +690,11 @@ module.exports.handleEvent = async function ({
             return;
         }
 
-
-        // ==================================================
-        // رسالة الاختبارات الأصلية
-        // ==================================================
+        /*
+         * ==================================================
+         * رسالة الاختبارات الأصلية
+         * ==================================================
+         */
 
         const message =
 `⌬ ━━ 𝗛𝗜𝗡𝗔 〢 𝗔𝗡𝗚𝗘𝗟𝗦 𝗔𝗖𝗔𝗗𝗘𝗠𝗬 ━━ ⌬
@@ -770,90 +732,59 @@ ${mentionText}
 
 بالتوفيق لك في الأكاديمية.`;
 
-
-        // ==================================================
-        // إرسال الاختبارات أولًا
-        // ==================================================
-
-        api.sendMessage(
+        await api.sendMessage(
             {
                 body: message,
                 mentions
             },
-
-            threadID,
-
-            error => {
-
-                if (error) {
-
-                    console.error(
-                        "[academyJoin] TEST SEND ERROR:",
-                        error
-                    );
-
-                }
-
-            }
+            threadID
         );
 
-
-        // ==================================================
-        // بعد 3 ثوانٍ طلب الكنية
-        // ==================================================
+        /*
+         * ==================================================
+         * طلب الكنية بعد 3 ثوانٍ
+         * ==================================================
+         */
 
         setTimeout(
             async () => {
 
-                try {
+                for (
+                    const participant
+                    of newMembers
+                ) {
 
-                    for (
-                        const participant
-                        of newMembers
-                    ) {
+                    const userID =
+                        String(
+                            participant.userFbId || ""
+                        );
 
-                        const userID =
-                            String(
-                                participant.userFbId || ""
-                            );
+                    if (!userID) {
+                        continue;
+                    }
 
-
-                        if (!userID) {
-                            continue;
-                        }
-
-
-                        const name =
-                            String(
-                                participant.fullName ||
-                                participant.name ||
-                                "عضو جديد"
-                            );
-
+                    try {
 
                         await askNickname(
                             api,
                             threadID,
-                            userID,
-                            name
+                            userID
+                        );
+
+                    } catch (error) {
+
+                        console.error(
+                            "[academyJoin] NICKNAME EVENT ERROR:",
+                            error.message
                         );
 
                     }
 
-                } catch (error) {
-
-                    console.error(
-                        "[academyJoin] NICKNAME DELAY ERROR:",
-                        error
-                    );
-
                 }
 
             },
-
             NICKNAME_DELAY
         );
-
 
     } catch (error) {
 
@@ -863,14 +794,18 @@ ${mentionText}
         );
 
     }
+
 };
 
 
-// ==================================================
-// نظام الرد
-// ==================================================
+/*
+ * ==========================================================
+ * الرد على رسائل الأكاديمية
+ * ==========================================================
+ */
 
-module.exports.handleReply = async function ({
+module.exports.handleReply =
+async function ({
     api,
     event,
     handleReply
@@ -878,16 +813,14 @@ module.exports.handleReply = async function ({
 
     try {
 
-        if (!event) {
+        if (!event || !handleReply) {
             return;
         }
-
 
         const threadID =
             String(
                 event.threadID || ""
             );
-
 
         if (
             threadID !==
@@ -896,239 +829,217 @@ module.exports.handleReply = async function ({
             return;
         }
 
+        const targetID =
+            String(
+                handleReply.targetID || ""
+            );
 
-        if (!handleReply) {
+        if (!targetID) {
             return;
         }
 
-
-        const messageID =
-            String(
-                handleReply.messageID || ""
-            );
-
+        const targetKey =
+            String(targetID);
 
         const session =
-            pending.get(
-                messageID
-            );
-
+            pending.get(targetKey);
 
         if (!session) {
             return;
         }
-
-
-        if (session.finished) {
-            return;
-        }
-
 
         const senderID =
             String(
                 event.senderID || ""
             );
 
+        const body =
+            String(
+                event.body || ""
+            ).trim();
 
-        // ==================================================
-        // مرحلة الكنية
-        // ==================================================
+        if (!body) {
+            return;
+        }
+
+        /*
+         * ==================================================
+         * مرحلة الكنية
+         * ==================================================
+         */
 
         if (
-            session.type ===
+            handleReply.type ===
             "nickname"
         ) {
 
-            const isMember =
-                senderID ===
-                session.userID;
+            /*
+             * العضو نفسه أو أي أدمن يستطيع
+             * إرسال الكنية.
+             */
+
+            let isAdmin = false;
+
+            try {
+
+                const threadInfo =
+                    await getThreadInfo(
+                        api,
+                        threadID
+                    );
+
+                const adminIDs =
+                    Array.isArray(
+                        threadInfo &&
+                        threadInfo.adminIDs
+                    )
+                        ? threadInfo.adminIDs
+                            .map(
+                                id =>
+                                    String(
+                                        typeof id === "object"
+                                            ? (
+                                                id.id ||
+                                                id.userFbId ||
+                                                id.userID
+                                            )
+                                            : id
+                                    )
+                            )
+                        : [];
+
+                isAdmin =
+                    adminIDs.includes(
+                        senderID
+                    );
+
+            } catch (error) {
+
+                console.error(
+                    "[academyJoin] ADMIN CHECK ERROR:",
+                    error.message
+                );
+
+            }
+
+            if (
+                senderID !== targetID &&
+                !isAdmin
+            ) {
+                return;
+            }
+
+            clearTimeout(
+                session.nicknameTimeout
+            );
+
+            removeHandleReply(
+                handleReply.messageID
+            );
+
+            session.nickname =
+                body;
+
+            await askNumber(
+                api,
+                threadID,
+                targetID,
+                body
+            );
+
+            return;
+        }
 
 
-            // نحتاج معلومات الأدمن
+        /*
+         * ==================================================
+         * مرحلة الرقم
+         * ==================================================
+         */
+
+        if (
+            handleReply.type ===
+            "number"
+        ) {
+
+            /*
+             * فحص الأدمن لحظة الرد.
+             * لا نعتمد على قائمة قديمة.
+             */
+
             const threadInfo =
                 await getThreadInfo(
                     api,
                     threadID
                 );
 
+            if (!threadInfo) {
+                return;
+            }
+
+            const rawAdminIDs =
+                Array.isArray(
+                    threadInfo.adminIDs
+                )
+                    ? threadInfo.adminIDs
+                    : [];
 
             const adminIDs =
-                new Set(
-                    Array.isArray(
-                        threadInfo?.adminIDs
-                    )
-                        ? threadInfo.adminIDs.map(
-                            id => String(id)
+                rawAdminIDs.map(
+                    admin =>
+                        String(
+                            typeof admin === "object"
+                                ? (
+                                    admin.id ||
+                                    admin.userFbId ||
+                                    admin.userID
+                                )
+                                : admin
                         )
-                        : []
                 );
-
 
             const isAdmin =
-                adminIDs.has(
+                adminIDs.includes(
                     senderID
                 );
 
-
-            // العضو أو الأدمن فقط
-            if (
-                !isMember &&
-                !isAdmin
-            ) {
+            if (!isAdmin) {
                 return;
             }
 
-
-            const nickname =
-                String(
-                    event.body || ""
-                )
-                    .trim()
-                    .replace(/\s+/g, " ");
-
-
-            if (!nickname) {
-                return;
-            }
-
-
-            if (
-                nickname.length > 40
-            ) {
-
-                return api.sendMessage(
-                    "الكنية طويلة جدًا.",
-                    threadID,
-                    event.messageID
-                );
-
-            }
-
-
-            session.finished =
-                true;
-
-
-            if (session.timeout) {
-                clearTimeout(
-                    session.timeout
-                );
-            }
-
-
-            pending.delete(
-                messageID
-            );
-
-
-            removeHandleReply(
-                messageID
-            );
-
-
-            // بعد الحصول على الكنية
-            // نطلب الرقم من الأدمن
-            return askNumber(
-                api,
-                threadID,
-                session.userID,
-                nickname,
-                session.accountName
-            );
-        }
-
-
-        // ==================================================
-        // مرحلة الرقم
-        // ==================================================
-
-        if (
-            session.type ===
-            "number"
-        ) {
-
-            // الرقم للأدمن فقط
-            if (
-                !session.adminIDs.has(
-                    senderID
-                )
-            ) {
-                return;
-            }
-
-
-            const numberText =
-                String(
-                    event.body || ""
-                )
-                    .trim();
-
-
-            // نقبل:
-            // 0
-            // 00
-            // 7
-            // 07
-            // EX_07
+            /*
+             * قبول:
+             * 7
+             * 07
+             * EX_07
+             */
 
             const match =
-                numberText.match(
+                body.match(
                     /^(?:EX_)?(\d{1,3})$/i
                 );
 
-
             if (!match) {
-
-                return api.sendMessage(
-                    "أرسل رقم الترتيب فقط، مثال: 07",
-                    threadID,
-                    event.messageID
-                );
-
-            }
-
-
-            const number =
-                Number(
-                    match[1]
-                );
-
-
-            if (
-                number < 0 ||
-                number > 999
-            ) {
-
                 return;
             }
 
-
-            session.finished =
-                true;
-
-
-            if (session.timeout) {
-                clearTimeout(
-                    session.timeout
-                );
-            }
-
-
-            pending.delete(
-                messageID
+            clearTimeout(
+                session.numberTimeout
             );
-
 
             removeHandleReply(
-                messageID
+                handleReply.messageID
             );
 
-
-            return finishNickname(
+            await finishNickname(
                 api,
-                session,
-                formatNumber(number)
+                threadID,
+                targetID,
+                session.nickname,
+                match[1]
             );
+
+            return;
         }
 
     } catch (error) {
