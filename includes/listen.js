@@ -1,7 +1,7 @@
 /**
  * ╔═══════════════════════════════════════════════════════════════╗
- * ║                 KIRA — LISTEN SYSTEM                         ║
- * ║              Event Router — Stable Version                   ║
+ * ║                 HINA — LISTEN SYSTEM                        ║
+ * ║              Event Router — Stable Version                  ║
  * ╚═══════════════════════════════════════════════════════════════╝
  */
 
@@ -10,269 +10,432 @@ module.exports = function ({ api, models }) {
     const logger = require("../utils/log.js");
 
     // ============================================================
+    // DATABASE STATUS
+    // ============================================================
+
+    const databaseAvailable =
+        !!models &&
+        typeof models.use === "function";
+
+    if (databaseAvailable) {
+
+        logger(
+            "✅ Database Models متاحة",
+            "[ DATABASE ]"
+        );
+
+    } else {
+
+        logger(
+            "⚠️ Database Models غير متاحة — سيتم تشغيل البوت بدون وظائف قاعدة البيانات",
+            "[ DATABASE ]"
+        );
+
+    }
+
+    // ============================================================
+    // Safe Controller
+    // ============================================================
+
+    function createSafeController(name) {
+
+        logger(
+            `⚠️ تم تعطيل Controller: ${name} بسبب عدم توفر قاعدة البيانات`,
+            "[ DATABASE ]"
+        );
+
+        return {
+
+            getAll: async () => [],
+
+            getData: async () => null,
+
+            setData: async () => null,
+
+            createData: async () => null,
+
+            deleteData: async () => null,
+
+            updateData: async () => null,
+
+            saveData: async () => null,
+
+            getName: async () => null,
+
+            getUserInfo: async () => null,
+
+            getThreadInfo: async () => null,
+
+            refreshData: async () => null,
+
+            removeData: async () => null
+
+        };
+
+    }
+
+    // ============================================================
     // Controllers
     // ============================================================
 
-    const Users = require("./controllers/users")({
-        models,
-        api
-    });
+    let Users;
+    let Threads;
+    let Currencies;
 
-    const Threads = require("./controllers/threads")({
-        models,
-        api
-    });
+    if (databaseAvailable) {
 
-    const Currencies = require("./controllers/currencies")({
-        models
-    });
+        try {
+
+            Users = require("./controllers/users")({
+                models,
+                api
+            });
+
+        } catch (error) {
+
+            console.error(
+                "❌ USERS CONTROLLER ERROR:",
+                error
+            );
+
+            Users =
+                createSafeController("Users");
+
+        }
+
+        try {
+
+            Threads = require("./controllers/threads")({
+                models,
+                api
+            });
+
+        } catch (error) {
+
+            console.error(
+                "❌ THREADS CONTROLLER ERROR:",
+                error
+            );
+
+            Threads =
+                createSafeController("Threads");
+
+        }
+
+        try {
+
+            Currencies =
+                require("./controllers/currencies")({
+                    models
+                });
+
+        } catch (error) {
+
+            console.error(
+                "❌ CURRENCIES CONTROLLER ERROR:",
+                error
+            );
+
+            Currencies =
+                createSafeController("Currencies");
+
+        }
+
+    } else {
+
+        Users =
+            createSafeController("Users");
+
+        Threads =
+            createSafeController("Threads");
+
+        Currencies =
+            createSafeController("Currencies");
+
+    }
 
     // ============================================================
     // Handlers
     // ============================================================
 
-    const handleCommand = require("./handle/handleCommand")({
-        api,
-        models,
-        Users,
-        Threads,
-        Currencies
-    });
+    const handleCommand =
+        require("./handle/handleCommand")({
+            api,
+            models,
+            Users,
+            Threads,
+            Currencies
+        });
 
-    const handleCommandEvent = require("./handle/handleCommandEvent")({
-        api,
-        models,
-        Users,
-        Threads,
-        Currencies
-    });
+    const handleCommandEvent =
+        require("./handle/handleCommandEvent")({
+            api,
+            models,
+            Users,
+            Threads,
+            Currencies
+        });
 
-    const handleReply = require("./handle/handleReply")({
-        api,
-        models,
-        Users,
-        Threads,
-        Currencies
-    });
+    const handleReply =
+        require("./handle/handleReply")({
+            api,
+            models,
+            Users,
+            Threads,
+            Currencies
+        });
 
-    const handleReaction = require("./handle/handleReaction")({
-        api,
-        models,
-        Users,
-        Threads,
-        Currencies
-    });
+    const handleReaction =
+        require("./handle/handleReaction")({
+            api,
+            models,
+            Users,
+            Threads,
+            Currencies
+        });
 
-    const handleEvent = require("./handle/handleEvent")({
-        api,
-        models,
-        Users,
-        Threads,
-        Currencies
-    });
+    const handleEvent =
+        require("./handle/handleEvent")({
+            api,
+            models,
+            Users,
+            Threads,
+            Currencies
+        });
 
-    const handleRefresh = require("./handle/handleRefresh")({
-        api,
-        models,
-        Users,
-        Threads,
-        Currencies
-    });
+    const handleRefresh =
+        require("./handle/handleRefresh")({
+            api,
+            models,
+            Users,
+            Threads,
+            Currencies
+        });
 
-    const handleCreateDatabase = require("./handle/handleCreateDatabase")({
-        api,
-        Threads,
-        Users,
-        Currencies,
-        models
-    });
+    const handleCreateDatabase =
+        require("./handle/handleCreateDatabase")({
+            api,
+            Threads,
+            Users,
+            Currencies,
+            models
+        });
 
-    const handleNotification = require("./handle/handleNotification")({
-        api
-    });
+    const handleNotification =
+        require("./handle/handleNotification")({
+            api
+        });
 
     // ============================================================
     // تحميل قاعدة البيانات
     // ============================================================
 
-    (async function loadDatabase() {
+    if (databaseAvailable) {
 
-        try {
+        (async function loadDatabase() {
 
-            logger(
-                "📊 جاري تحميل قاعدة البيانات...",
-                "[ DATABASE ]"
-            );
+            try {
 
-            const threads = await Threads.getAll([
-                "threadID",
-                "data",
-                "threadInfo"
-            ]);
-
-            for (const thread of threads) {
-
-                const tid =
-                    String(thread.threadID);
-
-                if (
-                    !global.data.allThreadID.includes(tid)
-                ) {
-                    global.data.allThreadID.push(tid);
-                }
-
-                global.data.threadData.set(
-                    tid,
-                    thread.data || {}
+                logger(
+                    "📊 جاري تحميل قاعدة البيانات...",
+                    "[ DATABASE ]"
                 );
 
-                global.data.threadInfo.set(
-                    tid,
-                    thread.threadInfo || {}
-                );
+                const threads =
+                    await Threads.getAll([
+                        "threadID",
+                        "data",
+                        "threadInfo"
+                    ]);
 
-                if (
-                    thread.data &&
-                    thread.data.banned == 1
-                ) {
+                for (const thread of threads) {
 
-                    global.data.threadBanned.set(
-                        tid,
-                        {
-                            reason:
-                                thread.data.reason || "",
-
-                            dateAdded:
-                                thread.data.dateAdded ||
-                                Date.now()
-                        }
-                    );
-                }
-
-                if (
-                    thread.data &&
-                    Array.isArray(
-                        thread.data.commandBanned
-                    ) &&
-                    thread.data.commandBanned.length
-                ) {
-
-                    global.data.commandBanned.set(
-                        tid,
-                        thread.data.commandBanned
-                    );
-                }
-
-                if (
-                    thread.data &&
-                    thread.data.NSFW
-                ) {
+                    const tid =
+                        String(thread.threadID);
 
                     if (
-                        !global.data.threadAllowNSFW.includes(tid)
+                        !global.data.allThreadID.includes(tid)
                     ) {
 
-                        global.data.threadAllowNSFW.push(tid);
+                        global.data.allThreadID.push(tid);
+
                     }
-                }
-            }
 
-            const users = await Users.getAll([
-                "userID",
-                "name",
-                "data"
-            ]);
-
-            for (const user of users) {
-
-                const uid =
-                    String(user.userID);
-
-                if (
-                    !global.data.allUserID.includes(uid)
-                ) {
-
-                    global.data.allUserID.push(uid);
-                }
-
-                if (user.name) {
-
-                    global.data.userName.set(
-                        uid,
-                        user.name
+                    global.data.threadData.set(
+                        tid,
+                        thread.data || {}
                     );
-                }
 
-                if (
-                    user.data &&
-                    user.data.banned == 1
-                ) {
+                    global.data.threadInfo.set(
+                        tid,
+                        thread.threadInfo || {}
+                    );
 
-                    global.data.userBanned.set(
-                        uid,
-                        {
-                            reason:
-                                user.data.reason || "",
+                    if (
+                        thread.data &&
+                        thread.data.banned == 1
+                    ) {
 
-                            dateAdded:
-                                user.data.dateAdded ||
-                                Date.now()
+                        global.data.threadBanned.set(
+                            tid,
+                            {
+                                reason:
+                                    thread.data.reason || "",
+
+                                dateAdded:
+                                    thread.data.dateAdded ||
+                                    Date.now()
+                            }
+                        );
+
+                    }
+
+                    if (
+                        thread.data &&
+                        Array.isArray(
+                            thread.data.commandBanned
+                        ) &&
+                        thread.data.commandBanned.length
+                    ) {
+
+                        global.data.commandBanned.set(
+                            tid,
+                            thread.data.commandBanned
+                        );
+
+                    }
+
+                    if (
+                        thread.data &&
+                        thread.data.NSFW
+                    ) {
+
+                        if (
+                            !global.data.threadAllowNSFW.includes(tid)
+                        ) {
+
+                            global.data.threadAllowNSFW.push(tid);
+
                         }
-                    );
+
+                    }
+
                 }
 
-                if (
-                    user.data &&
-                    Array.isArray(
-                        user.data.commandBanned
-                    ) &&
-                    user.data.commandBanned.length
-                ) {
+                const users =
+                    await Users.getAll([
+                        "userID",
+                        "name",
+                        "data"
+                    ]);
 
-                    global.data.commandBanned.set(
-                        uid,
-                        user.data.commandBanned
-                    );
+                for (const user of users) {
+
+                    const uid =
+                        String(user.userID);
+
+                    if (
+                        !global.data.allUserID.includes(uid)
+                    ) {
+
+                        global.data.allUserID.push(uid);
+
+                    }
+
+                    if (user.name) {
+
+                        global.data.userName.set(
+                            uid,
+                            user.name
+                        );
+
+                    }
+
+                    if (
+                        user.data &&
+                        user.data.banned == 1
+                    ) {
+
+                        global.data.userBanned.set(
+                            uid,
+                            {
+                                reason:
+                                    user.data.reason || "",
+
+                                dateAdded:
+                                    user.data.dateAdded ||
+                                    Date.now()
+                            }
+                        );
+
+                    }
+
+                    if (
+                        user.data &&
+                        Array.isArray(
+                            user.data.commandBanned
+                        ) &&
+                        user.data.commandBanned.length
+                    ) {
+
+                        global.data.commandBanned.set(
+                            uid,
+                            user.data.commandBanned
+                        );
+
+                    }
+
                 }
+
+                const currencies =
+                    await Currencies.getAll([
+                        "userID"
+                    ]);
+
+                for (const currency of currencies) {
+
+                    const uid =
+                        String(currency.userID);
+
+                    if (
+                        !global.data.allCurrenciesID.includes(uid)
+                    ) {
+
+                        global.data.allCurrenciesID.push(uid);
+
+                    }
+
+                }
+
+                logger(
+                    "✅ اكتمل تحميل قاعدة البيانات",
+                    "[ DATABASE ]"
+                );
+
+            } catch (error) {
+
+                console.error(
+                    "❌ DATABASE LOAD ERROR:",
+                    error
+                );
+
+                logger(
+                    `❌ فشل تحميل قاعدة البيانات: ${error.message}`,
+                    "error"
+                );
+
             }
 
-            const currencies =
-                await Currencies.getAll([
-                    "userID"
-                ]);
+        })();
 
-            for (const currency of currencies) {
+    } else {
 
-                const uid =
-                    String(currency.userID);
+        logger(
+            "⚠️ تم تخطي تحميل بيانات Users و Threads و Currencies لأن قاعدة البيانات غير متاحة",
+            "[ DATABASE ]"
+        );
 
-                if (
-                    !global.data.allCurrenciesID.includes(uid)
-                ) {
-
-                    global.data.allCurrenciesID.push(uid);
-                }
-            }
-
-            logger(
-                "✅ اكتمل تحميل قاعدة البيانات",
-                "[ DATABASE ]"
-            );
-
-        } catch (error) {
-
-            console.error(
-                "❌ DATABASE LOAD ERROR:",
-                error
-            );
-
-            logger(
-                `❌ فشل تحميل قاعدة البيانات: ${error.message}`,
-                "error"
-            );
-        }
-
-    })();
+    }
 
     // ============================================================
     // Startup
@@ -281,7 +444,7 @@ module.exports = function ({ api, models }) {
     logger(
 `
 ╔═══════════════════════════════════════════════════════════════╗
-║                  ${global.config.BOTNAME || "KIRA"} SYSTEM
+║                  ${global.config.BOTNAME || "HINA"} SYSTEM
 ║───────────────────────────────────────────────────────────────║
 ║ PREFIX : ${global.config.PREFIX || "."}
 ║ STATUS : ONLINE
@@ -329,11 +492,13 @@ module.exports = function ({ api, models }) {
                     handleNotification({
                         api
                     });
+
                 }
 
             } catch (error) {}
 
         }, 60000);
+
     }
 
     // ============================================================
@@ -379,7 +544,9 @@ module.exports = function ({ api, models }) {
                 ) {
 
                     return;
+
                 }
+
             }
 
             if (
@@ -395,7 +562,9 @@ module.exports = function ({ api, models }) {
                 ) {
 
                     return;
+
                 }
+
             }
 
             if (
@@ -404,6 +573,7 @@ module.exports = function ({ api, models }) {
             ) {
 
                 return;
+
             }
 
         } catch (error) {
@@ -412,6 +582,7 @@ module.exports = function ({ api, models }) {
                 "❌ LISTEN FILTER ERROR:",
                 error
             );
+
         }
 
         // ========================================================
@@ -425,6 +596,7 @@ module.exports = function ({ api, models }) {
             console.log(
                 `[LISTEN] type=${type} log=${logMessageType} thread=${threadID} sender=${senderID}`
             );
+
         }
 
         // ============================================================
@@ -437,61 +609,82 @@ module.exports = function ({ api, models }) {
         ) {
 
             try {
+
                 await handleCreateDatabase({
                     event
                 });
+
             } catch (error) {
+
                 console.error(
                     "❌ handleCreateDatabase:",
                     error
                 );
+
             }
 
             try {
+
                 await handleCommand({
                     event
                 });
+
             } catch (error) {
+
                 console.error(
                     "❌ handleCommand:",
                     error
                 );
+
             }
 
             try {
+
                 await handleReply({
                     event
                 });
+
             } catch (error) {
+
                 console.error(
                     "❌ handleReply:",
                     error
                 );
+
             }
 
             try {
+
                 await handleCommandEvent({
                     event
                 });
+
             } catch (error) {
+
                 console.error(
                     "❌ handleCommandEvent:",
                     error
                 );
+
             }
 
             try {
+
                 await handleEvent({
                     event
                 });
+
             } catch (error) {
+
                 console.error(
                     "❌ handleEvent MESSAGE:",
                     error
                 );
+
             }
 
             return;
+
         }
 
         // ============================================================
@@ -514,6 +707,7 @@ module.exports = function ({ api, models }) {
                     "❌ handleReaction:",
                     error
                 );
+
             }
 
             try {
@@ -528,9 +722,11 @@ module.exports = function ({ api, models }) {
                     "❌ handleEvent REACTION:",
                     error
                 );
+
             }
 
             return;
+
         }
 
         // ============================================================
@@ -554,6 +750,7 @@ module.exports = function ({ api, models }) {
                     "❌ Database JOIN:",
                     error
                 );
+
             }
 
             try {
@@ -568,6 +765,7 @@ module.exports = function ({ api, models }) {
                     "❌ handleEvent JOIN:",
                     error
                 );
+
             }
 
             try {
@@ -582,6 +780,7 @@ module.exports = function ({ api, models }) {
                     "❌ handleRefresh JOIN:",
                     error
                 );
+
             }
 
             // ====================================================
@@ -617,7 +816,6 @@ module.exports = function ({ api, models }) {
 
                     if (botAdded) {
 
-                        // تغيير لقب البوت
                         try {
 
                             await api.changeNickname(
@@ -658,7 +856,9 @@ ${prefix}اوامر
                             message,
                             threadID
                         );
+
                     }
+
                 }
 
             } catch (error) {
@@ -667,9 +867,11 @@ ${prefix}اوامر
                     "❌ BOT JOIN MESSAGE:",
                     error
                 );
+
             }
 
             return;
+
         }
 
         // ============================================================
@@ -693,6 +895,7 @@ ${prefix}اوامر
                     "❌ handleEvent LEAVE:",
                     error
                 );
+
             }
 
             try {
@@ -701,15 +904,10 @@ ${prefix}اوامر
                     event
                 });
 
-            } catch (error) {
-
-                console.error(
-                    "❌ handleRefresh LEAVE:",
-                    error
-                );
-            }
+            } catch (error) {}
 
             return;
+
         }
 
         // ============================================================
@@ -727,13 +925,7 @@ ${prefix}اوامر
                     event
                 });
 
-            } catch (error) {
-
-                console.error(
-                    "❌ handleEvent ADMINS:",
-                    error
-                );
-            }
+            } catch (error) {}
 
             try {
 
@@ -744,6 +936,7 @@ ${prefix}اوامر
             } catch (error) {}
 
             return;
+
         }
 
         // ============================================================
@@ -772,6 +965,7 @@ ${prefix}اوامر
             } catch (error) {}
 
             return;
+
         }
 
         // ============================================================
@@ -801,6 +995,7 @@ ${prefix}اوامر
             } catch (error) {}
 
             return;
+
         }
 
         // ============================================================
@@ -836,6 +1031,7 @@ ${prefix}اوامر
             } catch (error) {}
 
             return;
+
         }
 
         // ============================================================
@@ -854,7 +1050,9 @@ ${prefix}اوامر
                 "❌ handleEvent UNKNOWN:",
                 error
             );
+
         }
 
     };
+
 };
