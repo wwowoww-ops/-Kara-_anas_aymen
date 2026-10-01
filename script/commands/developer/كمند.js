@@ -2,7 +2,7 @@
  * كمند.js
  *
  * كمند
- *   → يحفظ كود الأمر
+ *   → يطلب كود الأمر ويحفظه
  *
  * كمند تجربة
  *   → ينفذ الأمر المحفوظ فعليًا
@@ -14,11 +14,10 @@
  */
 
 let savedCommand = null;
-let waitingForCode = false;
 
 module.exports.config = {
     name: "كمند",
-    version: "1.0.0",
+    version: "2.0.0",
     author: "أبو هريرة",
     countDown: 0,
     role: 2,
@@ -30,19 +29,161 @@ module.exports.config = {
     }
 };
 
+
+/*
+ * =========================
+ * التحقق من المطور
+ * =========================
+ */
+
+function isDeveloper(event) {
+
+    const admins = Array.isArray(global.config?.ADMINBOT)
+        ? global.config.ADMINBOT.map(String)
+        : [];
+
+    return admins.includes(String(event.senderID));
+}
+
+
+/*
+ * =========================
+ * تنفيذ الكود المحفوظ
+ * =========================
+ */
+
+async function executeSavedCommand({
+    api,
+    event
+}) {
+
+    if (!savedCommand) {
+        throw new Error("لا يوجد كمند محفوظ.");
+    }
+
+    const AsyncFunction = Object.getPrototypeOf(
+        async function () {}
+    ).constructor;
+
+
+    /*
+     * module وهمي حتى نتعامل مع الكود
+     * كأنه ملف أمر حقيقي
+     */
+
+    const moduleObject = {
+        exports: {}
+    };
+
+    const exportsObject = moduleObject.exports;
+
+
+    /*
+     * تشغيل الكود المحفوظ كملف JavaScript
+     */
+
+    const executeModule = new AsyncFunction(
+        "module",
+        "exports",
+        "require",
+        "__dirname",
+        "__filename",
+        savedCommand
+    );
+
+    await executeModule(
+        moduleObject,
+        exportsObject,
+        require,
+        __dirname,
+        __filename
+    );
+
+
+    /*
+     * إذا كان الكود أمرًا كاملًا
+     * يحتوي على module.exports.run
+     */
+
+    if (
+        moduleObject.exports &&
+        typeof moduleObject.exports.run === "function"
+    ) {
+
+        return await moduleObject.exports.run({
+            api,
+            event,
+            args: [],
+
+            models: global.models || null,
+            Threads: global.Threads || null,
+            Users: global.Users || null,
+            Currencies: global.Currencies || null,
+
+            commandName: "كمند"
+        });
+    }
+
+
+    /*
+     * إذا كان الكود مجرد JavaScript عادي
+     */
+
+    const runCode = new AsyncFunction(
+        "api",
+        "event",
+        "args",
+        "global",
+        "config",
+        "models",
+        "Threads",
+        "Users",
+        "Currencies",
+        "require",
+        "process",
+        "__dirname",
+        "__filename",
+
+        `"use strict";
+${savedCommand}`
+    );
+
+    return await runCode(
+        api,
+        event,
+        [],
+
+        global,
+        global.config,
+
+        global.models || null,
+        global.Threads || null,
+        global.Users || null,
+        global.Currencies || null,
+
+        require,
+        process,
+
+        __dirname,
+        __filename
+    );
+}
+
+
+/*
+ * =========================
+ * الأمر الرئيسي
+ * =========================
+ */
+
 module.exports.run = async function ({
     api,
     event,
     args
 }) {
 
-    const admins = Array.isArray(global.config?.ADMINBOT)
-        ? global.config.ADMINBOT.map(String)
-        : [];
+    if (!isDeveloper(event)) {
 
-    const developerID = String(event.senderID);
-
-    if (!admins.includes(developerID)) {
         return api.sendMessage(
             "هذا الأمر مخصص للمطور فقط.",
             event.threadID,
@@ -50,7 +191,12 @@ module.exports.run = async function ({
         );
     }
 
-    const action = args.join(" ").trim().toLowerCase();
+
+    const action = args
+        .join(" ")
+        .trim()
+        .toLowerCase();
+
 
     /*
      * =========================
@@ -61,16 +207,17 @@ module.exports.run = async function ({
     if (action === "جديد") {
 
         savedCommand = null;
-        waitingForCode = false;
 
         return api.sendMessage(
             "⌬ ━━ 𝗛𝗜𝗡𝗔  ━━ ⌬\n\n" +
             "تم حذف الكمند المحفوظ.\n\n" +
-            "أرسل «كمند» لإدخال كمند جديد.",
+            "يمكنك الآن استخدام:\n" +
+            "كمند",
             event.threadID,
             event.messageID
         );
     }
+
 
     /*
      * =========================
@@ -81,6 +228,7 @@ module.exports.run = async function ({
     if (action === "تجربة") {
 
         if (!savedCommand) {
+
             return api.sendMessage(
                 "⌬ ━━ 𝗛𝗜𝗡𝗔  ━━ ⌬\n\n" +
                 "لا يوجد كمند محفوظ للتجربة.",
@@ -89,101 +237,13 @@ module.exports.run = async function ({
             );
         }
 
+
         try {
 
-            const moduleObject = {
-                exports: {}
-            };
-
-            const exportsObject = moduleObject.exports;
-
-            /*
-             * تشغيل ملف الكمند كما لو أنه ملف JavaScript مستقل
-             */
-
-            const AsyncFunction = Object.getPrototypeOf(
-                async function () {}
-            ).constructor;
-
-            const executeModule = new AsyncFunction(
-                "module",
-                "exports",
-                "require",
-                "__dirname",
-                "__filename",
-                savedCommand
-            );
-
-            await executeModule(
-                moduleObject,
-                exportsObject,
-                require,
-                __dirname,
-                __filename
-            );
-
-            /*
-             * إذا كان الكود يحتوي على module.exports.run
-             * يتم تشغيله كأمر حقيقي
-             */
-
-            if (
-                moduleObject.exports &&
-                typeof moduleObject.exports.run === "function"
-            ) {
-
-                await moduleObject.exports.run({
-                    api,
-                    event,
-                    args: [],
-                    models: global.models || null,
-                    Threads: global.Threads || null,
-                    Users: global.Users || null,
-                    Currencies: global.Currencies || null
-                });
-
-                return;
-            }
-
-            /*
-             * إذا لم يكن ملف أمر كامل
-             * نعتبر الكود نفسه هو جسم الأمر
-             */
-
-            const runCode = new AsyncFunction(
-                "api",
-                "event",
-                "args",
-                "global",
-                "config",
-                "models",
-                "Threads",
-                "Users",
-                "Currencies",
-                "require",
-                "process",
-                "__dirname",
-                "__filename",
-
-                `"use strict";
-${savedCommand}`
-            );
-
-            await runCode(
+            await executeSavedCommand({
                 api,
-                event,
-                [],
-                global,
-                global.config,
-                global.models || null,
-                global.Threads || null,
-                global.Users || null,
-                global.Currencies || null,
-                require,
-                process,
-                __dirname,
-                __filename
-            );
+                event
+            });
 
         } catch (error) {
 
@@ -204,6 +264,7 @@ ${savedCommand}`
         return;
     }
 
+
     /*
      * =========================
      * كمند
@@ -212,50 +273,115 @@ ${savedCommand}`
 
     if (!action) {
 
-        waitingForCode = true;
-
         return api.sendMessage(
             "⌬ ━━ 𝗛𝗜𝗡𝗔  ━━ ⌬\n\n" +
-            "أرسل الآن كود الكمند.\n\n" +
+            "أرسل الآن كود الكمند كرد على هذه الرسالة.\n\n" +
             "سيتم حفظه فقط ولن يتم تشغيله.\n\n" +
-            "بعدها استخدم:\n" +
+            "بعد الحفظ:\n" +
             "كمند تجربة\n\n" +
-            "لحذف الكمند والبدء من جديد:\n" +
+            "لبدء كمند جديد:\n" +
             "كمند جديد",
             event.threadID,
+
+            (error, info) => {
+
+                if (error || !info) {
+                    return;
+                }
+
+
+                /*
+                 * تسجيل انتظار الرد
+                 */
+
+                if (!global.client.handleReply) {
+                    global.client.handleReply = [];
+                }
+
+
+                global.client.handleReply.push({
+                    name: module.exports.config.name,
+
+                    messageID: info.messageID,
+
+                    author: String(event.senderID),
+
+                    type: "saveCommand"
+                });
+            },
+
             event.messageID
         );
     }
+
 
     /*
-     * إذا كتب المستخدم الكود مباشرة بعد كمند
+     * إذا استُخدم كمند مع نص مباشر
      */
 
-    if (waitingForCode) {
-
-        savedCommand = event.body || "";
-        waitingForCode = false;
-
-        return api.sendMessage(
-            "⌬ ━━ 𝗛𝗜𝗡𝗔  ━━ ⌬\n\n" +
-            "تم حفظ الكمند.\n\n" +
-            "لن يتم تشغيله الآن.\n\n" +
-            "لتشغيله فعليًا استخدم:\n" +
-            "كمند تجربة",
-            event.threadID,
-            event.messageID
-        );
-    }
+    savedCommand = args.join(" ");
 
     return api.sendMessage(
         "⌬ ━━ 𝗛𝗜𝗡𝗔  ━━ ⌬\n\n" +
-        "استخدم:\n\n" +
-        "كمند\n" +
-        "لحفظ كمند جديد\n\n" +
-        "كمند تجربة\n" +
-        "لتشغيل الكمند المحفوظ\n\n" +
-        "كمند جديد\n" +
-        "لحذف الكمند المحفوظ",
+        "تم حفظ الكمند.\n\n" +
+        "لتشغيله:\n" +
+        "كمند تجربة",
+        event.threadID,
+        event.messageID
+    );
+};
+
+
+/*
+ * =========================
+ * استقبال كود الكمند
+ * =========================
+ */
+
+module.exports.handleReply = async function ({
+    api,
+    event,
+    handleReply
+}) {
+
+    if (!isDeveloper(event)) {
+        return;
+    }
+
+
+    if (handleReply.type !== "saveCommand") {
+        return;
+    }
+
+
+    const code = event.body || "";
+
+
+    if (!code.trim()) {
+
+        return api.sendMessage(
+            "لم يتم إرسال أي كود.",
+            event.threadID,
+            event.messageID
+        );
+    }
+
+
+    /*
+     * حفظ الكود فقط
+     */
+
+    savedCommand = code;
+
+
+    return api.sendMessage(
+        "⌬ ━━ 𝗛𝗜𝗡𝗔  ━━ ⌬\n\n" +
+        "تم حفظ الكمند.\n\n" +
+        "لم يتم تشغيله.\n\n" +
+        "لتشغيله فعليًا:\n" +
+        "كمند تجربة\n\n" +
+        "لحذفه وإدخال كمند جديد:\n" +
+        "كمند جديد",
         event.threadID,
         event.messageID
     );
