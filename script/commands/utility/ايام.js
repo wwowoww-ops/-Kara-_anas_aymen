@@ -7,8 +7,8 @@
  * - لا يحسب رسائل البوت
  * - Pagination أكثر أمانًا
  * - إعادة محاولة عند فشل الصفحة
- * - يوضح فشل جلب اليوم بدل اعتباره 0
- * - يرسل رسالة "جاري جلب الإحصائيات" أولًا
+ * - فشل اليوم يظهر كـ "فشل جلب"
+ * - إرسال رسالة "جاري جلب الإحصائيات" أولًا
  */
 
 module.exports.config = {
@@ -28,9 +28,7 @@ module.exports.config = {
 // ==================================================
 
 const HISTORY_AMOUNT = 50;
-
 const MAX_HISTORY_PAGES = 200;
-
 const PAGE_RETRIES = 3;
 
 const ONE_DAY =
@@ -269,7 +267,7 @@ function getImageCount(message) {
 
 
 // ==================================================
-// مفتاح الرسالة
+// مفتاح ثابت للرسالة
 // ==================================================
 
 function getMessageKey(message) {
@@ -393,7 +391,7 @@ async function fetchHistoryPage(
 
 
 // ==================================================
-// جلب تاريخ الأسبوع
+// جلب تاريخ آخر 7 أيام
 // ==================================================
 
 async function getWeekMessages(
@@ -465,6 +463,7 @@ async function getWeekMessages(
             ) {
 
                 complete = true;
+
                 stoppedReason =
                     "reached_start";
 
@@ -556,12 +555,17 @@ async function getWeekMessages(
             );
         }
 
+        /*
+         * وصلنا إلى بداية الفترة.
+         */
+
         if (
             pageOldest <
             weekStart
         ) {
 
             complete = true;
+
             stoppedReason =
                 "reached_start";
 
@@ -583,16 +587,9 @@ async function getWeekMessages(
             break;
         }
 
-        if (
-            timestamp !== undefined &&
-            pageOldest === timestamp
-        ) {
-
-            stoppedReason =
-                "same_timestamp";
-
-            break;
-        }
+        /*
+         * الانتقال إلى أقدم رسالة.
+         */
 
         timestamp =
             pageOldest;
@@ -669,7 +666,7 @@ async function getThreadInfo(
 
 
 // ==================================================
-// الأعضاء
+// استخراج الأعضاء
 // ==================================================
 
 function getParticipants(info) {
@@ -743,6 +740,7 @@ function analyzeMessages(
             );
 
         days.push({
+
             start,
 
             messages: 0,
@@ -757,16 +755,11 @@ function analyzeMessages(
     }
 
     /*
-     * إذا لم يكتمل جلب التاريخ
-     * نحدد الأيام التي لا يوجد
-     * لدينا دليل كافٍ على اكتمالها.
+     * إذا لم يكتمل جلب التاريخ،
+     * لا نعطي الأيام غير المؤكدة 0.
      */
 
     if (!complete) {
-
-        /*
-         * نحدد أقدم timestamp تم جلبه.
-         */
 
         let oldestFetched =
             Infinity;
@@ -793,9 +786,7 @@ function analyzeMessages(
         }
 
         /*
-         * إذا لم توجد رسائل أصلًا
-         * ولا نعرف هل السجل فارغ أم فشل،
-         * نعتبر الأيام السبعة غير مؤكدة.
+         * لا توجد بيانات يمكن الاعتماد عليها.
          */
 
         if (
@@ -812,19 +803,15 @@ function analyzeMessages(
 
         } else {
 
+            /*
+             * كل يوم يبدأ قبل أقدم
+             * رسالة وصلتنا يعتبر غير مكتمل.
+             */
+
             for (
                 const day
                 of days
             ) {
-
-                const dayEnd =
-                    day.start +
-                    ONE_DAY;
-
-                /*
-                 * اليوم الذي يبدأ قبل أقدم
-                 * رسالة تم جلبها قد يكون ناقصًا.
-                 */
 
                 if (
                     day.start <=
@@ -862,7 +849,8 @@ function analyzeMessages(
         }
 
         /*
-         * البوت لا يدخل في الإحصائيات.
+         * مهم:
+         * رسائل البوت لا تحسب.
          */
 
         if (
@@ -874,7 +862,8 @@ function analyzeMessages(
         }
 
         /*
-         * المستخدم يجب أن يكون عضوًا حاليًا.
+         * المستخدم يجب أن يكون
+         * عضوًا حاليًا.
          */
 
         if (
@@ -913,8 +902,8 @@ function analyzeMessages(
         }
 
         /*
-         * إذا كان اليوم فشل جلبه
-         * لا نعطيه أرقامًا.
+         * اليوم فشل جلبه،
+         * لذلك لا نحسب أي شيء فيه.
          */
 
         if (
@@ -983,18 +972,25 @@ module.exports.run = async function ({
         messageID
     } = event;
 
-    /*
-     * إرسال رسالة أولية فورًا.
-     */
 
-    await api.sendMessage(
-        `⌬ ━━ 𝗛𝗜𝗡𝗔 UTILITY ━━ ⌬
+    // ==================================================
+    // إرسال رسالة البداية أولًا
+    // ==================================================
 
-⏳ جاري جلب الإحصائيات...
+    await new Promise(
+        resolve => {
 
-قد يستغرق الأمر بعض الوقت حسب حجم سجل المجموعة.`,
-        threadID
+            api.sendMessage(
+                "⌬ ━━ 𝗛𝗜𝗡𝗔 UTILITY ━━ ⌬\n\n" +
+                "⏳ جاري جلب الإحصائيات...",
+                threadID,
+                () => resolve(),
+                messageID
+            );
+
+        }
     );
+
 
     try {
 
@@ -1012,13 +1008,13 @@ module.exports.run = async function ({
         if (!info) {
 
             return api.sendMessage(
-                `⌬ ━━ 𝗛𝗜𝗡𝗔 UTILITY ━━ ⌬
-
-❌ فشل جلب معلومات المجموعة.`,
+                "⌬ ━━ 𝗛𝗜𝗡𝗔 UTILITY ━━ ⌬\n\n" +
+                "❌ فشل جلب معلومات المجموعة.",
                 threadID,
                 messageID
             );
         }
+
 
         // ==================================================
         // الأعضاء
@@ -1032,12 +1028,14 @@ module.exports.run = async function ({
                 participants
             );
 
+
         // ==================================================
         // ID البوت
         // ==================================================
 
         const botID =
             await getBotID(api);
+
 
         // ==================================================
         // جلب التاريخ
@@ -1048,6 +1046,7 @@ module.exports.run = async function ({
                 api,
                 threadID
             );
+
 
         // ==================================================
         // تحليل الأيام
@@ -1062,11 +1061,13 @@ module.exports.run = async function ({
                 history.complete
             );
 
+
         // ==================================================
         // الإجماليات
         // ==================================================
 
         let totalMessages = 0;
+
         let totalImages = 0;
 
         for (
@@ -1087,6 +1088,7 @@ module.exports.run = async function ({
             totalImages +=
                 day.images;
         }
+
 
         // ==================================================
         // أكثر يوم نشاطًا
@@ -1125,6 +1127,7 @@ module.exports.run = async function ({
             }
         }
 
+
         // ==================================================
         // اسم المجموعة
         // ==================================================
@@ -1133,6 +1136,7 @@ module.exports.run = async function ({
             info.threadName ||
             info.name ||
             "بدون اسم";
+
 
         // ==================================================
         // تفاصيل الأيام
@@ -1155,6 +1159,7 @@ module.exports.run = async function ({
                     day.start
                 );
 
+
             if (
                 day.failed
             ) {
@@ -1168,6 +1173,7 @@ module.exports.run = async function ({
                 continue;
             }
 
+
             daysText +=
 `📅 ${dayName} ${dateText}
 💬 ${day.messages} رسالة
@@ -1177,12 +1183,14 @@ module.exports.run = async function ({
 `;
         }
 
+
         // ==================================================
         // أكثر يوم نشاطًا
         // ==================================================
 
         let activeText =
             "لا توجد بيانات مكتملة.";
+
 
         if (
             mostActiveDay &&
@@ -1199,11 +1207,13 @@ module.exports.run = async function ({
 🖼️ ${mostActiveDay.images} صورة`;
         }
 
+
         // ==================================================
         // حالة السجل
         // ==================================================
 
         let historyStatus;
+
 
         if (
             history.complete
@@ -1220,6 +1230,7 @@ module.exports.run = async function ({
 📚 الصفحات المقروءة: ${history.pageCount}
 🔎 السبب: ${history.stoppedReason}`;
         }
+
 
         // ==================================================
         // التقرير النهائي
@@ -1267,6 +1278,7 @@ ${historyStatus}
 🆔 ID:
 ${threadID}`;
 
+
         return api.sendMessage(
             text,
             threadID,
@@ -1281,12 +1293,12 @@ ${threadID}`;
         );
 
         return api.sendMessage(
-            `⌬ ━━ 𝗛𝗜𝗡𝗔 UTILITY ━━ ⌬
-
-❌ فشل جلب إحصائيات الأيام.
-
-${error?.message ||
-"خطأ غير معروف"}`,
+            "⌬ ━━ 𝗛𝗜𝗡𝗔 UTILITY ━━ ⌬\n\n" +
+            "❌ فشل جلب إحصائيات الأيام.\n\n" +
+            (
+                error?.message ||
+                "خطأ غير معروف"
+            ),
             threadID,
             messageID
         );
