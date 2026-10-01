@@ -1,23 +1,26 @@
 /**
  * ايام.js
- * الإصدار 2.0.1
+ * الإصدار 2.1.0
  *
  * إحصائيات آخر 7 أيام
  *
  * - لا يحسب رسائل البوت
- * - Pagination أكثر أمانًا
- * - إعادة محاولة عند فشل الصفحة
- * - فشل اليوم يظهر كـ "فشل جلب"
- * - إرسال رسالة "جاري جلب الإحصائيات" أولًا
+ * - Pagination ثابت حسب طريقة getThreadHistory
+ * - 50 رسالة في كل صفحة
+ * - حتى 1000 صفحة
+ * - إزالة الرسائل المتكررة
+ * - إعادة المحاولة عند فشل الصفحة
+ * - الأيام التي لم يتم الوصول إليها تظهر "فشل جلب"
+ * - إرسال "جاري جلب الإحصائيات..." أولًا
  */
 
 module.exports.config = {
     name: "ايام",
-    version: "2.0.1",
+    version: "2.1.0",
     hasPermssion: 0,
     credits: "أبو هريرة",
     description: "عرض إحصائيات المجموعة خلال آخر 7 أيام",
-    commandCategory: "utility",
+    commandCategory: "Utility",
     usages: "ايام",
     cooldowns: 10
 };
@@ -27,9 +30,30 @@ module.exports.config = {
 // الإعدادات
 // ==================================================
 
+/*
+ * توثيق getThreadHistory يستخدم 50
+ * في مثال pagination.
+ */
+
 const HISTORY_AMOUNT = 50;
-const MAX_HISTORY_PAGES = 200;
+
+
+/*
+ * 1000 × 50 = 50,000 رسالة
+ *
+ * هذا يسمح للمجموعات النشطة جدًا
+ * بتغطية فترة أطول من 7 أيام.
+ */
+
+const MAX_HISTORY_PAGES = 1000;
+
+
+/*
+ * عدد محاولات إعادة جلب الصفحة.
+ */
+
 const PAGE_RETRIES = 3;
+
 
 const ONE_DAY =
     24 *
@@ -39,7 +63,7 @@ const ONE_DAY =
 
 
 // ==================================================
-// تحويل timestamp
+// Timestamp
 // ==================================================
 
 function normalizeTimestamp(value) {
@@ -50,20 +74,21 @@ function normalizeTimestamp(value) {
         return 0;
     }
 
+    /*
+     * دعم seconds و milliseconds.
+     */
+
     if (
         number > 0 &&
         number < 100000000000
     ) {
+
         return number * 1000;
     }
 
     return number;
 }
 
-
-// ==================================================
-// timestamp الرسالة
-// ==================================================
 
 function getMessageTimestamp(message) {
 
@@ -171,7 +196,7 @@ function getDateText(timestamp) {
 
 
 // ==================================================
-// هل المرفق صورة؟
+// الصور
 // ==================================================
 
 function isImageAttachment(
@@ -229,10 +254,6 @@ function isImageAttachment(
 }
 
 
-// ==================================================
-// عدد الصور
-// ==================================================
-
 function getImageCount(message) {
 
     if (
@@ -267,7 +288,7 @@ function getImageCount(message) {
 
 
 // ==================================================
-// مفتاح ثابت للرسالة
+// معرف ثابت للرسالة
 // ==================================================
 
 function getMessageKey(message) {
@@ -275,6 +296,10 @@ function getMessageKey(message) {
     if (!message) {
         return "";
     }
+
+    /*
+     * الأولوية للـ messageID.
+     */
 
     const messageID =
         message.messageID ||
@@ -285,6 +310,11 @@ function getMessageKey(message) {
 
         return `id:${String(messageID)}`;
     }
+
+
+    /*
+     * احتياط في حال عدم وجود messageID.
+     */
 
     const timestamp =
         getMessageTimestamp(
@@ -303,25 +333,39 @@ function getMessageKey(message) {
             ? message.body
             : "";
 
-    const attachmentCount =
+    const attachments =
         Array.isArray(
             message.attachments
         )
-            ? message.attachments.length
-            : 0;
+            ? message.attachments
+            : [];
+
+    const attachmentIDs =
+        attachments
+            .map(
+                attachment =>
+                    String(
+                        attachment?.photoID ||
+                        attachment?.photoId ||
+                        attachment?.id ||
+                        attachment?.url ||
+                        ""
+                    )
+            )
+            .join(",");
 
     return [
         "fallback",
         timestamp,
         senderID,
         body,
-        attachmentCount
+        attachmentIDs
     ].join("|");
 }
 
 
 // ==================================================
-// جلب صفحة مع إعادة المحاولة
+// جلب صفحة
 // ==================================================
 
 async function fetchHistoryPage(
@@ -358,10 +402,11 @@ async function fetchHistoryPage(
 
         } catch (error) {
 
-            lastError = error;
+            lastError =
+                error;
 
             console.error(
-                `[ايام] فشل جلب الصفحة ${attempt}/${PAGE_RETRIES}:`,
+                `[ايام] فشل الصفحة ${attempt}/${PAGE_RETRIES}:`,
                 error?.message ||
                 error
             );
@@ -391,7 +436,7 @@ async function fetchHistoryPage(
 
 
 // ==================================================
-// جلب تاريخ آخر 7 أيام
+// جلب آخر 7 أيام
 // ==================================================
 
 async function getWeekMessages(
@@ -402,6 +447,11 @@ async function getWeekMessages(
     const todayStart =
         getTunisiaDayStart();
 
+    /*
+     * الخميس 01/10
+     * ← الجمعة 25/09
+     */
+
     const weekStart =
         todayStart -
         (
@@ -409,21 +459,34 @@ async function getWeekMessages(
             ONE_DAY
         );
 
+
     const messages = [];
 
     const messageKeys =
         new Set();
 
+
+    /*
+     * undefined = آخر الرسائل.
+     */
+
     let timestamp;
 
-    let oldestSeen = null;
+
+    let oldestSeen =
+        null;
+
 
     let pageCount = 0;
 
-    let complete = false;
+
+    let complete =
+        false;
+
 
     let stoppedReason =
         "unknown";
+
 
     for (
         let page = 0;
@@ -432,6 +495,7 @@ async function getWeekMessages(
     ) {
 
         pageCount++;
+
 
         let history;
 
@@ -452,10 +516,20 @@ async function getWeekMessages(
             break;
         }
 
+
+        /*
+         * لا توجد رسائل أخرى.
+         */
+
         if (
             !history ||
             history.length === 0
         ) {
+
+            /*
+             * إذا وصلنا إلى ما قبل
+             * بداية الفترة فكل شيء مكتمل.
+             */
 
             if (
                 oldestSeen !== null &&
@@ -476,6 +550,12 @@ async function getWeekMessages(
             break;
         }
 
+
+        /*
+         * ترتيب الصفحة من الأقدم
+         * إلى الأحدث.
+         */
+
         const validMessages =
             history
                 .filter(
@@ -490,6 +570,7 @@ async function getWeekMessages(
                         getMessageTimestamp(b)
                 );
 
+
         if (
             validMessages.length === 0
         ) {
@@ -500,10 +581,23 @@ async function getWeekMessages(
             break;
         }
 
+
+        /*
+         * حسب توثيق getThreadHistory:
+         *
+         * أقدم رسالة في الصفحة
+         * هي cursor الصفحة التالية.
+         */
+
         const pageOldest =
             getMessageTimestamp(
                 validMessages[0]
             );
+
+
+        /*
+         * حماية إضافية.
+         */
 
         if (
             oldestSeen === null ||
@@ -513,6 +607,11 @@ async function getWeekMessages(
             oldestSeen =
                 pageOldest;
         }
+
+
+        /*
+         * إضافة الرسائل.
+         */
 
         for (
             const message
@@ -524,6 +623,11 @@ async function getWeekMessages(
                     message
                 );
 
+
+            /*
+             * أقدم من بداية الأيام السبعة.
+             */
+
             if (
                 messageTimestamp <
                 weekStart
@@ -532,14 +636,22 @@ async function getWeekMessages(
                 continue;
             }
 
+
             const key =
                 getMessageKey(
                     message
                 );
 
+
             if (!key) {
                 continue;
             }
+
+
+            /*
+             * التخلص من الرسالة
+             * المتكررة بين الصفحات.
+             */
 
             if (
                 messageKeys.has(key)
@@ -548,12 +660,14 @@ async function getWeekMessages(
                 continue;
             }
 
+
             messageKeys.add(key);
 
             messages.push(
                 message
             );
         }
+
 
         /*
          * وصلنا إلى بداية الفترة.
@@ -572,8 +686,11 @@ async function getWeekMessages(
             break;
         }
 
+
         /*
-         * حماية من pagination عالق.
+         * إذا كانت الصفحة التالية
+         * لن تتحرك للخلف فهذا يعني
+         * أن pagination عالق.
          */
 
         if (
@@ -587,22 +704,43 @@ async function getWeekMessages(
             break;
         }
 
+
         /*
-         * الانتقال إلى أقدم رسالة.
+         * مهم جدًا:
+         *
+         * لا نطرح 1 من timestamp.
+         *
+         * نستخدم timestamp الأقدم
+         * نفسه كما هو موضح في API.
+         *
+         * الرسالة الحدّية ستتكرر،
+         * و getMessageKey سيحذف التكرار.
          */
 
         timestamp =
             pageOldest;
     }
 
+
+    /*
+     * وصلنا إلى الحد الأقصى
+     * بدون الوصول إلى بداية الفترة.
+     */
+
     if (
         !complete &&
-        pageCount >= MAX_HISTORY_PAGES
+        pageCount >=
+        MAX_HISTORY_PAGES
     ) {
 
         stoppedReason =
             "max_pages";
     }
+
+
+    /*
+     * ترتيب نهائي.
+     */
 
     messages.sort(
         (a, b) =>
@@ -610,13 +748,15 @@ async function getWeekMessages(
             getMessageTimestamp(b)
     );
 
+
     return {
         messages,
         weekStart,
         todayStart,
         pageCount,
         complete,
-        stoppedReason
+        stoppedReason,
+        oldestSeen
     };
 }
 
@@ -633,6 +773,7 @@ async function getThreadInfo(
 
     let info = null;
 
+
     try {
 
         if (
@@ -647,7 +788,8 @@ async function getThreadInfo(
                 );
         }
 
-    } catch (e) {}
+    } catch (error) {}
+
 
     if (!info) {
 
@@ -658,15 +800,16 @@ async function getThreadInfo(
                     String(threadID)
                 );
 
-        } catch (e) {}
+        } catch (error) {}
     }
+
 
     return info;
 }
 
 
 // ==================================================
-// استخراج الأعضاء
+// الأعضاء
 // ==================================================
 
 function getParticipants(info) {
@@ -682,6 +825,7 @@ function getParticipants(info) {
         );
     }
 
+
     if (
         Array.isArray(
             info?.participants
@@ -689,42 +833,51 @@ function getParticipants(info) {
     ) {
 
         return info.participants
-            .map(user => {
+            .map(
+                user => {
 
-                if (
-                    typeof user === "string" ||
-                    typeof user === "number"
-                ) {
+                    if (
+                        typeof user === "string" ||
+                        typeof user === "number"
+                    ) {
 
-                    return String(user);
+                        return String(user);
+                    }
+
+
+                    return String(
+                        user?.id ||
+                        user?.userID ||
+                        ""
+                    );
                 }
-
-                return String(
-                    user?.id ||
-                    user?.userID ||
-                    ""
-                );
-            })
+            )
             .filter(Boolean);
     }
+
 
     return [];
 }
 
 
 // ==================================================
-// تحليل الأيام
+// تحليل الرسائل
 // ==================================================
 
 function analyzeMessages(
     messages,
-    currentMembers,
     botID,
     weekStart,
-    complete
+    complete,
+    oldestSeen
 ) {
 
     const days = [];
+
+
+    /*
+     * إنشاء 7 أيام.
+     */
 
     for (
         let i = 0;
@@ -738,6 +891,7 @@ function analyzeMessages(
                 i *
                 ONE_DAY
             );
+
 
         days.push({
 
@@ -754,43 +908,22 @@ function analyzeMessages(
         });
     }
 
+
     /*
-     * إذا لم يكتمل جلب التاريخ،
-     * لا نعطي الأيام غير المؤكدة 0.
+     * إذا لم نصل إلى بداية الفترة،
+     * الأيام التي لم نصل إليها
+     * لا يجوز اعتبارها 0.
      */
 
     if (!complete) {
 
-        let oldestFetched =
-            Infinity;
-
-        for (
-            const message
-            of messages
-        ) {
-
-            const timestamp =
-                getMessageTimestamp(
-                    message
-                );
-
-            if (
-                timestamp > 0 &&
-                timestamp <
-                oldestFetched
-            ) {
-
-                oldestFetched =
-                    timestamp;
-            }
-        }
-
         /*
-         * لا توجد بيانات يمكن الاعتماد عليها.
+         * إذا لم نصل لأي timestamp
+         * فلا نملك أي يوم مؤكد.
          */
 
         if (
-            oldestFetched === Infinity
+            !oldestSeen
         ) {
 
             for (
@@ -804,8 +937,9 @@ function analyzeMessages(
         } else {
 
             /*
-             * كل يوم يبدأ قبل أقدم
-             * رسالة وصلتنا يعتبر غير مكتمل.
+             * أي يوم يبدأ قبل أقدم
+             * timestamp وصلنا إليه
+             * يعتبر غير مكتمل.
              */
 
             for (
@@ -815,7 +949,7 @@ function analyzeMessages(
 
                 if (
                     day.start <=
-                    oldestFetched
+                    oldestSeen
                 ) {
 
                     day.failed = true;
@@ -823,6 +957,7 @@ function analyzeMessages(
             }
         }
     }
+
 
     /*
      * تحليل الرسائل.
@@ -837,6 +972,7 @@ function analyzeMessages(
             continue;
         }
 
+
         const senderID =
             String(
                 message.senderID ||
@@ -844,13 +980,14 @@ function analyzeMessages(
                 ""
             );
 
+
         if (!senderID) {
             continue;
         }
 
+
         /*
-         * مهم:
-         * رسائل البوت لا تحسب.
+         * لا نحسب رسائل البوت.
          */
 
         if (
@@ -861,28 +998,17 @@ function analyzeMessages(
             continue;
         }
 
-        /*
-         * المستخدم يجب أن يكون
-         * عضوًا حاليًا.
-         */
-
-        if (
-            !currentMembers.has(
-                senderID
-            )
-        ) {
-
-            continue;
-        }
 
         const timestamp =
             getMessageTimestamp(
                 message
             );
 
+
         if (!timestamp) {
             continue;
         }
+
 
         const dayIndex =
             Math.floor(
@@ -893,6 +1019,7 @@ function analyzeMessages(
                 ONE_DAY
             );
 
+
         if (
             dayIndex < 0 ||
             dayIndex > 6
@@ -901,9 +1028,10 @@ function analyzeMessages(
             continue;
         }
 
+
         /*
-         * اليوم فشل جلبه،
-         * لذلك لا نحسب أي شيء فيه.
+         * إذا فشل جلب اليوم
+         * لا نعطيه أرقامًا.
          */
 
         if (
@@ -913,17 +1041,26 @@ function analyzeMessages(
             continue;
         }
 
+
+        /*
+         * الصور.
+         */
+
         const imageCount =
             getImageCount(
                 message
             );
 
+
         if (
             imageCount > 0
         ) {
 
-            days[dayIndex].images +=
+            days[
+                dayIndex
+            ].images +=
                 imageCount;
+
 
             days[
                 dayIndex
@@ -931,8 +1068,14 @@ function analyzeMessages(
                 senderID
             );
 
+
             continue;
         }
+
+
+        /*
+         * الرسائل النصية.
+         */
 
         const body =
             typeof message.body ===
@@ -940,11 +1083,16 @@ function analyzeMessages(
                 ? message.body.trim()
                 : "";
 
+
         if (!body) {
             continue;
         }
 
-        days[dayIndex].messages++;
+
+        days[
+            dayIndex
+        ].messages++;
+
 
         days[
             dayIndex
@@ -953,12 +1101,13 @@ function analyzeMessages(
         );
     }
 
+
     return days;
 }
 
 
 // ==================================================
-// تنفيذ الأمر
+// الأمر
 // ==================================================
 
 module.exports.run = async function ({
@@ -974,7 +1123,7 @@ module.exports.run = async function ({
 
 
     // ==================================================
-    // إرسال رسالة البداية أولًا
+    // رسالة البداية
     // ==================================================
 
     await new Promise(
@@ -1005,6 +1154,7 @@ module.exports.run = async function ({
                 threadID
             );
 
+
         if (!info) {
 
             return api.sendMessage(
@@ -1022,11 +1172,6 @@ module.exports.run = async function ({
 
         const participants =
             getParticipants(info);
-
-        const currentMembers =
-            new Set(
-                participants
-            );
 
 
         // ==================================================
@@ -1055,10 +1200,10 @@ module.exports.run = async function ({
         const days =
             analyzeMessages(
                 history.messages,
-                currentMembers,
                 botID,
                 history.weekStart,
-                history.complete
+                history.complete,
+                history.oldestSeen
             );
 
 
@@ -1070,6 +1215,7 @@ module.exports.run = async function ({
 
         let totalImages = 0;
 
+
         for (
             const day
             of days
@@ -1082,8 +1228,10 @@ module.exports.run = async function ({
                 continue;
             }
 
+
             totalMessages +=
                 day.messages;
+
 
             totalImages +=
                 day.images;
@@ -1094,9 +1242,13 @@ module.exports.run = async function ({
         // أكثر يوم نشاطًا
         // ==================================================
 
-        let mostActiveDay = null;
+        let mostActiveDay =
+            null;
 
-        let highestActivity = -1;
+
+        let highestActivity =
+            -1;
+
 
         for (
             const day
@@ -1110,9 +1262,11 @@ module.exports.run = async function ({
                 continue;
             }
 
+
             const activity =
                 day.messages +
                 day.images;
+
 
             if (
                 activity >
@@ -1121,6 +1275,7 @@ module.exports.run = async function ({
 
                 highestActivity =
                     activity;
+
 
                 mostActiveDay =
                     day;
@@ -1139,10 +1294,11 @@ module.exports.run = async function ({
 
 
         // ==================================================
-        // تفاصيل الأيام
+        // الأيام
         // ==================================================
 
         let daysText = "";
+
 
         for (
             const day
@@ -1153,6 +1309,7 @@ module.exports.run = async function ({
                 getDayName(
                     day.start
                 );
+
 
             const dateText =
                 getDateText(
@@ -1233,7 +1390,7 @@ module.exports.run = async function ({
 
 
         // ==================================================
-        // التقرير النهائي
+        // التقرير
         // ==================================================
 
         const text =
@@ -1288,9 +1445,10 @@ ${threadID}`;
     } catch (error) {
 
         console.error(
-            "[ايام v2.0.1 ERROR]",
+            "[ايام v2.1 ERROR]",
             error
         );
+
 
         return api.sendMessage(
             "⌬ ━━ 𝗛𝗜𝗡𝗔 UTILITY ━━ ⌬\n\n" +
@@ -1323,12 +1481,15 @@ async function getBotID(api) {
             const id =
                 await api.getCurrentUserID();
 
+
             if (id) {
+
                 return String(id);
             }
         }
 
-    } catch (e) {}
+    } catch (error) {}
+
 
     return "";
 }
