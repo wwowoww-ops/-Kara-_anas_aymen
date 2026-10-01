@@ -1,8 +1,19 @@
-const path = require("path");
+/**
+ * ايام.js
+ * الإصدار 2.0.1
+ *
+ * إحصائيات آخر 7 أيام
+ *
+ * - لا يحسب رسائل البوت
+ * - Pagination أكثر أمانًا
+ * - إعادة محاولة عند فشل الصفحة
+ * - يوضح فشل جلب اليوم بدل اعتباره 0
+ * - يرسل رسالة "جاري جلب الإحصائيات" أولًا
+ */
 
 module.exports.config = {
     name: "ايام",
-    version: "1.0.0",
+    version: "2.0.1",
     hasPermssion: 0,
     credits: "أبو هريرة",
     description: "عرض إحصائيات المجموعة خلال آخر 7 أيام",
@@ -11,15 +22,26 @@ module.exports.config = {
     cooldowns: 10
 };
 
+
 // ==================================================
 // الإعدادات
 // ==================================================
 
-const HISTORY_AMOUNT = 100;
-const MAX_HISTORY_PAGES = 100;
+const HISTORY_AMOUNT = 50;
+
+const MAX_HISTORY_PAGES = 200;
+
+const PAGE_RETRIES = 3;
+
+const ONE_DAY =
+    24 *
+    60 *
+    60 *
+    1000;
+
 
 // ==================================================
-// تحويل timestamp إلى milliseconds
+// تحويل timestamp
 // ==================================================
 
 function normalizeTimestamp(value) {
@@ -30,36 +52,67 @@ function normalizeTimestamp(value) {
         return 0;
     }
 
-    if (number < 100000000000) {
+    if (
+        number > 0 &&
+        number < 100000000000
+    ) {
         return number * 1000;
     }
 
     return number;
 }
 
+
+// ==================================================
+// timestamp الرسالة
+// ==================================================
+
+function getMessageTimestamp(message) {
+
+    if (!message) {
+        return 0;
+    }
+
+    return normalizeTimestamp(
+        message.timestamp ||
+        message.time ||
+        message.createdAt
+    );
+}
+
+
 // ==================================================
 // بداية اليوم بتوقيت تونس
 // ==================================================
 
-function getTunisiaDayStart(date = new Date()) {
+function getTunisiaDayStart(
+    date = new Date()
+) {
 
-    const formatter = new Intl.DateTimeFormat(
-        "en-US",
-        {
-            timeZone: "Africa/Tunis",
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit"
-        }
-    );
+    const formatter =
+        new Intl.DateTimeFormat(
+            "en-US",
+            {
+                timeZone: "Africa/Tunis",
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit"
+            }
+        );
 
-    const parts = formatter.formatToParts(date);
+    const parts =
+        formatter.formatToParts(date);
+
     const values = {};
 
     for (const part of parts) {
 
-        if (part.type !== "literal") {
-            values[part.type] = part.value;
+        if (
+            part.type !== "literal"
+        ) {
+
+            values[part.type] =
+                part.value;
         }
     }
 
@@ -73,9 +126,14 @@ function getTunisiaDayStart(date = new Date()) {
             0,
             0
         ) -
-        60 * 60 * 1000
+        (
+            60 *
+            60 *
+            1000
+        )
     );
 }
+
 
 // ==================================================
 // اسم اليوم
@@ -89,8 +147,11 @@ function getDayName(timestamp) {
             timeZone: "Africa/Tunis",
             weekday: "long"
         }
-    ).format(new Date(timestamp));
+    ).format(
+        new Date(timestamp)
+    );
 }
+
 
 // ==================================================
 // التاريخ
@@ -105,14 +166,19 @@ function getDateText(timestamp) {
             day: "2-digit",
             month: "2-digit"
         }
-    ).format(new Date(timestamp));
+    ).format(
+        new Date(timestamp)
+    );
 }
 
+
 // ==================================================
-// معرفة هل المرفق صورة
+// هل المرفق صورة؟
 // ==================================================
 
-function isImageAttachment(attachment) {
+function isImageAttachment(
+    attachment
+) {
 
     if (!attachment) {
         return false;
@@ -130,10 +196,22 @@ function isImageAttachment(attachment) {
         type === "photo" ||
         type === "image" ||
         type === "image/jpeg" ||
+        type === "image/jpg" ||
         type === "image/png" ||
         type === "image/webp" ||
         type === "image/gif"
     ) {
+
+        return true;
+    }
+
+    if (
+        attachment.photoID ||
+        attachment.photoId ||
+        attachment.imageID ||
+        attachment.imageId
+    ) {
+
         return true;
     }
 
@@ -143,11 +221,15 @@ function isImageAttachment(attachment) {
             attachment.href ||
             attachment.src ||
             attachment.previewUrl ||
+            attachment.previewURL ||
             ""
         ).toLowerCase();
 
-    return /\.(jpg|jpeg|png|webp|gif)(\?|$)/i.test(url);
+    return /\.(jpg|jpeg|png|webp|gif)(\?|$)/i.test(
+        url
+    );
 }
+
 
 // ==================================================
 // عدد الصور
@@ -157,16 +239,27 @@ function getImageCount(message) {
 
     if (
         !message ||
-        !Array.isArray(message.attachments)
+        !Array.isArray(
+            message.attachments
+        )
     ) {
+
         return 0;
     }
 
     let count = 0;
 
-    for (const attachment of message.attachments) {
+    for (
+        const attachment
+        of message.attachments
+    ) {
 
-        if (isImageAttachment(attachment)) {
+        if (
+            isImageAttachment(
+                attachment
+            )
+        ) {
+
             count++;
         }
     }
@@ -174,34 +267,133 @@ function getImageCount(message) {
     return count;
 }
 
+
 // ==================================================
-// ID البوت
+// مفتاح الرسالة
 // ==================================================
 
-async function getBotID(api) {
+function getMessageKey(message) {
 
-    try {
+    if (!message) {
+        return "";
+    }
 
-        if (
-            api &&
-            typeof api.getCurrentUserID === "function"
-        ) {
+    const messageID =
+        message.messageID ||
+        message.messageId ||
+        message.id;
 
-            const id =
-                await api.getCurrentUserID();
+    if (messageID) {
 
-            if (id) {
-                return String(id);
-            }
-        }
+        return `id:${String(messageID)}`;
+    }
 
-    } catch (e) {}
+    const timestamp =
+        getMessageTimestamp(
+            message
+        );
 
-    return "";
+    const senderID =
+        String(
+            message.senderID ||
+            message.authorID ||
+            ""
+        );
+
+    const body =
+        typeof message.body === "string"
+            ? message.body
+            : "";
+
+    const attachmentCount =
+        Array.isArray(
+            message.attachments
+        )
+            ? message.attachments.length
+            : 0;
+
+    return [
+        "fallback",
+        timestamp,
+        senderID,
+        body,
+        attachmentCount
+    ].join("|");
 }
 
+
 // ==================================================
-// قراءة آخر 7 أيام
+// جلب صفحة مع إعادة المحاولة
+// ==================================================
+
+async function fetchHistoryPage(
+    api,
+    threadID,
+    timestamp
+) {
+
+    let lastError = null;
+
+    for (
+        let attempt = 1;
+        attempt <= PAGE_RETRIES;
+        attempt++
+    ) {
+
+        try {
+
+            const history =
+                await api.getThreadHistory(
+                    String(threadID),
+                    HISTORY_AMOUNT,
+                    timestamp
+                );
+
+            if (
+                Array.isArray(history)
+            ) {
+
+                return history;
+            }
+
+            return [];
+
+        } catch (error) {
+
+            lastError = error;
+
+            console.error(
+                `[ايام] فشل جلب الصفحة ${attempt}/${PAGE_RETRIES}:`,
+                error?.message ||
+                error
+            );
+
+            if (
+                attempt < PAGE_RETRIES
+            ) {
+
+                await new Promise(
+                    resolve =>
+                        setTimeout(
+                            resolve,
+                            1000 * attempt
+                        )
+                );
+            }
+        }
+    }
+
+    throw (
+        lastError ||
+        new Error(
+            "فشل تحميل سجل الرسائل."
+        )
+    );
+}
+
+
+// ==================================================
+// جلب تاريخ الأسبوع
 // ==================================================
 
 async function getWeekMessages(
@@ -209,38 +401,31 @@ async function getWeekMessages(
     threadID
 ) {
 
-    if (
-        !api ||
-        typeof api.getThreadHistory !== "function"
-    ) {
-
-        throw new Error(
-            "API لا يدعم getThreadHistory."
-        );
-    }
-
     const todayStart =
         getTunisiaDayStart();
-
-    /*
-     * اليوم الحالي + 6 أيام سابقة
-     */
 
     const weekStart =
         todayStart -
         (
             6 *
-            24 *
-            60 *
-            60 *
-            1000
+            ONE_DAY
         );
 
     const messages = [];
-    const messageIDs = new Set();
+
+    const messageKeys =
+        new Set();
 
     let timestamp;
-    let previousOldestTimestamp = null;
+
+    let oldestSeen = null;
+
+    let pageCount = 0;
+
+    let complete = false;
+
+    let stoppedReason =
+        "unknown";
 
     for (
         let page = 0;
@@ -248,121 +433,196 @@ async function getWeekMessages(
         page++
     ) {
 
+        pageCount++;
+
         let history;
 
         try {
 
             history =
-                await api.getThreadHistory(
-                    String(threadID),
-                    HISTORY_AMOUNT,
+                await fetchHistoryPage(
+                    api,
+                    threadID,
                     timestamp
                 );
 
         } catch (error) {
 
-            console.error(
-                "[ايام HISTORY ERROR]",
-                error
-            );
+            stoppedReason =
+                "history_error";
 
             break;
         }
 
         if (
-            !Array.isArray(history) ||
+            !history ||
             history.length === 0
         ) {
+
+            if (
+                oldestSeen !== null &&
+                oldestSeen < weekStart
+            ) {
+
+                complete = true;
+                stoppedReason =
+                    "reached_start";
+
+            } else {
+
+                stoppedReason =
+                    "empty_history";
+            }
+
             break;
         }
 
-        let oldestTimestamp = null;
+        const validMessages =
+            history
+                .filter(
+                    message =>
+                        getMessageTimestamp(
+                            message
+                        ) > 0
+                )
+                .sort(
+                    (a, b) =>
+                        getMessageTimestamp(a) -
+                        getMessageTimestamp(b)
+                );
 
-        for (const message of history) {
+        if (
+            validMessages.length === 0
+        ) {
 
-            if (!message) {
-                continue;
-            }
+            stoppedReason =
+                "no_valid_timestamps";
+
+            break;
+        }
+
+        const pageOldest =
+            getMessageTimestamp(
+                validMessages[0]
+            );
+
+        if (
+            oldestSeen === null ||
+            pageOldest < oldestSeen
+        ) {
+
+            oldestSeen =
+                pageOldest;
+        }
+
+        for (
+            const message
+            of validMessages
+        ) {
 
             const messageTimestamp =
-                normalizeTimestamp(
-                    message.timestamp ||
-                    message.time ||
-                    message.createdAt
+                getMessageTimestamp(
+                    message
                 );
 
-            if (!messageTimestamp) {
+            if (
+                messageTimestamp <
+                weekStart
+            ) {
+
+                continue;
+            }
+
+            const key =
+                getMessageKey(
+                    message
+                );
+
+            if (!key) {
                 continue;
             }
 
             if (
-                oldestTimestamp === null ||
-                messageTimestamp < oldestTimestamp
+                messageKeys.has(key)
             ) {
 
-                oldestTimestamp =
-                    messageTimestamp;
-            }
-
-            if (
-                messageTimestamp < weekStart
-            ) {
                 continue;
             }
 
-            const messageID =
-                String(
-                    message.messageID ||
-                    message.threadingID ||
-                    `${messageTimestamp}_${message.senderID || ""}_${message.body || ""}`
-                );
+            messageKeys.add(key);
 
-            if (!messageIDs.has(messageID)) {
-
-                messageIDs.add(messageID);
-                messages.push(message);
-            }
+            messages.push(
+                message
+            );
         }
 
-        /*
-         * وصلنا لما قبل آخر 7 أيام
-         */
-
         if (
-            oldestTimestamp !== null &&
-            oldestTimestamp < weekStart
+            pageOldest <
+            weekStart
         ) {
+
+            complete = true;
+            stoppedReason =
+                "reached_start";
+
             break;
         }
 
         /*
-         * حماية من تكرار الصفحة
+         * حماية من pagination عالق.
          */
 
         if (
-            oldestTimestamp === null ||
-            oldestTimestamp ===
-            previousOldestTimestamp
+            timestamp !== undefined &&
+            pageOldest >= timestamp
         ) {
+
+            stoppedReason =
+                "pagination_stuck";
+
             break;
         }
 
-        previousOldestTimestamp =
-            oldestTimestamp;
+        if (
+            timestamp !== undefined &&
+            pageOldest === timestamp
+        ) {
 
-        /*
-         * جلب الصفحة الأقدم
-         */
+            stoppedReason =
+                "same_timestamp";
+
+            break;
+        }
 
         timestamp =
-            oldestTimestamp;
+            pageOldest;
     }
+
+    if (
+        !complete &&
+        pageCount >= MAX_HISTORY_PAGES
+    ) {
+
+        stoppedReason =
+            "max_pages";
+    }
+
+    messages.sort(
+        (a, b) =>
+            getMessageTimestamp(a) -
+            getMessageTimestamp(b)
+    );
 
     return {
         messages,
-        weekStart
+        weekStart,
+        todayStart,
+        pageCount,
+        complete,
+        stoppedReason
     };
 }
+
 
 // ==================================================
 // معلومات المجموعة
@@ -380,7 +640,8 @@ async function getThreadInfo(
 
         if (
             Threads &&
-            typeof Threads.getInfo === "function"
+            typeof Threads.getInfo ===
+            "function"
         ) {
 
             info =
@@ -405,6 +666,7 @@ async function getThreadInfo(
 
     return info;
 }
+
 
 // ==================================================
 // الأعضاء
@@ -452,30 +714,26 @@ function getParticipants(info) {
     return [];
 }
 
+
 // ==================================================
-// تحليل الرسائل
+// تحليل الأيام
 // ==================================================
 
 function analyzeMessages(
     messages,
     currentMembers,
     botID,
-    weekStart
+    weekStart,
+    complete
 ) {
-
-    const ONE_DAY =
-        24 *
-        60 *
-        60 *
-        1000;
 
     const days = [];
 
-    /*
-     * إنشاء 7 أيام
-     */
-
-    for (let i = 0; i < 7; i++) {
+    for (
+        let i = 0;
+        i < 7;
+        i++
+    ) {
 
         const start =
             weekStart +
@@ -486,12 +744,107 @@ function analyzeMessages(
 
         days.push({
             start,
+
             messages: 0,
-            images: 0
+
+            images: 0,
+
+            activeUsers:
+                new Set(),
+
+            failed: false
         });
     }
 
-    for (const message of messages) {
+    /*
+     * إذا لم يكتمل جلب التاريخ
+     * نحدد الأيام التي لا يوجد
+     * لدينا دليل كافٍ على اكتمالها.
+     */
+
+    if (!complete) {
+
+        /*
+         * نحدد أقدم timestamp تم جلبه.
+         */
+
+        let oldestFetched =
+            Infinity;
+
+        for (
+            const message
+            of messages
+        ) {
+
+            const timestamp =
+                getMessageTimestamp(
+                    message
+                );
+
+            if (
+                timestamp > 0 &&
+                timestamp <
+                oldestFetched
+            ) {
+
+                oldestFetched =
+                    timestamp;
+            }
+        }
+
+        /*
+         * إذا لم توجد رسائل أصلًا
+         * ولا نعرف هل السجل فارغ أم فشل،
+         * نعتبر الأيام السبعة غير مؤكدة.
+         */
+
+        if (
+            oldestFetched === Infinity
+        ) {
+
+            for (
+                const day
+                of days
+            ) {
+
+                day.failed = true;
+            }
+
+        } else {
+
+            for (
+                const day
+                of days
+            ) {
+
+                const dayEnd =
+                    day.start +
+                    ONE_DAY;
+
+                /*
+                 * اليوم الذي يبدأ قبل أقدم
+                 * رسالة تم جلبها قد يكون ناقصًا.
+                 */
+
+                if (
+                    day.start <=
+                    oldestFetched
+                ) {
+
+                    day.failed = true;
+                }
+            }
+        }
+    }
+
+    /*
+     * تحليل الرسائل.
+     */
+
+    for (
+        const message
+        of messages
+    ) {
 
         if (!message) {
             continue;
@@ -509,41 +862,43 @@ function analyzeMessages(
         }
 
         /*
-         * تجاهل البوت
+         * البوت لا يدخل في الإحصائيات.
          */
 
         if (
             botID &&
             senderID === botID
         ) {
+
             continue;
         }
 
         /*
-         * أعضاء المجموعة الحاليون فقط
+         * المستخدم يجب أن يكون عضوًا حاليًا.
          */
 
         if (
-            !currentMembers.has(senderID)
+            !currentMembers.has(
+                senderID
+            )
         ) {
+
             continue;
         }
 
-        const messageTimestamp =
-            normalizeTimestamp(
-                message.timestamp ||
-                message.time ||
-                message.createdAt
+        const timestamp =
+            getMessageTimestamp(
+                message
             );
 
-        if (!messageTimestamp) {
+        if (!timestamp) {
             continue;
         }
 
         const dayIndex =
             Math.floor(
                 (
-                    messageTimestamp -
+                    timestamp -
                     weekStart
                 ) /
                 ONE_DAY
@@ -553,34 +908,46 @@ function analyzeMessages(
             dayIndex < 0 ||
             dayIndex > 6
         ) {
+
+            continue;
+        }
+
+        /*
+         * إذا كان اليوم فشل جلبه
+         * لا نعطيه أرقامًا.
+         */
+
+        if (
+            days[dayIndex].failed
+        ) {
+
             continue;
         }
 
         const imageCount =
-            getImageCount(message);
+            getImageCount(
+                message
+            );
 
-        /*
-         * الصور
-         */
-
-        if (imageCount > 0) {
+        if (
+            imageCount > 0
+        ) {
 
             days[dayIndex].images +=
                 imageCount;
-        }
 
-        /*
-         * نفس منطق احصائيات:
-         * الرسالة التي تحتوي صورة
-         * لا تحسب كرسالة نصية.
-         */
+            days[
+                dayIndex
+            ].activeUsers.add(
+                senderID
+            );
 
-        if (imageCount > 0) {
             continue;
         }
 
         const body =
-            typeof message.body === "string"
+            typeof message.body ===
+            "string"
                 ? message.body.trim()
                 : "";
 
@@ -589,10 +956,17 @@ function analyzeMessages(
         }
 
         days[dayIndex].messages++;
+
+        days[
+            dayIndex
+        ].activeUsers.add(
+            senderID
+        );
     }
 
     return days;
 }
+
 
 // ==================================================
 // تنفيذ الأمر
@@ -608,6 +982,19 @@ module.exports.run = async function ({
         threadID,
         messageID
     } = event;
+
+    /*
+     * إرسال رسالة أولية فورًا.
+     */
+
+    await api.sendMessage(
+        `⌬ ━━ 𝗛𝗜𝗡𝗔 UTILITY ━━ ⌬
+
+⏳ جاري جلب الإحصائيات...
+
+قد يستغرق الأمر بعض الوقت حسب حجم سجل المجموعة.`,
+        threadID
+    );
 
     try {
 
@@ -627,7 +1014,7 @@ module.exports.run = async function ({
             return api.sendMessage(
                 `⌬ ━━ 𝗛𝗜𝗡𝗔 UTILITY ━━ ⌬
 
-❌ تعذر الحصول على معلومات المجموعة.`,
+❌ فشل جلب معلومات المجموعة.`,
                 threadID,
                 messageID
             );
@@ -641,7 +1028,9 @@ module.exports.run = async function ({
             getParticipants(info);
 
         const currentMembers =
-            new Set(participants);
+            new Set(
+                participants
+            );
 
         // ==================================================
         // ID البوت
@@ -651,28 +1040,26 @@ module.exports.run = async function ({
             await getBotID(api);
 
         // ==================================================
-        // قراءة الرسائل
+        // جلب التاريخ
         // ==================================================
 
-        const {
-            messages,
-            weekStart
-        } =
+        const history =
             await getWeekMessages(
                 api,
                 threadID
             );
 
         // ==================================================
-        // تحليل
+        // تحليل الأيام
         // ==================================================
 
         const days =
             analyzeMessages(
-                messages,
+                history.messages,
                 currentMembers,
                 botID,
-                weekStart
+                history.weekStart,
+                history.complete
             );
 
         // ==================================================
@@ -682,7 +1069,17 @@ module.exports.run = async function ({
         let totalMessages = 0;
         let totalImages = 0;
 
-        for (const day of days) {
+        for (
+            const day
+            of days
+        ) {
+
+            if (
+                day.failed
+            ) {
+
+                continue;
+            }
 
             totalMessages +=
                 day.messages;
@@ -697,22 +1094,34 @@ module.exports.run = async function ({
 
         let mostActiveDay = null;
 
-        for (const day of days) {
+        let highestActivity = -1;
+
+        for (
+            const day
+            of days
+        ) {
+
+            if (
+                day.failed
+            ) {
+
+                continue;
+            }
 
             const activity =
                 day.messages +
                 day.images;
 
             if (
-                !mostActiveDay ||
                 activity >
-                (
-                    mostActiveDay.messages +
-                    mostActiveDay.images
-                )
+                highestActivity
             ) {
 
-                mostActiveDay = day;
+                highestActivity =
+                    activity;
+
+                mostActiveDay =
+                    day;
             }
         }
 
@@ -731,18 +1140,39 @@ module.exports.run = async function ({
 
         let daysText = "";
 
-        for (const day of days) {
+        for (
+            const day
+            of days
+        ) {
 
             const dayName =
-                getDayName(day.start);
+                getDayName(
+                    day.start
+                );
 
             const dateText =
-                getDateText(day.start);
+                getDateText(
+                    day.start
+                );
+
+            if (
+                day.failed
+            ) {
+
+                daysText +=
+`📅 ${dayName} ${dateText}
+❌ فشل جلب إحصائيات هذا اليوم
+
+`;
+
+                continue;
+            }
 
             daysText +=
 `📅 ${dayName} ${dateText}
 💬 ${day.messages} رسالة
 🖼️ ${day.images} صورة
+👥 ${day.activeUsers.size} أعضاء نشطين
 
 `;
         }
@@ -752,24 +1182,47 @@ module.exports.run = async function ({
         // ==================================================
 
         let activeText =
-            "لا توجد رسائل مسجلة.";
+            "لا توجد بيانات مكتملة.";
 
         if (
             mostActiveDay &&
-            (
-                mostActiveDay.messages > 0 ||
-                mostActiveDay.images > 0
-            )
+            highestActivity > 0
         ) {
 
             activeText =
-`${getDayName(mostActiveDay.start)} ${getDateText(mostActiveDay.start)}
+`${getDayName(
+    mostActiveDay.start
+)} ${getDateText(
+    mostActiveDay.start
+)}
 💬 ${mostActiveDay.messages} رسالة
 🖼️ ${mostActiveDay.images} صورة`;
         }
 
         // ==================================================
-        // الرسالة النهائية
+        // حالة السجل
+        // ==================================================
+
+        let historyStatus;
+
+        if (
+            history.complete
+        ) {
+
+            historyStatus =
+`✅ تم جلب كامل فترة الـ7 أيام
+📚 الصفحات المقروءة: ${history.pageCount}`;
+
+        } else {
+
+            historyStatus =
+`⚠️ تعذر جلب كامل فترة الـ7 أيام
+📚 الصفحات المقروءة: ${history.pageCount}
+🔎 السبب: ${history.stoppedReason}`;
+        }
+
+        // ==================================================
+        // التقرير النهائي
         // ==================================================
 
         const text =
@@ -805,6 +1258,12 @@ ${activeText}
 
 ━━━━━━━━━━━━━━━━━━
 
+📚 حالة السجل:
+
+${historyStatus}
+
+━━━━━━━━━━━━━━━━━━
+
 🆔 ID:
 ${threadID}`;
 
@@ -817,18 +1276,47 @@ ${threadID}`;
     } catch (error) {
 
         console.error(
-            "[ايام ERROR]",
+            "[ايام v2.0.1 ERROR]",
             error
         );
 
         return api.sendMessage(
             `⌬ ━━ 𝗛𝗜𝗡𝗔 UTILITY ━━ ⌬
 
-❌ حدث خطأ أثناء قراءة إحصائيات الأيام.
+❌ فشل جلب إحصائيات الأيام.
 
-${error?.message || "خطأ غير معروف"}`,
+${error?.message ||
+"خطأ غير معروف"}`,
             threadID,
             messageID
         );
     }
 };
+
+
+// ==================================================
+// ID البوت
+// ==================================================
+
+async function getBotID(api) {
+
+    try {
+
+        if (
+            api &&
+            typeof api.getCurrentUserID ===
+            "function"
+        ) {
+
+            const id =
+                await api.getCurrentUserID();
+
+            if (id) {
+                return String(id);
+            }
+        }
+
+    } catch (e) {}
+
+    return "";
+}
