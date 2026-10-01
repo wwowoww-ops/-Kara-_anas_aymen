@@ -17,7 +17,7 @@ let savedCommand = null;
 
 module.exports.config = {
     name: "كمند",
-    version: "2.0.0",
+    version: "2.1.0",
     author: "أبو هريرة",
     countDown: 0,
     role: 2,
@@ -42,7 +42,9 @@ function isDeveloper(event) {
         ? global.config.ADMINBOT.map(String)
         : [];
 
-    return admins.includes(String(event.senderID));
+    return admins.includes(
+        String(event.senderID)
+    );
 }
 
 
@@ -54,55 +56,97 @@ function isDeveloper(event) {
 
 async function executeSavedCommand({
     api,
-    event
+    event,
+    args = []
 }) {
 
-    if (!savedCommand) {
+    if (!savedCommand || !savedCommand.trim()) {
         throw new Error("لا يوجد كمند محفوظ.");
     }
 
-    const AsyncFunction = Object.getPrototypeOf(
-        async function () {}
-    ).constructor;
+    const AsyncFunction =
+        Object.getPrototypeOf(
+            async function () {}
+        ).constructor;
 
 
     /*
-     * module وهمي حتى نتعامل مع الكود
-     * كأنه ملف أمر حقيقي
+     * =========================
+     * إنشاء Module حقيقي
+     * =========================
      */
 
     const moduleObject = {
         exports: {}
     };
 
-    const exportsObject = moduleObject.exports;
+    const exportsObject =
+        moduleObject.exports;
 
 
     /*
-     * تشغيل الكود المحفوظ كملف JavaScript
+     * =========================
+     * تنفيذ ملف الأمر
+     * =========================
+     *
+     * يتم تمرير module و exports
+     * حتى يعمل:
+     *
+     * module.exports.config
+     * module.exports.run
+     * module.exports.handleReply
      */
 
-    const executeModule = new AsyncFunction(
-        "module",
-        "exports",
-        "require",
-        "__dirname",
-        "__filename",
-        savedCommand
-    );
+    const executeModule =
+        new AsyncFunction(
+            "module",
+            "exports",
+            "require",
+            "__dirname",
+            "__filename",
+            "api",
+            "event",
+            "args",
+            "models",
+            "Threads",
+            "Users",
+            "Currencies",
+            "global",
+            "config",
+            "process",
+
+            savedCommand
+        );
+
 
     await executeModule(
         moduleObject,
         exportsObject,
+
         require,
         __dirname,
-        __filename
+        __filename,
+
+        api,
+        event,
+        args,
+
+        global.models || null,
+        global.Threads || null,
+        global.Users || null,
+        global.Currencies || null,
+
+        global,
+        global.config,
+
+        process
     );
 
 
     /*
-     * إذا كان الكود أمرًا كاملًا
-     * يحتوي على module.exports.run
+     * =========================
+     * تشغيل module.exports.run
+     * =========================
      */
 
     if (
@@ -113,12 +157,19 @@ async function executeSavedCommand({
         return await moduleObject.exports.run({
             api,
             event,
-            args: [],
+            args,
 
-            models: global.models || null,
-            Threads: global.Threads || null,
-            Users: global.Users || null,
-            Currencies: global.Currencies || null,
+            models:
+                global.models || null,
+
+            Threads:
+                global.Threads || null,
+
+            Users:
+                global.Users || null,
+
+            Currencies:
+                global.Currencies || null,
 
             commandName: "كمند"
         });
@@ -126,47 +177,14 @@ async function executeSavedCommand({
 
 
     /*
-     * إذا كان الكود مجرد JavaScript عادي
+     * =========================
+     * إذا لم يكن هناك run
+     * =========================
+     *
+     * لا نعيد تنفيذ الكود مرة ثانية.
      */
 
-    const runCode = new AsyncFunction(
-        "api",
-        "event",
-        "args",
-        "global",
-        "config",
-        "models",
-        "Threads",
-        "Users",
-        "Currencies",
-        "require",
-        "process",
-        "__dirname",
-        "__filename",
-
-        `"use strict";
-${savedCommand}`
-    );
-
-    return await runCode(
-        api,
-        event,
-        [],
-
-        global,
-        global.config,
-
-        global.models || null,
-        global.Threads || null,
-        global.Users || null,
-        global.Currencies || null,
-
-        require,
-        process,
-
-        __dirname,
-        __filename
-    );
+    return moduleObject.exports;
 }
 
 
@@ -192,10 +210,11 @@ module.exports.run = async function ({
     }
 
 
-    const action = args
-        .join(" ")
-        .trim()
-        .toLowerCase();
+    const action =
+        args
+            .join(" ")
+            .trim()
+            .toLowerCase();
 
 
     /*
@@ -242,7 +261,8 @@ module.exports.run = async function ({
 
             await executeSavedCommand({
                 api,
-                event
+                event,
+                args: []
             });
 
         } catch (error) {
@@ -289,24 +309,22 @@ module.exports.run = async function ({
                     return;
                 }
 
-
-                /*
-                 * تسجيل انتظار الرد
-                 */
-
                 if (!global.client.handleReply) {
                     global.client.handleReply = [];
                 }
 
-
                 global.client.handleReply.push({
-                    name: module.exports.config.name,
+                    name:
+                        module.exports.config.name,
 
-                    messageID: info.messageID,
+                    messageID:
+                        info.messageID,
 
-                    author: String(event.senderID),
+                    author:
+                        String(event.senderID),
 
-                    type: "saveCommand"
+                    type:
+                        "saveCommand"
                 });
             },
 
@@ -316,10 +334,14 @@ module.exports.run = async function ({
 
 
     /*
-     * إذا استُخدم كمند مع نص مباشر
+     * =========================
+     * كمند مع كود مباشر
+     * =========================
      */
 
-    savedCommand = args.join(" ");
+    savedCommand =
+        args.join(" ");
+
 
     return api.sendMessage(
         "⌬ ━━ 𝗛𝗜𝗡𝗔  ━━ ⌬\n\n" +
@@ -349,12 +371,16 @@ module.exports.handleReply = async function ({
     }
 
 
-    if (handleReply.type !== "saveCommand") {
+    if (
+        !handleReply ||
+        handleReply.type !== "saveCommand"
+    ) {
         return;
     }
 
 
-    const code = event.body || "";
+    const code =
+        event.body || "";
 
 
     if (!code.trim()) {
@@ -371,7 +397,8 @@ module.exports.handleReply = async function ({
      * حفظ الكود فقط
      */
 
-    savedCommand = code;
+    savedCommand =
+        code;
 
 
     return api.sendMessage(
