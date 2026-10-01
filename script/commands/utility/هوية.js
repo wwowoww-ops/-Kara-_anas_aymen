@@ -1,28 +1,52 @@
 /**
  * HINA — بطاقة الهوية
- * نظام تفاعلي خطوة بخطوة
+ * الإصدار: 2.0.0
  *
- * لا يحتاج قاعدة بيانات
+ * نظام تفاعلي:
+ * هوية
+ *   ↓
+ * صورة
+ *   ↓
+ * الاسم
+ *   ↓
+ * اللون
+ *   ↓
+ * الجنس
+ *   ↓
+ * اللقب
+ *   ↓
+ * البطاقة
+ *
+ * لا تحتاج قاعدة بيانات
  */
 
 const axios = require("axios");
-const Jimp = require("jimp");
 const fs = require("fs");
 const path = require("path");
 
+const {
+    createCanvas,
+    loadImage
+} = require("@napi-rs/canvas");
+
 const sessions = new Map();
+
+const HINA_HEADER =
+    "⌬ ━━ 𝗛𝗜𝗡𝗔  ━━ ⌬";
+
+// ============================================================
+// إعداد الأمر
+// ============================================================
 
 module.exports.config = {
     name: "هوية",
-    version: "1.0.1",
+    version: "2.0.0",
     credits: "أبو هريرة",
     description: "إنشاء بطاقة هوية تفاعلية",
-    commandCategory: "utility",
+    commandCategory: "Utility",
     usages: "هوية",
     cooldowns: 5
 };
-
-const HINA_HEADER = "⌬ ━━ 𝗛𝗜𝗡𝗔  ━━ ⌬";
 
 // ============================================================
 // الألوان
@@ -31,46 +55,62 @@ const HINA_HEADER = "⌬ ━━ 𝗛𝗜𝗡𝗔  ━━ ⌬";
 const COLORS = {
     "1": {
         name: "بنفسجي",
-        bg: 0x24113FFF,
-        main: 0x9B59B6FF,
-        light: 0xD8B4FEFF
+        background: "#171020",
+        panel: "#24152F",
+        main: "#A855F7",
+        light: "#E9D5FF",
+        text: "#FFFFFF"
     },
 
     "2": {
         name: "أزرق",
-        bg: 0x10243DFF,
-        main: 0x3498DBFF,
-        light: 0x93C5FDFF
+        background: "#0D1726",
+        panel: "#13253D",
+        main: "#3B82F6",
+        light: "#BFDBFE",
+        text: "#FFFFFF"
     },
 
     "3": {
         name: "أحمر",
-        bg: 0x351313FF,
-        main: 0xE74C3CFF,
-        light: 0xFCA5A5FF
+        background: "#210F12",
+        panel: "#35151A",
+        main: "#EF4444",
+        light: "#FECACA",
+        text: "#FFFFFF"
     },
 
     "4": {
         name: "أخضر",
-        bg: 0x12301FFF,
-        main: 0x2ECC71FF,
-        light: 0x86EFACFF
+        background: "#0D1D16",
+        panel: "#123326",
+        main: "#22C55E",
+        light: "#BBF7D0",
+        text: "#FFFFFF"
     },
 
     "5": {
         name: "ذهبي",
-        bg: 0x30240DFF,
-        main: 0xD4AF37FF,
-        light: 0xFDE68AFF
+        background: "#1F1809",
+        panel: "#33270D",
+        main: "#D4AF37",
+        light: "#FDE68A",
+        text: "#FFFFFF"
     },
 
     "6": {
         name: "أسود",
-        bg: 0x111111FF,
-        main: 0x777777FF,
-        light: 0xD4D4D4FF
+        background: "#101010",
+        panel: "#1C1C1C",
+        main: "#777777",
+        light: "#D4D4D4",
+        text: "#FFFFFF"
     }
 };
+
+// ============================================================
+// الجنس
+// ============================================================
 
 const GENDERS = {
     "1": "ذكر",
@@ -78,7 +118,7 @@ const GENDERS = {
 };
 
 // ============================================================
-// الملفات المؤقتة
+// مجلد الملفات المؤقتة
 // ============================================================
 
 const TEMP_DIR = path.join(
@@ -97,10 +137,9 @@ if (!fs.existsSync(TEMP_DIR)) {
 // أدوات
 // ============================================================
 
-function getReplyText(event) {
+function getText(event) {
     return String(
         event.body ||
-        event.messageReply?.body ||
         ""
     ).trim();
 }
@@ -110,14 +149,18 @@ function isSkip(text) {
         "تخطي",
         "تخطى",
         "skip",
-        "لا",
-        "-"
+        "-",
+        "لا"
     ].includes(
-        text.toLowerCase()
+        String(text).toLowerCase()
     );
 }
 
-function addReply(event, step, messageID) {
+function addReply(
+    event,
+    step,
+    messageID
+) {
 
     if (!global.client.handleReply) {
         global.client.handleReply = [];
@@ -132,43 +175,41 @@ function addReply(event, step, messageID) {
 }
 
 // ============================================================
-// الحصول على صورة المستخدم
+// حذف الملفات القديمة
 // ============================================================
 
-async function getProfileImage(api, userID) {
+function deleteFile(file) {
 
     try {
-        const info = await api.getUserInfo(
-            String(userID)
-        );
-
-        const user = info?.[String(userID)];
 
         if (
-            user?.profileUrl &&
-            typeof user.profileUrl === "string"
+            file &&
+            fs.existsSync(file)
         ) {
-            return user.profileUrl;
+            fs.unlinkSync(file);
         }
-    } catch (error) {}
 
-    return null;
+    } catch (error) {}
 }
 
 // ============================================================
 // تحميل الصورة
 // ============================================================
 
-async function downloadImage(url, filePath) {
+async function downloadImage(
+    url,
+    filePath
+) {
 
-    const response = await axios.get(
-        url,
-        {
-            responseType: "arraybuffer",
-            timeout: 30000,
-            maxRedirects: 5
-        }
-    );
+    const response =
+        await axios.get(
+            url,
+            {
+                responseType: "arraybuffer",
+                timeout: 30000,
+                maxRedirects: 5
+            }
+        );
 
     fs.writeFileSync(
         filePath,
@@ -179,257 +220,41 @@ async function downloadImage(url, filePath) {
 }
 
 // ============================================================
-// تجهيز الصورة
+// الحصول على صورة من رسالة
 // ============================================================
 
-async function prepareProfileImage(
-    imagePath,
-    outputPath
-) {
+function getAttachmentImage(event) {
 
-    const image =
-        await Jimp.read(imagePath);
+    const attachments =
+        Array.isArray(event.attachments)
+            ? event.attachments
+            : [];
 
-    const size =
-        Math.min(
-            image.bitmap.width,
-            image.bitmap.height
-        );
+    return attachments.find(
+        attachment => {
 
-    image.crop(
-        (image.bitmap.width - size) / 2,
-        (image.bitmap.height - size) / 2,
-        size,
-        size
+            if (!attachment) {
+                return false;
+            }
+
+            const type =
+                String(
+                    attachment.type || ""
+                ).toLowerCase();
+
+            return (
+                (
+                    type === "photo" ||
+                    type === "image"
+                ) &&
+                attachment.url
+            );
+        }
     );
-
-    image.resize(
-        500,
-        500
-    );
-
-    await image.writeAsync(
-        outputPath
-    );
-
-    return outputPath;
 }
 
 // ============================================================
-// إنشاء البطاقة
-// ============================================================
-
-async function createIdentityCard(data) {
-
-    const color =
-        COLORS[data.color] || COLORS["1"];
-
-    const width = 1200;
-    const height = 720;
-
-    const card =
-        new Jimp(
-            width,
-            height,
-            color.bg
-        );
-
-    const fontTitle =
-        await Jimp.loadFont(
-            Jimp.FONT_SANS_64_WHITE
-        );
-
-    const fontBig =
-        await Jimp.loadFont(
-            Jimp.FONT_SANS_32_WHITE
-        );
-
-    const fontSmall =
-        await Jimp.loadFont(
-            Jimp.FONT_SANS_24_WHITE
-        );
-
-    const fontTiny =
-        await Jimp.loadFont(
-            Jimp.FONT_SANS_16_WHITE
-        );
-
-    // ========================================================
-    // HINA
-    // ========================================================
-
-    card.print(
-        fontSmall,
-        45,
-        35,
-        "⌬ ━━ 𝗛𝗜𝗡𝗔  ━━ ⌬"
-    );
-
-    card.print(
-        fontTitle,
-        45,
-        80,
-        "IDENTITY"
-    );
-
-    // ========================================================
-    // الخط العلوي
-    // ========================================================
-
-    const header =
-        new Jimp(
-            width,
-            4,
-            color.main
-        );
-
-    card.composite(
-        header,
-        0,
-        155
-    );
-
-    // ========================================================
-    // الصورة
-    // ========================================================
-
-    const profile =
-        await Jimp.read(
-            data.profilePath
-        );
-
-    profile.resize(
-        390,
-        390
-    );
-
-    const imageFrame =
-        new Jimp(
-            410,
-            410,
-            color.main
-        );
-
-    card.composite(
-        imageFrame,
-        45,
-        190
-    );
-
-    card.composite(
-        profile,
-        55,
-        200
-    );
-
-    // ========================================================
-    // البيانات
-    // ========================================================
-
-    const infoX = 500;
-
-    card.print(
-        fontSmall,
-        infoX,
-        190,
-        "NAME"
-    );
-
-    card.print(
-        fontBig,
-        infoX,
-        225,
-        data.name
-    );
-
-    card.print(
-        fontSmall,
-        infoX,
-        295,
-        "GENDER"
-    );
-
-    card.print(
-        fontBig,
-        infoX,
-        330,
-        data.gender
-    );
-
-    card.print(
-        fontSmall,
-        infoX,
-        400,
-        "NICKNAME"
-    );
-
-    card.print(
-        fontBig,
-        infoX,
-        435,
-        data.nickname || "بدون لقب"
-    );
-
-    card.print(
-        fontSmall,
-        infoX,
-        505,
-        "USER ID"
-    );
-
-    card.print(
-        fontSmall,
-        infoX,
-        540,
-        String(data.userID)
-    );
-
-    // ========================================================
-    // أسفل البطاقة
-    // ========================================================
-
-    const bottom =
-        new Jimp(
-            width,
-            55,
-            color.main
-        );
-
-    card.composite(
-        bottom,
-        0,
-        height - 55
-    );
-
-    card.print(
-        fontTiny,
-        45,
-        height - 38,
-        `ISSUED: ${data.date}`
-    );
-
-    card.print(
-        fontTiny,
-        850,
-        height - 38,
-        data.cardID
-    );
-
-    const outputPath =
-        path.join(
-            TEMP_DIR,
-            `identity_${data.userID}_${Date.now()}.png`
-        );
-
-    await card.writeAsync(
-        outputPath
-    );
-
-    return outputPath;
-}
-
-// ============================================================
-// رقم البطاقة
+// إنشاء رقم البطاقة
 // ============================================================
 
 function generateCardID() {
@@ -444,7 +269,436 @@ function generateCardID() {
 }
 
 // ============================================================
-// الأمر
+// رسم النص العربي
+// ============================================================
+
+function drawText(
+    ctx,
+    text,
+    x,
+    y,
+    font,
+    color,
+    align = "left"
+) {
+
+    ctx.font = font;
+    ctx.fillStyle = color;
+    ctx.textAlign = align;
+    ctx.textBaseline = "middle";
+
+    ctx.fillText(
+        String(text),
+        x,
+        y
+    );
+}
+
+// ============================================================
+// قص الصورة بشكل دائري
+// ============================================================
+
+async function drawProfileImage(
+    ctx,
+    imagePath,
+    x,
+    y,
+    size,
+    radius
+) {
+
+    const image =
+        await loadImage(
+            imagePath
+        );
+
+    ctx.save();
+
+    ctx.beginPath();
+
+    ctx.roundRect(
+        x,
+        y,
+        size,
+        size,
+        radius
+    );
+
+    ctx.clip();
+
+    const imageRatio =
+        image.width /
+        image.height;
+
+    let drawWidth = size;
+    let drawHeight = size;
+
+    if (imageRatio > 1) {
+        drawHeight = size;
+        drawWidth =
+            size * imageRatio;
+    } else {
+        drawWidth = size;
+        drawHeight =
+            size / imageRatio;
+    }
+
+    const drawX =
+        x +
+        (size - drawWidth) / 2;
+
+    const drawY =
+        y +
+        (size - drawHeight) / 2;
+
+    ctx.drawImage(
+        image,
+        drawX,
+        drawY,
+        drawWidth,
+        drawHeight
+    );
+
+    ctx.restore();
+}
+
+// ============================================================
+// إنشاء بطاقة الهوية
+// ============================================================
+
+async function createIdentityCard(
+    data
+) {
+
+    const color =
+        COLORS[data.color] ||
+        COLORS["1"];
+
+    const width = 1200;
+    const height = 720;
+
+    const canvas =
+        createCanvas(
+            width,
+            height
+        );
+
+    const ctx =
+        canvas.getContext("2d");
+
+    // ========================================================
+    // الخلفية
+    // ========================================================
+
+    ctx.fillStyle =
+        color.background;
+
+    ctx.fillRect(
+        0,
+        0,
+        width,
+        height
+    );
+
+    // ========================================================
+    // زخرفة خفيفة
+    // ========================================================
+
+    ctx.globalAlpha = 0.08;
+
+    ctx.beginPath();
+
+    ctx.arc(
+        1080,
+        90,
+        180,
+        0,
+        Math.PI * 2
+    );
+
+    ctx.fillStyle =
+        color.main;
+
+    ctx.fill();
+
+    ctx.beginPath();
+
+    ctx.arc(
+        1050,
+        650,
+        220,
+        0,
+        Math.PI * 2
+    );
+
+    ctx.fill();
+
+    ctx.globalAlpha = 1;
+
+    // ========================================================
+    // شريط HINA
+    // ========================================================
+
+    ctx.fillStyle =
+        color.panel;
+
+    ctx.beginPath();
+
+    ctx.roundRect(
+        30,
+        25,
+        width - 60,
+        105,
+        22
+    );
+
+    ctx.fill();
+
+    ctx.fillStyle =
+        color.main;
+
+    ctx.fillRect(
+        30,
+        25,
+        8,
+        105
+    );
+
+    drawText(
+        ctx,
+        "⌬ ━━ 𝗛𝗜𝗡𝗔  ━━ ⌬",
+        65,
+        62,
+        "bold 30px Arial",
+        color.light
+    );
+
+    drawText(
+        ctx,
+        "بطاقة الهوية",
+        65,
+        103,
+        "bold 24px Arial",
+        color.text
+    );
+
+    // ========================================================
+    // البطاقة الداخلية
+    // ========================================================
+
+    ctx.fillStyle =
+        color.panel;
+
+    ctx.beginPath();
+
+    ctx.roundRect(
+        30,
+        155,
+        width - 60,
+        500,
+        25
+    );
+
+    ctx.fill();
+
+    // ========================================================
+    // إطار الصورة
+    // ========================================================
+
+    ctx.strokeStyle =
+        color.main;
+
+    ctx.lineWidth = 5;
+
+    ctx.beginPath();
+
+    ctx.roundRect(
+        65,
+        195,
+        330,
+        330,
+        22
+    );
+
+    ctx.stroke();
+
+    await drawProfileImage(
+        ctx,
+        data.profilePath,
+        75,
+        205,
+        310,
+        15
+    );
+
+    // ========================================================
+    // بيانات المستخدم
+    // ========================================================
+
+    const x = 455;
+
+    drawText(
+        ctx,
+        "الاسم",
+        x,
+        205,
+        "bold 21px Arial",
+        color.light
+    );
+
+    drawText(
+        ctx,
+        data.name,
+        x,
+        245,
+        "bold 34px Arial",
+        color.text
+    );
+
+    drawText(
+        ctx,
+        "الجنس",
+        x,
+        310,
+        "bold 21px Arial",
+        color.light
+    );
+
+    drawText(
+        ctx,
+        data.gender,
+        x,
+        345,
+        "bold 28px Arial",
+        color.text
+    );
+
+    drawText(
+        ctx,
+        "اللقب",
+        x,
+        405,
+        "bold 21px Arial",
+        color.light
+    );
+
+    drawText(
+        ctx,
+        data.nickname || "بدون لقب",
+        x,
+        440,
+        "bold 28px Arial",
+        color.text
+    );
+
+    // ========================================================
+    // UID
+    // ========================================================
+
+    drawText(
+        ctx,
+        "UID",
+        x,
+        500,
+        "bold 18px Arial",
+        color.light
+    );
+
+    drawText(
+        ctx,
+        String(data.userID),
+        x,
+        532,
+        "22px Arial",
+        color.text
+    );
+
+    // ========================================================
+    // معلومات البطاقة
+    // ========================================================
+
+    ctx.fillStyle =
+        color.background;
+
+    ctx.beginPath();
+
+    ctx.roundRect(
+        65,
+        555,
+        width - 130,
+        70,
+        15
+    );
+
+    ctx.fill();
+
+    drawText(
+        ctx,
+        `اللون: ${color.name}`,
+        90,
+        590,
+        "20px Arial",
+        color.light
+    );
+
+    drawText(
+        ctx,
+        `رقم البطاقة: ${data.cardID}`,
+        390,
+        590,
+        "20px Arial",
+        color.light
+    );
+
+    drawText(
+        ctx,
+        data.date,
+        1080,
+        590,
+        "20px Arial",
+        color.light,
+        "right"
+    );
+
+    // ========================================================
+    // الخط السفلي
+    // ========================================================
+
+    ctx.fillStyle =
+        color.main;
+
+    ctx.fillRect(
+        30,
+        680,
+        width - 60,
+        5
+    );
+
+    // ========================================================
+    // حفظ الصورة
+    // ========================================================
+
+    const outputPath =
+        path.join(
+            TEMP_DIR,
+            `identity_${data.userID}_${Date.now()}.png`
+        );
+
+    const buffer =
+        canvas.toBuffer(
+            "image/png"
+        );
+
+    fs.writeFileSync(
+        outputPath,
+        buffer
+    );
+
+    return outputPath;
+}
+
+// ============================================================
+// الأمر الرئيسي
 // ============================================================
 
 module.exports.run = async function ({
@@ -455,14 +709,12 @@ module.exports.run = async function ({
     const userID =
         String(event.senderID);
 
-    const session = {
-        userID,
-        step: "photo"
-    };
-
     sessions.set(
         userID,
-        session
+        {
+            userID,
+            step: "photo"
+        }
     );
 
     const message =
@@ -470,7 +722,8 @@ module.exports.run = async function ({
 
 بطاقة الهوية
 
-سنقوم بإنشاء بطاقة هويتك خطوة بخطوة.
+سنقوم بإنشاء بطاقة هويتك
+خطوة بخطوة.
 
 الخطوة 1 من 5
 
@@ -491,7 +744,7 @@ module.exports.run = async function ({
 };
 
 // ============================================================
-// الردود
+// نظام الرد
 // ============================================================
 
 module.exports.handleReply = async function ({
@@ -502,6 +755,10 @@ module.exports.handleReply = async function ({
 
     const userID =
         String(event.senderID);
+
+    // ========================================================
+    // حماية الجلسة
+    // ========================================================
 
     if (
         String(handleReply.author) !==
@@ -517,29 +774,21 @@ module.exports.handleReply = async function ({
         return;
     }
 
-    const step =
-        handleReply.step;
-
     // ========================================================
     // الصورة
     // ========================================================
 
-    if (step === "photo") {
+    if (
+        handleReply.step === "photo"
+    ) {
 
-        const attachments =
-            event.attachments || [];
+        const attachment =
+            getAttachmentImage(event);
 
-        const image =
-            attachments.find(
-                item =>
-                    item.type === "photo" &&
-                    item.url
-            );
-
-        if (!image) {
+        if (!attachment) {
 
             return api.sendMessage(
-                `${HINA_HEADER}
+`${HINA_HEADER}
 
 أرسل صورة أولاً.`,
                 event.threadID
@@ -551,27 +800,16 @@ module.exports.handleReply = async function ({
             const rawPath =
                 path.join(
                     TEMP_DIR,
-                    `raw_${userID}_${Date.now()}.jpg`
-                );
-
-            const profilePath =
-                path.join(
-                    TEMP_DIR,
-                    `profile_${userID}_${Date.now()}.jpg`
+                    `raw_${userID}_${Date.now()}`
                 );
 
             await downloadImage(
-                image.url,
+                attachment.url,
                 rawPath
             );
 
-            await prepareProfileImage(
-                rawPath,
-                profilePath
-            );
-
             session.profilePath =
-                profilePath;
+                rawPath;
 
             session.step =
                 "name";
@@ -603,15 +841,16 @@ module.exports.handleReply = async function ({
         } catch (error) {
 
             console.error(
-                "IDENTITY PHOTO ERROR:",
+                "❌ IDENTITY IMAGE ERROR:",
                 error
             );
 
             return api.sendMessage(
-                `${HINA_HEADER}
+`${HINA_HEADER}
 
-حدث خطأ أثناء معالجة الصورة.
-حاول إرسال صورة أخرى.`,
+حدث خطأ أثناء قراءة الصورة.
+
+${error?.message || error}`,
                 event.threadID
             );
         }
@@ -623,18 +862,20 @@ module.exports.handleReply = async function ({
     // الاسم
     // ========================================================
 
-    if (step === "name") {
+    if (
+        handleReply.step === "name"
+    ) {
 
         const name =
-            getReplyText(event);
+            getText(event);
 
         if (!name) {
 
             return api.sendMessage(
-                `${HINA_HEADER}
+`${HINA_HEADER}
 
-اكتب الاسم الذي تريد وضعه
-في الهوية.`,
+اكتب الاسم الذي تريد ظهوره
+في بطاقة الهوية.`,
                 event.threadID
             );
         }
@@ -668,8 +909,8 @@ module.exports.handleReply = async function ({
 6. أسود
 
 أرسل رقم اللون فقط.`,
-            event.threadID
-        );
+                event.threadID
+            );
 
         addReply(
             event,
@@ -684,10 +925,12 @@ module.exports.handleReply = async function ({
     // اللون
     // ========================================================
 
-    if (step === "color") {
+    if (
+        handleReply.step === "color"
+    ) {
 
         const choice =
-            getReplyText(event);
+            getText(event);
 
         if (!COLORS[choice]) {
 
@@ -743,10 +986,12 @@ ${COLORS[choice].name}
     // الجنس
     // ========================================================
 
-    if (step === "gender") {
+    if (
+        handleReply.step === "gender"
+    ) {
 
         const choice =
-            getReplyText(event);
+            getText(event);
 
         if (!GENDERS[choice]) {
 
@@ -775,7 +1020,8 @@ ${COLORS[choice].name}
             await api.sendMessage(
 `${HINA_HEADER}
 
-تم تسجيل الجنس: ${session.gender}
+تم تسجيل الجنس:
+${session.gender}
 
 الخطوة 5 من 5
 
@@ -797,18 +1043,23 @@ ${COLORS[choice].name}
     }
 
     // ========================================================
-    // اللقب
+    // اللقب وإنشاء البطاقة
     // ========================================================
 
-    if (step === "nickname") {
+    if (
+        handleReply.step === "nickname"
+    ) {
 
-        const text =
-            getReplyText(event);
+        const nickname =
+            getText(event);
 
         session.nickname =
-            isSkip(text)
+            isSkip(nickname)
                 ? ""
-                : text.substring(0, 35);
+                : nickname.substring(
+                    0,
+                    35
+                );
 
         sessions.delete(
             userID
@@ -819,7 +1070,7 @@ ${COLORS[choice].name}
             await api.sendMessage(
 `${HINA_HEADER}
 
-جاري تجهيز بطاقة هويتك...`,
+جاري إنشاء بطاقة الهوية...`,
                 event.threadID
             );
 
@@ -829,12 +1080,7 @@ ${COLORS[choice].name}
             const date =
                 new Date()
                     .toLocaleDateString(
-                        "fr-FR",
-                        {
-                            year: "numeric",
-                            month: "2-digit",
-                            day: "2-digit"
-                        }
+                        "ar-TN"
                     );
 
             const cardPath =
@@ -849,9 +1095,10 @@ ${COLORS[choice].name}
                     body:
 `${HINA_HEADER}
 
-تم إصدار بطاقة هويتك بنجاح.
+تم إنشاء بطاقة هويتك بنجاح.
 
-رقم البطاقة: ${cardID}`,
+رقم البطاقة:
+${cardID}`,
                     attachment:
                         fs.createReadStream(
                             cardPath
@@ -860,46 +1107,41 @@ ${COLORS[choice].name}
                 event.threadID
             );
 
-            setTimeout(() => {
+            // حذف الصورة بعد الإرسال
+            setTimeout(
+                () => {
+                    deleteFile(
+                        cardPath
+                    );
 
-                try {
-
-                    if (
-                        fs.existsSync(
-                            cardPath
-                        )
-                    ) {
-                        fs.unlinkSync(
-                            cardPath
-                        );
-                    }
-
-                    if (
-                        session.profilePath &&
-                        fs.existsSync(
-                            session.profilePath
-                        )
-                    ) {
-                        fs.unlinkSync(
-                            session.profilePath
-                        );
-                    }
-
-                } catch (error) {}
-
-            }, 30000);
+                    deleteFile(
+                        session.profilePath
+                    );
+                },
+                30000
+            );
 
         } catch (error) {
 
             console.error(
-                "IDENTITY CARD ERROR:",
+                "❌ IDENTITY CARD ERROR:"
+            );
+
+            console.error(
                 error
+            );
+
+            console.error(
+                error?.stack
             );
 
             await api.sendMessage(
 `${HINA_HEADER}
 
-حدث خطأ أثناء إنشاء بطاقة الهوية.`,
+حدث خطأ أثناء إنشاء بطاقة الهوية.
+
+الخطأ:
+${error?.message || error}`,
                 event.threadID
             );
         }
